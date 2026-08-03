@@ -1,0 +1,469 @@
+import React, { useState, useMemo } from 'react';
+import { Heart, MessageCircle, Share2, Bookmark, LayoutGrid, Wallet, CalendarCheck, Search, Plus, Minus, Sparkles, X, Star, MapPin, Compass, ArrowLeft } from 'lucide-react';
+
+const THEME = {
+  ink: '#15121C',
+  inkLine: 'rgba(255,255,255,0.10)',
+  paper: '#FBF6EE',
+  paperLine: '#E9E1D2',
+  coral: '#FF3B5C',
+  violet: '#6C4CFC',
+  violetSoft: '#EFEAFF',
+  gold: '#F5A623',
+  textDark: '#F8F4EC',
+  textLight: '#1C1A22',
+  muted: '#93899A',
+  mutedDark: '#B7AFC3',
+};
+
+const CATEGORY_META = {
+  'Home Services': { grad: ['#2B4C5C', '#0F2027'], icon: '🧽' },
+  'Beauty': { grad: ['#7A2E52', '#2E1024'], icon: '💄' },
+  'Parties': { grad: ['#5A2E7A', '#1E1030'], icon: '🎉' },
+  'Restaurants': { grad: ['#6B4A1E', '#241706'], icon: '🍽' },
+};
+
+const FEED = [
+  { id: 'f1', category: 'Home Services', name: 'Sparkle Squad Cleaning', location: 'Denver, CO', rating: 4.8, price: 120, likes: '1.3K', comments: 42, blurb: 'Deep clean, move-in/move-out, eco-friendly products.' },
+  { id: 'f2', category: 'Home Services', name: 'Fresh Start Cleaners', location: 'Miami, FL', rating: 4.9, price: 90, likes: '892', comments: 18, blurb: 'Residential and post-construction cleaning.' },
+  { id: 'f3', category: 'Beauty', name: 'Glow by Mia', location: 'Austin, TX', rating: 4.7, price: 150, likes: '2.1K', comments: 76, blurb: 'Balayage and color correction specialist.' },
+  { id: 'f4', category: 'Beauty', name: 'Kiana Frost MUA', location: 'Brooklyn, NY', rating: 5.0, price: 220, likes: '3.4K', comments: 130, blurb: 'Bridal and editorial makeup artistry.' },
+  { id: 'f5', category: 'Parties', name: 'Belle Noir Events', location: 'Chicago, IL', rating: 4.6, price: 400, likes: '640', comments: 24, blurb: 'Full-service party planning and styling.' },
+  { id: 'f6', category: 'Restaurants', name: "Camille's Table", location: 'New Orleans, LA', rating: 4.9, price: 85, likes: '1.8K', comments: 58, blurb: "Chef's tasting menu, seasonal ingredients." },
+];
+
+const CATEGORIES = [
+  { id: 'shorts', label: 'All shorts', count: 31, icon: Compass },
+  { id: 'beauty', label: 'Beauty', count: 14, icon: Sparkles },
+  { id: 'parties', label: 'Parties', count: 9, icon: Star },
+  { id: 'educational', label: 'Educational', count: 5, icon: LayoutGrid },
+  { id: 'restaurants', label: 'Restaurants', count: 7, icon: MapPin },
+  { id: 'home', label: 'Home services', count: 11, icon: Wallet },
+];
+
+const PROVIDERS_BY_CAT = {
+  beauty: [
+    { id: 'p1', initials: 'AC', name: 'Ariana Cruz', price: 120, color: THEME.coral },
+    { id: 'p2', initials: 'GB', name: 'Glow by Mia', price: 150, color: '#8FBF3F' },
+    { id: 'p3', initials: 'BN', name: 'Belle Noir Beauty', price: 140, color: THEME.gold },
+    { id: 'p4', initials: 'CR', name: 'Camille Rae', price: 95, color: THEME.violet },
+    { id: 'p5', initials: 'SB', name: 'Studio Blush', price: 110, color: '#3FA6BF' },
+    { id: 'p6', initials: 'KF', name: 'Kiana Frost MUA', price: 220, color: '#BF6B3F' },
+  ],
+  home: [
+    { id: 'p7', initials: 'SS', name: 'Sparkle Squad Cleaning', price: 120, color: '#3F6FBF' },
+    { id: 'p8', initials: 'FS', name: 'Fresh Start Cleaners', price: 90, color: '#3FBF8A' },
+  ],
+  parties: [{ id: 'p9', initials: 'BN', name: 'Belle Noir Events', price: 400, color: THEME.coral }],
+  restaurants: [{ id: 'p10', initials: 'CT', name: "Camille's Table", price: 85, color: THEME.gold }],
+  educational: [{ id: 'p11', initials: 'TT', name: 'Tempo Tutors', price: 60, color: THEME.violet }],
+  shorts: [],
+};
+
+const TIME_SLOTS = ['9:00 AM', '10:30 AM', '12:00 PM', '1:30 PM', '3:00 PM', '4:30 PM', '6:00 PM', '7:30 PM'];
+
+function nextDays(n) {
+  const out = [];
+  const base = new Date();
+  for (let i = 0; i < n; i++) {
+    const d = new Date(base);
+    d.setDate(base.getDate() + i);
+    out.push(d);
+  }
+  return out;
+}
+
+function money(n) {
+  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+}
+
+export default function App() {
+  const [tab, setTab] = useState('discover');
+  const [activeCat, setActiveCat] = useState(null);
+  const [bookingTarget, setBookingTarget] = useState(null);
+  const [bookings, setBookings] = useState([
+    { id: 'b0', name: 'Fresh Start Cleaners', date: 'Aug 6', time: '10:30 AM', total: 97.2, status: 'upcoming' },
+  ]);
+  const [balance, setBalance] = useState(120.4);
+  const [monthlyBudget, setMonthlyBudget] = useState(2000);
+  const [preferredTime, setPreferredTime] = useState('Any time');
+  const [allocations, setAllocations] = useState({ Barber: 0, Beauty: 0, 'Home cleaning': 0 });
+  const [toast, setToast] = useState(null);
+
+  const days = useMemo(() => nextDays(7), []);
+  const [selDate, setSelDate] = useState(0);
+  const [selTime, setSelTime] = useState(null);
+
+  const spent = Object.values(allocations).reduce((a, b) => a + b, 0);
+  const ringPct = monthlyBudget > 0 ? Math.min(100, Math.round((spent / monthlyBudget) * 100)) : 0;
+
+  function flashToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2600);
+  }
+
+  function openBooking(item) {
+    setSelDate(0);
+    setSelTime(null);
+    setBookingTarget(item);
+  }
+
+  function confirmBooking() {
+    if (selTime == null) return;
+    const price = bookingTarget.price;
+    const tax = Math.round(price * 0.08 * 100) / 100;
+    const total = Math.round((price + tax) * 100) / 100;
+    const d = days[selDate];
+    const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    setBookings((prev) => [{ id: 'b' + Date.now(), name: bookingTarget.name, date: label, time: TIME_SLOTS[selTime], total, status: 'upcoming' }, ...prev]);
+    setBalance((b) => Math.max(0, b - total));
+    setBookingTarget(null);
+    flashToast(`Booked ${bookingTarget.name} on ${label} at ${TIME_SLOTS[selTime]} · ${money(total)} total`);
+  }
+
+  function suggestPlan() {
+    setAllocations({ Barber: Math.round(monthlyBudget * 0.15), Beauty: Math.round(monthlyBudget * 0.35), 'Home cleaning': Math.round(monthlyBudget * 0.2) });
+    flashToast('Plan suggested based on your booking history');
+  }
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        maxWidth: 480,
+        margin: '0 auto',
+        height: '100dvh',
+        position: 'relative',
+        overflow: 'hidden',
+        background: THEME.paper,
+        fontFamily: 'Inter, sans-serif',
+        boxShadow: '0 0 40px rgba(0,0,0,0.08)',
+      }}
+    >
+      {/* ===== DISCOVER TAB ===== */}
+      {tab === 'discover' && (
+        <div className="avio-scroll" style={{ height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' }}>
+          {FEED.map((item) => {
+            const meta = CATEGORY_META[item.category];
+            return (
+              <div
+                key={item.id}
+                style={{ height: '100dvh', scrollSnapAlign: 'start', position: 'relative', background: `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})` }}
+              >
+                <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 16, zIndex: 2 }}>
+                  <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textDark, letterSpacing: 0.5 }}>AVIO</p>
+                  <p style={{ fontSize: 9, color: THEME.mutedDark, letterSpacing: 1.5, marginTop: -2 }}>ALL-IN-ONE BOOKING</p>
+                </div>
+
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 84, opacity: 0.9 }}>
+                  {meta.icon}
+                </div>
+
+                <div style={{ position: 'absolute', right: 12, bottom: 'calc(env(safe-area-inset-bottom) + 214px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, zIndex: 2 }}>
+                  <button className="flex flex-col items-center" style={{ color: THEME.textDark }}>
+                    <Heart size={26} fill={THEME.coral} color={THEME.coral} />
+                    <span style={{ fontSize: 11, marginTop: 2 }}>{item.likes}</span>
+                  </button>
+                  <button className="flex flex-col items-center" style={{ color: THEME.textDark }}>
+                    <MessageCircle size={24} />
+                    <span style={{ fontSize: 11, marginTop: 2 }}>{item.comments}</span>
+                  </button>
+                  <button style={{ color: THEME.textDark }}>
+                    <Share2 size={23} />
+                  </button>
+                  <button style={{ color: THEME.textDark }}>
+                    <Bookmark size={23} />
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    padding: `16px 16px calc(env(safe-area-inset-bottom) + 100px)`,
+                    background: 'linear-gradient(0deg, rgba(0,0,0,0.75), rgba(0,0,0,0))',
+                  }}
+                >
+                  <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 5, background: THEME.violetSoft, color: THEME.violet, marginBottom: 8 }}>
+                    {item.category.toUpperCase()}
+                  </span>
+                  <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: THEME.textDark }}>{item.name}</p>
+                  <div className="flex items-center gap-1" style={{ marginTop: 3 }}>
+                    <Star size={12} fill={THEME.gold} color={THEME.gold} />
+                    <span style={{ fontSize: 12, color: THEME.mutedDark }}>{item.rating} · {item.location}</span>
+                  </div>
+                  <p style={{ fontSize: 12, color: THEME.mutedDark, marginTop: 4, maxWidth: 320 }}>{item.blurb}</p>
+                  <button
+                    onClick={() => openBooking(item)}
+                    style={{ marginTop: 12, background: THEME.coral, color: '#fff', fontWeight: 600, fontSize: 13, padding: '9px 16px', borderRadius: 20 }}
+                  >
+                    Book now · {money(item.price)}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ===== BROWSE TAB ===== */}
+      {tab === 'browse' && (
+        <div style={{ height: '100%', overflowY: 'auto', background: THEME.paper, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` }}>
+          {!activeCat ? (
+            <>
+              <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textLight }}>Browse categories</p>
+              <div className="flex items-center gap-2 mt-4 px-3" style={{ background: '#fff', border: `1px solid ${THEME.paperLine}`, borderRadius: 12, height: 38 }}>
+                <Search size={15} color={THEME.muted} />
+                <span style={{ fontSize: 13, color: THEME.muted }}>Search artist profiles</span>
+              </div>
+              <p style={{ fontSize: 11, color: THEME.muted, marginTop: 18, marginBottom: 8, letterSpacing: 0.5 }}>CHOOSE A CATEGORY</p>
+              <div className="grid grid-cols-2 gap-3">
+                {CATEGORIES.map((c) => {
+                  const Icon = c.icon;
+                  const wide = c.id === 'shorts';
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => setActiveCat(c.id)}
+                      className={wide ? 'col-span-2' : ''}
+                      style={{ background: '#fff', border: `1px solid ${THEME.paperLine}`, borderRadius: 14, padding: '14px 16px', textAlign: 'left' }}
+                    >
+                      <Icon size={18} color={THEME.violet} />
+                      <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: THEME.textLight, marginTop: 8 }}>{c.label}</p>
+                      <p style={{ fontSize: 11, color: THEME.muted }}>{c.count} profiles</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <>
+              <button onClick={() => setActiveCat(null)} className="flex items-center gap-1" style={{ color: THEME.textLight, fontSize: 13, marginBottom: 14 }}>
+                <ArrowLeft size={16} /> {CATEGORIES.find((c) => c.id === activeCat)?.label}
+              </button>
+              <div className="grid grid-cols-3 gap-3">
+                {(PROVIDERS_BY_CAT[activeCat] || []).map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => openBooking({ id: p.id, name: p.name, price: p.price, category: CATEGORIES.find((c) => c.id === activeCat)?.label || 'Home Services' })}
+                    style={{ background: p.color, borderRadius: 12, aspectRatio: '1', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: 8, color: '#fff', textAlign: 'left' }}
+                  >
+                    <span style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15 }}>{p.initials}</span>
+                    <span style={{ fontSize: 9, lineHeight: 1.2, marginTop: 2 }}>{p.name}</span>
+                    <span style={{ fontSize: 9, opacity: 0.85 }}>{money(p.price)}</span>
+                  </button>
+                ))}
+                {(PROVIDERS_BY_CAT[activeCat] || []).length === 0 && (
+                  <p style={{ fontSize: 12, color: THEME.muted, gridColumn: 'span 3' }}>No profiles in this category yet.</p>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ===== BUDGET TAB ===== */}
+      {tab === 'budget' && (
+        <div style={{ height: '100%', overflowY: 'auto', background: THEME.paper, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` }}>
+          <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textLight }}>My wallet</p>
+
+          <div style={{ marginTop: 14, background: THEME.violet, borderRadius: 16, padding: 18 }}>
+            <p style={{ fontSize: 11, color: '#DCD4FF', letterSpacing: 0.5 }}>AVAILABLE BALANCE</p>
+            <p style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, fontSize: 28, color: '#fff', marginTop: 4 }}>{money(balance)}</p>
+            <button
+              onClick={() => {
+                setBalance((b) => b + 100);
+                flashToast('Added $100.00 to your balance');
+              }}
+              style={{ marginTop: 12, background: THEME.coral, color: '#fff', fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 18 }}
+            >
+              + Add funds
+            </button>
+          </div>
+
+          <div className="flex items-center gap-4 mt-5">
+            <div style={{ width: 74, height: 74, borderRadius: '50%', background: `conic-gradient(${THEME.coral} ${ringPct * 3.6}deg, ${THEME.paperLine} 0deg)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, fontSize: 14, color: THEME.textLight }}>{ringPct}%</span>
+              </div>
+            </div>
+            <div>
+              <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: THEME.textLight }}>Monthly plan</p>
+              <p style={{ fontSize: 11, color: THEME.muted, marginTop: 2 }}>{money(spent)} allocated of {money(monthlyBudget)}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between mt-5">
+            <span style={{ fontSize: 13, color: THEME.textLight, fontWeight: 500 }}>Monthly budget</span>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: THEME.textLight }}>${monthlyBudget}</span>
+          </div>
+          <input type="range" min="200" max="5000" step="50" value={monthlyBudget} onChange={(e) => setMonthlyBudget(Number(e.target.value))} className="w-full mt-2" />
+
+          <p style={{ fontSize: 11, color: THEME.muted, marginTop: 16, marginBottom: 6 }}>PREFERRED TIME TO BOOK</p>
+          <div className="flex gap-2 flex-wrap">
+            {['Any time', 'Morning', 'Afternoon', 'Evening'].map((t) => (
+              <button
+                key={t}
+                onClick={() => setPreferredTime(t)}
+                style={{ fontSize: 11, padding: '6px 12px', borderRadius: 16, border: `1px solid ${preferredTime === t ? THEME.violet : THEME.paperLine}`, background: preferredTime === t ? THEME.violetSoft : '#fff', color: preferredTime === t ? THEME.violet : THEME.textLight }}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+
+          <button onClick={suggestPlan} className="flex items-center justify-center gap-2" style={{ marginTop: 16, width: '100%', background: THEME.coral, color: '#fff', fontWeight: 600, fontSize: 13, padding: '11px 0', borderRadius: 22 }}>
+            <Sparkles size={14} /> AI suggest my plan
+          </button>
+
+          <p style={{ fontSize: 11, color: THEME.muted, marginTop: 18, marginBottom: 8 }}>ALLOCATE BY CATEGORY</p>
+          {Object.keys(allocations).map((cat) => (
+            <div key={cat} className="flex items-center justify-between" style={{ padding: '9px 0', borderBottom: `1px solid ${THEME.paperLine}` }}>
+              <span style={{ fontSize: 13, color: THEME.textLight }}>{cat}</span>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setAllocations((a) => ({ ...a, [cat]: Math.max(0, a[cat] - 25) }))} style={{ width: 22, height: 22, borderRadius: '50%', border: `1px solid ${THEME.paperLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Minus size={12} />
+                </button>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, width: 44, textAlign: 'center' }}>${allocations[cat]}</span>
+                <button onClick={() => setAllocations((a) => ({ ...a, [cat]: a[cat] + 25 }))} style={{ width: 22, height: 22, borderRadius: '50%', border: `1px solid ${THEME.paperLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Plus size={12} />
+                </button>
+              </div>
+            </div>
+          ))}
+          <div className="flex items-center justify-between mt-3">
+            <span style={{ fontSize: 12, color: THEME.muted }}>Remaining</span>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: THEME.textLight }}>{money(Math.max(0, monthlyBudget - spent))}</span>
+          </div>
+        </div>
+      )}
+
+      {/* ===== BOOKINGS TAB ===== */}
+      {tab === 'bookings' && (
+        <div style={{ height: '100%', overflowY: 'auto', background: THEME.paper, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` }}>
+          <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textLight }}>Your bookings</p>
+          {bookings.length === 0 && <p style={{ fontSize: 13, color: THEME.muted, marginTop: 16 }}>No bookings yet. Find something on Discover.</p>}
+          <div className="flex flex-col gap-3 mt-4">
+            {bookings.map((b) => (
+              <div key={b.id} style={{ background: '#fff', border: `1px solid ${THEME.paperLine}`, borderRadius: 14, padding: 14 }}>
+                <div className="flex items-center justify-between">
+                  <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: THEME.textLight }}>{b.name}</p>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: THEME.violet, background: THEME.violetSoft, padding: '3px 8px', borderRadius: 10 }}>{b.status}</span>
+                </div>
+                <div className="flex items-center gap-1 mt-2">
+                  <CalendarCheck size={13} color={THEME.muted} />
+                  <span style={{ fontSize: 12, color: THEME.muted }}>{b.date} at {b.time}</span>
+                </div>
+                <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: THEME.textLight, marginTop: 6 }}>{money(b.total)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* bottom nav */}
+      <div
+        className="flex items-center justify-around"
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: `calc(env(safe-area-inset-bottom) + 64px)`,
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          background: tab === 'discover' ? 'rgba(21,18,28,0.92)' : '#fff',
+          borderTop: `1px solid ${tab === 'discover' ? THEME.inkLine : THEME.paperLine}`,
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        {[
+          { id: 'discover', icon: Compass, label: 'Discover' },
+          { id: 'browse', icon: LayoutGrid, label: 'Browse' },
+          { id: 'bookings', icon: CalendarCheck, label: 'Bookings' },
+          { id: 'budget', icon: Wallet, label: 'Budget' },
+        ].map((t) => {
+          const Icon = t.icon;
+          const active = tab === t.id;
+          const onDark = tab === 'discover';
+          const activeColor = onDark ? '#fff' : THEME.coral;
+          const idleColor = onDark ? THEME.mutedDark : THEME.muted;
+          return (
+            <button key={t.id} onClick={() => { setTab(t.id); setActiveCat(null); }} className="flex flex-col items-center gap-1">
+              <Icon size={19} color={active ? activeColor : idleColor} fill={active && t.id === 'discover' ? activeColor : 'none'} />
+              <span style={{ fontSize: 9, color: active ? activeColor : idleColor, fontWeight: active ? 600 : 400 }}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* booking modal */}
+      {bookingTarget && (
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 }}>
+          <div style={{ width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '88%', overflowY: 'auto' }}>
+            <div className="flex items-center justify-between">
+              <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: THEME.textLight }}>{bookingTarget.name}</p>
+              <button onClick={() => setBookingTarget(null)}><X size={18} color={THEME.muted} /></button>
+            </div>
+            <p style={{ fontSize: 12, color: THEME.muted, marginTop: 2 }}>{bookingTarget.category}</p>
+
+            <p style={{ fontSize: 11, color: THEME.muted, marginTop: 16, marginBottom: 8, letterSpacing: 0.5 }}>CHOOSE A DATE</p>
+            <div className="flex gap-2 avio-scroll" style={{ overflowX: 'auto' }}>
+              {days.map((d, i) => {
+                const active = i === selDate;
+                return (
+                  <button key={i} onClick={() => setSelDate(i)} style={{ minWidth: 44, padding: '8px 0', borderRadius: 10, background: active ? THEME.coral : THEME.paper, color: active ? '#fff' : THEME.textLight, textAlign: 'center', flexShrink: 0 }}>
+                    <div style={{ fontSize: 10 }}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{d.getDate()}</div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <p style={{ fontSize: 11, color: THEME.muted, marginTop: 16, marginBottom: 8, letterSpacing: 0.5 }}>CHOOSE A TIME</p>
+            <div className="grid grid-cols-3 gap-2">
+              {TIME_SLOTS.map((t, i) => {
+                const active = i === selTime;
+                return (
+                  <button key={t} onClick={() => setSelTime(i)} style={{ padding: '8px 0', borderRadius: 10, fontSize: 12, border: `1px solid ${active ? THEME.coral : THEME.paperLine}`, background: active ? THEME.coral : '#fff', color: active ? '#fff' : THEME.textLight }}>
+                    {t}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ marginTop: 18, borderTop: `1px solid ${THEME.paperLine}`, paddingTop: 12 }}>
+              <div className="flex items-center justify-between">
+                <span style={{ fontSize: 12, color: THEME.muted }}>Service price</span>
+                <span style={{ fontSize: 12, color: THEME.textLight }}>{money(bookingTarget.price)}</span>
+              </div>
+              <div className="flex items-center justify-between mt-1">
+                <span style={{ fontSize: 12, color: THEME.muted }}>Tax (8%)</span>
+                <span style={{ fontSize: 12, color: THEME.textLight }}>{money(Math.round(bookingTarget.price * 0.08 * 100) / 100)}</span>
+              </div>
+              <div className="flex items-center justify-between mt-2" style={{ paddingTop: 8, borderTop: `1px solid ${THEME.paperLine}` }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: THEME.textLight }}>Total</span>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 15, fontWeight: 600, color: THEME.textLight }}>{money(Math.round(bookingTarget.price * 1.08 * 100) / 100)}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-4">
+              <button onClick={() => setBookingTarget(null)} style={{ flex: 1, padding: '11px 0', borderRadius: 24, border: `1px solid ${THEME.paperLine}`, color: THEME.textLight, fontSize: 13, fontWeight: 500 }}>Cancel</button>
+              <button onClick={confirmBooking} disabled={selTime == null} style={{ flex: 2, padding: '11px 0', borderRadius: 24, background: selTime == null ? THEME.paperLine : THEME.coral, color: selTime == null ? THEME.muted : '#fff', fontSize: 13, fontWeight: 600 }}>
+                Confirm and pay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* toast */}
+      {toast && (
+        <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.textLight, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.25)' }}>
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
