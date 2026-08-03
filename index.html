@@ -13,7 +13,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body, #root { height: 100%; margin: 0; overscroll-behavior: none; background: #15121C; }
@@ -21,370 +20,317 @@
   .avio-scroll::-webkit-scrollbar { display: none; }
   .avio-scroll { -ms-overflow-style: none; scrollbar-width: none; }
   button { font-family: inherit; cursor: pointer; border: none; background: none; }
+  #fallback { display:none; color:#F8F4EC; font-family: sans-serif; padding: 24px; text-align:center; }
 </style>
 </head>
 <body>
 <div id="root"></div>
-
-<script type="text/babel" data-presets="react">
-
+<div id="fallback">Loading AVIO…</div>
+<script>
+  window.addEventListener("error", function(e){
+    var f = document.getElementById("fallback");
+    if (f) { f.style.display = "block"; f.textContent = "Error: " + e.message; }
+  });
+</script>
+<script>
+"use strict";
 const { useState, useMemo } = React;
-
 const THEME = {
-  ink: '#15121C', inkLine: 'rgba(255,255,255,0.10)',
-  paper: '#FBF6EE', paperLine: '#E9E1D2',
-  coral: '#FF3B5C', violet: '#6C4CFC', violetSoft: '#EFEAFF',
-  gold: '#F5A623', textDark: '#F8F4EC', textLight: '#1C1A22',
-  muted: '#93899A', mutedDark: '#B7AFC3',
+    ink: '#15121C', inkLine: 'rgba(255,255,255,0.10)',
+    paper: '#FBF6EE', paperLine: '#E9E1D2',
+    coral: '#FF3B5C', violet: '#6C4CFC', violetSoft: '#EFEAFF',
+    gold: '#F5A623', textDark: '#F8F4EC', textLight: '#1C1A22',
+    muted: '#93899A', mutedDark: '#B7AFC3',
 };
-
 function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
-  const common = { width: size, height: size, viewBox: '0 0 24 24', fill, stroke: color, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' };
-  const paths = {
-    heart: <path d="M12 21s-6.7-4.3-9.2-8.4C1 9.7 2.3 6 6 6c2 0 3.6 1.2 6 4 2.4-2.8 4-4 6-4 3.7 0 5 3.7 3.2 6.6C18.7 16.7 12 21 12 21z" />,
-    message: <><rect x="3" y="5" width="18" height="12" rx="4" /><path d="M8 21l3-4h2l3 4" /></>,
-    share: <><circle cx="18" cy="5" r="2.4" /><circle cx="6" cy="12" r="2.4" /><circle cx="18" cy="19" r="2.4" /><path d="M8.2 10.7l7.6-4.4M8.2 13.3l7.6 4.4" /></>,
-    bookmark: <path d="M6 3h12v18l-6-4-6 4V3z" />,
-    grid: <><rect x="3" y="3" width="8" height="8" rx="1.5" /><rect x="13" y="3" width="8" height="8" rx="1.5" /><rect x="3" y="13" width="8" height="8" rx="1.5" /><rect x="13" y="13" width="8" height="8" rx="1.5" /></>,
-    wallet: <><rect x="3" y="6" width="18" height="13" rx="2.5" /><path d="M3 10h18" /><circle cx="16.5" cy="14" r="1" /></>,
-    calendar: <><rect x="3" y="5" width="18" height="16" rx="2.5" /><path d="M3 10h18M8 3v4M16 3v4" /><path d="M8.5 14.5l2 2 4-4.2" /></>,
-    search: <><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></>,
-    plus: <path d="M12 5v14M5 12h14" />,
-    minus: <path d="M5 12h14" />,
-    sparkles: <path d="M12 3l1.8 4.6L18 9.4l-4.2 1.8L12 16l-1.8-4.8L6 9.4l4.2-1.8L12 3zM19 15l.9 2.2L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.8L19 15z" />,
-    x: <path d="M6 6l12 12M18 6L6 18" />,
-    star: <path d="M12 2.5l2.9 6 6.6.8-4.8 4.6 1.2 6.5L12 17.2 6.1 20.4l1.2-6.5-4.8-4.6 6.6-.8L12 2.5z" />,
-    mappin: <><path d="M12 21s7-6.5 7-11.5A7 7 0 105 9.5C5 14.5 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.3" /></>,
-    compass: <><circle cx="12" cy="12" r="9" /><path d="M15.5 8.5l-2 5-5 2 2-5 5-2z" /></>,
-    arrowleft: <path d="M19 12H5M11 6l-6 6 6 6" />,
-  };
-  return <svg {...common}>{paths[name]}</svg>;
+    const common = { width: size, height: size, viewBox: '0 0 24 24', fill, stroke: color, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' };
+    const paths = {
+        heart: React.createElement("path", { d: "M12 21s-6.7-4.3-9.2-8.4C1 9.7 2.3 6 6 6c2 0 3.6 1.2 6 4 2.4-2.8 4-4 6-4 3.7 0 5 3.7 3.2 6.6C18.7 16.7 12 21 12 21z" }),
+        message: React.createElement(React.Fragment, null,
+            React.createElement("rect", { x: "3", y: "5", width: "18", height: "12", rx: "4" }),
+            React.createElement("path", { d: "M8 21l3-4h2l3 4" })),
+        share: React.createElement(React.Fragment, null,
+            React.createElement("circle", { cx: "18", cy: "5", r: "2.4" }),
+            React.createElement("circle", { cx: "6", cy: "12", r: "2.4" }),
+            React.createElement("circle", { cx: "18", cy: "19", r: "2.4" }),
+            React.createElement("path", { d: "M8.2 10.7l7.6-4.4M8.2 13.3l7.6 4.4" })),
+        bookmark: React.createElement("path", { d: "M6 3h12v18l-6-4-6 4V3z" }),
+        grid: React.createElement(React.Fragment, null,
+            React.createElement("rect", { x: "3", y: "3", width: "8", height: "8", rx: "1.5" }),
+            React.createElement("rect", { x: "13", y: "3", width: "8", height: "8", rx: "1.5" }),
+            React.createElement("rect", { x: "3", y: "13", width: "8", height: "8", rx: "1.5" }),
+            React.createElement("rect", { x: "13", y: "13", width: "8", height: "8", rx: "1.5" })),
+        wallet: React.createElement(React.Fragment, null,
+            React.createElement("rect", { x: "3", y: "6", width: "18", height: "13", rx: "2.5" }),
+            React.createElement("path", { d: "M3 10h18" }),
+            React.createElement("circle", { cx: "16.5", cy: "14", r: "1" })),
+        calendar: React.createElement(React.Fragment, null,
+            React.createElement("rect", { x: "3", y: "5", width: "18", height: "16", rx: "2.5" }),
+            React.createElement("path", { d: "M3 10h18M8 3v4M16 3v4" }),
+            React.createElement("path", { d: "M8.5 14.5l2 2 4-4.2" })),
+        search: React.createElement(React.Fragment, null,
+            React.createElement("circle", { cx: "11", cy: "11", r: "7" }),
+            React.createElement("path", { d: "M20 20l-4-4" })),
+        plus: React.createElement("path", { d: "M12 5v14M5 12h14" }),
+        minus: React.createElement("path", { d: "M5 12h14" }),
+        sparkles: React.createElement("path", { d: "M12 3l1.8 4.6L18 9.4l-4.2 1.8L12 16l-1.8-4.8L6 9.4l4.2-1.8L12 3zM19 15l.9 2.2L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.8L19 15z" }),
+        x: React.createElement("path", { d: "M6 6l12 12M18 6L6 18" }),
+        star: React.createElement("path", { d: "M12 2.5l2.9 6 6.6.8-4.8 4.6 1.2 6.5L12 17.2 6.1 20.4l1.2-6.5-4.8-4.6 6.6-.8L12 2.5z" }),
+        mappin: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M12 21s7-6.5 7-11.5A7 7 0 105 9.5C5 14.5 12 21 12 21z" }),
+            React.createElement("circle", { cx: "12", cy: "9.5", r: "2.3" })),
+        compass: React.createElement(React.Fragment, null,
+            React.createElement("circle", { cx: "12", cy: "12", r: "9" }),
+            React.createElement("path", { d: "M15.5 8.5l-2 5-5 2 2-5 5-2z" })),
+        arrowleft: React.createElement("path", { d: "M19 12H5M11 6l-6 6 6 6" }),
+    };
+    return React.createElement("svg", { ...common }, paths[name]);
 }
-
 const CATEGORY_META = {
-  'Home Services': { grad: ['#2B4C5C', '#0F2027'], icon: '🧽' },
-  'Beauty': { grad: ['#7A2E52', '#2E1024'], icon: '💄' },
-  'Parties': { grad: ['#5A2E7A', '#1E1030'], icon: '🎉' },
-  'Restaurants': { grad: ['#6B4A1E', '#241706'], icon: '🍽' },
+    'Home Services': { grad: ['#2B4C5C', '#0F2027'], icon: '🧽' },
+    'Beauty': { grad: ['#7A2E52', '#2E1024'], icon: '💄' },
+    'Parties': { grad: ['#5A2E7A', '#1E1030'], icon: '🎉' },
+    'Restaurants': { grad: ['#6B4A1E', '#241706'], icon: '🍽' },
 };
-
 const FEED = [
-  { id: 'f1', category: 'Home Services', name: 'Sparkle Squad Cleaning', location: 'Denver, CO', rating: 4.8, price: 120, likes: '1.3K', comments: 42, blurb: 'Deep clean, move-in/move-out, eco-friendly products.' },
-  { id: 'f2', category: 'Home Services', name: 'Fresh Start Cleaners', location: 'Miami, FL', rating: 4.9, price: 90, likes: '892', comments: 18, blurb: 'Residential and post-construction cleaning.' },
-  { id: 'f3', category: 'Beauty', name: 'Glow by Mia', location: 'Austin, TX', rating: 4.7, price: 150, likes: '2.1K', comments: 76, blurb: 'Balayage and color correction specialist.' },
-  { id: 'f4', category: 'Beauty', name: 'Kiana Frost MUA', location: 'Brooklyn, NY', rating: 5.0, price: 220, likes: '3.4K', comments: 130, blurb: 'Bridal and editorial makeup artistry.' },
-  { id: 'f5', category: 'Parties', name: 'Belle Noir Events', location: 'Chicago, IL', rating: 4.6, price: 400, likes: '640', comments: 24, blurb: 'Full-service party planning and styling.' },
-  { id: 'f6', category: 'Restaurants', name: "Camille's Table", location: 'New Orleans, LA', rating: 4.9, price: 85, likes: '1.8K', comments: 58, blurb: "Chef's tasting menu, seasonal ingredients." },
+    { id: 'f1', category: 'Home Services', name: 'Sparkle Squad Cleaning', location: 'Denver, CO', rating: 4.8, price: 120, likes: '1.3K', comments: 42, blurb: 'Deep clean, move-in/move-out, eco-friendly products.' },
+    { id: 'f2', category: 'Home Services', name: 'Fresh Start Cleaners', location: 'Miami, FL', rating: 4.9, price: 90, likes: '892', comments: 18, blurb: 'Residential and post-construction cleaning.' },
+    { id: 'f3', category: 'Beauty', name: 'Glow by Mia', location: 'Austin, TX', rating: 4.7, price: 150, likes: '2.1K', comments: 76, blurb: 'Balayage and color correction specialist.' },
+    { id: 'f4', category: 'Beauty', name: 'Kiana Frost MUA', location: 'Brooklyn, NY', rating: 5.0, price: 220, likes: '3.4K', comments: 130, blurb: 'Bridal and editorial makeup artistry.' },
+    { id: 'f5', category: 'Parties', name: 'Belle Noir Events', location: 'Chicago, IL', rating: 4.6, price: 400, likes: '640', comments: 24, blurb: 'Full-service party planning and styling.' },
+    { id: 'f6', category: 'Restaurants', name: "Camille's Table", location: 'New Orleans, LA', rating: 4.9, price: 85, likes: '1.8K', comments: 58, blurb: "Chef's tasting menu, seasonal ingredients." },
 ];
-
 const CATEGORIES = [
-  { id: 'shorts', label: 'All shorts', count: 31, icon: 'compass' },
-  { id: 'beauty', label: 'Beauty', count: 14, icon: 'sparkles' },
-  { id: 'parties', label: 'Parties', count: 9, icon: 'star' },
-  { id: 'educational', label: 'Educational', count: 5, icon: 'grid' },
-  { id: 'restaurants', label: 'Restaurants', count: 7, icon: 'mappin' },
-  { id: 'home', label: 'Home services', count: 11, icon: 'wallet' },
+    { id: 'shorts', label: 'All shorts', count: 31, icon: 'compass' },
+    { id: 'beauty', label: 'Beauty', count: 14, icon: 'sparkles' },
+    { id: 'parties', label: 'Parties', count: 9, icon: 'star' },
+    { id: 'educational', label: 'Educational', count: 5, icon: 'grid' },
+    { id: 'restaurants', label: 'Restaurants', count: 7, icon: 'mappin' },
+    { id: 'home', label: 'Home services', count: 11, icon: 'wallet' },
 ];
-
 const PROVIDERS_BY_CAT = {
-  beauty: [
-    { id: 'p1', initials: 'AC', name: 'Ariana Cruz', price: 120, color: THEME.coral },
-    { id: 'p2', initials: 'GB', name: 'Glow by Mia', price: 150, color: '#8FBF3F' },
-    { id: 'p3', initials: 'BN', name: 'Belle Noir Beauty', price: 140, color: THEME.gold },
-    { id: 'p4', initials: 'CR', name: 'Camille Rae', price: 95, color: THEME.violet },
-    { id: 'p5', initials: 'SB', name: 'Studio Blush', price: 110, color: '#3FA6BF' },
-    { id: 'p6', initials: 'KF', name: 'Kiana Frost MUA', price: 220, color: '#BF6B3F' },
-  ],
-  home: [
-    { id: 'p7', initials: 'SS', name: 'Sparkle Squad Cleaning', price: 120, color: '#3F6FBF' },
-    { id: 'p8', initials: 'FS', name: 'Fresh Start Cleaners', price: 90, color: '#3FBF8A' },
-  ],
-  parties: [{ id: 'p9', initials: 'BN', name: 'Belle Noir Events', price: 400, color: THEME.coral }],
-  restaurants: [{ id: 'p10', initials: 'CT', name: "Camille's Table", price: 85, color: THEME.gold }],
-  educational: [{ id: 'p11', initials: 'TT', name: 'Tempo Tutors', price: 60, color: THEME.violet }],
-  shorts: [],
+    beauty: [
+        { id: 'p1', initials: 'AC', name: 'Ariana Cruz', price: 120, color: THEME.coral },
+        { id: 'p2', initials: 'GB', name: 'Glow by Mia', price: 150, color: '#8FBF3F' },
+        { id: 'p3', initials: 'BN', name: 'Belle Noir Beauty', price: 140, color: THEME.gold },
+        { id: 'p4', initials: 'CR', name: 'Camille Rae', price: 95, color: THEME.violet },
+        { id: 'p5', initials: 'SB', name: 'Studio Blush', price: 110, color: '#3FA6BF' },
+        { id: 'p6', initials: 'KF', name: 'Kiana Frost MUA', price: 220, color: '#BF6B3F' },
+    ],
+    home: [
+        { id: 'p7', initials: 'SS', name: 'Sparkle Squad Cleaning', price: 120, color: '#3F6FBF' },
+        { id: 'p8', initials: 'FS', name: 'Fresh Start Cleaners', price: 90, color: '#3FBF8A' },
+    ],
+    parties: [{ id: 'p9', initials: 'BN', name: 'Belle Noir Events', price: 400, color: THEME.coral }],
+    restaurants: [{ id: 'p10', initials: 'CT', name: "Camille's Table", price: 85, color: THEME.gold }],
+    educational: [{ id: 'p11', initials: 'TT', name: 'Tempo Tutors', price: 60, color: THEME.violet }],
+    shorts: [],
 };
-
 const TIME_SLOTS = ['9:00 AM', '10:30 AM', '12:00 PM', '1:30 PM', '3:00 PM', '4:30 PM', '6:00 PM', '7:30 PM'];
-
 function nextDays(n) {
-  const out = []; const base = new Date();
-  for (let i = 0; i < n; i++) { const d = new Date(base); d.setDate(base.getDate() + i); out.push(d); }
-  return out;
+    const out = [];
+    const base = new Date();
+    for (let i = 0; i < n; i++) {
+        const d = new Date(base);
+        d.setDate(base.getDate() + i);
+        out.push(d);
+    }
+    return out;
 }
 function money(n) { return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' }); }
-
 function App() {
-  const [tab, setTab] = useState('discover');
-  const [activeCat, setActiveCat] = useState(null);
-  const [bookingTarget, setBookingTarget] = useState(null);
-  const [bookings, setBookings] = useState([
-    { id: 'b0', name: 'Fresh Start Cleaners', date: 'Aug 6', time: '10:30 AM', total: 97.2, status: 'upcoming' },
-  ]);
-  const [balance, setBalance] = useState(120.4);
-  const [monthlyBudget, setMonthlyBudget] = useState(2000);
-  const [preferredTime, setPreferredTime] = useState('Any time');
-  const [allocations, setAllocations] = useState({ Barber: 0, Beauty: 0, 'Home cleaning': 0 });
-  const [toast, setToast] = useState(null);
-  const days = useMemo(() => nextDays(7), []);
-  const [selDate, setSelDate] = useState(0);
-  const [selTime, setSelTime] = useState(null);
-
-  const spent = Object.values(allocations).reduce((a, b) => a + b, 0);
-  const ringPct = monthlyBudget > 0 ? Math.min(100, Math.round((spent / monthlyBudget) * 100)) : 0;
-
-  function flashToast(msg) { setToast(msg); setTimeout(() => setToast(null), 2600); }
-  function openBooking(item) { setSelDate(0); setSelTime(null); setBookingTarget(item); }
-
-  function confirmBooking() {
-    if (selTime == null) return;
-    const price = bookingTarget.price;
-    const tax = Math.round(price * 0.08 * 100) / 100;
-    const total = Math.round((price + tax) * 100) / 100;
-    const d = days[selDate];
-    const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    setBookings((prev) => [{ id: 'b' + Date.now(), name: bookingTarget.name, date: label, time: TIME_SLOTS[selTime], total, status: 'upcoming' }, ...prev]);
-    setBalance((b) => Math.max(0, b - total));
-    setBookingTarget(null);
-    flashToast(`Booked ${bookingTarget.name} on ${label} at ${TIME_SLOTS[selTime]} · ${money(total)} total`);
-  }
-
-  function suggestPlan() {
-    setAllocations({ Barber: Math.round(monthlyBudget * 0.15), Beauty: Math.round(monthlyBudget * 0.35), 'Home cleaning': Math.round(monthlyBudget * 0.2) });
-    flashToast('Plan suggested based on your booking history');
-  }
-
-  return (
-    <div style={{ width: '100%', maxWidth: 480, margin: '0 auto', height: '100dvh', position: 'relative', overflow: 'hidden', background: THEME.paper, boxShadow: '0 0 40px rgba(0,0,0,0.08)' }}>
-
-      {tab === 'discover' && (
-        <div className="avio-scroll" style={{ height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' }}>
-          {FEED.map((item) => {
+    var _a;
+    const [tab, setTab] = useState('discover');
+    const [activeCat, setActiveCat] = useState(null);
+    const [bookingTarget, setBookingTarget] = useState(null);
+    const [bookings, setBookings] = useState([
+        { id: 'b0', name: 'Fresh Start Cleaners', date: 'Aug 6', time: '10:30 AM', total: 97.2, status: 'upcoming' },
+    ]);
+    const [balance, setBalance] = useState(120.4);
+    const [monthlyBudget, setMonthlyBudget] = useState(2000);
+    const [preferredTime, setPreferredTime] = useState('Any time');
+    const [allocations, setAllocations] = useState({ Barber: 0, Beauty: 0, 'Home cleaning': 0 });
+    const [toast, setToast] = useState(null);
+    const days = useMemo(() => nextDays(7), []);
+    const [selDate, setSelDate] = useState(0);
+    const [selTime, setSelTime] = useState(null);
+    const spent = Object.values(allocations).reduce((a, b) => a + b, 0);
+    const ringPct = monthlyBudget > 0 ? Math.min(100, Math.round((spent / monthlyBudget) * 100)) : 0;
+    function flashToast(msg) { setToast(msg); setTimeout(() => setToast(null), 2600); }
+    function openBooking(item) { setSelDate(0); setSelTime(null); setBookingTarget(item); }
+    function confirmBooking() {
+        if (selTime == null)
+            return;
+        const price = bookingTarget.price;
+        const tax = Math.round(price * 0.08 * 100) / 100;
+        const total = Math.round((price + tax) * 100) / 100;
+        const d = days[selDate];
+        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        setBookings((prev) => [{ id: 'b' + Date.now(), name: bookingTarget.name, date: label, time: TIME_SLOTS[selTime], total, status: 'upcoming' }, ...prev]);
+        setBalance((b) => Math.max(0, b - total));
+        setBookingTarget(null);
+        flashToast(`Booked ${bookingTarget.name} on ${label} at ${TIME_SLOTS[selTime]} · ${money(total)} total`);
+    }
+    function suggestPlan() {
+        setAllocations({ Barber: Math.round(monthlyBudget * 0.15), Beauty: Math.round(monthlyBudget * 0.35), 'Home cleaning': Math.round(monthlyBudget * 0.2) });
+        flashToast('Plan suggested based on your booking history');
+    }
+    return (React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', height: '100dvh', position: 'relative', overflow: 'hidden', background: THEME.paper, boxShadow: '0 0 40px rgba(0,0,0,0.08)' } },
+        tab === 'discover' && (React.createElement("div", { className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, FEED.map((item) => {
             const meta = CATEGORY_META[item.category];
-            return (
-              <div key={item.id} style={{ height: '100dvh', scrollSnapAlign: 'start', position: 'relative', background: `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})` }}>
-                <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 16, zIndex: 2 }}>
-                  <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textDark, letterSpacing: 0.5, margin: 0 }}>AVIO</p>
-                  <p style={{ fontSize: 9, color: THEME.mutedDark, letterSpacing: 1.5, marginTop: -2 }}>ALL-IN-ONE BOOKING</p>
-                </div>
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 84, opacity: 0.9 }}>{meta.icon}</div>
-                <div style={{ position: 'absolute', right: 12, bottom: 'calc(env(safe-area-inset-bottom) + 214px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, zIndex: 2 }}>
-                  <button style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: THEME.textDark }}>
-                    <Icon name="heart" size={26} color={THEME.coral} fill={THEME.coral} />
-                    <span style={{ fontSize: 11, marginTop: 2 }}>{item.likes}</span>
-                  </button>
-                  <button style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: THEME.textDark }}>
-                    <Icon name="message" size={24} />
-                    <span style={{ fontSize: 11, marginTop: 2 }}>{item.comments}</span>
-                  </button>
-                  <button style={{ color: THEME.textDark }}><Icon name="share" size={23} /></button>
-                  <button style={{ color: THEME.textDark }}><Icon name="bookmark" size={23} /></button>
-                </div>
-                <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: `16px 16px calc(env(safe-area-inset-bottom) + 100px)`, background: 'linear-gradient(0deg, rgba(0,0,0,0.75), rgba(0,0,0,0))' }}>
-                  <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 5, background: THEME.violetSoft, color: THEME.violet, marginBottom: 8 }}>{item.category.toUpperCase()}</span>
-                  <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: THEME.textDark, margin: 0 }}>{item.name}</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
-                    <Icon name="star" size={12} color={THEME.gold} fill={THEME.gold} />
-                    <span style={{ fontSize: 12, color: THEME.mutedDark }}>{item.rating} · {item.location}</span>
-                  </div>
-                  <p style={{ fontSize: 12, color: THEME.mutedDark, marginTop: 4, maxWidth: 320 }}>{item.blurb}</p>
-                  <button onClick={() => openBooking(item)} style={{ marginTop: 12, background: THEME.coral, color: '#fff', fontWeight: 600, fontSize: 13, padding: '9px 16px', borderRadius: 20 }}>
-                    Book now · {money(item.price)}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {tab === 'browse' && (
-        <div style={{ height: '100%', overflowY: 'auto', background: THEME.paper, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` }}>
-          {!activeCat ? (
-            <>
-              <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textLight, margin: 0 }}>Browse categories</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, padding: '0 12px', background: '#fff', border: `1px solid ${THEME.paperLine}`, borderRadius: 12, height: 38 }}>
-                <Icon name="search" size={15} color={THEME.muted} />
-                <span style={{ fontSize: 13, color: THEME.muted }}>Search artist profiles</span>
-              </div>
-              <p style={{ fontSize: 11, color: THEME.muted, marginTop: 18, marginBottom: 8, letterSpacing: 0.5 }}>CHOOSE A CATEGORY</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                {CATEGORIES.map((c) => (
-                  <button key={c.id} onClick={() => setActiveCat(c.id)} style={{ gridColumn: c.id === 'shorts' ? 'span 2' : 'auto', background: '#fff', border: `1px solid ${THEME.paperLine}`, borderRadius: 14, padding: '14px 16px', textAlign: 'left' }}>
-                    <Icon name={c.icon} size={18} color={THEME.violet} />
-                    <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: THEME.textLight, marginTop: 8, marginBottom: 0 }}>{c.label}</p>
-                    <p style={{ fontSize: 11, color: THEME.muted, margin: 0 }}>{c.count} profiles</p>
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : (
-            <>
-              <button onClick={() => setActiveCat(null)} style={{ display: 'flex', alignItems: 'center', gap: 4, color: THEME.textLight, fontSize: 13, marginBottom: 14 }}>
-                <Icon name="arrowleft" size={16} /> {CATEGORIES.find((c) => c.id === activeCat)?.label}
-              </button>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                {(PROVIDERS_BY_CAT[activeCat] || []).map((p) => (
-                  <button key={p.id} onClick={() => openBooking({ id: p.id, name: p.name, price: p.price, category: CATEGORIES.find((c) => c.id === activeCat)?.label || 'Home Services' })}
-                    style={{ background: p.color, borderRadius: 12, aspectRatio: '1', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: 8, color: '#fff', textAlign: 'left' }}>
-                    <span style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15 }}>{p.initials}</span>
-                    <span style={{ fontSize: 9, lineHeight: 1.2, marginTop: 2 }}>{p.name}</span>
-                    <span style={{ fontSize: 9, opacity: 0.85 }}>{money(p.price)}</span>
-                  </button>
-                ))}
-                {(PROVIDERS_BY_CAT[activeCat] || []).length === 0 && <p style={{ fontSize: 12, color: THEME.muted, gridColumn: 'span 3' }}>No profiles in this category yet.</p>}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {tab === 'budget' && (
-        <div style={{ height: '100%', overflowY: 'auto', background: THEME.paper, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` }}>
-          <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textLight, margin: 0 }}>My wallet</p>
-          <div style={{ marginTop: 14, background: THEME.violet, borderRadius: 16, padding: 18 }}>
-            <p style={{ fontSize: 11, color: '#DCD4FF', letterSpacing: 0.5, margin: 0 }}>AVAILABLE BALANCE</p>
-            <p style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, fontSize: 28, color: '#fff', margin: '4px 0 0' }}>{money(balance)}</p>
-            <button onClick={() => { setBalance((b) => b + 100); flashToast('Added $100.00 to your balance'); }} style={{ marginTop: 12, background: THEME.coral, color: '#fff', fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 18 }}>+ Add funds</button>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 20 }}>
-            <div style={{ width: 74, height: 74, borderRadius: '50%', background: `conic-gradient(${THEME.coral} ${ringPct * 3.6}deg, ${THEME.paperLine} 0deg)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, fontSize: 14, color: THEME.textLight }}>{ringPct}%</span>
-              </div>
-            </div>
-            <div>
-              <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: THEME.textLight, margin: 0 }}>Monthly plan</p>
-              <p style={{ fontSize: 11, color: THEME.muted, marginTop: 2 }}>{money(spent)} allocated of {money(monthlyBudget)}</p>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 }}>
-            <span style={{ fontSize: 13, color: THEME.textLight, fontWeight: 500 }}>Monthly budget</span>
-            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: THEME.textLight }}>${monthlyBudget}</span>
-          </div>
-          <input type="range" min="200" max="5000" step="50" value={monthlyBudget} onChange={(e) => setMonthlyBudget(Number(e.target.value))} style={{ width: '100%', marginTop: 8 }} />
-          <p style={{ fontSize: 11, color: THEME.muted, marginTop: 16, marginBottom: 6 }}>PREFERRED TIME TO BOOK</p>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {['Any time', 'Morning', 'Afternoon', 'Evening'].map((t) => (
-              <button key={t} onClick={() => setPreferredTime(t)} style={{ fontSize: 11, padding: '6px 12px', borderRadius: 16, border: `1px solid ${preferredTime === t ? THEME.violet : THEME.paperLine}`, background: preferredTime === t ? THEME.violetSoft : '#fff', color: preferredTime === t ? THEME.violet : THEME.textLight }}>{t}</button>
-            ))}
-          </div>
-          <button onClick={suggestPlan} style={{ marginTop: 16, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: THEME.coral, color: '#fff', fontWeight: 600, fontSize: 13, padding: '11px 0', borderRadius: 22 }}>
-            <Icon name="sparkles" size={14} color="#fff" /> AI suggest my plan
-          </button>
-          <p style={{ fontSize: 11, color: THEME.muted, marginTop: 18, marginBottom: 8 }}>ALLOCATE BY CATEGORY</p>
-          {Object.keys(allocations).map((cat) => (
-            <div key={cat} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderBottom: `1px solid ${THEME.paperLine}` }}>
-              <span style={{ fontSize: 13, color: THEME.textLight }}>{cat}</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <button onClick={() => setAllocations((a) => ({ ...a, [cat]: Math.max(0, a[cat] - 25) }))} style={{ width: 22, height: 22, borderRadius: '50%', border: `1px solid ${THEME.paperLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="minus" size={12} color={THEME.textLight} /></button>
-                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, width: 44, textAlign: 'center' }}>${allocations[cat]}</span>
-                <button onClick={() => setAllocations((a) => ({ ...a, [cat]: a[cat] + 25 }))} style={{ width: 22, height: 22, borderRadius: '50%', border: `1px solid ${THEME.paperLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="plus" size={12} color={THEME.textLight} /></button>
-              </div>
-            </div>
-          ))}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-            <span style={{ fontSize: 12, color: THEME.muted }}>Remaining</span>
-            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: THEME.textLight }}>{money(Math.max(0, monthlyBudget - spent))}</span>
-          </div>
-        </div>
-      )}
-
-      {tab === 'bookings' && (
-        <div style={{ height: '100%', overflowY: 'auto', background: THEME.paper, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` }}>
-          <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textLight, margin: 0 }}>Your bookings</p>
-          {bookings.length === 0 && <p style={{ fontSize: 13, color: THEME.muted, marginTop: 16 }}>No bookings yet. Find something on Discover.</p>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 }}>
-            {bookings.map((b) => (
-              <div key={b.id} style={{ background: '#fff', border: `1px solid ${THEME.paperLine}`, borderRadius: 14, padding: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: THEME.textLight, margin: 0 }}>{b.name}</p>
-                  <span style={{ fontSize: 10, fontWeight: 600, color: THEME.violet, background: THEME.violetSoft, padding: '3px 8px', borderRadius: 10 }}>{b.status}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 }}>
-                  <Icon name="calendar" size={13} color={THEME.muted} />
-                  <span style={{ fontSize: 12, color: THEME.muted }}>{b.date} at {b.time}</span>
-                </div>
-                <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: THEME.textLight, marginTop: 6 }}>{money(b.total)}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', position: 'absolute', left: 0, right: 0, bottom: 0, height: `calc(env(safe-area-inset-bottom) + 64px)`, paddingBottom: 'env(safe-area-inset-bottom)', background: tab === 'discover' ? 'rgba(21,18,28,0.92)' : '#fff', borderTop: `1px solid ${tab === 'discover' ? THEME.inkLine : THEME.paperLine}`, backdropFilter: 'blur(8px)' }}>
-        {[
-          { id: 'discover', icon: 'compass', label: 'Discover' },
-          { id: 'browse', icon: 'grid', label: 'Browse' },
-          { id: 'bookings', icon: 'calendar', label: 'Bookings' },
-          { id: 'budget', icon: 'wallet', label: 'Budget' },
+            return (React.createElement("div", { key: item.id, style: { height: '100dvh', scrollSnapAlign: 'start', position: 'relative', background: `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})` } },
+                React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 16, zIndex: 2 } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textDark, letterSpacing: 0.5, margin: 0 } }, "AVIO"),
+                    React.createElement("p", { style: { fontSize: 9, color: THEME.mutedDark, letterSpacing: 1.5, marginTop: -2 } }, "ALL-IN-ONE BOOKING")),
+                React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 84, opacity: 0.9 } }, meta.icon),
+                React.createElement("div", { style: { position: 'absolute', right: 12, bottom: 'calc(env(safe-area-inset-bottom) + 214px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, zIndex: 2 } },
+                    React.createElement("button", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', color: THEME.textDark } },
+                        React.createElement(Icon, { name: "heart", size: 26, color: THEME.coral, fill: THEME.coral }),
+                        React.createElement("span", { style: { fontSize: 11, marginTop: 2 } }, item.likes)),
+                    React.createElement("button", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', color: THEME.textDark } },
+                        React.createElement(Icon, { name: "message", size: 24 }),
+                        React.createElement("span", { style: { fontSize: 11, marginTop: 2 } }, item.comments)),
+                    React.createElement("button", { style: { color: THEME.textDark } },
+                        React.createElement(Icon, { name: "share", size: 23 })),
+                    React.createElement("button", { style: { color: THEME.textDark } },
+                        React.createElement(Icon, { name: "bookmark", size: 23 }))),
+                React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: `16px 16px calc(env(safe-area-inset-bottom) + 100px)`, background: 'linear-gradient(0deg, rgba(0,0,0,0.75), rgba(0,0,0,0))' } },
+                    React.createElement("span", { style: { display: 'inline-block', fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 5, background: THEME.violetSoft, color: THEME.violet, marginBottom: 8 } }, item.category.toUpperCase()),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: THEME.textDark, margin: 0 } }, item.name),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 } },
+                        React.createElement(Icon, { name: "star", size: 12, color: THEME.gold, fill: THEME.gold }),
+                        React.createElement("span", { style: { fontSize: 12, color: THEME.mutedDark } },
+                            item.rating,
+                            " \u00B7 ",
+                            item.location)),
+                    React.createElement("p", { style: { fontSize: 12, color: THEME.mutedDark, marginTop: 4, maxWidth: 320 } }, item.blurb),
+                    React.createElement("button", { onClick: () => openBooking(item), style: { marginTop: 12, background: THEME.coral, color: '#fff', fontWeight: 600, fontSize: 13, padding: '9px 16px', borderRadius: 20 } },
+                        "Book now \u00B7 ",
+                        money(item.price)))));
+        }))),
+        tab === 'browse' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: THEME.paper, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` } }, !activeCat ? (React.createElement(React.Fragment, null,
+            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textLight, margin: 0 } }, "Browse categories"),
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, padding: '0 12px', background: '#fff', border: `1px solid ${THEME.paperLine}`, borderRadius: 12, height: 38 } },
+                React.createElement(Icon, { name: "search", size: 15, color: THEME.muted }),
+                React.createElement("span", { style: { fontSize: 13, color: THEME.muted } }, "Search artist profiles")),
+            React.createElement("p", { style: { fontSize: 11, color: THEME.muted, marginTop: 18, marginBottom: 8, letterSpacing: 0.5 } }, "CHOOSE A CATEGORY"),
+            React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 } }, CATEGORIES.map((c) => (React.createElement("button", { key: c.id, onClick: () => setActiveCat(c.id), style: { gridColumn: c.id === 'shorts' ? 'span 2' : 'auto', background: '#fff', border: `1px solid ${THEME.paperLine}`, borderRadius: 14, padding: '14px 16px', textAlign: 'left' } },
+                React.createElement(Icon, { name: c.icon, size: 18, color: THEME.violet }),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: THEME.textLight, marginTop: 8, marginBottom: 0 } }, c.label),
+                React.createElement("p", { style: { fontSize: 11, color: THEME.muted, margin: 0 } },
+                    c.count,
+                    " profiles"))))))) : (React.createElement(React.Fragment, null,
+            React.createElement("button", { onClick: () => setActiveCat(null), style: { display: 'flex', alignItems: 'center', gap: 4, color: THEME.textLight, fontSize: 13, marginBottom: 14 } },
+                React.createElement(Icon, { name: "arrowleft", size: 16 }),
+                " ", (_a = CATEGORIES.find((c) => c.id === activeCat)) === null || _a === void 0 ? void 0 :
+                _a.label),
+            React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 } },
+                (PROVIDERS_BY_CAT[activeCat] || []).map((p) => (React.createElement("button", { key: p.id, onClick: () => { var _a; return openBooking({ id: p.id, name: p.name, price: p.price, category: ((_a = CATEGORIES.find((c) => c.id === activeCat)) === null || _a === void 0 ? void 0 : _a.label) || 'Home Services' }); }, style: { background: p.color, borderRadius: 12, aspectRatio: '1', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: 8, color: '#fff', textAlign: 'left' } },
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15 } }, p.initials),
+                    React.createElement("span", { style: { fontSize: 9, lineHeight: 1.2, marginTop: 2 } }, p.name),
+                    React.createElement("span", { style: { fontSize: 9, opacity: 0.85 } }, money(p.price))))),
+                (PROVIDERS_BY_CAT[activeCat] || []).length === 0 && React.createElement("p", { style: { fontSize: 12, color: THEME.muted, gridColumn: 'span 3' } }, "No profiles in this category yet.")))))),
+        tab === 'budget' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: THEME.paper, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` } },
+            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textLight, margin: 0 } }, "My wallet"),
+            React.createElement("div", { style: { marginTop: 14, background: THEME.violet, borderRadius: 16, padding: 18 } },
+                React.createElement("p", { style: { fontSize: 11, color: '#DCD4FF', letterSpacing: 0.5, margin: 0 } }, "AVAILABLE BALANCE"),
+                React.createElement("p", { style: { fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, fontSize: 28, color: '#fff', margin: '4px 0 0' } }, money(balance)),
+                React.createElement("button", { onClick: () => { setBalance((b) => b + 100); flashToast('Added $100.00 to your balance'); }, style: { marginTop: 12, background: THEME.coral, color: '#fff', fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 18 } }, "+ Add funds")),
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 16, marginTop: 20 } },
+                React.createElement("div", { style: { width: 74, height: 74, borderRadius: '50%', background: `conic-gradient(${THEME.coral} ${ringPct * 3.6}deg, ${THEME.paperLine} 0deg)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement("div", { style: { width: 56, height: 56, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, fontSize: 14, color: THEME.textLight } },
+                            ringPct,
+                            "%"))),
+                React.createElement("div", null,
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: THEME.textLight, margin: 0 } }, "Monthly plan"),
+                    React.createElement("p", { style: { fontSize: 11, color: THEME.muted, marginTop: 2 } },
+                        money(spent),
+                        " allocated of ",
+                        money(monthlyBudget)))),
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 } },
+                React.createElement("span", { style: { fontSize: 13, color: THEME.textLight, fontWeight: 500 } }, "Monthly budget"),
+                React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: THEME.textLight } },
+                    "$",
+                    monthlyBudget)),
+            React.createElement("input", { type: "range", min: "200", max: "5000", step: "50", value: monthlyBudget, onChange: (e) => setMonthlyBudget(Number(e.target.value)), style: { width: '100%', marginTop: 8 } }),
+            React.createElement("p", { style: { fontSize: 11, color: THEME.muted, marginTop: 16, marginBottom: 6 } }, "PREFERRED TIME TO BOOK"),
+            React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } }, ['Any time', 'Morning', 'Afternoon', 'Evening'].map((t) => (React.createElement("button", { key: t, onClick: () => setPreferredTime(t), style: { fontSize: 11, padding: '6px 12px', borderRadius: 16, border: `1px solid ${preferredTime === t ? THEME.violet : THEME.paperLine}`, background: preferredTime === t ? THEME.violetSoft : '#fff', color: preferredTime === t ? THEME.violet : THEME.textLight } }, t)))),
+            React.createElement("button", { onClick: suggestPlan, style: { marginTop: 16, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: THEME.coral, color: '#fff', fontWeight: 600, fontSize: 13, padding: '11px 0', borderRadius: 22 } },
+                React.createElement(Icon, { name: "sparkles", size: 14, color: "#fff" }),
+                " AI suggest my plan"),
+            React.createElement("p", { style: { fontSize: 11, color: THEME.muted, marginTop: 18, marginBottom: 8 } }, "ALLOCATE BY CATEGORY"),
+            Object.keys(allocations).map((cat) => (React.createElement("div", { key: cat, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderBottom: `1px solid ${THEME.paperLine}` } },
+                React.createElement("span", { style: { fontSize: 13, color: THEME.textLight } }, cat),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12 } },
+                    React.createElement("button", { onClick: () => setAllocations((a) => ({ ...a, [cat]: Math.max(0, a[cat] - 25) })), style: { width: 22, height: 22, borderRadius: '50%', border: `1px solid ${THEME.paperLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: "minus", size: 12, color: THEME.textLight })),
+                    React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 12, width: 44, textAlign: 'center' } },
+                        "$",
+                        allocations[cat]),
+                    React.createElement("button", { onClick: () => setAllocations((a) => ({ ...a, [cat]: a[cat] + 25 })), style: { width: 22, height: 22, borderRadius: '50%', border: `1px solid ${THEME.paperLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: "plus", size: 12, color: THEME.textLight })))))),
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 } },
+                React.createElement("span", { style: { fontSize: 12, color: THEME.muted } }, "Remaining"),
+                React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: THEME.textLight } }, money(Math.max(0, monthlyBudget - spent)))))),
+        tab === 'bookings' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: THEME.paper, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` } },
+            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textLight, margin: 0 } }, "Your bookings"),
+            bookings.length === 0 && React.createElement("p", { style: { fontSize: 13, color: THEME.muted, marginTop: 16 } }, "No bookings yet. Find something on Discover."),
+            React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 } }, bookings.map((b) => (React.createElement("div", { key: b.id, style: { background: '#fff', border: `1px solid ${THEME.paperLine}`, borderRadius: 14, padding: 14 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: THEME.textLight, margin: 0 } }, b.name),
+                    React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: THEME.violet, background: THEME.violetSoft, padding: '3px 8px', borderRadius: 10 } }, b.status)),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 } },
+                    React.createElement(Icon, { name: "calendar", size: 13, color: THEME.muted }),
+                    React.createElement("span", { style: { fontSize: 12, color: THEME.muted } },
+                        b.date,
+                        " at ",
+                        b.time)),
+                React.createElement("p", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: THEME.textLight, marginTop: 6 } }, money(b.total)))))))),
+        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-around', position: 'absolute', left: 0, right: 0, bottom: 0, height: `calc(env(safe-area-inset-bottom) + 64px)`, paddingBottom: 'env(safe-area-inset-bottom)', background: tab === 'discover' ? 'rgba(21,18,28,0.92)' : '#fff', borderTop: `1px solid ${tab === 'discover' ? THEME.inkLine : THEME.paperLine}`, backdropFilter: 'blur(8px)' } }, [
+            { id: 'discover', icon: 'compass', label: 'Discover' },
+            { id: 'browse', icon: 'grid', label: 'Browse' },
+            { id: 'bookings', icon: 'calendar', label: 'Bookings' },
+            { id: 'budget', icon: 'wallet', label: 'Budget' },
         ].map((t) => {
-          const active = tab === t.id;
-          const onDark = tab === 'discover';
-          const activeColor = onDark ? '#fff' : THEME.coral;
-          const idleColor = onDark ? THEME.mutedDark : THEME.muted;
-          return (
-            <button key={t.id} onClick={() => { setTab(t.id); setActiveCat(null); }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <Icon name={t.icon} size={19} color={active ? activeColor : idleColor} fill={active && t.id === 'discover' ? activeColor : 'none'} />
-              <span style={{ fontSize: 9, color: active ? activeColor : idleColor, fontWeight: active ? 600 : 400 }}>{t.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {bookingTarget && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 }}>
-          <div style={{ width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '88%', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <p style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: THEME.textLight, margin: 0 }}>{bookingTarget.name}</p>
-              <button onClick={() => setBookingTarget(null)}><Icon name="x" size={18} color={THEME.muted} /></button>
-            </div>
-            <p style={{ fontSize: 12, color: THEME.muted, marginTop: 2 }}>{bookingTarget.category}</p>
-            <p style={{ fontSize: 11, color: THEME.muted, marginTop: 16, marginBottom: 8, letterSpacing: 0.5 }}>CHOOSE A DATE</p>
-            <div className="avio-scroll" style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
-              {days.map((d, i) => (
-                <button key={i} onClick={() => setSelDate(i)} style={{ minWidth: 44, padding: '8px 0', borderRadius: 10, background: i === selDate ? THEME.coral : THEME.paper, color: i === selDate ? '#fff' : THEME.textLight, textAlign: 'center', flexShrink: 0 }}>
-                  <div style={{ fontSize: 10 }}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{d.getDate()}</div>
-                </button>
-              ))}
-            </div>
-            <p style={{ fontSize: 11, color: THEME.muted, marginTop: 16, marginBottom: 8, letterSpacing: 0.5 }}>CHOOSE A TIME</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {TIME_SLOTS.map((t, i) => (
-                <button key={t} onClick={() => setSelTime(i)} style={{ padding: '8px 0', borderRadius: 10, fontSize: 12, border: `1px solid ${i === selTime ? THEME.coral : THEME.paperLine}`, background: i === selTime ? THEME.coral : '#fff', color: i === selTime ? '#fff' : THEME.textLight }}>{t}</button>
-              ))}
-            </div>
-            <div style={{ marginTop: 18, borderTop: `1px solid ${THEME.paperLine}`, paddingTop: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 12, color: THEME.muted }}>Service price</span>
-                <span style={{ fontSize: 12, color: THEME.textLight }}>{money(bookingTarget.price)}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                <span style={{ fontSize: 12, color: THEME.muted }}>Tax (8%)</span>
-                <span style={{ fontSize: 12, color: THEME.textLight }}>{money(Math.round(bookingTarget.price * 0.08 * 100) / 100)}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: `1px solid ${THEME.paperLine}` }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: THEME.textLight }}>Total</span>
-                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 15, fontWeight: 600, color: THEME.textLight }}>{money(Math.round(bookingTarget.price * 1.08 * 100) / 100)}</span>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-              <button onClick={() => setBookingTarget(null)} style={{ flex: 1, padding: '11px 0', borderRadius: 24, border: `1px solid ${THEME.paperLine}`, color: THEME.textLight, fontSize: 13, fontWeight: 500 }}>Cancel</button>
-              <button onClick={confirmBooking} disabled={selTime == null} style={{ flex: 2, padding: '11px 0', borderRadius: 24, background: selTime == null ? THEME.paperLine : THEME.coral, color: selTime == null ? THEME.muted : '#fff', fontSize: 13, fontWeight: 600 }}>Confirm and pay</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {toast && (
-        <div style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.textLight, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.25)' }}>{toast}</div>
-      )}
-    </div>
-  );
+            const active = tab === t.id;
+            const onDark = tab === 'discover';
+            const activeColor = onDark ? '#fff' : THEME.coral;
+            const idleColor = onDark ? THEME.mutedDark : THEME.muted;
+            return (React.createElement("button", { key: t.id, onClick: () => { setTab(t.id); setActiveCat(null); }, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
+                React.createElement(Icon, { name: t.icon, size: 19, color: active ? activeColor : idleColor, fill: active && t.id === 'discover' ? activeColor : 'none' }),
+                React.createElement("span", { style: { fontSize: 9, color: active ? activeColor : idleColor, fontWeight: active ? 600 : 400 } }, t.label)));
+        })),
+        bookingTarget && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } },
+            React.createElement("div", { style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '88%', overflowY: 'auto' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: THEME.textLight, margin: 0 } }, bookingTarget.name),
+                    React.createElement("button", { onClick: () => setBookingTarget(null) },
+                        React.createElement(Icon, { name: "x", size: 18, color: THEME.muted }))),
+                React.createElement("p", { style: { fontSize: 12, color: THEME.muted, marginTop: 2 } }, bookingTarget.category),
+                React.createElement("p", { style: { fontSize: 11, color: THEME.muted, marginTop: 16, marginBottom: 8, letterSpacing: 0.5 } }, "CHOOSE A DATE"),
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto' } }, days.map((d, i) => (React.createElement("button", { key: i, onClick: () => setSelDate(i), style: { minWidth: 44, padding: '8px 0', borderRadius: 10, background: i === selDate ? THEME.coral : THEME.paper, color: i === selDate ? '#fff' : THEME.textLight, textAlign: 'center', flexShrink: 0 } },
+                    React.createElement("div", { style: { fontSize: 10 } }, d.toLocaleDateString('en-US', { weekday: 'short' })),
+                    React.createElement("div", { style: { fontSize: 14, fontWeight: 600 } }, d.getDate()))))),
+                React.createElement("p", { style: { fontSize: 11, color: THEME.muted, marginTop: 16, marginBottom: 8, letterSpacing: 0.5 } }, "CHOOSE A TIME"),
+                React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 } }, TIME_SLOTS.map((t, i) => (React.createElement("button", { key: t, onClick: () => setSelTime(i), style: { padding: '8px 0', borderRadius: 10, fontSize: 12, border: `1px solid ${i === selTime ? THEME.coral : THEME.paperLine}`, background: i === selTime ? THEME.coral : '#fff', color: i === selTime ? '#fff' : THEME.textLight } }, t)))),
+                React.createElement("div", { style: { marginTop: 18, borderTop: `1px solid ${THEME.paperLine}`, paddingTop: 12 } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                        React.createElement("span", { style: { fontSize: 12, color: THEME.muted } }, "Service price"),
+                        React.createElement("span", { style: { fontSize: 12, color: THEME.textLight } }, money(bookingTarget.price))),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 } },
+                        React.createElement("span", { style: { fontSize: 12, color: THEME.muted } }, "Tax (8%)"),
+                        React.createElement("span", { style: { fontSize: 12, color: THEME.textLight } }, money(Math.round(bookingTarget.price * 0.08 * 100) / 100))),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: `1px solid ${THEME.paperLine}` } },
+                        React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: THEME.textLight } }, "Total"),
+                        React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 15, fontWeight: 600, color: THEME.textLight } }, money(Math.round(bookingTarget.price * 1.08 * 100) / 100)))),
+                React.createElement("div", { style: { display: 'flex', gap: 12, marginTop: 16 } },
+                    React.createElement("button", { onClick: () => setBookingTarget(null), style: { flex: 1, padding: '11px 0', borderRadius: 24, border: `1px solid ${THEME.paperLine}`, color: THEME.textLight, fontSize: 13, fontWeight: 500 } }, "Cancel"),
+                    React.createElement("button", { onClick: confirmBooking, disabled: selTime == null, style: { flex: 2, padding: '11px 0', borderRadius: 24, background: selTime == null ? THEME.paperLine : THEME.coral, color: selTime == null ? THEME.muted : '#fff', fontSize: 13, fontWeight: 600 } }, "Confirm and pay"))))),
+        toast && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.textLight, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.25)' } }, toast))));
 }
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App, null));
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
 </html>
