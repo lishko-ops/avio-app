@@ -92,6 +92,16 @@ function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
             React.createElement("path", { d: "M15.5 8.5l-2 5-5 2 2-5 5-2z" })),
         arrowleft: React.createElement("path", { d: "M19 12H5M11 6l-6 6 6 6" }),
         send: React.createElement("path", { d: "M3 11l18-8-8 18-2-8-8-2z" }),
+        house: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M4 11.5L12 4l8 7.5" }),
+            React.createElement("path", { d: "M6 10v9a1 1 0 0 0 1 1h4v-6h2v6h4a1 1 0 0 0 1-1v-9" })),
+        bottle: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M10 2h4" }),
+            React.createElement("path", { d: "M10.5 2v3.2L9 7.5v11.8a1.7 1.7 0 0 0 1.7 1.7h2.6a1.7 1.7 0 0 0 1.7-1.7V7.5l-1.5-2.3V2" }),
+            React.createElement("path", { d: "M9 12h6" })),
+        utensils: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M7 2v7a1.5 1.5 0 0 0 3 0V2M8.5 9v13" }),
+            React.createElement("path", { d: "M16 2c-1.4 1.4-2 3-2 5s1 3.5 2 4v11" })),
     };
     return React.createElement("svg", { ...common }, paths[name]);
 }
@@ -122,11 +132,11 @@ const FEED = [
 ];
 const CATEGORIES = [
     { id: 'shorts', label: 'All shorts', count: 31, icon: 'compass', color: '#2E9BFF' },
-    { id: 'beauty', label: 'Beauty', count: 14, icon: 'sparkles', color: '#F5134F' },
+    { id: 'beauty', label: 'Beauty', count: 14, icon: 'bottle', color: '#F5134F' },
     { id: 'parties', label: 'Parties', count: 9, icon: 'star', color: '#6C4CFC' },
     { id: 'educational', label: 'Educational', count: 5, icon: 'grid', color: '#2E9BFF' },
-    { id: 'restaurants', label: 'Restaurants', count: 7, icon: 'mappin', color: '#FF6B4D' },
-    { id: 'home', label: 'Home services', count: 11, icon: 'wallet', color: '#3FBF8A' },
+    { id: 'restaurants', label: 'Restaurants', count: 7, icon: 'utensils', color: '#FF6B4D' },
+    { id: 'home', label: 'Home services', count: 11, icon: 'house', color: '#3FBF8A' },
 ];
 const PROVIDERS_BY_CAT = {
     beauty: [
@@ -566,6 +576,8 @@ function App() {
                             React.createElement(Icon, { name: c.icon, size: active ? 22 : 18, color: active ? '#fff' : c.color }))),
                     React.createElement("span", { style: { fontSize: 10.5, fontWeight: active ? 600 : 400, color: active ? THEME.textDark : THEME.muted, textAlign: 'center' } }, c.label));
             }));
+            const activeDotId = exploreCategory || categories[0].id;
+            const categoryDots = React.createElement("div", { style: { display: 'flex', justifyContent: 'center', gap: 4, marginTop: 8 } }, categories.map((c) => React.createElement("span", { key: c.id, style: { width: c.id === activeDotId ? 12 : 4, height: 4, borderRadius: 2, background: c.id === activeDotId ? THEME.textDark : THEME.mutedDark, opacity: c.id === activeDotId ? 1 : 0.35, transition: 'width 0.2s' } })));
             const tabsRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 20, padding: '18px 18px 0', overflowX: 'auto', borderBottom: `1px solid ${THEME.inkLine}` } }, exploreTabs.map((t) => {
                 const active = exploreTab === t.id;
                 return React.createElement("button", { key: t.id, onClick: () => setExploreTab(t.id), style: { flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
@@ -590,7 +602,7 @@ function App() {
                 return React.createElement("div", { key: item.id, role: "button", tabIndex: 0, onClick: () => openBooking({ id: item.id, name: item.title, price: item.price, category: item.categoryLabel }), style: { textAlign: 'left', background: THEME.surface, borderRadius: 16, overflow: 'hidden', border: `1px solid ${THEME.inkLine}`, cursor: 'pointer' } }, imageBlock, textBlock);
             });
             const grid = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '16px 18px 0' } }, cards);
-            return React.createElement(React.Fragment, null, header, searchBar, quickFilterRow, categoryRow, tabsRow, grid);
+            return React.createElement(React.Fragment, null, header, searchBar, quickFilterRow, categoryRow, categoryDots, tabsRow, grid);
         })())),
         tab === 'budget' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: THEME.paper, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` } },
             React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textLight, margin: 0 } }, "My wallet"),
