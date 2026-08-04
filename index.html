@@ -142,6 +142,8 @@ function App() {
     var _a;
     const [tab, setTab] = useState('discover');
     const [activeCat, setActiveCat] = useState(null);
+    const [shortsSearchOpen, setShortsSearchOpen] = useState(false);
+    const [shortsQuery, setShortsQuery] = useState('');
     const [bookingTarget, setBookingTarget] = useState(null);
     const [bookings, setBookings] = useState([
         { id: 'b0', name: 'Fresh Start Cleaners', date: 'Aug 6', time: '10:30 AM', total: 97.2, status: 'upcoming' },
@@ -152,6 +154,12 @@ function App() {
     const [allocations, setAllocations] = useState({ Barber: 0, Beauty: 0, 'Home cleaning': 0 });
     const [toast, setToast] = useState(null);
     const days = useMemo(() => nextDays(7), []);
+    const filteredFeed = useMemo(() => {
+        const q = shortsQuery.trim().toLowerCase();
+        if (!q)
+            return FEED;
+        return FEED.filter((item) => item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q) || item.location.toLowerCase().includes(q));
+    }, [shortsQuery]);
     const [selDate, setSelDate] = useState(0);
     const [selTime, setSelTime] = useState(null);
     const spent = Object.values(allocations).reduce((a, b) => a + b, 0);
@@ -176,7 +184,9 @@ function App() {
         flashToast('Plan suggested based on your booking history');
     }
     return (React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', height: '100dvh', position: 'relative', overflow: 'hidden', background: THEME.paper, boxShadow: '0 0 40px rgba(0,0,0,0.08)' } },
-        tab === 'discover' && (React.createElement("div", { className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, FEED.map((item) => {
+        tab === 'discover' && (React.createElement("div", { className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
+            React.createElement(Icon, { name: "search", size: 22, color: THEME.mutedDark }),
+            React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, "No shorts match \"", shortsQuery, "\""))) : filteredFeed.map((item) => {
             const meta = CATEGORY_META[item.category];
             return (React.createElement("div", { key: item.id, style: { height: '100dvh', scrollSnapAlign: 'start', position: 'relative', background: `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})` } },
                 React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 16, zIndex: 2 } },
@@ -208,6 +218,12 @@ function App() {
                         "Book now \u00B7 ",
                         money(item.price)))));
         }))),
+        tab === 'discover' && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', right: 16, zIndex: 3, display: 'flex', alignItems: 'center' } }, shortsSearchOpen ? (React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '6px 10px', width: 190 } },
+            React.createElement(Icon, { name: "search", size: 14, color: THEME.mutedDark }),
+            React.createElement("input", { autoFocus: true, value: shortsQuery, onChange: (e) => setShortsQuery(e.target.value), placeholder: "Search shorts", style: { flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: THEME.textDark, fontSize: 13 } }),
+            React.createElement("button", { onClick: () => { setShortsSearchOpen(false); setShortsQuery(''); }, style: { color: THEME.mutedDark, display: 'flex' } },
+                React.createElement(Icon, { name: "x", size: 14, color: THEME.mutedDark })))) : (React.createElement("button", { onClick: () => setShortsSearchOpen(true), style: { width: 34, height: 34, borderRadius: '50%', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                React.createElement(Icon, { name: "search", size: 16, color: THEME.textDark }))))),
         tab === 'browse' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: THEME.paper, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` } }, !activeCat ? (React.createElement(React.Fragment, null,
             React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textLight, margin: 0 } }, "Browse categories"),
             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, padding: '0 12px', background: '#fff', border: `1px solid ${THEME.paperLine}`, borderRadius: 12, height: 38 } },
