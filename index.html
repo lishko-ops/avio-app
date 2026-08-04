@@ -151,6 +151,26 @@ function nextDays(n) {
     return out;
 }
 function money(n) { return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' }); }
+function parseCount(v) {
+    if (typeof v === 'number')
+        return v;
+    const m = /^([\d.]+)([KM]?)$/.exec(String(v).trim());
+    if (!m)
+        return 0;
+    const n = parseFloat(m[1]);
+    if (m[2] === 'K')
+        return Math.round(n * 1000);
+    if (m[2] === 'M')
+        return Math.round(n * 1000000);
+    return Math.round(n);
+}
+function formatCount(n) {
+    if (n >= 1000000)
+        return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1000)
+        return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return String(n);
+}
 function App() {
     var _a;
     const [tab, setTab] = useState('discover');
@@ -168,6 +188,10 @@ function App() {
     const [preferredTime, setPreferredTime] = useState('Any time');
     const [allocations, setAllocations] = useState({ Barber: 0, Beauty: 0, 'Home cleaning': 0 });
     const [toast, setToast] = useState(null);
+    const [likedIds, setLikedIds] = useState(() => new Set());
+    const [commentsByItem, setCommentsByItem] = useState({});
+    const [commentItem, setCommentItem] = useState(null);
+    const [commentDraft, setCommentDraft] = useState('');
     const days = useMemo(() => nextDays(7), []);
     const filteredFeed = useMemo(() => {
         const q = shortsQuery.trim().toLowerCase();
@@ -202,6 +226,37 @@ function App() {
         flashToast(`Booked ${bookingTarget.name} on ${label} at ${TIME_SLOTS[selTime]} · ${money(total)} total`);
     }
     function cancelBooking(id) { setBookings((prev) => prev.filter((b) => b.id !== id)); flashToast('Booking canceled'); }
+    function toggleLike(id) {
+        setLikedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id))
+                next.delete(id);
+            else
+                next.add(id);
+            return next;
+        });
+    }
+    function openComments(item) { setCommentItem(item); setCommentDraft(''); }
+    function postComment() {
+        const text = commentDraft.trim();
+        if (!text || !commentItem)
+            return;
+        setCommentsByItem((prev) => ({ ...prev, [commentItem.id]: [...(prev[commentItem.id] || []), text] }));
+        setCommentDraft('');
+    }
+    async function shareItem(item) {
+        const shareData = { title: item.name, text: `Check out ${item.name} on AVIO`, url: window.location.href };
+        if (navigator.share) {
+            try {
+                await navigator.share(shareData);
+            }
+            catch (e) { /* user canceled */ }
+        }
+        else if (navigator.clipboard) {
+            await navigator.clipboard.writeText(shareData.url);
+            flashToast('Link copied to clipboard');
+        }
+    }
     function suggestPlan() {
         setAllocations({ Barber: Math.round(monthlyBudget * 0.15), Beauty: Math.round(monthlyBudget * 0.35), 'Home cleaning': Math.round(monthlyBudget * 0.2) });
         flashToast('Plan suggested based on your booking history');
@@ -217,13 +272,13 @@ function App() {
                     React.createElement("p", { style: { fontSize: 9, color: THEME.mutedDark, letterSpacing: 1.5, marginTop: -2 } }, "ALL-IN-ONE BOOKING")),
                 React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 84, opacity: 0.9 } }, meta.icon),
                 React.createElement("div", { style: { position: 'absolute', right: 12, bottom: 'calc(env(safe-area-inset-bottom) + 214px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, zIndex: 2 } },
-                    React.createElement("button", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', color: THEME.textDark } },
-                        React.createElement(Icon, { name: "diamond", size: 24, color: THEME.textDark }),
-                        React.createElement("span", { style: { fontSize: 11, marginTop: 2 } }, item.likes)),
-                    React.createElement("button", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', color: THEME.textDark } },
+                    React.createElement("button", { onClick: () => toggleLike(item.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', color: THEME.textDark } },
+                        React.createElement(Icon, { name: "diamond", size: 24, color: likedIds.has(item.id) ? THEME.coral : THEME.textDark }),
+                        React.createElement("span", { style: { fontSize: 11, marginTop: 2 } }, formatCount(parseCount(item.likes) + (likedIds.has(item.id) ? 1 : 0)))),
+                    React.createElement("button", { onClick: () => openComments(item), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', color: THEME.textDark } },
                         React.createElement(Icon, { name: "message", size: 24 }),
-                        React.createElement("span", { style: { fontSize: 11, marginTop: 2 } }, item.comments)),
-                    React.createElement("button", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', color: THEME.textDark } },
+                        React.createElement("span", { style: { fontSize: 11, marginTop: 2 } }, item.comments + ((commentsByItem[item.id] || []).length))),
+                    React.createElement("button", { onClick: () => shareItem(item), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', color: THEME.textDark } },
                         React.createElement(Icon, { name: "share", size: 23 }),
                         React.createElement("span", { style: { fontSize: 11, marginTop: 2 } }, "Share"))),
                 React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: `16px 16px calc(env(safe-area-inset-bottom) + 100px)`, background: 'linear-gradient(0deg, rgba(0,0,0,0.75), rgba(0,0,0,0))' } },
@@ -393,6 +448,19 @@ function App() {
                 React.createElement("div", { style: { display: 'flex', gap: 12, marginTop: 16 } },
                     React.createElement("button", { onClick: () => setBookingTarget(null), style: { flex: 1, padding: '11px 0', borderRadius: 24, border: `1px solid ${THEME.paperLine}`, color: THEME.textLight, fontSize: 13, fontWeight: 500 } }, "Cancel"),
                     React.createElement("button", { onClick: confirmBooking, disabled: selTime == null, style: { flex: 2, padding: '11px 0', borderRadius: 24, background: selTime == null ? THEME.paperLine : THEME.coral, color: selTime == null ? THEME.muted : '#fff', fontSize: 13, fontWeight: 600 } }, "Confirm and pay"))))),
+        commentItem && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } },
+            React.createElement("div", { style: { width: '100%', background: THEME.surface, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '70%', display: 'flex', flexDirection: 'column' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: THEME.textLight, margin: 0 } }, "Comments"),
+                    React.createElement("button", { onClick: () => setCommentItem(null) },
+                        React.createElement(Icon, { name: "x", size: 18, color: THEME.muted }))),
+                React.createElement("div", { className: "avio-scroll", style: { overflowY: 'auto', marginTop: 12, flex: 1 } },
+                    (commentsByItem[commentItem.id] || []).length === 0 && React.createElement("p", { style: { fontSize: 13, color: THEME.muted } }, "No comments yet. Be the first!"),
+                    (commentsByItem[commentItem.id] || []).map((c, i) => (React.createElement("div", { key: i, style: { padding: '10px 0', borderBottom: `1px solid ${THEME.inkLine}` } },
+                        React.createElement("p", { style: { fontSize: 13, color: THEME.textLight, margin: 0 } }, c))))),
+                React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 12 } },
+                    React.createElement("input", { value: commentDraft, onChange: (e) => setCommentDraft(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') postComment(); }, placeholder: "Add a comment...", style: { flex: 1, background: THEME.ink, border: `1px solid ${THEME.inkLine}`, borderRadius: 20, padding: '10px 14px', color: THEME.textLight, fontSize: 13, outline: 'none' } }),
+                    React.createElement("button", { onClick: postComment, style: { background: THEME.coral, color: '#fff', fontWeight: 600, fontSize: 13, padding: '0 18px', borderRadius: 20 } }, "Post"))))),
         toast && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }, toast))));
 }
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App, null));
