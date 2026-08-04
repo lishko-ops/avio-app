@@ -591,13 +591,13 @@ function App() {
                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, item.discount));
             const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 74, bottom: 'calc(env(safe-area-inset-bottom) + 148px)', padding: '0 18px', zIndex: 2 } },
                 nameRow, categoryRow2, captionP, ratingRow, discountBadge);
-            const bookCta = React.createElement("div", { className: "avio-pulse", style: { position: 'absolute', left: 18, right: 18, bottom: 'calc(env(safe-area-inset-bottom) + 88px)', zIndex: 2, borderRadius: 30, background: '#fff', boxShadow: '0 10px 26px rgba(0,0,0,0.35)' } },
-                React.createElement("button", { onClick: () => openBooking(item), style: { position: 'relative', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '15px 10px' } },
-                    React.createElement("div", { style: { textAlign: 'center' } },
-                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: THEME.ink, margin: 0 } }, "Book Now"),
-                        React.createElement("p", { style: { fontSize: 12, color: THEME.muted, margin: '1px 0 0' } }, "From ", money(item.price))),
-                    React.createElement("div", { style: { position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 38, height: 38, borderRadius: '50%', background: THEME.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                        React.createElement(Icon, { name: "arrowright", size: 17, color: "#fff" }))));
+            const bookCta = React.createElement("div", { className: "avio-pulse", style: { position: 'absolute', left: 18, bottom: 'calc(env(safe-area-inset-bottom) + 88px)', zIndex: 2, borderRadius: 30, background: '#fff', boxShadow: '0 10px 26px rgba(0,0,0,0.35)', display: 'inline-block' } },
+                React.createElement("button", { onClick: () => openBooking(item), style: { display: 'flex', alignItems: 'center', gap: 12, padding: '9px 9px 9px 18px' } },
+                    React.createElement("div", { style: { textAlign: 'left' } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: THEME.ink, margin: 0, whiteSpace: 'nowrap' } }, "Book Now"),
+                        React.createElement("p", { style: { fontSize: 11, color: THEME.muted, margin: '1px 0 0', whiteSpace: 'nowrap' } }, "From ", money(item.price))),
+                    React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', background: THEME.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement(Icon, { name: "arrowright", size: 15, color: "#fff" }))));
             return React.createElement("div", { key: item.id, style: { height: '100dvh', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
                 backdrop, scrim, brand, actionStack, infoBlock, bookCta);
         }))),
