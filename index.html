@@ -90,6 +90,7 @@ function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
             React.createElement("circle", { cx: "12", cy: "12", r: "9" }),
             React.createElement("path", { d: "M15.5 8.5l-2 5-5 2 2-5 5-2z" })),
         arrowleft: React.createElement("path", { d: "M19 12H5M11 6l-6 6 6 6" }),
+        send: React.createElement("path", { d: "M3 11l18-8-8 18-2-8-8-2z" }),
     };
     return React.createElement("svg", { ...common }, paths[name]);
 }
@@ -99,6 +100,15 @@ const CATEGORY_META = {
     'Parties': { grad: ['#5A2E7A', '#1E1030'], icon: '🎉' },
     'Restaurants': { grad: ['#6B4A1E', '#241706'], icon: '🍽' },
 };
+const COMMENT_POOL = [
+    { name: 'Jordan', text: 'Booked instantly, worth every penny!', time: '2d', color: '#6C4CFC' },
+    { name: 'Casey', text: 'This looks amazing, saving for later.', time: '18h', color: '#F5A623' },
+    { name: 'Riley', text: 'How far in advance should I book?', time: '9h', color: '#3FA6BF' },
+    { name: 'Morgan', text: 'Followed! Can’t wait to try this.', time: '1d', color: '#F5134F' },
+];
+function seedComments(index) {
+    return [COMMENT_POOL[index % COMMENT_POOL.length], COMMENT_POOL[(index + 1) % COMMENT_POOL.length]];
+}
 const FEED = [
     { id: 'f1', category: 'Home Services', name: 'Sparkle Squad Cleaning', location: 'Denver, CO', rating: 4.8, price: 120, likes: '1.3K', comments: 42, blurb: 'Deep clean, move-in/move-out, eco-friendly products.' },
     { id: 'f2', category: 'Home Services', name: 'Fresh Start Cleaners', location: 'Miami, FL', rating: 4.9, price: 90, likes: '892', comments: 18, blurb: 'Residential and post-construction cleaning.' },
@@ -241,7 +251,7 @@ function App() {
         const text = commentDraft.trim();
         if (!text || !commentItem)
             return;
-        setCommentsByItem((prev) => ({ ...prev, [commentItem.id]: [...(prev[commentItem.id] || []), text] }));
+        setCommentsByItem((prev) => ({ ...prev, [commentItem.id]: [...(prev[commentItem.id] || []), { name: 'You', text, time: 'now', color: THEME.coral }] }));
         setCommentDraft('');
     }
     async function shareItem(item) {
@@ -448,19 +458,30 @@ function App() {
                 React.createElement("div", { style: { display: 'flex', gap: 12, marginTop: 16 } },
                     React.createElement("button", { onClick: () => setBookingTarget(null), style: { flex: 1, padding: '11px 0', borderRadius: 24, border: `1px solid ${THEME.paperLine}`, color: THEME.textLight, fontSize: 13, fontWeight: 500 } }, "Cancel"),
                     React.createElement("button", { onClick: confirmBooking, disabled: selTime == null, style: { flex: 2, padding: '11px 0', borderRadius: 24, background: selTime == null ? THEME.paperLine : THEME.coral, color: selTime == null ? THEME.muted : '#fff', fontSize: 13, fontWeight: 600 } }, "Confirm and pay"))))),
-        commentItem && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } },
-            React.createElement("div", { style: { width: '100%', background: THEME.surface, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '70%', display: 'flex', flexDirection: 'column' } },
+        commentItem && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } }, (() => {
+            const seeded = seedComments(FEED.findIndex((f) => f.id === commentItem.id));
+            const added = commentsByItem[commentItem.id] || [];
+            const allComments = [...seeded, ...added];
+            return React.createElement("div", { style: { width: '100%', background: THEME.surface, borderRadius: '20px 20px 0 0', padding: `10px 18px calc(env(safe-area-inset-bottom) + 14px)`, maxHeight: '75%', display: 'flex', flexDirection: 'column' } },
+                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: THEME.inkLine, margin: '0 auto 14px' } }),
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: THEME.textLight, margin: 0 } }, "Comments"),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: THEME.textLight, margin: 0 } }, commentItem.comments + added.length, " Comments"),
                     React.createElement("button", { onClick: () => setCommentItem(null) },
                         React.createElement(Icon, { name: "x", size: 18, color: THEME.muted }))),
-                React.createElement("div", { className: "avio-scroll", style: { overflowY: 'auto', marginTop: 12, flex: 1 } },
-                    (commentsByItem[commentItem.id] || []).length === 0 && React.createElement("p", { style: { fontSize: 13, color: THEME.muted } }, "No comments yet. Be the first!"),
-                    (commentsByItem[commentItem.id] || []).map((c, i) => (React.createElement("div", { key: i, style: { padding: '10px 0', borderBottom: `1px solid ${THEME.inkLine}` } },
-                        React.createElement("p", { style: { fontSize: 13, color: THEME.textLight, margin: 0 } }, c))))),
-                React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 12 } },
-                    React.createElement("input", { value: commentDraft, onChange: (e) => setCommentDraft(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') postComment(); }, placeholder: "Add a comment...", style: { flex: 1, background: THEME.ink, border: `1px solid ${THEME.inkLine}`, borderRadius: 20, padding: '10px 14px', color: THEME.textLight, fontSize: 13, outline: 'none' } }),
-                    React.createElement("button", { onClick: postComment, style: { background: THEME.coral, color: '#fff', fontWeight: 600, fontSize: 13, padding: '0 18px', borderRadius: 20 } }, "Post"))))),
+                React.createElement("div", { className: "avio-scroll", style: { overflowY: 'auto', marginTop: 14, flex: 1, display: 'flex', flexDirection: 'column', gap: 14 } },
+                    allComments.map((c, i) => (React.createElement("div", { key: i, style: { display: 'flex', gap: 10 } },
+                        React.createElement("div", { style: { width: 32, height: 32, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 12, fontWeight: 700 } }, c.name[0]),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("p", { style: { margin: 0, fontSize: 12.5 } },
+                                React.createElement("span", { style: { fontWeight: 600, color: THEME.textLight } }, c.name),
+                                React.createElement("span", { style: { color: THEME.muted, marginLeft: 6, fontSize: 11 } }, c.time)),
+                            React.createElement("p", { style: { margin: '2px 0 0', fontSize: 13, color: THEME.textLight } }, c.text)))))),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${THEME.inkLine}` } },
+                    React.createElement("div", { style: { width: 28, height: 28, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 11, fontWeight: 700 } }, "Y"),
+                    React.createElement("input", { value: commentDraft, onChange: (e) => setCommentDraft(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') postComment(); }, placeholder: "Add a comment...", style: { flex: 1, background: THEME.ink, border: `1px solid ${THEME.inkLine}`, borderRadius: 20, padding: '9px 14px', color: THEME.textLight, fontSize: 13, outline: 'none', minWidth: 0 } }),
+                    React.createElement("button", { onClick: postComment, style: { width: 32, height: 32, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement(Icon, { name: "send", size: 14, color: "#fff" }))));
+        })())),
         toast && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }, toast))));
 }
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App, null));
