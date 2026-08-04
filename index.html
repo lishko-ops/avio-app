@@ -332,7 +332,7 @@ function App() {
                         " at ",
                         b.time)),
                 React.createElement("p", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: THEME.textLight, marginTop: 6 } }, money(b.total)))))))),
-        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-around', position: 'absolute', left: 0, right: 0, bottom: 0, height: `calc(env(safe-area-inset-bottom) + 64px)`, paddingBottom: 'env(safe-area-inset-bottom)', background: 'rgba(21,18,28,0.92)', borderTop: `1px solid ${THEME.inkLine}`, backdropFilter: 'blur(8px)' } }, [
+        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-around', position: 'absolute', left: 0, right: 0, bottom: 0, height: `calc(env(safe-area-inset-bottom) + 64px)`, paddingBottom: 'env(safe-area-inset-bottom)', background: 'transparent', zIndex: 4 } }, [
             { id: 'discover', icon: 'compass', label: 'Discover' },
             { id: 'browse', icon: 'grid', label: 'Browse' },
             { id: 'bookings', icon: 'calendar', label: 'Bookings' },
