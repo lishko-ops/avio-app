@@ -99,6 +99,8 @@ const FEED = [
     { id: 'f4', category: 'Beauty', name: 'Kiana Frost MUA', location: 'Brooklyn, NY', rating: 5.0, price: 220, likes: '3.4K', comments: 130, blurb: 'Bridal and editorial makeup artistry.' },
     { id: 'f5', category: 'Parties', name: 'Belle Noir Events', location: 'Chicago, IL', rating: 4.6, price: 400, likes: '640', comments: 24, blurb: 'Full-service party planning and styling.' },
     { id: 'f6', category: 'Restaurants', name: "Camille's Table", location: 'New Orleans, LA', rating: 4.9, price: 85, likes: '1.8K', comments: 58, blurb: "Chef's tasting menu, seasonal ingredients." },
+    { id: 'f7', category: 'Parties', name: 'Nova Sound DJs', location: 'Los Angeles, CA', rating: 4.8, price: 350, likes: '2.7K', comments: 95, blurb: 'Wedding and club DJ sets with full sound and lighting rig.' },
+    { id: 'f8', category: 'Beauty', name: 'Bare Skin Makeup Co.', location: 'Phoenix, AZ', rating: 4.9, price: 130, likes: '1.5K', comments: 61, blurb: 'Natural glam and airbrush makeup for any event.' },
 ];
 const CATEGORIES = [
     { id: 'shorts', label: 'All shorts', count: 31, icon: 'compass' },
@@ -116,12 +118,16 @@ const PROVIDERS_BY_CAT = {
         { id: 'p4', initials: 'CR', name: 'Camille Rae', price: 95, color: THEME.violet },
         { id: 'p5', initials: 'SB', name: 'Studio Blush', price: 110, color: '#3FA6BF' },
         { id: 'p6', initials: 'KF', name: 'Kiana Frost MUA', price: 220, color: '#BF6B3F' },
+        { id: 'p13', initials: 'BS', name: 'Bare Skin Makeup Co.', price: 130, color: '#6BBF3F' },
     ],
     home: [
         { id: 'p7', initials: 'SS', name: 'Sparkle Squad Cleaning', price: 120, color: '#3F6FBF' },
         { id: 'p8', initials: 'FS', name: 'Fresh Start Cleaners', price: 90, color: '#3FBF8A' },
     ],
-    parties: [{ id: 'p9', initials: 'BN', name: 'Belle Noir Events', price: 400, color: THEME.coral }],
+    parties: [
+        { id: 'p9', initials: 'BN', name: 'Belle Noir Events', price: 400, color: THEME.coral },
+        { id: 'p12', initials: 'ND', name: 'Nova Sound DJs', price: 350, color: THEME.violet },
+    ],
     restaurants: [{ id: 'p10', initials: 'CT', name: "Camille's Table", price: 85, color: THEME.gold }],
     educational: [{ id: 'p11', initials: 'TT', name: 'Tempo Tutors', price: 60, color: THEME.violet }],
     shorts: [],
