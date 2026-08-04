@@ -42,6 +42,8 @@ const THEME = {
     coral: '#F5134F', violet: '#6C4CFC', violetSoft: 'rgba(108,76,252,0.20)',
     gold: '#F5A623', textDark: '#F8F4EC', textLight: '#F3EFFA',
     muted: '#93899A', mutedDark: '#B7AFC3',
+    blue: '#2E9BFF', turquoise: '#2FD9C4', green: '#3FBF8A',
+    rainbow: 'conic-gradient(from 180deg, #2E9BFF, #2FD9C4, #3FBF8A, #F5A623, #F5134F, #6C4CFC, #2E9BFF)',
 };
 function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
     const common = { width: size, height: size, viewBox: '0 0 24 24', fill, stroke: color, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round' };
@@ -148,6 +150,28 @@ const PROVIDERS_BY_CAT = {
     educational: [{ id: 'p11', initials: 'TT', name: 'Tempo Tutors', price: 60, color: THEME.violet }],
     shorts: [],
 };
+const CATEGORY_LABEL_TO_ID = { 'Home Services': 'home', Beauty: 'beauty', Parties: 'parties', Restaurants: 'restaurants', Educational: 'educational' };
+const EXPLORE_BADGES = ['New', 'Trending', 'Top Pick', 'Popular'];
+const EXPLORE_ITEMS = [
+    ...FEED.map((item, i) => ({
+        id: 'v-' + item.id, kind: 'video', categoryId: CATEGORY_LABEL_TO_ID[item.category] || 'home',
+        title: item.name, subtitle: `${item.location}`, price: item.price, rating: item.rating,
+        badge: EXPLORE_BADGES[i % EXPLORE_BADGES.length], meta: item.likes,
+        grad: CATEGORY_META[item.category] ? CATEGORY_META[item.category].grad : ['#3F3F5C', '#1E1E30'],
+        emoji: CATEGORY_META[item.category] ? CATEGORY_META[item.category].icon : '📍',
+        categoryLabel: item.category,
+    })),
+    ...Object.entries(PROVIDERS_BY_CAT).flatMap(([catId, list]) => list.map((p, i) => {
+        var _a;
+        return ({
+            id: 'b-' + p.id, kind: 'business', categoryId: catId,
+            title: p.name, subtitle: 'Booking available', price: p.price, rating: null,
+            badge: EXPLORE_BADGES[(i + 2) % EXPLORE_BADGES.length], meta: null,
+            color: p.color, initials: p.initials,
+            categoryLabel: ((_a = CATEGORIES.find((c) => c.id === catId)) === null || _a === void 0 ? void 0 : _a.label) || 'Home Services',
+        });
+    })),
+];
 const TIME_SLOTS = ['9:00 AM', '10:30 AM', '12:00 PM', '1:30 PM', '3:00 PM', '4:30 PM', '6:00 PM', '7:30 PM'];
 function nextDays(n) {
     const out = [];
@@ -212,6 +236,36 @@ function App() {
     const [commentsByItem, setCommentsByItem] = useState({});
     const [commentItem, setCommentItem] = useState(null);
     const [commentDraft, setCommentDraft] = useState('');
+    const [exploreCategory, setExploreCategory] = useState(null);
+    const [exploreTab, setExploreTab] = useState('forYou');
+    const [exploreQuickFilter, setExploreQuickFilter] = useState('forYou');
+    const [exploreBookmarks, setExploreBookmarks] = useState(() => new Set());
+    function toggleBookmark(id) {
+        setExploreBookmarks((prev) => {
+            const next = new Set(prev);
+            if (next.has(id))
+                next.delete(id);
+            else
+                next.add(id);
+            return next;
+        });
+    }
+    const exploreItems = useMemo(() => {
+        let items = EXPLORE_ITEMS;
+        if (exploreCategory)
+            items = items.filter((i) => i.categoryId === exploreCategory);
+        if (exploreTab === 'videos')
+            items = items.filter((i) => i.kind === 'video');
+        if (exploreTab === 'businesses')
+            items = items.filter((i) => i.kind === 'business');
+        if (exploreQuickFilter === 'trending')
+            items = [...items].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        else if (exploreQuickFilter === 'new')
+            items = [...items].slice().reverse();
+        else if (exploreQuickFilter === 'verified')
+            items = items.filter((i) => i.kind === 'business');
+        return items;
+    }, [exploreCategory, exploreTab, exploreQuickFilter]);
     const days = useMemo(() => nextDays(7), []);
     const filteredFeed = useMemo(() => {
         const q = shortsQuery.trim().toLowerCase();
@@ -469,44 +523,75 @@ function App() {
             React.createElement("button", { onClick: () => { setShortsSearchOpen(false); setShortsQuery(''); }, style: { color: THEME.mutedDark, display: 'flex' } },
                 React.createElement(Icon, { name: "x", size: 14, color: THEME.mutedDark })))) : (React.createElement("button", { onClick: () => setShortsSearchOpen(true), style: { width: 34, height: 34, borderRadius: '50%', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                 React.createElement(Icon, { name: "search", size: 16, color: THEME.textDark }))))),
-        tab === 'browse' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: THEME.ink, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` } }, !activeCat ? (React.createElement(React.Fragment, null,
-            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, margin: 0 } },
-                    React.createElement("span", { style: { color: THEME.textDark } }, "Browse "),
-                    React.createElement("span", { style: { color: THEME.coral } }, "Categories")),
-                React.createElement(Icon, { name: "diamond", size: 20, color: THEME.textDark })),
-            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, padding: '0 12px', background: THEME.surface, border: `1px solid ${THEME.inkLine}`, borderRadius: 12, height: 38 } },
-                React.createElement(Icon, { name: "search", size: 15, color: THEME.mutedDark }),
-                React.createElement("span", { style: { fontSize: 13, color: THEME.mutedDark } }, "Search artist profiles")),
-            React.createElement("p", { style: { fontSize: 11, color: THEME.muted, marginTop: 18, marginBottom: 8, letterSpacing: 0.5 } }, "CHOOSE A CATEGORY"),
-            React.createElement("button", { onClick: () => setActiveCat('shorts'), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'rgba(245,19,79,0.08)', border: `1px solid ${THEME.coral}`, borderRadius: 14, padding: '12px 14px', textAlign: 'left' } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12 } },
-                    React.createElement("div", { style: { width: 34, height: 34, borderRadius: 10, background: 'rgba(245,19,79,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                        React.createElement(Icon, { name: "grid", size: 16, color: THEME.coral })),
-                    React.createElement("div", null,
-                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: THEME.textDark, margin: 0 } }, "All Shorts"),
-                        React.createElement("p", { style: { fontSize: 11, color: THEME.muted, margin: 0 } },
-                            (_a = CATEGORIES.find((c) => c.id === 'shorts')) === null || _a === void 0 ? void 0 : _a.count,
-                            " profiles"))),
-                React.createElement("span", { style: { display: 'flex', transform: 'rotate(180deg)' } },
-                    React.createElement(Icon, { name: "arrowleft", size: 16, color: THEME.coral }))),
-            React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 } }, CATEGORIES.filter((c) => c.id !== 'shorts').map((c) => (React.createElement("button", { key: c.id, onClick: () => setActiveCat(c.id), style: { background: THEME.surface, border: `1px solid ${THEME.inkLine}`, borderRadius: 14, padding: '14px 16px', textAlign: 'left' } },
-                React.createElement("div", { style: { width: 34, height: 34, borderRadius: 10, background: THEME.violetSoft, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement(Icon, { name: c.icon, size: 16, color: THEME.violet })),
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: THEME.textDark, marginTop: 8, marginBottom: 0 } }, c.label),
-                React.createElement("p", { style: { fontSize: 11, color: THEME.muted, margin: 0 } },
-                    c.count,
-                    " profiles"))))))) : (React.createElement(React.Fragment, null,
-            React.createElement("button", { onClick: () => setActiveCat(null), style: { display: 'flex', alignItems: 'center', gap: 4, color: THEME.textLight, fontSize: 13, marginBottom: 14 } },
-                React.createElement(Icon, { name: "arrowleft", size: 16 }),
-                " ", (_a = CATEGORIES.find((c) => c.id === activeCat)) === null || _a === void 0 ? void 0 :
-                _a.label),
-            React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 } },
-                (PROVIDERS_BY_CAT[activeCat] || []).map((p) => (React.createElement("button", { key: p.id, onClick: () => { var _a; return openBooking({ id: p.id, name: p.name, price: p.price, category: ((_a = CATEGORIES.find((c) => c.id === activeCat)) === null || _a === void 0 ? void 0 : _a.label) || 'Home Services' }); }, style: { background: p.color, borderRadius: 12, aspectRatio: '1', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: 8, color: '#fff', textAlign: 'left' } },
-                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15 } }, p.initials),
-                    React.createElement("span", { style: { fontSize: 9, lineHeight: 1.2, marginTop: 2 } }, p.name),
-                    React.createElement("span", { style: { fontSize: 9, opacity: 0.85 } }, money(p.price))))),
-                (PROVIDERS_BY_CAT[activeCat] || []).length === 0 && React.createElement("p", { style: { fontSize: 12, color: THEME.muted, gridColumn: 'span 3' } }, "No profiles in this category yet.")))))),
+        tab === 'browse' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: THEME.ink, padding: `calc(env(safe-area-inset-top) + 16px) 0 calc(env(safe-area-inset-bottom) + 90px)` } }, (() => {
+            const categories = CATEGORIES.filter((c) => c.id !== 'shorts');
+            const quickFilters = [
+                { id: 'forYou', label: 'For You' },
+                { id: 'trending', label: 'Trending' },
+                { id: 'nearMe', label: 'Near Me' },
+                { id: 'businesses', label: 'Businesses' },
+                { id: 'new', label: 'New' },
+                { id: 'verified', label: 'Verified' },
+            ];
+            const exploreTabs = [
+                { id: 'forYou', label: 'For You' },
+                { id: 'videos', label: 'Videos' },
+                { id: 'businesses', label: 'Businesses' },
+            ];
+            const header = React.createElement("div", { style: { padding: '0 18px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' } },
+                React.createElement("div", null,
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: THEME.textDark, margin: 0 } }, "Explore"),
+                    React.createElement("p", { style: { fontSize: 12, color: THEME.muted, marginTop: 2, maxWidth: 220 } }, "Discover products, services and people around you")),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 } },
+                    React.createElement("button", { onClick: () => flashToast('Using your approximate location'), style: { width: 34, height: 34, borderRadius: '50%', background: THEME.surface, border: `1px solid ${THEME.inkLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: "mappin", size: 15, color: THEME.textDark })),
+                    React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: "user", size: 16, color: THEME.ink }))));
+            const searchBar = React.createElement("div", { style: { padding: '0 18px', marginTop: 14 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, borderRadius: 16, height: 44, padding: '0 14px' } },
+                    React.createElement(Icon, { name: "search", size: 16, color: THEME.mutedDark }),
+                    React.createElement("span", { style: { fontSize: 13, color: THEME.mutedDark, flex: 1 } }, "Search services, businesses or creators"),
+                    React.createElement("button", { onClick: () => flashToast('Filters coming soon'), style: { display: 'flex' } },
+                        React.createElement(Icon, { name: "grid", size: 15, color: THEME.mutedDark }))));
+            const quickFilterRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, padding: '14px 18px 0', overflowX: 'auto' } }, quickFilters.map((f) => {
+                const active = exploreQuickFilter === f.id;
+                return React.createElement("button", { key: f.id, onClick: () => setExploreQuickFilter(f.id), style: { flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 18, background: active ? THEME.surface : 'transparent', border: `1px solid ${active ? THEME.turquoise : THEME.inkLine}`, color: active ? '#fff' : THEME.mutedDark } }, f.label);
+            }));
+            const categoryRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 16, padding: '18px 18px 4px', overflowX: 'auto' } }, categories.map((c) => {
+                const active = exploreCategory === c.id;
+                const size = active ? 62 : 52;
+                return React.createElement("button", { key: c.id, onClick: () => setExploreCategory(active ? null : c.id), style: { flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, width: 66 } },
+                    React.createElement("div", { style: { width: size, height: size, borderRadius: '50%', padding: 2, background: active ? THEME.rainbow : THEME.inkLine } },
+                        React.createElement("div", { style: { width: '100%', height: '100%', borderRadius: '50%', background: THEME.surface, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement(Icon, { name: c.icon, size: active ? 22 : 18, color: active ? '#fff' : THEME.mutedDark }))),
+                    React.createElement("span", { style: { fontSize: 10.5, fontWeight: active ? 600 : 400, color: active ? THEME.textDark : THEME.muted, textAlign: 'center' } }, c.label));
+            }));
+            const tabsRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 20, padding: '18px 18px 0', overflowX: 'auto', borderBottom: `1px solid ${THEME.inkLine}` } }, exploreTabs.map((t) => {
+                const active = exploreTab === t.id;
+                return React.createElement("button", { key: t.id, onClick: () => setExploreTab(t.id), style: { flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
+                    React.createElement("span", { style: { fontSize: 13, fontWeight: active ? 700 : 500, color: active ? THEME.textDark : THEME.muted } }, t.label),
+                    React.createElement("div", { style: { width: active ? 22 : 0, height: 2, borderRadius: 1, background: THEME.rainbow } }));
+            }));
+            const cards = exploreItems.length === 0 ? [React.createElement("div", { key: "empty", style: { gridColumn: 'span 2', textAlign: 'center', padding: '60px 20px' } },
+                React.createElement(Icon, { name: "search", size: 22, color: THEME.mutedDark }),
+                React.createElement("p", { style: { fontSize: 13, color: THEME.muted, marginTop: 10 } }, "No results here yet."),
+                React.createElement("p", { style: { fontSize: 12, color: THEME.muted } }, "Try another category or filter."))] : exploreItems.map((item) => {
+                const media = item.kind === 'video' ? React.createElement("span", { style: { fontSize: 34 } }, item.emoji) : React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: '#fff' } }, item.initials);
+                const ratingIcon = item.rating ? React.createElement(Icon, { name: "star", size: 10, color: THEME.gold, fill: THEME.gold }) : null;
+                const metaText = item.rating ? `${item.rating} · ${item.subtitle}` : money(item.price);
+                const imageBlock = React.createElement("div", { style: { position: 'relative', aspectRatio: '4 / 5', background: item.kind === 'video' ? `linear-gradient(160deg, ${item.grad[0]}, ${item.grad[1]})` : item.color, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    media,
+                    React.createElement("span", { style: { position: 'absolute', top: 8, left: 8, fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 5, background: 'rgba(0,0,0,0.5)', color: '#fff' } }, item.badge),
+                    React.createElement("button", { onClick: (e) => { e.stopPropagation(); toggleBookmark(item.id); }, style: { position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 8, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: "bookmark", size: 12, color: "#fff", fill: exploreBookmarks.has(item.id) ? '#fff' : 'none' })));
+                const textBlock = React.createElement("div", { style: { padding: 10 } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 12.5, color: THEME.textDark, margin: 0, lineHeight: 1.3 } }, item.title),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 5 } }, ratingIcon, React.createElement("span", { style: { fontSize: 11, color: THEME.muted } }, metaText)));
+                return React.createElement("div", { key: item.id, role: "button", tabIndex: 0, onClick: () => openBooking({ id: item.id, name: item.title, price: item.price, category: item.categoryLabel }), style: { textAlign: 'left', background: THEME.surface, borderRadius: 16, overflow: 'hidden', border: `1px solid ${THEME.inkLine}`, cursor: 'pointer' } }, imageBlock, textBlock);
+            });
+            const grid = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '16px 18px 0' } }, cards);
+            return React.createElement(React.Fragment, null, header, searchBar, quickFilterRow, categoryRow, tabsRow, grid);
+        })())),
         tab === 'budget' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: THEME.paper, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` } },
             React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textLight, margin: 0 } }, "My wallet"),
             React.createElement("div", { style: { marginTop: 14, background: THEME.violet, borderRadius: 16, padding: 18 } },
