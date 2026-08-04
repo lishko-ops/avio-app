@@ -578,18 +578,25 @@ function App() {
                         React.createElement("p", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: THEME.gold, margin: 0 } }, money(b.total)),
                         b.status === 'upcoming' && React.createElement("button", { onClick: () => cancelBooking(b.id), style: { fontSize: 11, color: THEME.coral, marginTop: 2 } }, "Cancel"))));
             })))),
-        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-around', position: 'absolute', left: 0, right: 0, bottom: 0, height: `calc(env(safe-area-inset-bottom) + 64px)`, paddingBottom: 'env(safe-area-inset-bottom)', background: 'transparent', zIndex: 4 } }, [
-            { id: 'discover', icon: 'compass', label: 'Discover' },
-            { id: 'browse', icon: 'grid', label: 'Browse' },
-            { id: 'bookings', icon: 'calendar', label: 'Bookings' },
-            { id: 'budget', icon: 'wallet', label: 'Budget' },
-        ].map((t) => {
-            const active = tab === t.id;
-            return (React.createElement("button", { key: t.id, onClick: () => { setTab(t.id); setActiveCat(null); }, style: { display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                React.createElement("div", { style: { width: 36, height: 36, borderRadius: '50%', padding: active ? 2 : 0, background: active ? `conic-gradient(from 180deg, ${THEME.coral}, ${THEME.violet}, ${THEME.coral})` : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement("div", { style: { width: '100%', height: '100%', borderRadius: '50%', background: active ? THEME.ink : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                        React.createElement(Icon, { name: t.icon, size: 18, color: active ? '#fff' : THEME.mutedDark })))));
-        })),
+        React.createElement("div", { style: { position: 'absolute', left: 16, right: 16, bottom: 'calc(env(safe-area-inset-bottom) + 14px)', height: 58, zIndex: 4 } },
+            (() => {
+                const pairs = [
+                    [{ id: 'discover', icon: 'compass', label: 'Discover' }, { id: 'browse', icon: 'grid', label: 'Browse' }],
+                    [{ id: 'bookings', icon: 'calendar', label: 'Bookings' }, { id: 'budget', icon: 'wallet', label: 'Budget' }],
+                ];
+                return pairs.map((pair, pi) => {
+                    const side = pi === 0 ? 'left' : 'right';
+                    return React.createElement("div", { key: pi, style: { position: 'absolute', [side]: 0, top: 0, width: 'calc(50% - 36px)', height: '100%', background: 'rgba(20,17,26,0.92)', backdropFilter: 'blur(10px)', borderRadius: 30, display: 'flex', alignItems: 'center', justifyContent: 'space-around' } }, pair.map((t) => {
+                        const active = tab === t.id;
+                        return React.createElement("button", { key: t.id, onClick: () => { setTab(t.id); setActiveCat(null); }, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 } },
+                            React.createElement(Icon, { name: t.icon, size: 18, color: active ? '#fff' : THEME.mutedDark }),
+                            React.createElement("span", { style: { fontSize: 9, color: active ? '#fff' : THEME.mutedDark, fontWeight: active ? 600 : 400 } }, t.label));
+                    }));
+                });
+            })(),
+            React.createElement("button", { onClick: () => { setTab('browse'); setActiveCat(null); }, style: { position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -62%)', width: 68, height: 68, borderRadius: '50%', padding: 3, background: `conic-gradient(from 180deg, #21D4FD, #6C4CFC, ${THEME.coral}, #F5A623, #21D4FD)` } },
+                React.createElement("div", { style: { width: '100%', height: '100%', borderRadius: '50%', background: THEME.ink, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "plus", size: 24, color: "#fff" })))),
         bookingTarget && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } },
             React.createElement("div", { style: { width: '100%', background: THEME.surface, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '88%', overflowY: 'auto' } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
