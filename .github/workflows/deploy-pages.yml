@@ -30,5 +30,6 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+          retention-days: 7
       - id: deployment
         uses: actions/deploy-pages@v4
