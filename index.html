@@ -586,8 +586,9 @@ function App() {
         ].map((t) => {
             const active = tab === t.id;
             return (React.createElement("button", { key: t.id, onClick: () => { setTab(t.id); setActiveCat(null); }, style: { display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: active ? `linear-gradient(135deg, ${THEME.coral}, ${THEME.violet})` : 'transparent' } },
-                    React.createElement(Icon, { name: t.icon, size: 18, color: active ? '#fff' : THEME.mutedDark }))));
+                React.createElement("div", { style: { width: 36, height: 36, borderRadius: '50%', padding: active ? 2 : 0, background: active ? `conic-gradient(from 180deg, ${THEME.coral}, ${THEME.violet}, ${THEME.coral})` : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement("div", { style: { width: '100%', height: '100%', borderRadius: '50%', background: active ? THEME.ink : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: t.icon, size: 18, color: active ? '#fff' : THEME.mutedDark })))));
         })),
         bookingTarget && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } },
             React.createElement("div", { style: { width: '100%', background: THEME.surface, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '88%', overflowY: 'auto' } },
