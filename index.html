@@ -159,8 +159,10 @@ function App() {
     const [shortsQuery, setShortsQuery] = useState('');
     const [bookingTarget, setBookingTarget] = useState(null);
     const [bookings, setBookings] = useState([
-        { id: 'b0', name: 'Fresh Start Cleaners', date: 'Aug 6', time: '10:30 AM', total: 97.2, status: 'upcoming' },
+        { id: 'b0', name: 'Fresh Start Cleaners', category: 'Home Services', date: 'Aug 6', day: 6, month: 7, year: 2026, time: '10:30 AM', total: 97.2, status: 'upcoming' },
     ]);
+    const [calendarMonth, setCalendarMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
+    const [selectedDay, setSelectedDay] = useState(() => new Date().getDate());
     const [balance, setBalance] = useState(120.4);
     const [monthlyBudget, setMonthlyBudget] = useState(2000);
     const [preferredTime, setPreferredTime] = useState('Any time');
@@ -177,6 +179,13 @@ function App() {
     const [selTime, setSelTime] = useState(null);
     const spent = Object.values(allocations).reduce((a, b) => a + b, 0);
     const ringPct = monthlyBudget > 0 ? Math.min(100, Math.round((spent / monthlyBudget) * 100)) : 0;
+    const calYear = calendarMonth.getFullYear();
+    const calMonthIdx = calendarMonth.getMonth();
+    const calFirstWeekday = new Date(calYear, calMonthIdx, 1).getDay();
+    const calDaysInMonth = new Date(calYear, calMonthIdx + 1, 0).getDate();
+    const calCells = [...Array(calFirstWeekday).fill(null), ...Array.from({ length: calDaysInMonth }, (_, i) => i + 1)];
+    const bookingsThisMonth = bookings.filter((b) => b.month === calMonthIdx && b.year === calYear).sort((a, b) => a.day - b.day);
+    const bookingDaySet = new Set(bookingsThisMonth.map((b) => b.day));
     function flashToast(msg) { setToast(msg); setTimeout(() => setToast(null), 2600); }
     function openBooking(item) { setSelDate(0); setSelTime(null); setBookingTarget(item); }
     function confirmBooking() {
@@ -187,11 +196,12 @@ function App() {
         const total = Math.round((price + tax) * 100) / 100;
         const d = days[selDate];
         const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        setBookings((prev) => [{ id: 'b' + Date.now(), name: bookingTarget.name, date: label, time: TIME_SLOTS[selTime], total, status: 'upcoming' }, ...prev]);
+        setBookings((prev) => [{ id: 'b' + Date.now(), name: bookingTarget.name, category: bookingTarget.category, date: label, day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), time: TIME_SLOTS[selTime], total, status: 'upcoming' }, ...prev]);
         setBalance((b) => Math.max(0, b - total));
         setBookingTarget(null);
         flashToast(`Booked ${bookingTarget.name} on ${label} at ${TIME_SLOTS[selTime]} · ${money(total)} total`);
     }
+    function cancelBooking(id) { setBookings((prev) => prev.filter((b) => b.id !== id)); flashToast('Booking canceled'); }
     function suggestPlan() {
         setAllocations({ Barber: Math.round(monthlyBudget * 0.15), Beauty: Math.round(monthlyBudget * 0.35), 'Home cleaning': Math.round(monthlyBudget * 0.2) });
         flashToast('Plan suggested based on your booking history');
@@ -318,20 +328,34 @@ function App() {
             React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 } },
                 React.createElement("span", { style: { fontSize: 12, color: THEME.muted } }, "Remaining"),
                 React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: THEME.textLight } }, money(Math.max(0, monthlyBudget - spent)))))),
-        tab === 'bookings' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: THEME.paper, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` } },
-            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: THEME.textLight, margin: 0 } }, "Your bookings"),
-            bookings.length === 0 && React.createElement("p", { style: { fontSize: 13, color: THEME.muted, marginTop: 16 } }, "No bookings yet. Find something on Discover."),
-            React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 } }, bookings.map((b) => (React.createElement("div", { key: b.id, style: { background: THEME.surface, border: `1px solid ${THEME.inkLine}`, borderRadius: 14, padding: 14 } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: THEME.textLight, margin: 0 } }, b.name),
-                    React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: THEME.violet, background: THEME.violetSoft, padding: '3px 8px', borderRadius: 10 } }, b.status)),
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 } },
-                    React.createElement(Icon, { name: "calendar", size: 13, color: THEME.muted }),
-                    React.createElement("span", { style: { fontSize: 12, color: THEME.muted } },
-                        b.date,
-                        " at ",
-                        b.time)),
-                React.createElement("p", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: THEME.textLight, marginTop: 6 } }, money(b.total)))))))),
+        tab === 'bookings' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: THEME.ink, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` } },
+            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, margin: 0 } },
+                React.createElement("span", { style: { color: THEME.textDark } }, "My "),
+                React.createElement("span", { style: { color: THEME.coral } }, "Bookings")),
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 } },
+                React.createElement("button", { onClick: () => setCalendarMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1)), style: { width: 28, height: 28, borderRadius: '50%', border: `1px solid ${THEME.inkLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "arrowleft", size: 13, color: THEME.textDark })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: THEME.textDark, margin: 0 } }, calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })),
+                React.createElement("button", { onClick: () => setCalendarMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1)), style: { width: 28, height: 28, borderRadius: '50%', border: `1px solid ${THEME.inkLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement("span", { style: { display: 'flex', transform: 'rotate(180deg)' } },
+                        React.createElement(Icon, { name: "arrowleft", size: 13, color: THEME.textDark })))),
+            React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginTop: 14 } }, ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (React.createElement("div", { key: i, style: { textAlign: 'center', fontSize: 11, color: THEME.muted } }, d)))),
+            React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: 4 } }, calCells.map((day, i) => day === null ? React.createElement("div", { key: 'e' + i }) : (React.createElement("button", { key: day, onClick: () => setSelectedDay(day), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '7px 0', margin: '0 auto', width: 34, borderRadius: 10, border: `1.5px solid ${day === selectedDay ? THEME.coral : 'transparent'}` } },
+                React.createElement("span", { style: { fontSize: 13, color: THEME.textDark } }, day),
+                React.createElement("span", { style: { width: 4, height: 4, borderRadius: '50%', background: bookingDaySet.has(day) ? THEME.coral : 'transparent' } }))))),
+            React.createElement("p", { style: { fontSize: 13, fontWeight: 600, color: THEME.textDark, marginTop: 22, marginBottom: 10 } }, "All bookings this month"),
+            bookingsThisMonth.length === 0 && React.createElement("p", { style: { fontSize: 13, color: THEME.muted } }, "No bookings this month."),
+            React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, bookingsThisMonth.map((b) => {
+                const meta = CATEGORY_META[b.category] || { grad: ['#3F3F5C', '#1E1E30'], icon: '📅' };
+                return (React.createElement("div", { key: b.id, style: { display: 'flex', alignItems: 'center', gap: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, borderRadius: 14, padding: 10 } },
+                    React.createElement("div", { style: { width: 48, height: 48, borderRadius: 10, flexShrink: 0, background: `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 } }, meta.icon),
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: THEME.textDark, margin: 0 } }, b.name),
+                        React.createElement("p", { style: { fontSize: 11, color: THEME.muted, marginTop: 2 } }, [b.category, b.date, b.time].filter(Boolean).join(' · '))),
+                    React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
+                        React.createElement("p", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: THEME.gold, margin: 0 } }, money(b.total)),
+                        b.status === 'upcoming' && React.createElement("button", { onClick: () => cancelBooking(b.id), style: { fontSize: 11, color: THEME.coral, marginTop: 2 } }, "Cancel"))));
+            })))),
         React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-around', position: 'absolute', left: 0, right: 0, bottom: 0, height: `calc(env(safe-area-inset-bottom) + 64px)`, paddingBottom: 'env(safe-area-inset-bottom)', background: 'transparent', zIndex: 4 } }, [
             { id: 'discover', icon: 'compass', label: 'Discover' },
             { id: 'browse', icon: 'grid', label: 'Browse' },
