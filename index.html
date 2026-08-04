@@ -162,6 +162,20 @@ const PROVIDERS_BY_CAT = {
 };
 const CATEGORY_LABEL_TO_ID = { 'Home Services': 'home', Beauty: 'beauty', Parties: 'parties', Restaurants: 'restaurants', Educational: 'educational' };
 const EXPLORE_BADGES = ['New', 'Trending', 'Top Pick', 'Popular'];
+const CATEGORY_PHOTOS = {
+    beauty: ['assets/explore/brow-arc.jpg', 'assets/explore/makeup-promo.jpg', 'assets/explore/barbershop.jpg'],
+    home: ['assets/explore/real-estate.jpg'],
+    parties: ['assets/explore/dj-battle.jpg'],
+};
+const categoryPhotoCounters = {};
+function nextCategoryPhoto(catId) {
+    const photos = CATEGORY_PHOTOS[catId];
+    if (!photos || !photos.length)
+        return null;
+    const idx = categoryPhotoCounters[catId] || 0;
+    categoryPhotoCounters[catId] = idx + 1;
+    return photos[idx % photos.length];
+}
 const EXPLORE_ITEMS = [
     ...FEED.map((item, i) => ({
         id: 'v-' + item.id, kind: 'video', categoryId: CATEGORY_LABEL_TO_ID[item.category] || 'home',
@@ -169,6 +183,7 @@ const EXPLORE_ITEMS = [
         badge: EXPLORE_BADGES[i % EXPLORE_BADGES.length], meta: item.likes,
         grad: CATEGORY_META[item.category] ? CATEGORY_META[item.category].grad : ['#3F3F5C', '#1E1E30'],
         emoji: CATEGORY_META[item.category] ? CATEGORY_META[item.category].icon : '📍',
+        image: nextCategoryPhoto(CATEGORY_LABEL_TO_ID[item.category] || 'home'),
         categoryLabel: item.category,
     })),
     ...Object.entries(PROVIDERS_BY_CAT).flatMap(([catId, list]) => list.map((p, i) => {
@@ -177,7 +192,7 @@ const EXPLORE_ITEMS = [
             id: 'b-' + p.id, kind: 'business', categoryId: catId,
             title: p.name, subtitle: 'Booking available', price: p.price, rating: null,
             badge: EXPLORE_BADGES[(i + 2) % EXPLORE_BADGES.length], meta: null,
-            color: p.color, initials: p.initials,
+            color: p.color, initials: p.initials, image: nextCategoryPhoto(catId),
             categoryLabel: ((_a = CATEGORIES.find((c) => c.id === catId)) === null || _a === void 0 ? void 0 : _a.label) || 'Home Services',
         });
     })),
@@ -588,10 +603,13 @@ function App() {
                 React.createElement(Icon, { name: "search", size: 22, color: THEME.mutedDark }),
                 React.createElement("p", { style: { fontSize: 13, color: THEME.muted, marginTop: 10 } }, "No results here yet."),
                 React.createElement("p", { style: { fontSize: 12, color: THEME.muted } }, "Try another category or filter."))] : exploreItems.map((item) => {
-                const media = item.kind === 'video' ? React.createElement("span", { style: { fontSize: 34 } }, item.emoji) : React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: '#fff' } }, item.initials);
+                const media = item.image ? null : (item.kind === 'video' ? React.createElement("span", { style: { fontSize: 34 } }, item.emoji) : React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: '#fff' } }, item.initials));
                 const ratingIcon = item.rating ? React.createElement(Icon, { name: "star", size: 10, color: THEME.gold, fill: THEME.gold }) : null;
                 const metaText = item.rating ? `${item.rating} · ${item.subtitle}` : money(item.price);
-                const imageBlock = React.createElement("div", { style: { position: 'relative', aspectRatio: '4 / 5', background: item.kind === 'video' ? `linear-gradient(160deg, ${item.grad[0]}, ${item.grad[1]})` : item.color, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                const fillStyle = item.image
+                    ? { backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                    : { background: item.kind === 'video' ? `linear-gradient(160deg, ${item.grad[0]}, ${item.grad[1]})` : item.color };
+                const imageBlock = React.createElement("div", { style: { position: 'relative', aspectRatio: '4 / 5', ...fillStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                     media,
                     React.createElement("span", { style: { position: 'absolute', top: 8, left: 8, fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 5, background: 'rgba(0,0,0,0.5)', color: '#fff' } }, item.badge),
                     React.createElement("button", { onClick: (e) => { e.stopPropagation(); toggleBookmark(item.id); }, style: { position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 8, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
