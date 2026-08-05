@@ -126,6 +126,12 @@ function nextCategoryPhoto(catId) {
     categoryPhotoCounters[catId] = idx + 1;
     return photos[idx % photos.length];
 }
+const CATEGORY_VIDEOS = {
+    beauty: 'assets/shorts/beauty',
+    home: 'assets/shorts/home',
+    parties: 'assets/shorts/parties',
+    restaurants: 'assets/shorts/restaurants',
+};
 const COMMENT_POOL = [
     { name: 'Jordan', text: 'Booked instantly, worth every penny!', time: '2d', color: '#6C4CFC' },
     { name: 'Casey', text: 'This looks amazing, saving for later.', time: '18h', color: '#F5A623' },
@@ -145,7 +151,11 @@ const FEED = [
     { id: 'f7', category: 'Parties', name: 'Nova Sound DJs', location: 'Los Angeles, CA', rating: 4.8, price: 350, likes: '2.7K', comments: 95, saves: '4.1K', blurb: 'Wedding and club DJ sets with full sound and lighting rig.', verified: true, distance: '4.2 mi', openStatus: 'Available Today', hashtags: ['#dj', '#losangeles', '#nightlife'], friendsBooked: 31, avatarColor: '#6C4CFC', discount: 'FREE CONSULTATION' },
     { id: 'f8', category: 'Beauty', name: 'Bare Skin Makeup Co.', location: 'Phoenix, AZ', rating: 4.9, price: 130, likes: '1.5K', comments: 61, saves: '2.3K', blurb: 'Natural glam and airbrush makeup for any event.', verified: false, distance: '0.8 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#makeup', '#phoenix', '#airbrush'], friendsBooked: 11, avatarColor: '#3FA6BF' },
 ];
-FEED.forEach((item) => { item.image = nextCategoryPhoto(CATEGORY_LABEL_TO_ID[item.category] || 'home'); });
+FEED.forEach((item) => {
+    const catId = CATEGORY_LABEL_TO_ID[item.category] || 'home';
+    item.image = nextCategoryPhoto(catId);
+    item.video = CATEGORY_VIDEOS[catId] || null;
+});
 const CATEGORIES = [
     { id: 'shorts', label: 'All shorts', count: 31, icon: 'compass', color: '#2E9BFF' },
     { id: 'beauty', label: 'Beauty', count: 14, icon: 'bottle', color: '#F5134F' },
@@ -543,9 +553,13 @@ function App() {
             const shareCount = formatCount(Math.round(parseCount(item.likes) * 0.4));
             const saveCount = formatCount(parseCount(item.saves) + (saved ? 1 : 0));
             const reviewCount = formatCount(Math.max(12, Math.round(parseCount(item.likes) / 9)));
-            const backdrop = item.image
-                ? React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
-                : React.createElement("div", { style: { position: 'absolute', inset: 0, background: `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 84, opacity: 0.9 } }, meta.icon);
+            const backdrop = item.video
+                ? React.createElement("video", { key: item.id + '-video', poster: item.image || undefined, autoPlay: true, muted: true, loop: true, playsInline: true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } },
+                    React.createElement("source", { src: item.video + '.webm', type: "video/webm" }),
+                    React.createElement("source", { src: item.video + '.mp4', type: "video/mp4" }))
+                : item.image
+                    ? React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
+                    : React.createElement("div", { style: { position: 'absolute', inset: 0, background: `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 84, opacity: 0.9 } }, meta.icon);
             const scrim = React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.15) 22%, rgba(0,0,0,0.15) 45%, rgba(0,0,0,0.55) 72%, rgba(0,0,0,0.92) 100%)' } });
             const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 16, right: 60, zIndex: 2 } },
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#fff', margin: 0 } }, "Book Me"),
