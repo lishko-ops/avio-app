@@ -721,8 +721,6 @@ function App() {
             const PROFILE_STATS = [
                 { label: 'Following', value: 356 },
                 { label: 'Followers', value: 2842 },
-                { label: 'Likes', value: 14700, format: formatCount },
-                { label: 'Saved', value: 89 },
                 { label: 'Reviews', value: 74 },
                 { label: 'Bookings', value: 42 },
             ];
@@ -734,9 +732,6 @@ function App() {
                 { id: 'following', label: 'Following', icon: 'user' },
             ];
             const topIcons = React.createElement("div", { style: { display: 'flex', justifyContent: 'flex-end', gap: 10 } },
-                React.createElement("button", { onClick: () => flashToast('Notifications — coming soon'), style: { position: 'relative', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement("span", { style: { fontSize: 19 } }, "🔔"),
-                    React.createElement("span", { style: { position: 'absolute', top: 4, right: 6, width: 8, height: 8, borderRadius: '50%', background: THEME.coral, border: '2px solid #FAFAFA' } })),
                 React.createElement("button", { onClick: () => setProfileMenuOpen(true), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                     React.createElement("span", { style: { fontSize: 18, color: L.text, letterSpacing: 1 } }, "•••")));
             const avatarBlock = React.createElement("div", { style: { position: 'relative', flexShrink: 0 } },
@@ -770,15 +765,10 @@ function App() {
                         React.createElement(Icon, { name: "star", size: 11, color: THEME.gold, fill: THEME.gold }),
                         React.createElement("span", { style: { fontSize: 11, color: L.sub } }, "Member since 2026")),
                     React.createElement("p", { style: { fontSize: 11, color: THEME.coral, fontWeight: 700, marginTop: 4 } }, "Level 3 · VIP Member")));
-            const bioBlock = React.createElement("div", { style: { marginTop: 8 } },
-                React.createElement("p", { style: { fontSize: 12.5, color: L.text, lineHeight: 1.35, margin: 0 } }, "Building the future of booking. Short videos. Real people. Real bookings."),
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 } },
-                    React.createElement("span", { style: { fontSize: 11 } }, "🔗"),
-                    React.createElement("span", { style: { fontSize: 11.5, color: THEME.coral, fontWeight: 600 } }, "bookme.app/levidery")));
-            const statsRow = React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 10 } },
+            const statsRow = React.createElement("div", { style: { display: 'flex', justifyContent: 'center', gap: 28, marginTop: 14 } },
                 PROFILE_STATS.map((s) => React.createElement("div", { key: s.label, style: { textAlign: 'center' } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: L.text, margin: 0 } }, React.createElement(AnimatedNumber, { value: s.value, format: s.format })),
-                    React.createElement("p", { style: { fontSize: 9.5, color: L.sub, marginTop: 1 } }, s.label))));
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: L.text, margin: 0 } }, React.createElement(AnimatedNumber, { value: s.value, format: s.format })),
+                    React.createElement("p", { style: { fontSize: 11, color: L.sub, marginTop: 2 } }, s.label))));
             const actionButtons = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 10 } },
                 React.createElement("button", { onClick: () => flashToast('Edit profile — coming soon'), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: L.text, color: '#fff', fontWeight: 600, fontSize: 12.5, padding: '9px 0', borderRadius: 20 } },
                     React.createElement(Icon, { name: "user", size: 13, color: "#fff" }),
@@ -841,7 +831,7 @@ function App() {
                             React.createElement("p", { style: { fontSize: 11, color: L.sub, marginTop: 2 } }, f.category)),
                         React.createElement("button", { onClick: () => toggleFollow(f.id), style: { fontSize: 11, fontWeight: 600, color: THEME.coral, border: `1px solid ${THEME.coral}`, borderRadius: 14, padding: '5px 10px' } }, "Following"))));
             }
-            return React.createElement(React.Fragment, null, topIcons, topRow, bioBlock, statsRow, actionButtons, tabsRow2, tabContent);
+            return React.createElement(React.Fragment, null, topIcons, topRow, statsRow, actionButtons, tabsRow2, tabContent);
         })())),
         tab === 'bookings' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: THEME.ink, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` } },
             React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, margin: 0 } },
