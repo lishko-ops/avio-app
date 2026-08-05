@@ -23,6 +23,14 @@
   #fallback { display:none; color:#F8F4EC; font-family: sans-serif; padding: 24px; text-align:center; }
   @keyframes avioPulse { 0%, 100% { box-shadow: 0 10px 26px rgba(0,0,0,0.35), 0 0 0 0 rgba(255,255,255,0.4); } 50% { box-shadow: 0 10px 26px rgba(0,0,0,0.35), 0 0 0 13px rgba(255,255,255,0); } }
   .avio-pulse { animation: avioPulse 2.4s ease-in-out infinite; }
+  @keyframes avioSheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes avioBackdropIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes avioSectionIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  .avio-filter-sheet { animation: avioSheetUp 0.38s cubic-bezier(0.32, 0.72, 0, 1); }
+  .avio-filter-backdrop { animation: avioBackdropIn 0.25s ease; }
+  .avio-filter-section { animation: avioSectionIn 0.18s ease; }
+  .avio-filter-chip, .avio-filter-card { transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease; }
+  .avio-filter-chip:active, .avio-filter-card:active { transform: scale(0.97); }
 </style>
 </head>
 <body>
@@ -108,6 +116,8 @@ function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
         playcircle: React.createElement(React.Fragment, null,
             React.createElement("circle", { cx: "12", cy: "12", r: "9" }),
             React.createElement("path", { d: "M10.5 8.7v6.6l5.3-3.3z", ...solid })),
+        chevronright: React.createElement("path", { d: "M9 5l7 7-7 7" }),
+        chevrondown: React.createElement("path", { d: "M5 9l7 7 7-7" }),
     };
     return React.createElement("svg", { ...common }, paths[name]);
 }
@@ -273,6 +283,55 @@ function formatCount(n) {
         return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
     return String(n);
 }
+const FILTER_CATEGORIES_PRIMARY = [
+    { id: 'all', label: 'All' },
+    { id: 'beauty', label: 'Beauty' },
+    { id: 'barber', label: 'Barber' },
+    { id: 'cleaning', label: 'Cleaning' },
+    { id: 'realestate', label: 'Real Estate' },
+    { id: 'auto', label: 'Auto' },
+    { id: 'events', label: 'Events' },
+];
+const FILTER_CATEGORIES_MORE = [
+    { id: 'home', label: 'Home Services' },
+    { id: 'photography', label: 'Photography' },
+    { id: 'dj', label: 'DJ' },
+    { id: 'fitness', label: 'Fitness' },
+    { id: 'pets', label: 'Pets' },
+    { id: 'medical', label: 'Medical' },
+    { id: 'tutoring', label: 'Tutoring' },
+    { id: 'moving', label: 'Moving' },
+    { id: 'repair', label: 'Repair' },
+    { id: 'food', label: 'Food' },
+];
+const FILTER_SERVICES = {
+    beauty: ['Nails', 'Hair', 'Makeup', 'Lashes', 'Brows', 'Skincare', 'Spa', 'Tanning', 'Facial', 'Massage', 'Waxing', 'Teeth Whitening'],
+    barber: ['Haircut', 'Beard Trim', 'Shave', 'Fade', 'Kids Cut', 'Hair Design'],
+    cleaning: ['Home Cleaning', 'Deep Clean', 'Move Out', 'Office Cleaning', 'Carpet Cleaning', 'Window Cleaning'],
+    home: ['Handyman', 'Plumbing', 'Electrical', 'Landscaping', 'Painting', 'Pest Control'],
+    photography: ['Portrait', 'Wedding', 'Event', 'Product', 'Headshots', 'Family'],
+    dj: ['Wedding DJ', 'Club DJ', 'Private Party', 'Corporate Event', 'MC Services', 'Lighting'],
+    realestate: ['Home Staging', 'Photography', 'Open House', 'Inspection', 'Appraisal', 'Cleaning'],
+    fitness: ['Personal Training', 'Yoga', 'Pilates', 'Nutrition Coaching', 'Group Class', 'Recovery'],
+    auto: ['Detailing', 'Oil Change', 'Tire Service', 'Inspection', 'Car Wash', 'Repair'],
+    pets: ['Grooming', 'Walking', 'Sitting', 'Training', 'Vet Visit', 'Boarding'],
+    medical: ['Checkup', 'Dental', 'Vision', 'Therapy', 'Vaccination', 'Lab Work'],
+    tutoring: ['Math', 'Science', 'Language', 'Test Prep', 'Music Lessons', 'Coding'],
+    moving: ['Local Move', 'Long Distance', 'Packing', 'Storage', 'Furniture Assembly', 'Junk Removal'],
+    events: ['Wedding Planning', 'Birthday', 'Corporate', 'Catering', 'Decor', 'Entertainment'],
+    repair: ['Appliance', 'Electronics', 'Furniture', 'Plumbing', 'Handyman', 'Locksmith'],
+    food: ['Personal Chef', 'Catering', 'Meal Prep', 'Baking', 'Bartending', 'Food Delivery'],
+};
+const FILTER_PRICE_LEVELS = ['$', '$$', '$$$', '$$$$'];
+const FILTER_DISTANCE_OPTIONS = ['5 miles', '10 miles', '25 miles', '50 miles', '100+ miles'];
+const FILTER_RATING_OPTIONS = ['Any', '4+', '4.5+', '4.8+'];
+const FILTER_AVAILABILITY_OPTIONS = ['Any time', 'Today', 'This week', 'This weekend'];
+const FILTER_SORT_OPTIONS = ['Most popular', 'Trending', 'Closest', 'Highest rated', 'Most booked', 'Newest', 'Recommended', 'Price low to high', 'Price high to low'];
+const FILTER_TOGGLES = [
+    { id: 'verified', label: 'Verified only' }, { id: 'instant', label: 'Instant booking' }, { id: 'inStudio', label: 'In studio' },
+    { id: 'atHome', label: 'At your home' }, { id: 'openNow', label: 'Open now' }, { id: 'mobile', label: 'Mobile service' },
+    { id: 'licensed', label: 'Licensed' }, { id: 'topRated', label: 'Top rated' }, { id: 'discounts', label: 'Offers discounts' },
+];
 function App() {
     var _a;
     const [session, setSession] = useState(() => { try { return localStorage.getItem('avio_session'); } catch (e) { return null; } });
@@ -311,6 +370,49 @@ function App() {
     const [exploreTab, setExploreTab] = useState('forYou');
     const [exploreQuickFilter, setExploreQuickFilter] = useState('forYou');
     const [exploreBookmarks, setExploreBookmarks] = useState(() => new Set());
+    const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+    const [filterCat, setFilterCat] = useState('all');
+    const [filterSearch, setFilterSearch] = useState('');
+    const [filterServices, setFilterServices] = useState(() => new Set());
+    const [filterExpanded, setFilterExpanded] = useState(null);
+    const [filterLocation, setFilterLocation] = useState('Current location');
+    const [filterDistance, setFilterDistance] = useState('25 miles');
+    const [filterPrice, setFilterPrice] = useState(1);
+    const [filterRating, setFilterRating] = useState('4.5+');
+    const [filterAvailability, setFilterAvailability] = useState('Any time');
+    const [filterSort, setFilterSort] = useState('Most popular');
+    const [filterToggles, setFilterToggles] = useState(() => new Set());
+    const [filterShowMoreCats, setFilterShowMoreCats] = useState(false);
+    function toggleFilterService(catId, label) {
+        const key = catId + ':' + label;
+        setFilterServices((prev) => {
+            const next = new Set(prev);
+            next.has(key) ? next.delete(key) : next.add(key);
+            return next;
+        });
+    }
+    function toggleFilterSwitch(id) {
+        setFilterToggles((prev) => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
+    }
+    function resetFilters() {
+        setFilterCat('all');
+        setFilterSearch('');
+        setFilterServices(new Set());
+        setFilterExpanded(null);
+        setFilterShowMoreCats(false);
+        setFilterLocation('Current location');
+        setFilterDistance('25 miles');
+        setFilterPrice(1);
+        setFilterRating('4.5+');
+        setFilterAvailability('Any time');
+        setFilterSort('Most popular');
+        setFilterToggles(new Set());
+    }
+    const filterResultCount = Math.max(3, 247 - filterServices.size * 13 - filterToggles.size * 9 - (filterCat !== 'all' ? 38 : 0) - (filterSearch.trim() ? 55 : 0) - (filterRating !== 'Any' ? 12 : 0) - (filterAvailability !== 'Any time' ? 10 : 0));
     function toggleBookmark(id) {
         setExploreBookmarks((prev) => {
             const next = new Set(prev);
@@ -590,8 +692,8 @@ function App() {
             const scrim = React.createElement("div", { style: { position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.15) 22%, rgba(0,0,0,0.15) 45%, rgba(0,0,0,0.55) 72%, rgba(0,0,0,0.92) 100%)' } });
             const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 16, right: 60, zIndex: 2, display: 'flex', alignItems: 'center', gap: 14 } },
                 [{ id: 'forYou', label: 'Book Me' }, { id: 'following', label: 'Following' }, { id: 'filters', label: 'Filters' }].map((t) => {
-                    const active = t.id !== 'filters' && shortsFeedTab === t.id;
-                    const onClick = t.id === 'filters' ? () => { setTab('browse'); setActiveCat(null); } : () => setShortsFeedTab(t.id);
+                    const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
+                    const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
                     return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 } },
                         React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
                         React.createElement("span", { style: { width: active ? 18 : 0, height: 2, borderRadius: 2, background: '#fff', transition: 'width 0.2s' } }));
@@ -670,7 +772,7 @@ function App() {
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, borderRadius: 16, height: 44, padding: '0 14px' } },
                     React.createElement(Icon, { name: "search", size: 16, color: THEME.mutedDark }),
                     React.createElement("span", { style: { fontSize: 13, color: THEME.mutedDark, flex: 1 } }, "Search services, businesses or creators"),
-                    React.createElement("button", { onClick: () => flashToast('Filters coming soon'), style: { display: 'flex' } },
+                    React.createElement("button", { onClick: () => setFilterSheetOpen(true), style: { display: 'flex' } },
                         React.createElement(Icon, { name: "grid", size: 15, color: THEME.mutedDark }))));
             const quickFilterRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, padding: '14px 18px 0', overflowX: 'auto' } }, quickFilters.map((f) => {
                 const active = exploreQuickFilter === f.id;
@@ -909,6 +1011,86 @@ function App() {
                     React.createElement("input", { value: commentDraft, onChange: (e) => setCommentDraft(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') postComment(); }, placeholder: "Add a comment...", style: { flex: 1, background: THEME.ink, border: `1px solid ${THEME.inkLine}`, borderRadius: 20, padding: '9px 14px', color: THEME.textLight, fontSize: 13, outline: 'none', minWidth: 0 } }),
                     React.createElement("button", { onClick: postComment, style: { width: 32, height: 32, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                         React.createElement(Icon, { name: "send", size: 14, color: "#fff" }))));
+        })())),
+        filterSheetOpen && (React.createElement("div", { className: "avio-filter-backdrop", onClick: () => setFilterSheetOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 12, display: 'flex', alignItems: 'flex-end' } }, (() => {
+            const gridCatId = filterCat === 'all' ? 'beauty' : filterCat;
+            const gridServices = FILTER_SERVICES[gridCatId] || [];
+            const shownServices = filterSearch.trim() ? gridServices.filter((s) => s.toLowerCase().includes(filterSearch.trim().toLowerCase())) : gridServices;
+            const visibleCats = filterShowMoreCats ? [...FILTER_CATEGORIES_PRIMARY, ...FILTER_CATEGORIES_MORE] : FILTER_CATEGORIES_PRIMARY;
+            function refineRow(key, label, valueText, content) {
+                const expanded = filterExpanded === key;
+                return React.createElement("div", { key: key, style: { borderBottom: '1px solid #F5F5F5' } },
+                    React.createElement("button", { onClick: () => setFilterExpanded(expanded ? null : key), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 18px' } },
+                        React.createElement("span", { style: { fontSize: 14.5, color: '#161616' } }, label),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                            React.createElement("span", { style: { fontSize: 13.5, color: '#8A8A8E' } }, valueText),
+                            React.createElement(Icon, { name: expanded ? "chevrondown" : "chevronright", size: 14, color: "#C7C7CC" }))),
+                    expanded && React.createElement("div", { className: "avio-filter-section", style: { padding: '0 18px 16px' } }, content));
+            }
+            const headerBlock = React.createElement("div", { style: { flexShrink: 0, padding: '10px 18px 0' } },
+                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#E5E5E5', margin: '0 auto 14px' } }),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: '#161616', margin: 0 } }, "Filters"),
+                    React.createElement("button", { onClick: resetFilters, style: { fontSize: 13.5, fontWeight: 600, color: '#8A8A8E' } }, "Reset")));
+            const chipRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 20, overflowX: 'auto', padding: '18px 18px 6px', alignItems: 'center' } },
+                visibleCats.map((c) => {
+                    const active = filterCat === c.id;
+                    return React.createElement("div", { key: c.id, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, gap: 6 } },
+                        React.createElement("button", { className: "avio-filter-chip", onClick: () => setFilterCat(c.id), style: { padding: active ? '9px 16px' : '9px 2px', borderRadius: 20, background: active ? '#161616' : 'transparent', fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? '#fff' : '#8A8A8E', whiteSpace: 'nowrap' } }, c.label),
+                        React.createElement("span", { style: { width: active ? 16 : 0, height: 2, borderRadius: 1, background: '#161616' } }));
+                }),
+                React.createElement("button", { className: "avio-filter-chip", onClick: () => setFilterShowMoreCats((v) => !v), style: { flexShrink: 0, fontSize: 13.5, fontWeight: 500, color: '#8A8A8E', padding: '9px 2px', whiteSpace: 'nowrap' } }, filterShowMoreCats ? "Less" : "More"));
+            const searchBarBlock = React.createElement("div", { style: { position: 'sticky', top: 0, zIndex: 2, background: '#fff', padding: '4px 18px 12px' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: '#F5F5F5', borderRadius: 16, height: 44, padding: '0 14px' } },
+                    React.createElement(Icon, { name: "search", size: 16, color: "#B5B5B8" }),
+                    React.createElement("input", { value: filterSearch, onChange: (e) => setFilterSearch(e.target.value), placeholder: "Search services or categories", style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13.5, color: '#161616' } }),
+                    filterSearch && React.createElement("button", { onClick: () => setFilterSearch('') }, React.createElement(Icon, { name: "x", size: 14, color: "#B5B5B8" }))));
+            const categoriesBlock = React.createElement("div", { className: "avio-filter-section" },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 18px 0' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: '#161616', margin: 0 } }, "Categories"),
+                    React.createElement("button", { onClick: () => flashToast('More categories coming soon'), style: { display: 'flex', alignItems: 'center', gap: 2, fontSize: 13, fontWeight: 600, color: '#8A8A8E' } }, "See all", React.createElement(Icon, { name: "chevronright", size: 13, color: "#8A8A8E" }))),
+                React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', marginTop: 10 } },
+                    shownServices.length === 0 ? React.createElement("p", { style: { gridColumn: 'span 4', textAlign: 'center', fontSize: 12.5, color: '#B5B5B8', padding: '18px 0' } }, "No services match your search") :
+                        shownServices.map((s, i) => {
+                            const col = i % 4, row = Math.floor(i / 4), totalRows = Math.ceil(shownServices.length / 4);
+                            const key = gridCatId + ':' + s;
+                            const selected = filterServices.has(key);
+                            return React.createElement("button", { key: s, className: "avio-filter-card", onClick: () => toggleFilterService(gridCatId, s), style: { padding: '18px 4px', textAlign: 'center', fontSize: 12.5, fontWeight: selected ? 700 : 500, color: '#161616', background: selected ? '#F7F7F8' : 'transparent', borderRight: col === 3 || i === shownServices.length - 1 ? 'none' : '1px solid #F5F5F5', borderBottom: row === totalRows - 1 ? 'none' : '1px solid #F5F5F5' } }, s);
+                        })));
+            const refineBlock = React.createElement("div", { style: { marginTop: 20 } },
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: '#161616', margin: '0 0 4px', padding: '0 18px' } }, "Refine your search"),
+                React.createElement("div", { style: { marginTop: 6 } },
+                    refineRow('location', 'Location', filterLocation, React.createElement("div", { style: { display: 'flex', gap: 8 } },
+                        ['Current location', 'Choose on map'].map((opt) => React.createElement("button", { key: opt, onClick: () => { setFilterLocation(opt); setFilterExpanded(null); }, style: { flex: 1, padding: '10px 0', borderRadius: 12, fontSize: 12.5, fontWeight: 600, border: `1.5px solid ${filterLocation === opt ? '#161616' : '#ECECEE'}`, color: filterLocation === opt ? '#161616' : '#8A8A8E', background: '#fff' } }, opt)))),
+                    refineRow('distance', 'Distance', filterDistance, React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto' } },
+                        FILTER_DISTANCE_OPTIONS.map((opt) => React.createElement("button", { key: opt, onClick: () => { setFilterDistance(opt); setFilterExpanded(null); }, style: { flexShrink: 0, padding: '9px 14px', borderRadius: 16, fontSize: 12.5, fontWeight: 600, border: `1.5px solid ${filterDistance === opt ? '#161616' : '#ECECEE'}`, color: filterDistance === opt ? '#161616' : '#8A8A8E', background: '#fff' } }, opt)))),
+                    refineRow('price', 'Price', FILTER_PRICE_LEVELS[filterPrice], React.createElement("div", { style: { display: 'flex', gap: 8 } },
+                        FILTER_PRICE_LEVELS.map((lvl, i) => React.createElement("button", { key: lvl, onClick: () => setFilterPrice(i), style: { flex: 1, padding: '10px 0', borderRadius: 12, fontSize: 13, fontWeight: 700, border: `1.5px solid ${filterPrice === i ? '#161616' : '#ECECEE'}`, color: filterPrice === i ? '#161616' : '#8A8A8E', background: '#fff' } }, lvl)))),
+                    refineRow('rating', 'Rating', filterRating === 'Any' ? 'Any' : filterRating, React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+                        FILTER_RATING_OPTIONS.slice().reverse().map((opt) => React.createElement("button", { key: opt, onClick: () => { setFilterRating(opt); setFilterExpanded(null); }, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 12, border: `1.5px solid ${filterRating === opt ? '#161616' : '#ECECEE'}`, background: '#fff' } },
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } }, React.createElement(Icon, { name: "star", size: 13, color: "#F5A623", fill: "#F5A623" }), React.createElement("span", { style: { fontSize: 13, color: '#161616', fontWeight: 600 } }, opt === 'Any' ? 'Any rating' : opt)),
+                            filterRating === opt && React.createElement(Icon, { name: "check", size: 14, color: "#161616" }))))),
+                    refineRow('availability', 'Availability', filterAvailability, React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto' } },
+                        FILTER_AVAILABILITY_OPTIONS.map((opt) => React.createElement("button", { key: opt, onClick: () => { setFilterAvailability(opt); setFilterExpanded(null); }, style: { flexShrink: 0, padding: '9px 14px', borderRadius: 16, fontSize: 12.5, fontWeight: 600, border: `1.5px solid ${filterAvailability === opt ? '#161616' : '#ECECEE'}`, color: filterAvailability === opt ? '#161616' : '#8A8A8E', background: '#fff' } }, opt)))),
+                    refineRow('sort', 'Sort by', filterSort, React.createElement("div", { style: { display: 'flex', flexDirection: 'column' } },
+                        FILTER_SORT_OPTIONS.map((opt, i) => React.createElement("button", { key: opt, onClick: () => { setFilterSort(opt); setFilterExpanded(null); }, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 2px', borderBottom: i < FILTER_SORT_OPTIONS.length - 1 ? '1px solid #F5F5F5' : 'none' } },
+                            React.createElement("span", { style: { fontSize: 13.5, color: '#161616', fontWeight: filterSort === opt ? 700 : 500 } }, opt),
+                            filterSort === opt && React.createElement(Icon, { name: "check", size: 14, color: "#161616" })))))));
+            const moreFiltersBlock = React.createElement("div", { style: { padding: '20px 18px 4px' } },
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: '#161616', margin: '0 0 12px' } }, "More filters"),
+                React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
+                    FILTER_TOGGLES.map((t) => {
+                        const on = filterToggles.has(t.id);
+                        return React.createElement("button", { key: t.id, className: "avio-filter-chip", onClick: () => toggleFilterSwitch(t.id), style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 14, border: `1.5px solid ${on ? '#161616' : '#ECECEE'}`, background: '#fff' } },
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 500, color: '#161616' } }, t.label),
+                            React.createElement("div", { style: { width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${on ? '#161616' : '#D1D1D6'}`, background: on ? '#161616' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, on && React.createElement(Icon, { name: "check", size: 10, color: "#fff" })));
+                    })));
+            const bodyScroll = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto' } },
+                chipRow, searchBarBlock, categoriesBlock, refineBlock, moreFiltersBlock, React.createElement("div", { style: { height: 16 } }));
+            const footerBlock = React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', background: '#fff', borderTop: '1px solid #F5F5F5' } },
+                React.createElement("button", { onClick: () => setFilterSheetOpen(false), style: { width: '100%', height: 58, borderRadius: 29, background: '#161616', color: '#fff', fontSize: 15.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, `Show ${filterResultCount} Results`));
+            return React.createElement("div", { className: "avio-filter-sheet", onClick: (e) => e.stopPropagation(), style: { width: '100%', height: '90%', background: '#fff', borderRadius: '24px 24px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 -12px 40px rgba(0,0,0,0.22)' } },
+                headerBlock, bodyScroll, footerBlock);
         })())),
         toast && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }, toast))));
 }
