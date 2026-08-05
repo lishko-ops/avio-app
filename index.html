@@ -456,7 +456,7 @@ function App() {
         setAllocations({ Barber: Math.round(monthlyBudget * 0.15), Beauty: Math.round(monthlyBudget * 0.35), 'Home cleaning': Math.round(monthlyBudget * 0.2) });
         flashToast('Plan suggested based on your booking history');
     }
-    const authFrame = (children) => React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', height: '100dvh', position: 'relative', overflow: 'hidden', background: THEME.ink, boxShadow: '0 0 40px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column' } }, children);
+    const authFrame = (children) => React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', position: 'fixed', top: 0, bottom: 0, overflow: 'hidden', background: THEME.ink, boxShadow: '0 0 40px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column' } }, children);
     const authBack = (onClick) => React.createElement("button", { onClick: onClick, style: { alignSelf: 'flex-start', color: THEME.mutedDark, display: 'flex', marginBottom: 18 } }, React.createElement(Icon, { name: "arrowleft", size: 18, color: THEME.mutedDark }));
     const authInputStyle = { width: '100%', background: THEME.surface, border: `1px solid ${THEME.inkLine}`, borderRadius: 12, padding: '13px 14px', color: THEME.textDark, fontSize: 14, outline: 'none' };
     const authPrimaryBtn = { width: '100%', background: THEME.coral, color: '#fff', fontWeight: 600, fontSize: 14, padding: '13px 0', borderRadius: 24, marginTop: 18 };
@@ -543,8 +543,8 @@ function App() {
                             React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 15, color: THEME.textDark, margin: 0 } }, "I have a business"),
                             React.createElement("p", { style: { fontSize: 12, color: THEME.muted, margin: '2px 0 0' } }, "List services and take bookings"))))))));
     }
-    return (React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', height: '100dvh', position: 'relative', overflow: 'hidden', background: THEME.paper, boxShadow: '0 0 40px rgba(0,0,0,0.08)' } },
-        tab === 'discover' && (React.createElement("div", { className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
+    return (React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', position: 'fixed', top: 0, bottom: 0, overflow: 'hidden', background: THEME.paper, boxShadow: '0 0 40px rgba(0,0,0,0.08)' } },
+        tab === 'discover' && (React.createElement("div", { className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
             React.createElement(Icon, { name: shortsFeedTab === 'following' ? "user" : "search", size: 22, color: THEME.mutedDark }),
             React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : `No shorts match "${shortsQuery}"`))) : filteredFeed.map((item) => {
             const meta = CATEGORY_META[item.category];
@@ -606,7 +606,7 @@ function App() {
                     React.createElement(Icon, { name: "calendar", size: 18, color: THEME.ink }),
                     React.createElement("span", { style: { flex: 1, textAlign: 'left', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: THEME.ink } }, "Book Now"),
                     React.createElement(Icon, { name: "arrowright", size: 16, color: THEME.ink })));
-            return React.createElement("div", { key: item.id, style: { height: '100dvh', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
+            return React.createElement("div", { key: item.id, style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
                 backdrop, scrim, brand, actionStack, infoBlock, bookCta);
         }))),
         tab === 'discover' && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 18px)', right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 } }, !shortsSearchOpen && (React.createElement("button", { onClick: logout, style: { display: 'flex' } },
