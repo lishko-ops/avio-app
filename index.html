@@ -762,7 +762,7 @@ function App() {
                         React.createElement("p", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: THEME.gold, margin: 0 } }, money(b.total)),
                         b.status === 'upcoming' && React.createElement("button", { onClick: () => cancelBooking(b.id), style: { fontSize: 11, color: THEME.coral, marginTop: 2 } }, "Cancel"))));
             })))),
-        React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: `16px 12px 6px` } },
+        React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: `6px 12px 6px` } },
             [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'browse', icon: 'compass', label: 'Browse' }, null, { id: 'bookings', icon: 'message', label: 'Bookings' }, { id: 'budget', icon: 'user', label: 'Budget' }].map((t, i) => {
                 if (!t) {
                     return React.createElement("button", { key: "create", onClick: () => { setTab('browse'); setActiveCat(null); }, style: { width: 40, height: 40, borderRadius: '50%', background: THEME.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
