@@ -554,13 +554,13 @@ function App() {
             const saveCount = formatCount(parseCount(item.saves) + (saved ? 1 : 0));
             const reviewCount = formatCount(Math.max(12, Math.round(parseCount(item.likes) / 9)));
             const backdrop = item.video
-                ? React.createElement("video", { key: item.id + '-video', poster: item.image || undefined, autoPlay: true, muted: true, loop: true, playsInline: true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } },
+                ? React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) { const p = el.play(); if (p && p.catch) p.catch(() => { }); } }, poster: item.image || undefined, autoPlay: true, muted: true, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
                     React.createElement("source", { src: item.video + '.webm', type: "video/webm" }),
                     React.createElement("source", { src: item.video + '.mp4', type: "video/mp4" }))
                 : item.image
                     ? React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
                     : React.createElement("div", { style: { position: 'absolute', inset: 0, background: `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 84, opacity: 0.9 } }, meta.icon);
-            const scrim = React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.15) 22%, rgba(0,0,0,0.15) 45%, rgba(0,0,0,0.55) 72%, rgba(0,0,0,0.92) 100%)' } });
+            const scrim = React.createElement("div", { style: { position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.15) 22%, rgba(0,0,0,0.15) 45%, rgba(0,0,0,0.55) 72%, rgba(0,0,0,0.92) 100%)' } });
             const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 16, right: 60, zIndex: 2 } },
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#fff', margin: 0 } }, "Book Me"),
                 React.createElement("div", { style: { display: 'flex', gap: 4, marginTop: 10 } }, filteredFeed.slice(0, 5).map((f, fi) => React.createElement("span", { key: f.id, style: { flex: 1, height: 2.5, borderRadius: 2, background: fi === 0 ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.32)' } }))));
