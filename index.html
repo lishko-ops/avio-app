@@ -726,14 +726,6 @@ function App() {
                 { label: 'Reviews', value: 74 },
                 { label: 'Bookings', value: 42 },
             ];
-            const QUICK_ACCESS = [
-                { label: 'Upcoming Bookings', icon: 'calendar', accent: true, badge: bookings.filter((b) => b.status === 'upcoming').length || null, onClick: () => setTab('bookings') },
-                { label: 'Past Bookings', icon: 'clock', onClick: () => setProfileTab('bookings') },
-                { label: 'Saved Businesses', icon: 'bookmark', onClick: () => setProfileTab('saved') },
-                { label: 'Saved Videos', icon: 'playcircle', onClick: () => setProfileTab('saved') },
-                { label: 'Wallet', icon: 'wallet', sub: money(balance), onClick: () => flashToast(`Wallet balance: ${money(balance)}`) },
-                { label: 'Messages', icon: 'message', badge: 5, onClick: () => flashToast('Messages — coming soon') },
-            ];
             const PROFILE_TABS = [
                 { id: 'videos', label: 'Videos', icon: 'grid' },
                 { id: 'saved', label: 'Saved', icon: 'bookmark' },
@@ -794,16 +786,6 @@ function App() {
                 React.createElement("button", { onClick: () => flashToast('Share link copied'), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#fff', border: `1px solid ${L.border}`, color: L.text, fontWeight: 600, fontSize: 12.5, padding: '9px 0', borderRadius: 20 } },
                     React.createElement(Icon, { name: "send", size: 13, color: L.text }),
                     " Share Profile"));
-            const quickAccessGrid = React.createElement("div", { style: { marginTop: 14 } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                    React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: L.text } }, "Quick Access"),
-                    React.createElement("button", { onClick: () => flashToast('Quick access — coming soon'), style: { fontSize: 11, color: THEME.coral, fontWeight: 600 } }, "View all")),
-                React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 8 } },
-                    QUICK_ACCESS.map((q) => React.createElement("button", { key: q.label, onClick: q.onClick, style: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: '#fff', border: `1px solid ${L.border}`, borderRadius: 12, padding: '9px 6px' } },
-                        q.badge ? React.createElement("span", { style: { position: 'absolute', top: 4, right: 8, minWidth: 15, height: 15, borderRadius: 8, background: THEME.coral, color: '#fff', fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' } }, q.badge) : null,
-                        React.createElement(Icon, { name: q.icon, size: 17, color: q.accent ? THEME.coral : L.text }),
-                        React.createElement("span", { style: { fontSize: 9.5, color: L.text, textAlign: 'center', fontWeight: 500, lineHeight: 1.2 } }, q.label),
-                        q.sub ? React.createElement("span", { style: { fontSize: 9.5, color: THEME.coral, fontWeight: 600 } }, q.sub) : null))));
             const tabsRow2 = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 18, marginTop: 14, borderBottom: `1px solid ${L.border}`, overflowX: 'auto' } },
                 PROFILE_TABS.map((t) => {
                     const active = profileTab === t.id;
@@ -859,7 +841,7 @@ function App() {
                             React.createElement("p", { style: { fontSize: 11, color: L.sub, marginTop: 2 } }, f.category)),
                         React.createElement("button", { onClick: () => toggleFollow(f.id), style: { fontSize: 11, fontWeight: 600, color: THEME.coral, border: `1px solid ${THEME.coral}`, borderRadius: 14, padding: '5px 10px' } }, "Following"))));
             }
-            return React.createElement(React.Fragment, null, topIcons, topRow, bioBlock, statsRow, actionButtons, quickAccessGrid, tabsRow2, tabContent);
+            return React.createElement(React.Fragment, null, topIcons, topRow, bioBlock, statsRow, actionButtons, tabsRow2, tabContent);
         })())),
         tab === 'bookings' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: THEME.ink, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` } },
             React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, margin: 0 } },
