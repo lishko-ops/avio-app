@@ -602,11 +602,11 @@ function App() {
                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, item.discount));
             const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 74, bottom: 120, padding: '0 18px', zIndex: 2 } },
                 categoryTag, nameRow, categoryRow2, captionP, discountBadge);
-            const bookCta = React.createElement("div", { className: "avio-pulse", style: { position: 'absolute', left: 18, right: 18, bottom: 60, zIndex: 2, borderRadius: 16, background: '#fff', boxShadow: '0 10px 26px rgba(0,0,0,0.35)' } },
-                React.createElement("button", { onClick: () => openBooking(item), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px' } },
-                    React.createElement(Icon, { name: "calendar", size: 18, color: THEME.ink }),
-                    React.createElement("span", { style: { flex: 1, textAlign: 'left', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: THEME.ink } }, "Book Now"),
-                    React.createElement(Icon, { name: "arrowright", size: 16, color: THEME.ink })));
+            const bookCta = React.createElement("div", { className: "avio-pulse", style: { position: 'absolute', left: 18, right: 18, bottom: 70, zIndex: 2, borderRadius: 14, background: '#fff', boxShadow: '0 10px 26px rgba(0,0,0,0.35)' } },
+                React.createElement("button", { onClick: () => openBooking(item), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 16px' } },
+                    React.createElement(Icon, { name: "calendar", size: 17, color: THEME.ink }),
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: THEME.ink } }, "Book Now"),
+                    React.createElement(Icon, { name: "arrowright", size: 15, color: THEME.ink })));
             return React.createElement("div", { key: item.id, style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
                 backdrop, scrim, brand, actionStack, infoBlock, bookCta);
         }))),
