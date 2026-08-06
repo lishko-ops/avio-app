@@ -655,6 +655,12 @@ function App() {
     const [filterServices, setFilterServices] = useState(() => new Set());
     const [filterExpanded, setFilterExpanded] = useState(null);
     const [filterLocation, setFilterLocation] = useState('Current location');
+    const [swipeArrow, setSwipeArrow] = useState(null);
+    const [profileDrag, setProfileDrag] = useState(null);
+    const [businessProfileTarget, setBusinessProfileTarget] = useState(null);
+    const shortTouchRef = useRef(null);
+    const shortVideoRefs = useRef({});
+    const bizPanelTouchRef = useRef(null);
     const [filterDistance, setFilterDistance] = useState('25 miles');
     const [filterPrice, setFilterPrice] = useState(1);
     const [filterRating, setFilterRating] = useState('4.5+');
@@ -868,6 +874,106 @@ function App() {
             return next;
         });
     }
+    function restartShort(item) {
+        const el = shortVideoRefs.current[item.id];
+        if (el) {
+            el.currentTime = 0;
+            const p = el.play();
+            if (p && p.catch)
+                p.catch(() => { });
+        }
+    }
+    function openBusinessProfile(item) {
+        setBusinessProfileTarget(item);
+        setProfileDrag({ itemId: item.id, progress: 1, dragging: false });
+    }
+    function closeBusinessProfile() {
+        setProfileDrag((prev) => prev ? { ...prev, progress: 0, dragging: false } : null);
+        setTimeout(() => { setBusinessProfileTarget(null); setProfileDrag(null); }, 260);
+    }
+    function handleBizPanelTouchStart(e) {
+        bizPanelTouchRef.current = { startX: e.touches[0].clientX };
+    }
+    function handleBizPanelTouchMove(e) {
+        const t = bizPanelTouchRef.current;
+        if (!t || !businessProfileTarget)
+            return;
+        const dx = e.touches[0].clientX - t.startX;
+        if (dx >= 0)
+            return;
+        const progress = Math.max(0, 1 + dx / 150);
+        setProfileDrag({ itemId: businessProfileTarget.id, progress, dragging: true });
+    }
+    function handleBizPanelTouchEnd() {
+        const t = bizPanelTouchRef.current;
+        bizPanelTouchRef.current = null;
+        if (!t || !businessProfileTarget)
+            return;
+        setProfileDrag((prev) => {
+            if (!prev)
+                return prev;
+            if (prev.progress <= 0.65) {
+                closeBusinessProfile();
+                return { ...prev, dragging: false };
+            }
+            return { ...prev, progress: 1, dragging: false };
+        });
+    }
+    function handleShortTouchStart(e, item) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.touches[0].clientX;
+        const relX = x - rect.left;
+        const edge = relX < rect.width * 0.4;
+        shortTouchRef.current = { itemId: item.id, startX: x, edge, triggered: false };
+        if (edge)
+            setSwipeArrow({ itemId: item.id, progress: 0, dragging: true });
+    }
+    function handleShortTouchMove(e, item) {
+        const t = shortTouchRef.current;
+        if (!t || t.itemId !== item.id)
+            return;
+        const dx = e.touches[0].clientX - t.startX;
+        if (dx <= 0)
+            return;
+        if (t.edge) {
+            const progress = Math.min(1, dx / 90);
+            setSwipeArrow({ itemId: item.id, progress, dragging: true });
+            if (progress >= 1 && !t.triggered) {
+                t.triggered = true;
+                if (navigator.vibrate)
+                    navigator.vibrate(10);
+                restartShort(item);
+            }
+        }
+        else {
+            const progress = Math.min(1, dx / 150);
+            setProfileDrag({ itemId: item.id, progress, dragging: true });
+        }
+    }
+    function handleShortTouchEnd(e, item) {
+        const t = shortTouchRef.current;
+        shortTouchRef.current = null;
+        if (!t || t.itemId !== item.id)
+            return;
+        if (t.edge) {
+            setSwipeArrow((prev) => prev ? { ...prev, dragging: false, progress: t.triggered ? 1 : 0 } : null);
+            setTimeout(() => setSwipeArrow((prev) => prev && prev.itemId === item.id ? null : prev), 260);
+        }
+        else {
+            setProfileDrag((prev) => {
+                if (!prev || prev.itemId !== item.id)
+                    return prev;
+                if (prev.progress >= 0.35) {
+                    if (navigator.vibrate)
+                        navigator.vibrate(10);
+                    setBusinessProfileTarget(item);
+                    return { ...prev, progress: 1, dragging: false };
+                }
+                setTimeout(() => setProfileDrag((p2) => p2 && p2.itemId === item.id && p2.progress < 1 ? null : p2), 260);
+                return { ...prev, progress: 0, dragging: false };
+            });
+        }
+    }
     function toggleSaveShort(id) {
         setSavedShorts((prev) => {
             const next = new Set(prev);
@@ -1000,9 +1106,9 @@ function App() {
             const shareCount = formatCount(Math.round(parseCount(item.likes) * 0.4));
             const saveCount = formatCount(parseCount(item.saves) + (saved ? 1 : 0));
             const backdrop = item.customVideoUrl
-                ? React.createElement("video", { key: item.id + '-video', src: item.customVideoUrl, autoPlay: true, muted: true, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } })
+                ? React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, src: item.customVideoUrl, autoPlay: true, muted: true, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } })
                 : item.video
-                    ? React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) { const p = el.play(); if (p && p.catch) p.catch(() => { }); } }, poster: item.image || undefined, autoPlay: true, muted: true, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
+                    ? React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) { shortVideoRefs.current[item.id] = el; const p = el.play(); if (p && p.catch) p.catch(() => { }); } }, poster: item.image || undefined, autoPlay: true, muted: true, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
                         React.createElement("source", { src: item.video + '.webm', type: "video/webm" }),
                         React.createElement("source", { src: item.video + '.mp4', type: "video/mp4" }))
                     : item.image
@@ -1047,9 +1153,10 @@ function App() {
                                 React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, shareCount)));
                     })());
             const nameRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: '#fff', margin: 0 } }, item.name),
-                item.verified && React.createElement("div", { style: { width: 16, height: 16, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                    React.createElement(Icon, { name: "check", size: 10, color: THEME.ink })));
+                React.createElement("button", { onClick: () => openBusinessProfile(item), style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: '#fff', margin: 0 } }, item.name),
+                    item.verified && React.createElement("div", { style: { width: 16, height: 16, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement(Icon, { name: "check", size: 10, color: THEME.ink }))));
             const categoryRow2 = React.createElement("p", { style: { fontSize: 13, color: 'rgba(255,255,255,0.75)', margin: '3px 0 0' } }, item.location);
             const captionP = React.createElement("p", { style: { fontSize: 13, color: '#fff', marginTop: 12, maxWidth: 280, lineHeight: 1.4 } }, item.blurb);
             const discountBadge = item.discount && React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(248,244,236,0.92)', borderRadius: 18, padding: '6px 12px', marginTop: 12 } },
@@ -1062,8 +1169,17 @@ function App() {
                     React.createElement(Icon, { name: "calendar", size: 17, color: THEME.coral }),
                     React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: THEME.coral } }, "Book Now"),
                     React.createElement(Icon, { name: "arrowright", size: 15, color: THEME.coral })));
-            return React.createElement("div", { key: item.id, style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
-                backdrop, scrim, brand, actionStack, infoBlock, bookCta);
+            const isArrowHere = swipeArrow && swipeArrow.itemId === item.id;
+            const arrowOverlay = isArrowHere && React.createElement("div", { style: { position: 'absolute', left: 0, top: '50%', zIndex: 5, pointerEvents: 'none', transform: `translate(${-30 + swipeArrow.progress * 60}px,-50%) scale(${0.7 + swipeArrow.progress * 0.5})`, opacity: swipeArrow.progress, transition: swipeArrow.dragging ? 'none' : 'transform 0.25s ease, opacity 0.25s ease' } },
+                React.createElement("div", { style: { width: 54, height: 54, borderRadius: '50%', background: 'rgba(16,185,129,0.22)', boxShadow: `0 0 ${18 + swipeArrow.progress * 20}px ${6 + swipeArrow.progress * 6}px rgba(16,185,129,0.45)`, backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "arrowright", size: 24, color: THEME.coral })));
+            const isDraggingHere = profileDrag && profileDrag.itemId === item.id;
+            const dragProgress = isDraggingHere ? profileDrag.progress : 0;
+            const innerTransition = isDraggingHere && profileDrag.dragging ? 'none' : 'transform 0.26s ease, opacity 0.26s ease';
+            return React.createElement("div", { key: item.id, onTouchStart: (e) => handleShortTouchStart(e, item), onTouchMove: (e) => handleShortTouchMove(e, item), onTouchEnd: (e) => handleShortTouchEnd(e, item), style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
+                React.createElement("div", { style: { position: 'absolute', inset: 0, transform: `translateX(${-dragProgress * 46}px)`, opacity: 1 - dragProgress * 0.35, transition: innerTransition } },
+                    backdrop, scrim, brand, actionStack, infoBlock, bookCta),
+                arrowOverlay);
         }))),
         tab === 'discover' && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 18px)', right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 } }, !shortsSearchOpen && (React.createElement("button", { onClick: logout, style: { display: 'flex' } },
             React.createElement(Icon, { name: "user", size: 18, color: "rgba(255,255,255,0.7)" }))), shortsSearchOpen ? (React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '6px 10px', width: 190 } },
@@ -1474,6 +1590,62 @@ function App() {
                     React.createElement(Icon, { name: t.icon, size: 22, color: active ? THEME.coral : THEME.muted, fill: active && (t.icon === 'house' || t.icon === 'message') ? THEME.coral : 'none' }),
                     React.createElement("span", { style: { fontSize: 9.5, color: active ? THEME.coral : THEME.muted, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' } }, t.label));
             })),
+        businessProfileTarget && (() => {
+            const item = businessProfileTarget;
+            const P = profileDrag && profileDrag.itemId === item.id ? profileDrag : { progress: 1, dragging: false };
+            const followed = followedIds.has(item.id);
+            const catId = CATEGORY_LABEL_TO_ID[item.category] || 'home';
+            const meta = CATEGORY_META[item.category] || { grad: ['#3F3F5C', '#1E1E30'], icon: '📍' };
+            const followersCount = formatCount(Math.round(parseCount(item.likes) * 3.4));
+            const followingCount = Math.max(20, Math.round(parseCount(item.likes) / 60));
+            const reviewCount = formatCount(Math.max(12, Math.round(parseCount(item.likes) / 9)));
+            const portfolio = (CATEGORY_PHOTOS[catId] && CATEGORY_PHOTOS[catId].length ? CATEGORY_PHOTOS[catId] : [item.image]).filter(Boolean);
+            const header = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 0` } },
+                React.createElement("button", { onClick: closeBusinessProfile, style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "arrowleft", size: 20, color: "#fff" })),
+                React.createElement("button", { onClick: () => flashToast('More options — coming soon'), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement("span", { style: { fontSize: 18, color: '#fff', letterSpacing: 1 } }, "•••")));
+            const avatarRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px 0' } },
+                item.image
+                    ? React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } })
+                    : React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: item.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: '#fff', flexShrink: 0 } }, item.name.charAt(0)),
+                React.createElement("div", { style: { minWidth: 0 } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                        React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: '#fff' } }, item.name),
+                        item.verified && React.createElement("div", { style: { width: 15, height: 15, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                            React.createElement(Icon, { name: "check", size: 9, color: "#fff" }))),
+                    React.createElement("p", { style: { fontSize: 12.5, color: 'rgba(255,255,255,0.55)', margin: '2px 0 0' } }, "@", item.name.toLowerCase().replace(/[^a-z0-9]+/g, ''))));
+            const statsRow = React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', padding: '18px 18px 0' } },
+                [{ label: 'Shorts', value: 1 }, { label: 'Followers', value: followersCount }, { label: 'Following', value: followingCount }].map((s) => React.createElement("div", { key: s.label, style: { textAlign: 'center' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#fff', margin: 0 } }, s.value),
+                    React.createElement("p", { style: { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 } }, s.label))));
+            const actionRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, padding: '14px 18px 0' } },
+                React.createElement("button", { onClick: () => toggleFollow(item.id), style: { flex: 1, padding: '10px 0', borderRadius: 20, background: followed ? 'transparent' : THEME.coral, border: followed ? '1px solid rgba(255,255,255,0.25)' : 'none', color: followed ? '#fff' : '#061410', fontWeight: 700, fontSize: 13.5 } }, followed ? "Following" : "Follow"),
+                React.createElement("button", { onClick: () => flashToast('Message — coming soon'), style: { width: 40, height: 40, borderRadius: 20, border: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement(Icon, { name: "message", size: 16, color: "#fff" })),
+                React.createElement("button", { onClick: () => shareItem(item), style: { width: 40, height: 40, borderRadius: 20, border: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement(Icon, { name: "sendoutline", size: 15, color: "#fff" })));
+            const bioBlock = React.createElement("div", { style: { padding: '16px 18px 0' } },
+                React.createElement("p", { style: { fontSize: 13, color: '#fff', lineHeight: 1.4, margin: 0 } }, item.blurb),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 } },
+                    React.createElement("span", { style: { fontSize: 12 } }, meta.icon),
+                    React.createElement("span", { style: { fontSize: 12.5, color: 'rgba(255,255,255,0.6)' } }, item.category)),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 } },
+                    React.createElement(Icon, { name: "mappin", size: 12, color: 'rgba(255,255,255,0.6)' }),
+                    React.createElement("span", { style: { fontSize: 12.5, color: 'rgba(255,255,255,0.6)' } }, item.location)),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 6 } },
+                    React.createElement(Icon, { name: "star", size: 12, color: THEME.gold, fill: THEME.gold }),
+                    React.createElement("span", { style: { fontSize: 12.5, color: '#fff', fontWeight: 600 } }, item.rating),
+                    React.createElement("span", { style: { fontSize: 12, color: 'rgba(255,255,255,0.5)' } }, "(", reviewCount, " reviews)")));
+            const portfolioRow = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginTop: 18, padding: '0 0 100px' } },
+                Array.from({ length: 6 }, (_, i) => portfolio[i % portfolio.length]).map((src, i) => React.createElement("div", { key: i, style: { aspectRatio: '1 / 1', backgroundImage: src ? `url(${src})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', background: src ? undefined : `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})` } })));
+            const bookCta2 = React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 'calc(env(safe-area-inset-bottom) + 18px)', zIndex: 2, borderRadius: 14, background: '#fff', boxShadow: '0 10px 26px rgba(0,0,0,0.35)' } },
+                React.createElement("button", { onClick: () => openBooking(item), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 16px' } },
+                    React.createElement(Icon, { name: "calendar", size: 17, color: THEME.coral }),
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: THEME.coral } }, "Book Now")));
+            return React.createElement("div", { key: "bizprofile", onTouchStart: handleBizPanelTouchStart, onTouchMove: handleBizPanelTouchMove, onTouchEnd: handleBizPanelTouchEnd, style: { position: 'absolute', inset: 0, zIndex: 8, background: THEME.ink, overflowY: 'auto', transform: `translateX(${(1 - P.progress) * 100}%)`, transition: P.dragging ? 'none' : 'transform 0.28s cubic-bezier(0.22,1,0.36,1)' } },
+                header, avatarRow, statsRow, actionRow, bioBlock, portfolioRow, bookCta2);
+        })(),
         profileSheetOpen && (React.createElement("div", { onClick: () => setProfileSheetOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } }, (() => {
             const titles = { bookings: 'Past Bookings', saved: 'Saved Businesses', reviews: 'Reviews', videos: 'My Short Videos', drafts: 'Drafts' };
             let sheetContent;
