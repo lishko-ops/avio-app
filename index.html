@@ -920,10 +920,8 @@ function App() {
         });
     }
     function handleShortTouchStart(e, item) {
-        const rect = e.currentTarget.getBoundingClientRect();
         const x = e.touches[0].clientX;
-        const relX = x - rect.left;
-        const edge = relX < rect.width * 0.4;
+        const edge = x < window.innerWidth * 0.55;
         shortTouchRef.current = { itemId: item.id, startX: x, edge, triggered: false };
         if (edge)
             setSwipeArrow({ itemId: item.id, progress: 0, dragging: true });
@@ -1602,48 +1600,48 @@ function App() {
             const portfolio = (CATEGORY_PHOTOS[catId] && CATEGORY_PHOTOS[catId].length ? CATEGORY_PHOTOS[catId] : [item.image]).filter(Boolean);
             const header = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 0` } },
                 React.createElement("button", { onClick: closeBusinessProfile, style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement(Icon, { name: "arrowleft", size: 20, color: "#fff" })),
+                    React.createElement(Icon, { name: "arrowleft", size: 20, color: "#161616" })),
                 React.createElement("button", { onClick: () => flashToast('More options — coming soon'), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement("span", { style: { fontSize: 18, color: '#fff', letterSpacing: 1 } }, "•••")));
+                    React.createElement("span", { style: { fontSize: 18, color: '#161616', letterSpacing: 1 } }, "•••")));
             const avatarRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px 0' } },
                 item.image
                     ? React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } })
                     : React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: item.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: '#fff', flexShrink: 0 } }, item.name.charAt(0)),
                 React.createElement("div", { style: { minWidth: 0 } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-                        React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: '#fff' } }, item.name),
+                        React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: '#161616' } }, item.name),
                         item.verified && React.createElement("div", { style: { width: 15, height: 15, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                             React.createElement(Icon, { name: "check", size: 9, color: "#fff" }))),
-                    React.createElement("p", { style: { fontSize: 12.5, color: 'rgba(255,255,255,0.55)', margin: '2px 0 0' } }, "@", item.name.toLowerCase().replace(/[^a-z0-9]+/g, ''))));
+                    React.createElement("p", { style: { fontSize: 12.5, color: '#8A8A8E', margin: '2px 0 0' } }, "@", item.name.toLowerCase().replace(/[^a-z0-9]+/g, ''))));
             const statsRow = React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', padding: '18px 18px 0' } },
                 [{ label: 'Shorts', value: 1 }, { label: 'Followers', value: followersCount }, { label: 'Following', value: followingCount }].map((s) => React.createElement("div", { key: s.label, style: { textAlign: 'center' } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#fff', margin: 0 } }, s.value),
-                    React.createElement("p", { style: { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 } }, s.label))));
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', margin: 0 } }, s.value),
+                    React.createElement("p", { style: { fontSize: 11, color: '#8A8A8E', marginTop: 2 } }, s.label))));
             const actionRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, padding: '14px 18px 0' } },
-                React.createElement("button", { onClick: () => toggleFollow(item.id), style: { flex: 1, padding: '10px 0', borderRadius: 20, background: followed ? 'transparent' : THEME.coral, border: followed ? '1px solid rgba(255,255,255,0.25)' : 'none', color: followed ? '#fff' : '#061410', fontWeight: 700, fontSize: 13.5 } }, followed ? "Following" : "Follow"),
-                React.createElement("button", { onClick: () => flashToast('Message — coming soon'), style: { width: 40, height: 40, borderRadius: 20, border: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                    React.createElement(Icon, { name: "message", size: 16, color: "#fff" })),
-                React.createElement("button", { onClick: () => shareItem(item), style: { width: 40, height: 40, borderRadius: 20, border: '1px solid rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                    React.createElement(Icon, { name: "sendoutline", size: 15, color: "#fff" })));
+                React.createElement("button", { onClick: () => toggleFollow(item.id), style: { flex: 1, padding: '10px 0', borderRadius: 20, background: followed ? 'transparent' : THEME.coral, border: followed ? '1px solid #E0E0E0' : 'none', color: followed ? '#161616' : '#fff', fontWeight: 700, fontSize: 13.5 } }, followed ? "Following" : "Follow"),
+                React.createElement("button", { onClick: () => flashToast('Message — coming soon'), style: { width: 40, height: 40, borderRadius: 20, border: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement(Icon, { name: "message", size: 16, color: "#161616" })),
+                React.createElement("button", { onClick: () => shareItem(item), style: { width: 40, height: 40, borderRadius: 20, border: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement(Icon, { name: "sendoutline", size: 15, color: "#161616" })));
             const bioBlock = React.createElement("div", { style: { padding: '16px 18px 0' } },
-                React.createElement("p", { style: { fontSize: 13, color: '#fff', lineHeight: 1.4, margin: 0 } }, item.blurb),
+                React.createElement("p", { style: { fontSize: 13, color: '#161616', lineHeight: 1.4, margin: 0 } }, item.blurb),
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 } },
                     React.createElement("span", { style: { fontSize: 12 } }, meta.icon),
-                    React.createElement("span", { style: { fontSize: 12.5, color: 'rgba(255,255,255,0.6)' } }, item.category)),
+                    React.createElement("span", { style: { fontSize: 12.5, color: '#8A8A8E' } }, item.category)),
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 } },
-                    React.createElement(Icon, { name: "mappin", size: 12, color: 'rgba(255,255,255,0.6)' }),
-                    React.createElement("span", { style: { fontSize: 12.5, color: 'rgba(255,255,255,0.6)' } }, item.location)),
+                    React.createElement(Icon, { name: "mappin", size: 12, color: '#8A8A8E' }),
+                    React.createElement("span", { style: { fontSize: 12.5, color: '#8A8A8E' } }, item.location)),
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 6 } },
                     React.createElement(Icon, { name: "star", size: 12, color: THEME.gold, fill: THEME.gold }),
-                    React.createElement("span", { style: { fontSize: 12.5, color: '#fff', fontWeight: 600 } }, item.rating),
-                    React.createElement("span", { style: { fontSize: 12, color: 'rgba(255,255,255,0.5)' } }, "(", reviewCount, " reviews)")));
+                    React.createElement("span", { style: { fontSize: 12.5, color: '#161616', fontWeight: 600 } }, item.rating),
+                    React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "(", reviewCount, " reviews)")));
             const portfolioRow = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginTop: 18, padding: '0 0 100px' } },
                 Array.from({ length: 6 }, (_, i) => portfolio[i % portfolio.length]).map((src, i) => React.createElement("div", { key: i, style: { aspectRatio: '1 / 1', backgroundImage: src ? `url(${src})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center', background: src ? undefined : `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})` } })));
-            const bookCta2 = React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 'calc(env(safe-area-inset-bottom) + 18px)', zIndex: 2, borderRadius: 14, background: '#fff', boxShadow: '0 10px 26px rgba(0,0,0,0.35)' } },
+            const bookCta2 = React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 'calc(env(safe-area-inset-bottom) + 18px)', zIndex: 2, borderRadius: 14, background: THEME.coral, boxShadow: '0 10px 26px rgba(0,0,0,0.2)' } },
                 React.createElement("button", { onClick: () => openBooking(item), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 16px' } },
-                    React.createElement(Icon, { name: "calendar", size: 17, color: THEME.coral }),
-                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: THEME.coral } }, "Book Now")));
-            return React.createElement("div", { key: "bizprofile", onTouchStart: handleBizPanelTouchStart, onTouchMove: handleBizPanelTouchMove, onTouchEnd: handleBizPanelTouchEnd, style: { position: 'absolute', inset: 0, zIndex: 8, background: THEME.ink, overflowY: 'auto', transform: `translateX(${(1 - P.progress) * 100}%)`, transition: P.dragging ? 'none' : 'transform 0.28s cubic-bezier(0.22,1,0.36,1)' } },
+                    React.createElement(Icon, { name: "calendar", size: 17, color: "#fff" }),
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: "#fff" } }, "Book Now")));
+            return React.createElement("div", { key: "bizprofile", onTouchStart: handleBizPanelTouchStart, onTouchMove: handleBizPanelTouchMove, onTouchEnd: handleBizPanelTouchEnd, style: { position: 'absolute', inset: 0, zIndex: 8, background: '#fff', overflowY: 'auto', transform: `translateX(${(1 - P.progress) * 100}%)`, transition: P.dragging ? 'none' : 'transform 0.28s cubic-bezier(0.22,1,0.36,1)' } },
                 header, avatarRow, statsRow, actionRow, bioBlock, portfolioRow, bookCta2);
         })(),
         profileSheetOpen && (React.createElement("div", { onClick: () => setProfileSheetOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } }, (() => {
