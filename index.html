@@ -43,8 +43,8 @@
   .avio-upload-sheet { animation: avioUploadSheetUp 0.25s cubic-bezier(0.32, 0.72, 0, 1); }
   @keyframes avioUploadPageIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   .avio-upload-page { animation: avioUploadPageIn 0.22s ease; }
-  .avio-rail-circle { width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.12); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.18); transition: transform 0.2s ease, background 0.2s ease; }
-  .avio-rail-btn:active .avio-rail-circle { transform: scale(0.94); background: rgba(255,255,255,0.22); }
+  .avio-rail-circle { width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,0.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.18); transition: transform 0.2s ease, background 0.2s ease; }
+  .avio-rail-btn:active .avio-rail-circle { transform: scale(0.94); background: rgba(0,0,0,0.7); }
   .avio-rail-btn.share:active .avio-rail-circle { transform: scale(0.94) rotate(8deg); }
   @keyframes avioRailBounce { 0%, 100% { transform: scale(0.94); } 50% { transform: scale(1.05); } }
   .avio-rail-btn.comment:active .avio-rail-circle { animation: avioRailBounce 0.2s ease; }
@@ -1017,18 +1017,30 @@ function App() {
                         React.createElement("div", { style: { width: 48, height: 48, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.92)', boxShadow: '0 4px 12px rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#fff' } }, item.name.charAt(0)),
                         React.createElement("button", { onClick: () => toggleFollow(item.id), style: { position: 'absolute', bottom: -5, right: -5, width: 20, height: 20, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' } },
                             React.createElement(Icon, { name: followed ? "check" : "plus", size: 11, color: THEME.ink }))),
-                    React.createElement("button", { className: "avio-rail-btn", onClick: () => toggleLike(item.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: '#fff' } },
-                        React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "diamond", size: 25, color: liked ? THEME.magenta : '#fff', fill: liked ? THEME.magenta : 'none' })),
-                        React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, likeCount)),
-                    React.createElement("button", { className: "avio-rail-btn comment", onClick: () => openComments(item), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: '#fff' } },
-                        React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "message", size: 21, color: "#fff" })),
-                        React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, commentCount)),
-                    React.createElement("button", { className: "avio-rail-btn", onClick: () => toggleSaveShort(item.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: '#fff' } },
-                        React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "bookmark", size: 20, color: "#fff", fill: saved ? '#fff' : 'none' })),
-                        React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, saveCount)),
-                    React.createElement("button", { className: "avio-rail-btn share", onClick: () => shareItem(item), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: '#fff' } },
-                        React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "sendoutline", size: 21, color: "#fff" })),
-                        React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, shareCount)));
+                    (() => {
+                        const railDot = React.createElement("span", { style: { position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: '50%', background: THEME.coral, border: '2px solid rgba(0,0,0,0.55)' } });
+                        return React.createElement(React.Fragment, null,
+                            React.createElement("button", { className: "avio-rail-btn", onClick: () => toggleLike(item.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: '#fff' } },
+                                React.createElement("div", { style: { position: 'relative' } },
+                                    React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "diamond", size: 25, color: liked ? THEME.coral : '#fff', fill: liked ? THEME.coral : 'none' })),
+                                    railDot),
+                                React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, likeCount)),
+                            React.createElement("button", { className: "avio-rail-btn comment", onClick: () => openComments(item), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: '#fff' } },
+                                React.createElement("div", { style: { position: 'relative' } },
+                                    React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "message", size: 21, color: "#fff" })),
+                                    railDot),
+                                React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, commentCount)),
+                            React.createElement("button", { className: "avio-rail-btn", onClick: () => toggleSaveShort(item.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: '#fff' } },
+                                React.createElement("div", { style: { position: 'relative' } },
+                                    React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "bookmark", size: 20, color: saved ? THEME.coral : "#fff", fill: saved ? THEME.coral : 'none' })),
+                                    railDot),
+                                React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, saveCount)),
+                            React.createElement("button", { className: "avio-rail-btn share", onClick: () => shareItem(item), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: '#fff' } },
+                                React.createElement("div", { style: { position: 'relative' } },
+                                    React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "sendoutline", size: 21, color: "#fff" })),
+                                    railDot),
+                                React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, shareCount)));
+                    })());
             const nameRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: '#fff', margin: 0 } }, item.name),
                 item.verified && React.createElement("div", { style: { width: 16, height: 16, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
