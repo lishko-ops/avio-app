@@ -31,6 +31,12 @@
   .avio-filter-section { animation: avioSectionIn 0.18s ease; }
   .avio-filter-chip, .avio-filter-card { transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease; }
   .avio-filter-chip:active, .avio-filter-card:active { transform: scale(0.97); }
+  @keyframes avioCalFade { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes avioCardIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .avio-cal-fade { animation: avioCalFade 0.28s ease; }
+  .avio-card-in { animation: avioCardIn 0.22s ease backwards; }
+  .avio-date-btn { transition: transform 0.12s ease; }
+  .avio-date-btn:active { transform: scale(0.88); }
 </style>
 </head>
 <body>
@@ -121,6 +127,15 @@ function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
             React.createElement("path", { d: "M10.5 8.7v6.6l5.3-3.3z", ...solid })),
         chevronright: React.createElement("path", { d: "M9 5l7 7-7 7" }),
         chevrondown: React.createElement("path", { d: "M5 9l7 7 7-7" }),
+        bell: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M12 3.5c-.4 0-1 .3-1 1v.7C8.7 5.7 7 7.9 7 10.5v3.3c0 .5-.2 1-.6 1.4L5 16.6v.9h14v-.9l-1.4-1.4c-.4-.4-.6-.9-.6-1.4v-3.3c0-2.6-1.7-4.8-4-5.3v-.7c0-.7-.6-1-1-1z" }),
+            React.createElement("path", { d: "M9.5 19a2.5 2.5 0 0 0 5 0" })),
+        phone: React.createElement("path", { d: "M6.6 3.5 9.3 6.2c.4.4.4 1 .1 1.5L7.9 9.7c1 2.5 3 4.5 5.5 5.5l2-1.5c.4-.3 1.1-.3 1.5.1l2.7 2.7c.5.5.5 1.2.1 1.7l-1.4 1.6c-.5.6-1.4.8-2.1.5C10.8 18 6 13.2 3.7 7.8c-.3-.7-.1-1.6.5-2.1L5.8 4.3c.5-.4 1.2-.4 1.7.1z" }),
+        repeat: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M4 7.5h11a4 4 0 0 1 4 4v1" }),
+            React.createElement("path", { d: "M16.5 5 19 7.5 16.5 10" }),
+            React.createElement("path", { d: "M20 16.5H9a4 4 0 0 1-4-4v-1" }),
+            React.createElement("path", { d: "M7.5 19 5 16.5 7.5 14" })),
     };
     return React.createElement("svg", { ...common }, paths[name]);
 }
@@ -132,6 +147,13 @@ const CATEGORY_META = {
 };
 const CATEGORY_LABEL_TO_ID = { 'Home Services': 'home', Beauty: 'beauty', Parties: 'parties', Restaurants: 'restaurants', Educational: 'educational' };
 const CATEGORY_TAG_LABEL = { 'Home Services': 'Cleaning', Beauty: 'Beauty', Parties: 'Event', Restaurants: 'Dining' };
+const CATEGORY_DURATION = { 'Home Services': '2h', Beauty: '1h', Parties: '3h', Restaurants: '1h 30 min', Educational: '1h' };
+const BOOKING_STATUS_STYLE = {
+    confirmed: { bg: '#161616', color: '#fff', border: 'none' },
+    pending: { bg: '#EDEDED', color: '#6B6B6B', border: 'none' },
+    completed: { bg: '#4A4A4A', color: '#fff', border: 'none' },
+    cancelled: { bg: '#fff', color: '#D0304A', border: '1px solid #D0304A' },
+};
 const CATEGORY_PHOTOS = {
     beauty: ['assets/explore/brow-arc.jpg', 'assets/explore/makeup-promo.jpg', 'assets/explore/barbershop.jpg'],
     home: ['assets/explore/real-estate.jpg'],
@@ -357,10 +379,34 @@ function App() {
     const [profileTab, setProfileTab] = useState('videos');
     const [bookingTarget, setBookingTarget] = useState(null);
     const [bookings, setBookings] = useState([
-        { id: 'b0', name: 'Fresh Start Cleaners', category: 'Home Services', date: 'Aug 6', day: 6, month: 7, year: 2026, time: '10:30 AM', total: 97.2, status: 'upcoming' },
+        { id: 'b1', name: 'John Barber', service: 'Haircut', business: 'John Barber', category: 'Beauty', date: 'Aug 6', day: 6, month: 7, year: 2026, time: '9:00 AM', total: 45, status: 'confirmed', address: '123 Main St, New York, NY', duration: '45 min', logoText: 'JB' },
+        { id: 'b2', name: 'Luxury Nails', service: 'Nails', business: 'Luxury Nails', category: 'Beauty', date: 'Aug 6', day: 6, month: 7, year: 2026, time: '11:30 AM', total: 65, status: 'confirmed', address: '456 Broadway, New York, NY', duration: '1h 15 min', logoText: 'LN' },
+        { id: 'b3', name: 'DJ Alex', service: 'DJ Event', business: 'DJ Alex', category: 'Parties', date: 'Aug 6', day: 6, month: 7, year: 2026, time: '2:00 PM', total: 350, status: 'confirmed', address: '789 Park Ave, New York, NY', duration: '3h', logoText: 'DJ' },
+        { id: 'b4', name: 'John Barber', service: 'Haircut', business: 'John Barber', category: 'Beauty', date: 'Aug 7', day: 7, month: 7, year: 2026, time: '2:00 PM', total: 45, status: 'confirmed', address: '123 Main St, New York, NY', duration: '45 min', logoText: 'JB' },
+        { id: 'b5', name: 'Zen Spa', service: 'Massage', business: 'Zen Spa', category: 'Beauty', date: 'Aug 3', day: 3, month: 7, year: 2026, time: '4:00 PM', total: 120, status: 'completed', address: '22 Wellness Way, New York, NY', duration: '1h', logoText: 'ZS' },
+        { id: 'b6', name: 'FitLife Coach', service: 'Personal Training', business: 'FitLife Coach', category: 'Educational', date: 'Aug 9', day: 9, month: 7, year: 2026, time: '8:00 AM', total: 80, status: 'pending', address: '10 Fit St, New York, NY', duration: '1h', logoText: 'FL' },
     ]);
     const [calendarMonth, setCalendarMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
     const [selectedDay, setSelectedDay] = useState(() => new Date().getDate());
+    const [calView, setCalView] = useState('month');
+    const [dailyExpanded, setDailyExpanded] = useState(true);
+    const [bookingDetail, setBookingDetail] = useState(null);
+    const calTouchRef = useRef(null);
+    function handleCalTouchStart(e) { calTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
+    function handleCalTouchEnd(e) {
+        if (!calTouchRef.current)
+            return;
+        const dx = e.changedTouches[0].clientX - calTouchRef.current.x;
+        const dy = e.changedTouches[0].clientY - calTouchRef.current.y;
+        calTouchRef.current = null;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+            setCalendarMonth((m) => new Date(m.getFullYear(), m.getMonth() + (dx < 0 ? 1 : -1), 1));
+            setDailyExpanded(true);
+        }
+        else if (Math.abs(dy) > 50 && Math.abs(dy) > Math.abs(dx)) {
+            setCalView(dy > 0 ? 'week' : 'month');
+        }
+    }
     const [balance, setBalance] = useState(120.4);
     const [toast, setToast] = useState(null);
     const [likedIds, setLikedIds] = useState(() => new Set());
@@ -458,7 +504,8 @@ function App() {
     const calDaysInMonth = new Date(calYear, calMonthIdx + 1, 0).getDate();
     const calCells = [...Array(calFirstWeekday).fill(null), ...Array.from({ length: calDaysInMonth }, (_, i) => i + 1)];
     const bookingsThisMonth = bookings.filter((b) => b.month === calMonthIdx && b.year === calYear).sort((a, b) => a.day - b.day);
-    const bookingDaySet = new Set(bookingsThisMonth.map((b) => b.day));
+    const bookingCountByDay = {};
+    bookingsThisMonth.forEach((b) => { bookingCountByDay[b.day] = (bookingCountByDay[b.day] || 0) + 1; });
     function flashToast(msg) { setToast(msg); setTimeout(() => setToast(null), 2600); }
     function goAuth(view) { setAuthError(''); setAuthView(view); }
     function login() {
@@ -529,12 +576,23 @@ function App() {
         const total = Math.round((price + tax) * 100) / 100;
         const d = days[selDate];
         const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        setBookings((prev) => [{ id: 'b' + Date.now(), name: bookingTarget.name, category: bookingTarget.category, date: label, day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), time: TIME_SLOTS[selTime], total, status: 'upcoming' }, ...prev]);
+        const initials = bookingTarget.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+        setBookings((prev) => [{ id: 'b' + Date.now(), name: bookingTarget.name, service: bookingTarget.category, business: bookingTarget.name, category: bookingTarget.category, date: label, day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), time: TIME_SLOTS[selTime], total, status: 'confirmed', address: bookingTarget.location || 'Address shared after booking', duration: CATEGORY_DURATION[bookingTarget.category] || '1h', logoText: initials }, ...prev]);
         setBalance((b) => Math.max(0, b - total));
         setBookingTarget(null);
         flashToast(`Booked ${bookingTarget.name} on ${label} at ${TIME_SLOTS[selTime]} · ${money(total)} total`);
     }
-    function cancelBooking(id) { setBookings((prev) => prev.filter((b) => b.id !== id)); flashToast('Booking canceled'); }
+    function cancelBooking(id) { setBookings((prev) => prev.map((b) => b.id === id ? { ...b, status: 'cancelled' } : b)); setBookingDetail(null); flashToast('Booking canceled'); }
+    function addToAppleCalendar(b) {
+        const dt = new Date(b.year, b.month, b.day);
+        const stamp = dt.toISOString().slice(0, 10).replace(/-/g, '');
+        const ics = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nUID:${b.id}@avio.app\nDTSTART;VALUE=DATE:${stamp}\nSUMMARY:${b.service || b.name} with ${b.business || b.name}\nLOCATION:${b.address || ''}\nDESCRIPTION:${b.service || b.name} · ${money(b.total)}\nEND:VEVENT\nEND:VCALENDAR`;
+        const a = document.createElement('a');
+        a.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+        a.download = `${(b.service || b.name).replace(/\s+/g, '-')}.ics`;
+        a.click();
+        flashToast('Added to Apple Calendar');
+    }
     function toggleLike(id) {
         setLikedIds((prev) => {
             const next = new Set(prev);
@@ -899,7 +957,7 @@ function App() {
                         React.createElement("div", null,
                             React.createElement("p", { style: { fontSize: 13, fontWeight: 600, color: L.text, margin: 0 } }, b.name),
                             React.createElement("p", { style: { fontSize: 11, color: L.sub, marginTop: 2 } }, [b.category, b.date, b.time].filter(Boolean).join(' · '))),
-                        React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: b.status === 'upcoming' ? THEME.turquoise : L.sub, textTransform: 'capitalize' } }, b.status))));
+                        React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: (b.status === 'confirmed' || b.status === 'pending') ? THEME.turquoise : L.sub, textTransform: 'capitalize' } }, b.status))));
             }
             else if (profileTab === 'reviews') {
                 tabContent = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 12, marginTop: 14 } }, PROFILE_REVIEWS.map((r, i) => React.createElement("div", { key: i, style: { background: '#fff', border: `1px solid ${L.border}`, borderRadius: 14, padding: 14 } },
@@ -922,34 +980,134 @@ function App() {
             }
             return React.createElement(React.Fragment, null, topIcons, topRow, statsRow, actionButtons, tabsRow2, tabContent);
         })())),
-        tab === 'bookings' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: THEME.ink, padding: `calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 90px)` } },
-            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, margin: 0 } },
-                React.createElement("span", { style: { color: THEME.textDark } }, "My "),
-                React.createElement("span", { style: { color: THEME.coral } }, "Bookings")),
-            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 } },
-                React.createElement("button", { onClick: () => setCalendarMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1)), style: { width: 28, height: 28, borderRadius: '50%', border: `1px solid ${THEME.inkLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement(Icon, { name: "arrowleft", size: 13, color: THEME.textDark })),
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: THEME.textDark, margin: 0 } }, calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })),
-                React.createElement("button", { onClick: () => setCalendarMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1)), style: { width: 28, height: 28, borderRadius: '50%', border: `1px solid ${THEME.inkLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement("span", { style: { display: 'flex', transform: 'rotate(180deg)' } },
-                        React.createElement(Icon, { name: "arrowleft", size: 13, color: THEME.textDark })))),
-            React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginTop: 14 } }, ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (React.createElement("div", { key: i, style: { textAlign: 'center', fontSize: 11, color: THEME.muted } }, d)))),
-            React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: 4 } }, calCells.map((day, i) => day === null ? React.createElement("div", { key: 'e' + i }) : (React.createElement("button", { key: day, onClick: () => setSelectedDay(day), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '7px 0', margin: '0 auto', width: 34, borderRadius: 10, border: `1.5px solid ${day === selectedDay ? THEME.coral : 'transparent'}` } },
-                React.createElement("span", { style: { fontSize: 13, color: THEME.textDark } }, day),
-                React.createElement("span", { style: { width: 4, height: 4, borderRadius: '50%', background: bookingDaySet.has(day) ? THEME.coral : 'transparent' } }))))),
-            React.createElement("p", { style: { fontSize: 13, fontWeight: 600, color: THEME.textDark, marginTop: 22, marginBottom: 10 } }, "All bookings this month"),
-            bookingsThisMonth.length === 0 && React.createElement("p", { style: { fontSize: 13, color: THEME.muted } }, "No bookings this month."),
-            React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, bookingsThisMonth.map((b) => {
-                const meta = CATEGORY_META[b.category] || { grad: ['#3F3F5C', '#1E1E30'], icon: '📅' };
-                return (React.createElement("div", { key: b.id, style: { display: 'flex', alignItems: 'center', gap: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, borderRadius: 14, padding: 10 } },
-                    React.createElement("div", { style: { width: 48, height: 48, borderRadius: 10, flexShrink: 0, background: `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 } }, meta.icon),
+        tab === 'bookings' && (React.createElement("div", { style: { height: '100%', position: 'relative', background: '#fff' } }, (() => {
+            const BK = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const today = new Date();
+            const isCurrentMonth = calYear === today.getFullYear() && calMonthIdx === today.getMonth();
+            const nowMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const selectedDateObj = new Date(calYear, calMonthIdx, selectedDay);
+            const selectedDateBookings = bookingsThisMonth.filter((b) => b.day === selectedDay);
+            const activeBookings = bookings.filter((b) => b.status === 'confirmed' || b.status === 'pending');
+            const reminder = activeBookings.map((b) => ({ ...b, dateObj: new Date(b.year, b.month, b.day) })).sort((a, c) => a.dateObj - c.dateObj).find((b) => b.dateObj.getTime() >= nowMidnight.getTime());
+            function reminderLabel(dateObj) {
+                const diffDays = Math.round((dateObj - nowMidnight) / 86400000);
+                if (diffDays === 0)
+                    return 'Today';
+                if (diffDays === 1)
+                    return 'Tomorrow';
+                return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
+            function timeToMinutes(t) {
+                const [time, ampm] = t.split(' ');
+                let [h, m] = time.split(':').map(Number);
+                if (ampm === 'PM' && h !== 12)
+                    h += 12;
+                if (ampm === 'AM' && h === 12)
+                    h = 0;
+                return h * 60 + m;
+            }
+            function getWeekDays(dateObj) {
+                const d = new Date(dateObj);
+                d.setDate(d.getDate() - d.getDay());
+                return Array.from({ length: 7 }, (_, i) => { const nd = new Date(d); nd.setDate(d.getDate() + i); return nd; });
+            }
+            const header = React.createElement("div", { style: { padding: '0 18px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' } },
+                React.createElement("div", null,
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: BK.text, margin: 0 } }, "Bookings"),
+                    React.createElement("p", { style: { fontSize: 13, color: BK.sub, marginTop: 4 } }, `${activeBookings.length} Upcoming Appointment${activeBookings.length === 1 ? '' : 's'}`)),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0, marginTop: 6 } },
+                    React.createElement("button", { onClick: () => flashToast('Search bookings — coming soon') }, React.createElement(Icon, { name: "search", size: 19, color: BK.text })),
+                    React.createElement("button", { onClick: () => flashToast('Filter bookings — coming soon') }, React.createElement(Icon, { name: "grid", size: 18, color: BK.text })),
+                    React.createElement("button", { onClick: () => flashToast('More options — coming soon'), style: { fontSize: 18, color: BK.text, letterSpacing: 1 } }, "•••")));
+            const calNav = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px', marginTop: 22 } },
+                React.createElement("button", { onClick: () => { setCalendarMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1)); setDailyExpanded(true); }, style: { width: 30, height: 30, borderRadius: '50%', border: `1px solid ${BK.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "arrowleft", size: 13, color: BK.text })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: BK.text, margin: 0 } }, calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })),
+                React.createElement("button", { onClick: () => { setCalendarMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1)); setDailyExpanded(true); }, style: { width: 30, height: 30, borderRadius: '50%', border: `1px solid ${BK.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement("span", { style: { display: 'flex', transform: 'rotate(180deg)' } }, React.createElement(Icon, { name: "arrowleft", size: 13, color: BK.text }))));
+            let calendarBlock;
+            if (calView === 'month') {
+                const weekdayRow = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '0 18px', marginTop: 16 } }, ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => React.createElement("div", { key: i, style: { textAlign: 'center', fontSize: 11, color: BK.sub } }, d)));
+                const monthGrid = React.createElement("div", { key: `${calYear}-${calMonthIdx}`, className: "avio-cal-fade", style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: 8, padding: '10px 18px 0' } }, calCells.map((day, i) => {
+                    if (day === null)
+                        return React.createElement("div", { key: 'e' + i });
+                    const isToday = isCurrentMonth && day === today.getDate();
+                    const isSelected = day === selectedDay;
+                    const count = bookingCountByDay[day] || 0;
+                    return React.createElement("button", { key: day, className: "avio-date-btn", onClick: () => { setSelectedDay(day); setDailyExpanded(true); if (navigator.vibrate) navigator.vibrate(8); }, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '6px 0' } },
+                        React.createElement("span", { style: { width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13.5, fontWeight: isSelected ? 700 : 500, background: isSelected ? '#161616' : 'transparent', color: isSelected ? '#fff' : BK.text, border: !isSelected && isToday ? '1.5px solid #161616' : 'none' } }, day),
+                        React.createElement("div", { style: { display: 'flex', gap: 2, height: 4 } }, Array.from({ length: Math.min(count, 3) }).map((_, di) => React.createElement("span", { key: di, style: { width: 4, height: 4, borderRadius: '50%', background: '#161616' } }))));
+                }));
+                calendarBlock = React.createElement("div", { onTouchStart: handleCalTouchStart, onTouchEnd: handleCalTouchEnd }, weekdayRow, monthGrid);
+            }
+            else {
+                const weekDays = getWeekDays(selectedDateObj);
+                const weekStrip = React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '10px 18px 0' } }, weekDays.map((wd, i) => {
+                    const isSel = wd.getDate() === selectedDay && wd.getMonth() === calMonthIdx && wd.getFullYear() === calYear;
+                    const isToday2 = wd.toDateString() === today.toDateString();
+                    return React.createElement("button", { key: i, className: "avio-date-btn", onClick: () => { setCalendarMonth(new Date(wd.getFullYear(), wd.getMonth(), 1)); setSelectedDay(wd.getDate()); setDailyExpanded(true); }, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 } },
+                        React.createElement("span", { style: { fontSize: 10, color: BK.sub } }, wd.toLocaleDateString('en-US', { weekday: 'short' })[0]),
+                        React.createElement("span", { style: { width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, fontWeight: isSel ? 700 : 500, background: isSel ? '#161616' : 'transparent', color: isSel ? '#fff' : BK.text, border: !isSel && isToday2 ? '1.5px solid #161616' : 'none' } }, wd.getDate()));
+                }));
+                const HOURS = Array.from({ length: 13 }, (_, i) => 7 + i);
+                const dayStartMin = HOURS[0] * 60;
+                const timelineHeight = HOURS.length * 60;
+                const timeline = React.createElement("div", { className: "avio-cal-fade", style: { position: 'relative', margin: '18px 18px 0', height: timelineHeight, borderTop: `1px solid ${BK.border}` } },
+                    HOURS.map((h, i) => React.createElement("div", { key: h, style: { position: 'absolute', top: i * 60, left: 0, right: 0, height: 60, borderBottom: `1px solid ${BK.border}` } },
+                        React.createElement("span", { style: { position: 'absolute', top: -7, left: 0, fontSize: 10, color: BK.sub, background: '#fff', paddingRight: 6 } }, `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'}`))),
+                    selectedDateBookings.map((b) => {
+                        const top = Math.max(0, timeToMinutes(b.time) - dayStartMin);
+                        const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
+                        return React.createElement("button", { key: b.id, onClick: () => setBookingDetail(b), style: { position: 'absolute', top, left: 48, right: 4, minHeight: 32, background: st.bg, color: st.color, borderRadius: 8, padding: '5px 8px', textAlign: 'left' } },
+                            React.createElement("p", { style: { fontSize: 11, fontWeight: 700, margin: 0 } }, b.service || b.name),
+                            React.createElement("p", { style: { fontSize: 9.5, margin: 0, opacity: 0.85 } }, b.time));
+                    }));
+                calendarBlock = React.createElement("div", { onTouchStart: handleCalTouchStart, onTouchEnd: handleCalTouchEnd }, weekStrip, timeline);
+            }
+            const viewToggle = React.createElement("div", { style: { display: 'flex', justifyContent: 'center', marginTop: 12 } },
+                React.createElement("button", { onClick: () => setCalView((v) => v === 'month' ? 'week' : 'month'), style: { display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 12, background: '#F5F5F5' } },
+                    React.createElement("span", { style: { fontSize: 10.5, color: BK.sub, fontWeight: 600 } }, calView === 'month' ? 'Week view' : 'Month view'),
+                    React.createElement(Icon, { name: "chevrondown", size: 11, color: BK.sub })));
+            const dayLabel = selectedDateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            const dailyHeader = React.createElement("button", { onClick: () => setDailyExpanded((v) => !v), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 12px', marginTop: 10, borderTop: `1px solid ${BK.border}` } },
+                React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: BK.text } }, dayLabel),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                    React.createElement("span", { style: { fontSize: 13, color: BK.sub } }, `${selectedDateBookings.length} Appointment${selectedDateBookings.length === 1 ? '' : 's'}`),
+                    React.createElement("span", { style: { display: 'flex', transform: dailyExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s' } }, React.createElement(Icon, { name: "chevrondown", size: 15, color: BK.sub }))));
+            const emptyState = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 18px 20px', textAlign: 'center' } },
+                React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 } }, React.createElement(Icon, { name: "calendar", size: 30, color: '#C7C7CC' })),
+                React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: BK.text, margin: 0 } }, "No bookings scheduled"),
+                React.createElement("button", { onClick: () => { setTab('browse'); setActiveCat(null); }, style: { marginTop: 14, padding: '10px 22px', borderRadius: 20, background: '#161616', color: '#fff', fontSize: 12.5, fontWeight: 600 } }, "Browse Services"));
+            const cards = selectedDateBookings.length === 0 ? emptyState : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '0 18px' } }, selectedDateBookings.map((b, i) => {
+                const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
+                const [tNum, tAmPm] = b.time.split(' ');
+                return React.createElement("button", { key: b.id, className: "avio-card-in", onClick: () => setBookingDetail(b), style: { animationDelay: `${i * 0.04}s`, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: `1px solid ${BK.border}`, borderRadius: 18, padding: 12, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
+                    React.createElement("div", { style: { textAlign: 'center', flexShrink: 0, width: 42 } },
+                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: BK.text, margin: 0 } }, tNum),
+                        React.createElement("p", { style: { fontSize: 9.5, color: BK.sub, margin: 0 } }, tAmPm)),
+                    React.createElement("div", { style: { width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.logoText || (b.business || b.name).slice(0, 2).toUpperCase()),
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 14, color: THEME.textDark, margin: 0 } }, b.name),
-                        React.createElement("p", { style: { fontSize: 11, color: THEME.muted, marginTop: 2 } }, [b.category, b.date, b.time].filter(Boolean).join(' · '))),
+                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BK.text, margin: 0 } }, b.service || b.name),
+                        React.createElement("p", { style: { fontSize: 11.5, color: BK.sub, margin: '1px 0 0' } }, b.business || b.name),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 3, marginTop: 3 } }, React.createElement(Icon, { name: "mappin", size: 9, color: BK.sub }), React.createElement("span", { style: { fontSize: 10, color: BK.sub } }, b.address))),
                     React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
-                        React.createElement("p", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: THEME.gold, margin: 0 } }, money(b.total)),
-                        b.status === 'upcoming' && React.createElement("button", { onClick: () => cancelBooking(b.id), style: { fontSize: 11, color: THEME.coral, marginTop: 2 } }, "Cancel"))));
-            })))),
+                        React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize', display: 'inline-block' } }, b.status),
+                        React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: BK.text, margin: '5px 0 0' } }, money(b.total)),
+                        React.createElement("p", { style: { fontSize: 9.5, color: BK.sub, margin: '2px 0 0' } }, b.duration)),
+                    React.createElement(Icon, { name: "chevronright", size: 14, color: '#D1D1D6' }));
+            }));
+            const scrollContent = React.createElement("div", { className: "avio-scroll", style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 150px)` } },
+                header, calNav, calendarBlock, viewToggle, dailyHeader, dailyExpanded && cards);
+            const reminderBanner = reminder && React.createElement("div", { style: { position: 'absolute', left: 18, right: 88, bottom: 'calc(env(safe-area-inset-bottom) + 90px)', background: '#F7F7F8', borderRadius: 16, padding: 10, display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.1)', zIndex: 3 } },
+                React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "bell", size: 15, color: '#161616' })),
+                React.createElement("button", { onClick: () => setBookingDetail(reminder), style: { flex: 1, minWidth: 0, textAlign: 'left' } },
+                    React.createElement("p", { style: { fontSize: 10.5, color: BK.sub, margin: 0 } }, `${reminderLabel(reminder.dateObj)} • ${reminder.time}`),
+                    React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: BK.text, margin: '1px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, `${reminder.service || reminder.name} with ${reminder.business || reminder.name}`)),
+                React.createElement("button", { onClick: () => flashToast('Messaging ' + (reminder.business || reminder.name)), style: { width: 30, height: 30, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "message", size: 13, color: '#161616' })),
+                React.createElement("button", { onClick: () => flashToast('Opening directions to ' + reminder.address), style: { width: 30, height: 30, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "send", size: 13, color: '#161616' })));
+            const fab = React.createElement("button", { onClick: () => { setTab('browse'); setActiveCat(null); }, style: { position: 'absolute', right: 18, bottom: 'calc(env(safe-area-inset-bottom) + 90px)', width: 52, height: 52, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 20px rgba(0,0,0,0.28)', zIndex: 3 } }, React.createElement(Icon, { name: "plus", size: 22, color: "#fff" }));
+            return React.createElement(React.Fragment, null, scrollContent, reminderBanner, fab);
+        })())),
         React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: `6px 12px 6px` } },
             [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'browse', icon: 'compass', label: 'Browse' }, null, { id: 'bookings', icon: 'calendar', label: 'Calendar' }, { id: 'budget', icon: 'user', label: 'Profile' }].map((t, i) => {
                 if (!t) {
@@ -1094,6 +1252,43 @@ function App() {
                 React.createElement("button", { onClick: () => setFilterSheetOpen(false), style: { width: '100%', height: 58, borderRadius: 29, background: '#161616', color: '#fff', fontSize: 15.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, `Show ${filterResultCount} Results`));
             return React.createElement("div", { className: "avio-filter-sheet", onClick: (e) => e.stopPropagation(), style: { width: '100%', height: '90%', background: '#fff', borderRadius: '24px 24px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 -12px 40px rgba(0,0,0,0.22)' } },
                 headerBlock, bodyScroll, footerBlock);
+        })())),
+        bookingDetail && (React.createElement("div", { onClick: () => setBookingDetail(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } }, (() => {
+            const b = bookingDetail;
+            const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
+            const actions = [
+                { icon: 'message', label: 'Message Business', onClick: () => flashToast('Messaging ' + (b.business || b.name)) },
+                { icon: 'phone', label: 'Call Business', onClick: () => flashToast('Calling ' + (b.business || b.name)) },
+                { icon: 'send', label: 'Get Directions', onClick: () => flashToast('Opening directions to ' + b.address) },
+            ];
+            if (b.status === 'confirmed' || b.status === 'pending') {
+                actions.push({ icon: 'clock', label: 'Reschedule', onClick: () => flashToast('Reschedule — coming soon') });
+                actions.push({ icon: 'x', label: 'Cancel Booking', danger: true, onClick: () => cancelBooking(b.id) });
+            }
+            if (b.status === 'completed') {
+                actions.push({ icon: 'star', label: 'Leave Review', onClick: () => flashToast('Thanks! Review flow coming soon') });
+                actions.push({ icon: 'repeat', label: 'Book Again', onClick: () => flashToast('Booking ' + (b.business || b.name) + ' again') });
+            }
+            actions.push({ icon: 'share', label: 'Share Booking', onClick: () => flashToast('Share link copied') });
+            actions.push({ icon: 'calendar', label: 'Add to Apple Calendar', onClick: () => addToAppleCalendar(b) });
+            return React.createElement("div", { onClick: (e) => e.stopPropagation(), className: "avio-filter-sheet", style: { width: '100%', background: '#fff', borderRadius: '24px 24px 0 0', padding: `14px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '85%', overflowY: 'auto' } },
+                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#ECECEE', margin: '0 auto 14px' } }),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12 } },
+                    React.createElement("div", { style: { width: 52, height: 52, borderRadius: 14, background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, b.logoText || (b.business || b.name).slice(0, 2).toUpperCase()),
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: '#161616', margin: 0, fontFamily: 'Space Grotesk, sans-serif' } }, b.service || b.name),
+                        React.createElement("p", { style: { fontSize: 12.5, color: '#8A8A8E', marginTop: 2 } }, b.business || b.name)),
+                    React.createElement("button", { onClick: () => setBookingDetail(null) }, React.createElement(Icon, { name: "x", size: 18, color: "#8A8A8E" }))),
+                React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 14, alignItems: 'center' } },
+                    React.createElement("span", { style: { fontSize: 11, fontWeight: 700, padding: '5px 11px', borderRadius: 12, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize' } }, b.status),
+                    React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E', display: 'flex', alignItems: 'center', gap: 4 } }, React.createElement(Icon, { name: "clock", size: 12, color: "#8A8A8E" }), b.duration)),
+                React.createElement("div", { style: { marginTop: 16, background: '#FAFAFA', borderRadius: 14, padding: 14 } },
+                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Date & Time"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, `${b.date} · ${b.time}`)),
+                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Location"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616', textAlign: 'right', maxWidth: 200 } }, b.address)),
+                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: '1px solid #ECECEE' } }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, "Total"), React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: '#161616' } }, money(b.total)))),
+                React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, actions.map((a, i) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px 4px', borderBottom: i < actions.length - 1 ? '1px solid #F5F5F5' : 'none' } },
+                    React.createElement(Icon, { name: a.icon, size: 16, color: a.danger ? '#D0304A' : '#161616' }),
+                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: a.danger ? '#D0304A' : '#161616' } }, a.label)))));
         })())),
         toast && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }, toast))));
 }
