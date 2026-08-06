@@ -136,6 +136,32 @@ function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
             React.createElement("path", { d: "M16.5 5 19 7.5 16.5 10" }),
             React.createElement("path", { d: "M20 16.5H9a4 4 0 0 1-4-4v-1" }),
             React.createElement("path", { d: "M7.5 19 5 16.5 7.5 14" })),
+        camera: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M4 8.5a2 2 0 0 1 2-2h1.6l1-1.7h6.8l1 1.7H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9z" }),
+            React.createElement("circle", { cx: "12", cy: "13", r: "3.4" })),
+        image: React.createElement(React.Fragment, null,
+            React.createElement("rect", { x: "3", y: "4.5", width: "18", height: "15", rx: "2.5" }),
+            React.createElement("circle", { cx: "8.5", cy: "9.5", r: "1.6", ...solid }),
+            React.createElement("path", { d: "M4 16.5l4.5-4.5a1.5 1.5 0 0 1 2.1 0l2.4 2.4M14 14l1.3-1.3a1.5 1.5 0 0 1 2.1 0L20 15.3" })),
+        video: React.createElement(React.Fragment, null,
+            React.createElement("rect", { x: "3", y: "6.5", width: "12", height: "11", rx: "2.5" }),
+            React.createElement("path", { d: "M15 10.5l5.3-3v9l-5.3-3z", ...solid })),
+        sliders: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M4 7h6M14 7h6M4 12h11M19 12h1M4 17h3M11 17h9" }),
+            React.createElement("circle", { cx: "10", cy: "7", r: "2", ...solid }),
+            React.createElement("circle", { cx: "17", cy: "12", r: "2", ...solid }),
+            React.createElement("circle", { cx: "7", cy: "17", r: "2", ...solid })),
+        pin: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M9 4h6l-.7 6.3L18 14v1.5H6V14l3.7-3.7z" }),
+            React.createElement("path", { d: "M12 15.5V21" })),
+        mute: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M12 3.5c-.4 0-1 .3-1 1v.7C8.7 5.7 7 7.9 7 10.5v3.3c0 .5-.2 1-.6 1.4L5 16.6v.9h14v-.9l-1.4-1.4c-.4-.4-.6-.9-.6-1.4v-3.3c0-1-.2-1.9-.7-2.7" }),
+            React.createElement("path", { d: "M9.5 19a2.5 2.5 0 0 0 5 0" }),
+            React.createElement("path", { d: "M4 4l16 16" })),
+        archive: React.createElement(React.Fragment, null,
+            React.createElement("rect", { x: "3", y: "4", width: "18", height: "5", rx: "1.5" }),
+            React.createElement("path", { d: "M4.5 9.5V18a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V9.5" }),
+            React.createElement("path", { d: "M10 13h4" })),
     };
     return React.createElement("svg", { ...common }, paths[name]);
 }
@@ -154,6 +180,27 @@ const BOOKING_STATUS_STYLE = {
     completed: { bg: '#4A4A4A', color: '#fff', border: 'none' },
     cancelled: { bg: '#fff', color: '#D0304A', border: '1px solid #D0304A' },
 };
+const CONVERSATIONS_SEED = [
+    { id: 'c1', name: 'Fade Kings', category: 'Barbershop', rating: 4.9, verified: true, online: true, unread: 2, initials: 'FK', responseTime: '~5 min', hasBookingThread: true,
+        messages: [
+            { id: 'm1', from: 'them', text: 'Yessir, I got you in for Saturday at 12PM. You want a skin fade?', time: '9:39 AM' },
+            { id: 'm2', from: 'me', text: 'Yessir that works perfect', time: '9:40 AM' },
+            { id: 'm3', from: 'me', text: "Bet, I'll book it right now", time: '9:41 AM' },
+            { id: 'm4', from: 'them', text: 'See you then 💪', time: '9:41 AM' },
+        ] },
+    { id: 'c2', name: 'Glam Studio', category: 'Nails', rating: 5.0, verified: false, online: true, unread: 1, initials: 'GS', responseTime: '~10 min', hasBookingThread: true,
+        messages: [{ id: 'm1', from: 'them', text: 'Can we move it to 3PM?', time: '9:32 AM' }] },
+    { id: 'c3', name: 'Luxe Beauty', category: 'Makeup', rating: 4.8, verified: false, online: true, unread: 0, initials: 'LB', responseTime: '~15 min',
+        messages: [{ id: 'm1', from: 'me', text: 'Thank you so much!', time: 'Yesterday' }] },
+    { id: 'c4', name: 'DJ Prime', category: 'DJ', rating: 4.9, verified: false, online: true, unread: 0, initials: 'DP', responseTime: '~20 min',
+        messages: [{ id: 'm1', from: 'me', text: "Perfect, let's lock it in", time: 'Yesterday' }] },
+    { id: 'c5', name: 'Shot By Dre', category: 'Photography', rating: 5.0, verified: false, online: true, unread: 1, initials: 'SD', responseTime: '~30 min',
+        messages: [{ id: 'm1', from: 'them', text: 'Sent a booking request', time: 'Mon', isRequest: true }] },
+    { id: 'c6', name: 'Ink Forever', category: 'Tattoo', rating: 4.9, verified: false, online: false, unread: 0, initials: 'IF', responseTime: '~1 hr',
+        messages: [{ id: 'm1', from: 'them', text: 'What size are you thinking?', time: 'Mon' }] },
+    { id: 'c7', name: 'Loc Queen', category: 'Loctician', rating: 5.0, verified: false, online: true, unread: 2, initials: 'LQ', responseTime: '~5 min',
+        messages: [{ id: 'm1', from: 'them', text: "I'll send you some styles", time: 'Sun' }] },
+];
 const CATEGORY_PHOTOS = {
     beauty: ['assets/explore/brow-arc.jpg', 'assets/explore/makeup-promo.jpg', 'assets/explore/barbershop.jpg'],
     home: ['assets/explore/real-estate.jpg'],
@@ -406,6 +453,57 @@ function App() {
         else if (Math.abs(dy) > 50 && Math.abs(dy) > Math.abs(dx)) {
             setCalView(dy > 0 ? 'week' : 'month');
         }
+    }
+    const [conversations, setConversations] = useState(() => CONVERSATIONS_SEED.map((c) => ({ ...c, messages: c.messages.map((m) => ({ ...m })) })));
+    const [activeConversationId, setActiveConversationId] = useState(null);
+    const [connectFilter, setConnectFilter] = useState('all');
+    const [connectSearch, setConnectSearch] = useState('');
+    const [connectDraft, setConnectDraft] = useState('');
+    const [pinnedIds, setPinnedIds] = useState(() => new Set());
+    const [swipedRowId, setSwipedRowId] = useState(null);
+    const connectTouchRef = useRef(null);
+    function openConversation(id) {
+        setActiveConversationId(id);
+        setConversations((prev) => prev.map((c) => c.id === id ? { ...c, unread: 0 } : c));
+    }
+    function sendConnectMessage() {
+        if (!connectDraft.trim() || !activeConversationId)
+            return;
+        const text = connectDraft.trim();
+        setConversations((prev) => prev.map((c) => c.id === activeConversationId ? { ...c, messages: [...c.messages, { id: 'm' + Date.now(), from: 'me', text, time: 'Just now' }] } : c));
+        setConnectDraft('');
+    }
+    function insertBookingCard() {
+        if (!activeConversationId)
+            return;
+        setConversations((prev) => prev.map((c) => c.id === activeConversationId ? { ...c, messages: [...c.messages, { id: 'm' + Date.now(), from: 'me', type: 'booking', service: c.category, price: 65, duration: '45 min', date: 'Sat · 12:00 PM', time: 'Just now' }] } : c));
+        flashToast('Booking card sent');
+    }
+    function togglePin(id) {
+        setPinnedIds((prev) => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            flashToast(next.has(id) ? 'Conversation pinned' : 'Conversation unpinned');
+            return next;
+        });
+        setSwipedRowId(null);
+    }
+    function markConversationUnread(id) { setConversations((prev) => prev.map((c) => c.id === id ? { ...c, unread: Math.max(1, c.unread) } : c)); setSwipedRowId(null); flashToast('Marked as unread'); }
+    function muteConversation() { setSwipedRowId(null); flashToast('Conversation muted'); }
+    function archiveConversation(id) { setConversations((prev) => prev.filter((c) => c.id !== id)); setSwipedRowId(null); flashToast('Conversation archived'); }
+    function handleRowTouchStart(e, id) { connectTouchRef.current = { id, x: e.touches[0].clientX }; }
+    function handleRowTouchEnd(e) {
+        if (!connectTouchRef.current)
+            return;
+        const { id, x } = connectTouchRef.current;
+        const dx = e.changedTouches[0].clientX - x;
+        connectTouchRef.current = null;
+        if (dx < -50)
+            setSwipedRowId(id);
+        else if (dx > 50)
+            togglePin(id);
+        else
+            setSwipedRowId((prev) => prev === id ? null : prev);
     }
     const [balance, setBalance] = useState(120.4);
     const [toast, setToast] = useState(null);
@@ -879,6 +977,127 @@ function App() {
             const grid = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '16px 18px 0' } }, cards);
             return React.createElement(React.Fragment, null, header, searchBar, quickFilterRow, categoryRow, categoryDots, tabsRow, grid);
         })())),
+        tab === 'connect' && (React.createElement("div", { style: { height: '100%', position: 'relative', background: '#fff' } }, (() => {
+            const CN = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const activeConversation = conversations.find((c) => c.id === activeConversationId);
+            if (activeConversation) {
+                const c = activeConversation;
+                const chatHeader = React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 12px) 18px 12px`, borderBottom: `1px solid ${CN.border}` } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                        React.createElement("button", { onClick: () => setActiveConversationId(null), style: { flexShrink: 0 } }, React.createElement(Icon, { name: "arrowleft", size: 18, color: CN.text })),
+                        React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, c.initials),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
+                                React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: CN.text } }, c.name),
+                                c.verified && React.createElement("div", { style: { width: 14, height: 14, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" }))),
+                            React.createElement("p", { style: { fontSize: 11.5, color: CN.sub, margin: '1px 0 0' } }, `${c.category} · ${c.rating.toFixed(1)}★`),
+                            c.online && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 } }, React.createElement("span", { style: { width: 6, height: 6, borderRadius: '50%', background: '#3FBF6A' } }), React.createElement("span", { style: { fontSize: 10.5, color: '#3FBF6A' } }, "Online"))),
+                        React.createElement("button", { onClick: () => flashToast('More options — coming soon'), style: { fontSize: 18, color: CN.text, letterSpacing: 1, flexShrink: 0 } }, "•••")),
+                    React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 12 } },
+                        React.createElement("button", { onClick: () => flashToast(`Viewing ${c.name}'s profile`), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', borderRadius: 18, border: `1px solid ${CN.border}` } }, React.createElement(Icon, { name: "user", size: 13, color: CN.text }), React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: CN.text } }, "View profile")),
+                        React.createElement("button", { onClick: () => { setTab('bookings'); }, style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', borderRadius: 18, border: `1px solid ${CN.border}` } }, React.createElement(Icon, { name: "calendar", size: 13, color: CN.text }), React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: CN.text } }, "View booking"))));
+                const bubbles = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 } },
+                    c.messages.map((m) => {
+                        if (m.type === 'booking') {
+                            return React.createElement("div", { key: m.id, style: { alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start', maxWidth: '78%', background: '#FAFAFA', border: `1px solid ${CN.border}`, borderRadius: 16, padding: 12 } },
+                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: CN.text, margin: 0 } }, m.service),
+                                React.createElement("p", { style: { fontSize: 11.5, color: CN.sub, marginTop: 2 } }, `${m.date} · ${m.duration}`),
+                                React.createElement("p", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 15, fontWeight: 700, color: CN.text, marginTop: 6 } }, money(m.price)),
+                                React.createElement("button", { onClick: () => flashToast('Booking confirmed'), style: { width: '100%', marginTop: 8, padding: '9px 0', borderRadius: 14, background: '#161616', color: '#fff', fontSize: 12.5, fontWeight: 700 } }, "Book Now"));
+                        }
+                        const mine = m.from === 'me';
+                        return React.createElement("div", { key: m.id, style: { alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '78%' } },
+                            React.createElement("div", { style: { background: mine ? '#161616' : '#F5F5F5', color: mine ? '#fff' : CN.text, borderRadius: 18, padding: '10px 14px', fontSize: 13.5, lineHeight: 1.35 } }, m.text),
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, justifyContent: mine ? 'flex-end' : 'flex-start' } },
+                                React.createElement("span", { style: { fontSize: 10, color: CN.sub } }, m.time),
+                                mine && React.createElement(Icon, { name: "check", size: 10, color: CN.sub })));
+                    }));
+                const quickActions = [
+                    { icon: 'camera', label: 'Camera', onClick: () => flashToast('Camera — coming soon') },
+                    { icon: 'image', label: 'Photos', onClick: () => flashToast('Photos — coming soon') },
+                    { icon: 'mappin', label: 'Location', onClick: () => flashToast('Location shared') },
+                    { icon: 'calendar', label: 'Booking', onClick: insertBookingCard },
+                    { icon: 'wallet', label: 'Payment', onClick: () => flashToast('Payment — coming soon') },
+                ];
+                const inputArea = React.createElement("div", { style: { flexShrink: 0, borderTop: `1px solid ${CN.border}`, padding: `10px 18px calc(env(safe-area-inset-bottom) + 10px)` } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                        React.createElement("button", { onClick: () => flashToast('Attach — coming soon'), style: { width: 30, height: 30, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "plus", size: 15, color: "#fff" })),
+                        React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: '#F5F5F5', borderRadius: 20, padding: '9px 14px', minWidth: 0 } },
+                            React.createElement("input", { value: connectDraft, onChange: (e) => setConnectDraft(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') sendConnectMessage(); }, placeholder: `Message ${c.name}...`, style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: CN.text } }),
+                            React.createElement("button", { onClick: () => flashToast('Emoji — coming soon') }, React.createElement("span", { style: { fontSize: 15 } }, "🙂"))),
+                        React.createElement("button", { onClick: sendConnectMessage, style: { width: 30, height: 30, borderRadius: '50%', background: connectDraft.trim() ? '#161616' : '#EDEDED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "send", size: 13, color: connectDraft.trim() ? '#fff' : '#B5B5B8' }))),
+                    React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 20, overflowX: 'auto', marginTop: 12 } }, quickActions.map((a) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
+                        React.createElement(Icon, { name: a.icon, size: 18, color: CN.sub }),
+                        React.createElement("span", { style: { fontSize: 9, color: CN.sub } }, a.label)))));
+                return React.createElement("div", { style: { height: '100%', display: 'flex', flexDirection: 'column' } }, chatHeader, bubbles, inputArea);
+            }
+            const q = connectSearch.trim().toLowerCase();
+            const filteredConversations = conversations.filter((c) => {
+                if (connectFilter === 'unread' && c.unread === 0)
+                    return false;
+                if (connectFilter === 'active' && !c.online)
+                    return false;
+                if (connectFilter === 'bookings' && !c.hasBookingThread)
+                    return false;
+                if (connectFilter === 'requests' && !c.messages.some((m) => m.isRequest))
+                    return false;
+                if (q && !(c.name.toLowerCase().includes(q) || c.category.toLowerCase().includes(q)))
+                    return false;
+                return true;
+            }).sort((a, b) => (pinnedIds.has(b.id) ? 1 : 0) - (pinnedIds.has(a.id) ? 1 : 0));
+            const header = React.createElement("div", { style: { padding: '0 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: CN.text, margin: 0 } }, "Connect"),
+                React.createElement("button", { onClick: () => flashToast('New conversation — coming soon'), style: { width: 32, height: 32, borderRadius: '50%', border: `1.5px solid ${CN.text}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "plus", size: 15, color: CN.text })));
+            const searchRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, padding: '0 18px', marginTop: 14 } },
+                React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: '#F5F5F5', borderRadius: 16, height: 40, padding: '0 12px' } },
+                    React.createElement(Icon, { name: "search", size: 15, color: CN.sub }),
+                    React.createElement("input", { value: connectSearch, onChange: (e) => setConnectSearch(e.target.value), placeholder: "Search conversations", style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: CN.text } })),
+                React.createElement("button", { onClick: () => flashToast('Filter conversations — coming soon'), style: { width: 40, height: 40, borderRadius: 16, background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "sliders", size: 15, color: CN.text })));
+            const avatarRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 16, overflowX: 'auto', padding: '16px 18px 0' } },
+                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 } },
+                    React.createElement("div", { style: { position: 'relative', width: 46, height: 46 } },
+                        React.createElement("div", { style: { width: 46, height: 46, borderRadius: '50%', background: '#F0F0F0', border: `1.5px dashed ${CN.sub}` } }),
+                        React.createElement("div", { style: { position: 'absolute', bottom: -2, right: -2, width: 16, height: 16, borderRadius: '50%', background: '#161616', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "plus", size: 8, color: "#fff" }))),
+                    React.createElement("span", { style: { fontSize: 9.5, color: CN.sub } }, "Your notes")),
+                conversations.map((c) => React.createElement("button", { key: c.id, onClick: () => openConversation(c.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 } },
+                    React.createElement("div", { style: { position: 'relative', width: 46, height: 46 } },
+                        React.createElement("div", { style: { width: 46, height: 46, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
+                        c.online && React.createElement("div", { style: { position: 'absolute', bottom: -1, right: -1, width: 13, height: 13, borderRadius: '50%', background: '#3FBF6A', border: '2px solid #fff' } })),
+                    React.createElement("span", { style: { fontSize: 9.5, color: CN.text, maxWidth: 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, c.name))));
+            const filters = [{ id: 'all', label: 'All' }, { id: 'unread', label: 'Unread' }, { id: 'bookings', label: 'Bookings' }, { id: 'active', label: 'Active' }, { id: 'requests', label: 'Requests' }];
+            const filterRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 18px 0' } }, filters.map((f) => {
+                const active = connectFilter === f.id;
+                return React.createElement("button", { key: f.id, onClick: () => setConnectFilter(f.id), style: { flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 16, background: active ? '#161616' : '#F5F5F5', color: active ? '#fff' : CN.text } }, f.label);
+            }));
+            const list = React.createElement("div", { style: { marginTop: 14 } }, filteredConversations.length === 0
+                ? React.createElement("p", { style: { textAlign: 'center', fontSize: 12.5, color: CN.sub, padding: '40px 18px' } }, "No conversations here.")
+                : filteredConversations.map((c) => {
+                    const swiped = swipedRowId === c.id;
+                    const lastMsg = c.messages[c.messages.length - 1];
+                    const preview = lastMsg ? (lastMsg.type === 'booking' ? `Sent a booking card · ${lastMsg.service}` : `${lastMsg.from === 'me' ? 'You: ' : ''}${lastMsg.text}`) : '';
+                    return React.createElement("div", { key: c.id, style: { position: 'relative', overflow: 'hidden', borderBottom: `1px solid ${CN.border}` } },
+                        React.createElement("div", { style: { position: 'absolute', top: 0, right: 0, bottom: 0, width: 132, display: 'flex' } },
+                            React.createElement("button", { onClick: () => markConversationUnread(c.id), style: { width: 44, background: '#2E9BFF', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "message", size: 15, color: "#fff" })),
+                            React.createElement("button", { onClick: muteConversation, style: { width: 44, background: '#8A8A8E', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "mute", size: 15, color: "#fff" })),
+                            React.createElement("button", { onClick: () => archiveConversation(c.id), style: { width: 44, background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "archive", size: 15, color: "#fff" }))),
+                        React.createElement("button", { onTouchStart: (e) => handleRowTouchStart(e, c.id), onTouchEnd: handleRowTouchEnd, onClick: () => !swiped && openConversation(c.id), style: { position: 'relative', width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', background: '#fff', transform: `translateX(${swiped ? -132 : 0}px)`, transition: 'transform 0.2s ease' } },
+                            pinnedIds.has(c.id) && React.createElement(Icon, { name: "pin", size: 11, color: CN.sub }),
+                            React.createElement("div", { style: { position: 'relative', width: 48, height: 48, flexShrink: 0 } },
+                                React.createElement("div", { style: { width: 48, height: 48, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
+                                c.online && React.createElement("div", { style: { position: 'absolute', bottom: -1, right: -1, width: 13, height: 13, borderRadius: '50%', background: '#3FBF6A', border: '2px solid #fff' } })),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0, textAlign: 'left' } },
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
+                                    React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: CN.text } }, c.name),
+                                    c.verified && React.createElement("div", { style: { width: 13, height: 13, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 7, color: "#fff" }))),
+                                React.createElement("p", { style: { fontSize: 11, color: CN.sub, margin: '1px 0 0' } }, `${c.category} · ${c.rating.toFixed(1)}★`),
+                                React.createElement("p", { style: { fontSize: 12, color: c.unread > 0 ? CN.text : CN.sub, fontWeight: c.unread > 0 ? 600 : 400, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, preview)),
+                            React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 } },
+                                React.createElement("span", { style: { fontSize: 10.5, color: CN.sub } }, lastMsg ? lastMsg.time : ''),
+                                c.unread > 0 && React.createElement("span", { style: { minWidth: 18, height: 18, borderRadius: 9, background: '#161616', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' } }, c.unread))));
+                }));
+            return React.createElement("div", { className: "avio-scroll", style: { height: '100%', overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 90px)` } },
+                header, searchRow, avatarRow, filterRow, list);
+        })())),
         tab === 'budget' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: '#FAFAFA', padding: `calc(env(safe-area-inset-top) + 10px) 18px calc(env(safe-area-inset-bottom) + 68px)` } }, (() => {
             const L = { card: '#F4F4F5', border: '#ECECEE', text: '#161616', sub: '#8A8A8E' };
             const PROFILE_STATS = [
@@ -1108,15 +1327,15 @@ function App() {
             const fab = React.createElement("button", { onClick: () => { setTab('browse'); setActiveCat(null); }, style: { position: 'absolute', right: 18, bottom: 'calc(env(safe-area-inset-bottom) + 90px)', width: 52, height: 52, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 20px rgba(0,0,0,0.28)', zIndex: 3 } }, React.createElement(Icon, { name: "plus", size: 22, color: "#fff" }));
             return React.createElement(React.Fragment, null, scrollContent, reminderBanner, fab);
         })())),
-        React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: `6px 12px 6px` } },
-            [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'browse', icon: 'compass', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Calendar' }, { id: 'budget', icon: 'user', label: 'Profile' }].map((t, i) => {
+        !(tab === 'connect' && activeConversationId) && React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: `6px 12px 6px` } },
+            [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Calendar' }, { id: 'budget', icon: 'user', label: 'Profile' }].map((t, i) => {
                 if (!t) {
                     return React.createElement("button", { key: "create", onClick: () => { setTab('browse'); setActiveCat(null); }, style: { width: 40, height: 40, borderRadius: '50%', background: THEME.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                         React.createElement(Icon, { name: "plus", size: 19, color: "#fff" }));
                 }
                 const active = tab === t.id;
                 return React.createElement("button", { key: t.id, onClick: () => { setTab(t.id); setActiveCat(null); }, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
-                    React.createElement(Icon, { name: t.icon, size: 22, color: active ? THEME.coral : THEME.muted, fill: active && t.icon === 'house' ? THEME.coral : 'none' }),
+                    React.createElement(Icon, { name: t.icon, size: 22, color: active ? THEME.coral : THEME.muted, fill: active && (t.icon === 'house' || t.icon === 'message') ? THEME.coral : 'none' }),
                     React.createElement("span", { style: { fontSize: 9.5, color: active ? THEME.coral : THEME.muted, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' } }, t.label));
             })),
         profileMenuOpen && (React.createElement("div", { onClick: () => setProfileMenuOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } },
