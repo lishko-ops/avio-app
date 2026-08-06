@@ -1109,7 +1109,7 @@ function App() {
             return React.createElement(React.Fragment, null, scrollContent, reminderBanner, fab);
         })())),
         React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: `6px 12px 6px` } },
-            [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'browse', icon: 'compass', label: 'Browse' }, null, { id: 'bookings', icon: 'calendar', label: 'Calendar' }, { id: 'budget', icon: 'user', label: 'Profile' }].map((t, i) => {
+            [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'browse', icon: 'compass', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Calendar' }, { id: 'budget', icon: 'user', label: 'Profile' }].map((t, i) => {
                 if (!t) {
                     return React.createElement("button", { key: "create", onClick: () => { setTab('browse'); setActiveCat(null); }, style: { width: 40, height: 40, borderRadius: '50%', background: THEME.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                         React.createElement(Icon, { name: "plus", size: 19, color: "#fff" }));
