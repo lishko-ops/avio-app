@@ -722,11 +722,32 @@ function App() {
     const [uploadEditPanel, setUploadEditPanel] = useState(0);
     const [uploadForm, setUploadForm] = useState({ caption: '', category: UPLOAD_CATEGORIES[0], location: '', tags: '', price: '', bookingAvailable: true, offerOn: false, offer: '', commentsOn: true, allowDuet: true, allowStitch: true, saveDraft: false });
     const [publishForm, setPublishForm] = useState({ businessName: '', shortDescription: '', offer: '', bookingLink: '', visibility: 'public' });
+    const [taggedBusinessIds, setTaggedBusinessIds] = useState([]);
+    function getTaggableBusinesses() {
+        const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        const seen = new Map();
+        bookings.forEach((b) => {
+            if (!b.providerId || b.status === 'cancelled')
+                return;
+            if (new Date(b.year, b.month, b.day).getTime() < cutoff)
+                return;
+            if (!seen.has(b.providerId)) {
+                const item = feed.find((f) => f.id === b.providerId);
+                if (item)
+                    seen.set(b.providerId, item);
+            }
+        });
+        return Array.from(seen.values());
+    }
+    function toggleTaggedBusiness(id) {
+        setTaggedBusinessIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+    }
     function openUploadFlow() { setUploadOpen(true); setUploadStep('options'); }
     function resetUploadForm() {
         uploadFileRef.current = null;
         setUploadVideoUrl(null);
         setUploadEditPanel(0);
+        setTaggedBusinessIds([]);
         setUploadForm({ caption: '', category: UPLOAD_CATEGORIES[0], location: '', tags: '', price: '', bookingAvailable: true, offerOn: false, offer: '', commentsOn: true, allowDuet: true, allowStitch: true, saveDraft: false });
         setPublishForm({ businessName: '', shortDescription: '', offer: '', bookingLink: '', visibility: 'public' });
     }
@@ -751,11 +772,17 @@ function App() {
         e.target.value = '';
     }
     function publishShort() {
+        const isCustomerPost = accountType === 'personal';
+        const taggedBusinesses = isCustomerPost ? getTaggableBusinesses().filter((b) => taggedBusinessIds.includes(b.id)) : [];
+        if (isCustomerPost && !taggedBusinesses.length)
+            return;
+        const primaryTag = taggedBusinesses[0];
         const newItem = {
-            id: 'short-' + Date.now(), category: uploadForm.category,
-            name: publishForm.businessName.trim() || 'My Business',
-            location: uploadForm.location.trim() || 'Your city',
-            rating: 5.0, price: Number(uploadForm.price) || 50,
+            id: 'short-' + Date.now(),
+            category: isCustomerPost && primaryTag ? primaryTag.category : uploadForm.category,
+            name: isCustomerPost ? 'Levi D.' : (publishForm.businessName.trim() || 'My Business'),
+            location: uploadForm.location.trim() || (primaryTag ? primaryTag.location : 'Your city'),
+            rating: 5.0, price: Number(uploadForm.price) || (primaryTag ? primaryTag.price : 50),
             likes: '0', comments: 0, saves: '0',
             blurb: publishForm.shortDescription.trim() || uploadForm.caption.trim(),
             verified: false, distance: '0 mi',
@@ -763,6 +790,7 @@ function App() {
             hashtags: uploadForm.tags.split(/\s+/).filter(Boolean),
             friendsBooked: 0, avatarColor: THEME.violet, image: null, video: null,
             customVideoUrl: uploadVideoUrl,
+            taggedBusinessIds: taggedBusinesses.map((b) => b.id),
         };
         if (uploadFileRef.current) {
             idbSaveBlob(newItem.id, uploadFileRef.current).catch(() => { });
@@ -1415,10 +1443,15 @@ function App() {
             const discountBadge = item.discount && React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(248,244,236,0.92)', borderRadius: 18, padding: '6px 12px', marginTop: 12 } },
                 React.createElement("span", { style: { fontSize: 13 } }, "\uD83C\uDF81"),
                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, item.discount));
+            const taggedBusinesses = (item.taggedBusinessIds || []).map((id) => feed.find((f) => f.id === id)).filter(Boolean);
+            const taggedRow = taggedBusinesses.length > 0 && React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, maxWidth: 280 } },
+                React.createElement("span", { style: { fontSize: 12, color: 'rgba(255,255,255,0.6)' } }, "with"),
+                taggedBusinesses.map((b) => React.createElement("button", { key: b.id, onClick: () => openBusinessProfile(b), style: { fontSize: 12, fontWeight: 600, color: THEME.coral, background: 'rgba(16,185,129,0.15)', borderRadius: 12, padding: '3px 10px' } }, b.name)));
+            const primaryTagTarget = taggedBusinesses[0] || item;
             const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 74, bottom: 120, padding: '0 18px', zIndex: 2 } },
-                nameRow, categoryRow2, captionP, discountBadge);
+                nameRow, categoryRow2, captionP, discountBadge, taggedRow);
             const bookCta = React.createElement("div", { className: "avio-pulse", style: { position: 'absolute', left: 18, right: 18, bottom: 70, zIndex: 2, borderRadius: 14, background: '#fff', boxShadow: '0 10px 26px rgba(0,0,0,0.35)' } },
-                React.createElement("button", { onClick: () => openBooking(item), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 16px' } },
+                React.createElement("button", { onClick: () => openBooking(primaryTagTarget), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 16px' } },
                     React.createElement(Icon, { name: "calendar", size: 17, color: THEME.coral }),
                     React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: THEME.coral } }, "Book Now"),
                     React.createElement(Icon, { name: "arrowright", size: 15, color: THEME.coral })));
@@ -1852,7 +1885,8 @@ function App() {
             const followersCount = formatCount(Math.round(parseCount(item.likes) * 3.4));
             const followingCount = Math.max(20, Math.round(parseCount(item.likes) / 60));
             const reviewCount = formatCount(Math.max(12, Math.round(parseCount(item.likes) / 9)));
-            const posts = getProviderPosts(item);
+            const taggedPosts = feed.filter((f) => (f.taggedBusinessIds || []).includes(item.id)).map((f) => ({ id: f.id, image: f.image, videoUrl: f.customVideoUrl || null, likes: f.likes, taggedBy: f.name }));
+            const posts = [...taggedPosts, ...getProviderPosts(item)];
             const header = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 0` } },
                 React.createElement("button", { onClick: closeBusinessProfile, style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                     React.createElement(Icon, { name: "arrowleft", size: 20, color: "#161616" })),
@@ -1892,7 +1926,7 @@ function App() {
                     React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "(", reviewCount, " reviews)")));
             const portfolioRow = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginTop: 18, padding: '0 0 100px' } },
                 posts.map((post, i) => React.createElement("button", { key: post.id, onClick: () => openPostViewer(item, posts, i), style: { position: 'relative', aspectRatio: '1 / 1', backgroundImage: post.image ? `url(${post.image})` : `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})`, backgroundSize: 'cover', backgroundPosition: 'center' } },
-                    post.video && React.createElement("span", { style: { position: 'absolute', top: 6, right: 6 } }, React.createElement(Icon, { name: "playcircle", size: 14, color: "#fff" })))));
+                    (post.video || post.videoUrl) && React.createElement("span", { style: { position: 'absolute', top: 6, right: 6 } }, React.createElement(Icon, { name: "playcircle", size: 14, color: "#fff" })))));
             const bookCta2 = React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 'calc(env(safe-area-inset-bottom) + 18px)', zIndex: 2, borderRadius: 14, background: THEME.coral, boxShadow: '0 10px 26px rgba(0,0,0,0.2)' } },
                 React.createElement("button", { onClick: () => openBooking(item), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 16px' } },
                     React.createElement(Icon, { name: "calendar", size: 17, color: "#fff" }),
@@ -1904,8 +1938,9 @@ function App() {
             const { item, posts, index } = postViewer;
             const post = posts[index];
             const goTo = (i) => { if (i >= 0 && i < posts.length) setPostViewer({ item, posts, index: i }); };
-            const backdrop = post.video
-                ? React.createElement("video", { key: post.id, src: `${post.video}.mp4`, autoPlay: true, muted: true, loop: true, playsInline: true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } })
+            const postVideoSrc = post.videoUrl || (post.video ? `${post.video}.mp4` : null);
+            const backdrop = postVideoSrc
+                ? React.createElement("video", { key: post.id, src: postVideoSrc, autoPlay: true, muted: true, loop: true, playsInline: true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' } })
                 : React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: post.image ? `url(${post.image})` : 'none', backgroundColor: post.image ? undefined : THEME.ink, backgroundSize: 'cover', backgroundPosition: 'center' } });
             return React.createElement("div", { key: "postviewer", style: { position: 'absolute', inset: 0, zIndex: 12, background: THEME.ink, overflow: 'hidden' } },
                 backdrop,
@@ -2467,7 +2502,24 @@ function App() {
                     React.createElement("button", { onClick: () => setUploadStep('edit') }, React.createElement(Icon, { name: "arrowleft", size: 17, color: UP.text })),
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: UP.text, margin: 0, flex: 1, textAlign: 'center', marginRight: 17 } }, "Publish Short")),
                 React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
-                    fieldWrap("Business Name", React.createElement("input", { value: publishForm.businessName, onChange: (e) => setPublishForm((f) => ({ ...f, businessName: e.target.value })), placeholder: "Nova Sound DJs", style: inputStyle })),
+                    accountType === 'personal'
+                        ? fieldWrap("Tag businesses you've booked", (() => {
+                            const taggable = getTaggableBusinesses();
+                            if (!taggable.length)
+                                return React.createElement("p", { style: { fontSize: 12.5, color: UP.sub, lineHeight: 1.5 } }, "You haven't booked anyone in the past month. Book a business first, then you can tag them in a post about your experience.");
+                            return React.createElement(React.Fragment, null,
+                                React.createElement("p", { style: { fontSize: 11.5, color: UP.sub, marginBottom: 10 } }, "You can only tag businesses you've booked in the last 30 days. Pick one or more."),
+                                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, taggable.map((b) => {
+                                    const active = taggedBusinessIds.includes(b.id);
+                                    return React.createElement("button", { key: b.id, onClick: () => toggleTaggedBusiness(b.id), style: { display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, border: `1.5px solid ${active ? THEME.coral : UP.border}`, background: active ? '#FAFAFA' : '#fff' } },
+                                        b.image
+                                            ? React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, backgroundImage: `url(${b.image})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } })
+                                            : React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 } }, b.name.charAt(0)),
+                                        React.createElement("span", { style: { flex: 1, textAlign: 'left', fontSize: 13.5, fontWeight: 600, color: UP.text } }, b.name),
+                                        React.createElement("div", { style: { width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" })));
+                                })));
+                        })())
+                        : fieldWrap("Business Name", React.createElement("input", { value: publishForm.businessName, onChange: (e) => setPublishForm((f) => ({ ...f, businessName: e.target.value })), placeholder: "Nova Sound DJs", style: inputStyle })),
                     fieldWrap("Short Description", React.createElement("textarea", { value: publishForm.shortDescription, onChange: (e) => setPublishForm((f) => ({ ...f, shortDescription: e.target.value })), rows: 3, maxLength: 150, placeholder: "Professional DJ services for weddings, clubs, private events and more.", style: { ...inputStyle, resize: 'none' } })),
                     fieldWrap("Offer (optional)", React.createElement("input", { value: publishForm.offer || uploadForm.offer, onChange: (e) => setPublishForm((f) => ({ ...f, offer: e.target.value })), placeholder: "10% OFF for first time bookings", style: inputStyle })),
                     fieldWrap("Booking Link", React.createElement("button", { onClick: () => flashToast('Booking page linked automatically'), style: { ...inputStyle, textAlign: 'left', color: publishForm.bookingLink ? UP.text : UP.sub, display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, publishForm.bookingLink || "Set your booking page", React.createElement(Icon, { name: "chevronright", size: 13, color: UP.sub }))),
@@ -2478,7 +2530,7 @@ function App() {
                             React.createElement("span", { style: { fontSize: 11, fontWeight: active ? 700 : 500, color: active ? THEME.coral : UP.sub } }, v.label));
                     })))),
                 React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${UP.border}` } },
-                    React.createElement("button", { onClick: publishShort, style: { width: '100%', height: 54, borderRadius: 27, background: THEME.coral, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "Publish Short")));
+                    React.createElement("button", { disabled: accountType === 'personal' && taggedBusinessIds.length === 0, onClick: publishShort, style: { width: '100%', height: 54, borderRadius: 27, background: (accountType === 'personal' && taggedBusinessIds.length === 0) ? '#E5E5EA' : THEME.coral, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "Publish Short")));
             const successStep = uploadStep === 'success' && React.createElement("div", { className: "avio-upload-page", style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', textAlign: 'center' } },
                 React.createElement("div", { style: { width: 76, height: 76, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 } }, React.createElement(Icon, { name: "check", size: 32, color: "#fff" })),
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: '#161616', margin: 0 } }, "Your short is live!"),
