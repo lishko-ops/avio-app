@@ -330,6 +330,41 @@ function saveLS(key, value) {
     }
     catch (e) { }
 }
+function idbOpen() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open('avio-media', 1);
+        req.onupgradeneeded = () => { req.result.createObjectStore('videos'); };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+async function idbSaveBlob(id, blob) {
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('videos', 'readwrite');
+        tx.objectStore('videos').put(blob, id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
+async function idbGetBlob(id) {
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('videos', 'readonly');
+        const req = tx.objectStore('videos').get(id);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+    });
+}
+async function idbDeleteBlob(id) {
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('videos', 'readwrite');
+        tx.objectStore('videos').delete(id);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+}
 function seededIndex(id, salt, mod) {
     let h = 0;
     const s = String(id) + '-' + salt;
@@ -566,6 +601,34 @@ function App() {
     const [shortsQuery, setShortsQuery] = useState('');
     const [shortsFeedTab, setShortsFeedTab] = useState('forYou');
     const [feed, setFeed] = useState(FEED);
+    const shortsHydratedRef = useRef(false);
+    useEffect(() => {
+        if (!shortsHydratedRef.current)
+            return;
+        const userShorts = feed.filter((item) => item.id.startsWith('short-')).map(({ customVideoUrl, ...meta }) => meta);
+        saveLS('avio_user_shorts_meta', userShorts);
+    }, [feed]);
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            const savedMeta = loadLS('avio_user_shorts_meta', []);
+            const restored = [];
+            for (const meta of savedMeta) {
+                try {
+                    const blob = await idbGetBlob(meta.id);
+                    if (blob)
+                        restored.push({ ...meta, customVideoUrl: URL.createObjectURL(blob) });
+                }
+                catch (e) { }
+            }
+            if (!cancelled) {
+                if (restored.length)
+                    setFeed((prev) => [...restored, ...prev.filter((item) => !item.id.startsWith('short-'))]);
+                shortsHydratedRef.current = true;
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
     const [profileMenuOpen, setProfileMenuOpen] = useState(false);
     const [profileTab, setProfileTab] = useState('videos');
     const [profileSheetOpen, setProfileSheetOpen] = useState(false);
@@ -651,6 +714,7 @@ function App() {
             setSwipedRowId((prev) => prev === id ? null : prev);
     }
     const fileInputRef = useRef(null);
+    const uploadFileRef = useRef(null);
     const discoverScrollRef = useRef(null);
     const [uploadOpen, setUploadOpen] = useState(false);
     const [uploadStep, setUploadStep] = useState('options');
@@ -660,6 +724,7 @@ function App() {
     const [publishForm, setPublishForm] = useState({ businessName: '', shortDescription: '', offer: '', bookingLink: '', visibility: 'public' });
     function openUploadFlow() { setUploadOpen(true); setUploadStep('options'); }
     function resetUploadForm() {
+        uploadFileRef.current = null;
         setUploadVideoUrl(null);
         setUploadEditPanel(0);
         setUploadForm({ caption: '', category: UPLOAD_CATEGORIES[0], location: '', tags: '', price: '', bookingAvailable: true, offerOn: false, offer: '', commentsOn: true, allowDuet: true, allowStitch: true, saveDraft: false });
@@ -679,6 +744,7 @@ function App() {
         const file = e.target.files && e.target.files[0];
         if (!file)
             return;
+        uploadFileRef.current = file;
         setUploadVideoUrl(URL.createObjectURL(file));
         setUploadStep('edit');
         setUploadEditPanel(0);
@@ -698,6 +764,10 @@ function App() {
             friendsBooked: 0, avatarColor: THEME.violet, image: null, video: null,
             customVideoUrl: uploadVideoUrl,
         };
+        if (uploadFileRef.current) {
+            idbSaveBlob(newItem.id, uploadFileRef.current).catch(() => { });
+            uploadFileRef.current = null;
+        }
         setFeed((prev) => [newItem, ...prev]);
         setUploadStep('success');
     }
