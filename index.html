@@ -48,6 +48,7 @@
   .avio-rail-btn.share:active .avio-rail-circle { transform: scale(0.94) rotate(8deg); }
   @keyframes avioRailBounce { 0%, 100% { transform: scale(0.94); } 50% { transform: scale(1.05); } }
   .avio-rail-btn.comment:active .avio-rail-circle { animation: avioRailBounce 0.2s ease; }
+  @keyframes avioLikeBurst { 0% { transform: scale(0.3); opacity: 0; } 15% { transform: scale(1.15); opacity: 1; } 30% { transform: scale(0.95); opacity: 1; } 80% { transform: scale(1); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
 </style>
 </head>
 <body>
@@ -829,9 +830,11 @@ function App() {
     const [profileDrag, setProfileDrag] = useState(null);
     const [businessProfileTarget, setBusinessProfileTarget] = useState(null);
     const [postViewer, setPostViewer] = useState(null);
+    const [likeBurst, setLikeBurst] = useState(null);
     const shortTouchRef = useRef(null);
     const shortVideoRefs = useRef({});
     const bizPanelTouchRef = useRef(null);
+    const lastTapRef = useRef({ time: 0, id: null });
     const [accountType, setAccountType] = useState(() => loadLS('avio_account_type_v2', null) || (() => { try { return localStorage.getItem('avio_account_type'); } catch (e) { return null; } })() || 'personal');
     const [providerServices, setProviderServices] = useState(() => loadLS('avio_provider_services', DEFAULT_MY_SERVICES));
     const [providerWeeklyHours, setProviderWeeklyHours] = useState(() => loadLS('avio_provider_weekly_hours', DEFAULT_WEEKLY_HOURS));
@@ -1116,6 +1119,11 @@ function App() {
             return next;
         });
     }
+    function triggerLikeBurst(itemId, x, y) {
+        const key = Date.now();
+        setLikeBurst({ itemId, x, y, key });
+        setTimeout(() => setLikeBurst((prev) => prev && prev.key === key ? null : prev), 700);
+    }
     function toggleFollow(id) {
         setFollowedIds((prev) => {
             const next = new Set(prev);
@@ -1230,7 +1238,38 @@ function App() {
     function handleShortTouchEnd(e, item) {
         const t = shortTouchRef.current;
         shortTouchRef.current = null;
-        if (!t || t.itemId !== item.id || t.axis !== 'horizontal')
+        if (!t || t.itemId !== item.id)
+            return;
+        if (!t.axis) {
+            const now = Date.now();
+            const touch = e.changedTouches && e.changedTouches[0];
+            if (lastTapRef.current.id === item.id && now - lastTapRef.current.time < 300) {
+                lastTapRef.current = { time: 0, id: null };
+                if (e.cancelable)
+                    e.preventDefault();
+                if (!likedIds.has(item.id))
+                    toggleLike(item.id);
+                if (touch) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    triggerLikeBurst(item.id, touch.clientX - rect.left, touch.clientY - rect.top);
+                }
+                else {
+                    triggerLikeBurst(item.id, window.innerWidth / 2, window.innerHeight / 2);
+                }
+                if (navigator.vibrate)
+                    navigator.vibrate(10);
+                const vid = shortVideoRefs.current[item.id];
+                if (vid && vid.paused) {
+                    const p = vid.play();
+                    if (p && p.catch)
+                        p.catch(() => { });
+                }
+                return;
+            }
+            lastTapRef.current = { time: now, id: item.id };
+            return;
+        }
+        if (t.axis !== 'horizontal')
             return;
         if (t.edge) {
             setSwipeArrow((prev) => prev ? { ...prev, dragging: false, progress: t.triggered ? 1 : 0 } : null);
@@ -1462,10 +1501,13 @@ function App() {
             const isDraggingHere = profileDrag && profileDrag.itemId === item.id;
             const dragProgress = isDraggingHere ? profileDrag.progress : 0;
             const innerTransition = isDraggingHere && profileDrag.dragging ? 'none' : 'transform 0.26s ease, opacity 0.26s ease';
+            const isBurstHere = likeBurst && likeBurst.itemId === item.id;
+            const burstOverlay = isBurstHere && React.createElement("div", { key: likeBurst.key, style: { position: 'absolute', left: likeBurst.x, top: likeBurst.y, zIndex: 6, pointerEvents: 'none', transform: 'translate(-50%,-50%)', animation: 'avioLikeBurst 0.7s ease' } },
+                React.createElement(Icon, { name: "diamond", size: 90, color: THEME.coral, fill: THEME.coral }));
             return React.createElement("div", { key: item.id, onTouchStart: (e) => handleShortTouchStart(e, item), onTouchMove: (e) => handleShortTouchMove(e, item), onTouchEnd: (e) => handleShortTouchEnd(e, item), style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
                 React.createElement("div", { style: { position: 'absolute', inset: 0, transform: `translateX(${-dragProgress * 46}px)`, opacity: 1 - dragProgress * 0.35, transition: innerTransition } },
                     backdrop, scrim, brand, actionStack, infoBlock, bookCta),
-                arrowOverlay);
+                arrowOverlay, burstOverlay);
         }))),
         tab === 'discover' && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 18px)', right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 } }, !shortsSearchOpen && (React.createElement("button", { onClick: logout, style: { display: 'flex' } },
             React.createElement(Icon, { name: "user", size: 18, color: "rgba(255,255,255,0.7)" }))), shortsSearchOpen ? (React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '6px 10px', width: 190 } },
