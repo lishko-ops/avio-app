@@ -1321,7 +1321,7 @@ function App() {
             flashToast('Link copied to clipboard');
         }
     }
-    const authFrame = (children) =>React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', position: 'fixed', top: 0, bottom: 0, overflow: 'hidden', background: '#fff', boxShadow: '0 0 40px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column' } }, children);
+    const authFrame = (children) =>React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', position: 'fixed', top: 0, bottom: 0, height: '100dvh', overflow: 'hidden', background: '#fff', boxShadow: '0 0 40px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column' } }, children);
     const authBack = (onClick) => React.createElement("button", { onClick: onClick, style: { alignSelf: 'flex-start', color: '#8A8A8E', display: 'flex', marginBottom: 18 } }, React.createElement(Icon, { name: "arrowleft", size: 18, color: '#8A8A8E' }));
     const authInputStyle = { width: '100%', background: '#F5F5F5', border: '1px solid #F0F0F0', borderRadius: 12, padding: '13px 14px', color: '#161616', fontSize: 14, outline: 'none' };
     const authPrimaryBtn = { width: '100%', background: THEME.coral, color: '#fff', fontWeight: 600, fontSize: 14, padding: '13px 0', borderRadius: 24, marginTop: 18 };
@@ -1412,7 +1412,7 @@ function App() {
                 React.createElement("p", { style: { fontSize: 11.5, color: '#8A8A8E', marginTop: 14, textAlign: 'center' } }, "Tap either one to switch back and forth — nothing is final until you continue."),
                 React.createElement("button", { onClick: confirmAccountType, style: { ...authPrimaryBtn, marginTop: 'auto' } }, "Continue")))));
     }
-    return (React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', position: 'fixed', top: 0, bottom: 0, overflow: 'hidden', background: THEME.paper, boxShadow: '0 0 40px rgba(0,0,0,0.08)' } },
+    return (React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', position: 'fixed', top: 0, bottom: 0, height: '100dvh', overflow: 'hidden', background: THEME.paper, boxShadow: '0 0 40px rgba(0,0,0,0.08)' } },
         React.createElement("input", { ref: fileInputRef, type: "file", accept: "video/*", style: { display: 'none' }, onChange: handleFileChosen }),
         tab === 'discover' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
             React.createElement(Icon, { name: shortsFeedTab === 'following' ? "user" : "search", size: 22, color: THEME.mutedDark }),
@@ -2588,6 +2588,29 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App, null));
 
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        const shell = document.querySelector('div[style*="max-width: 480px"]') || document.querySelector('#root > div');
+        const probe = document.createElement('div');
+        probe.style.paddingBottom = 'env(safe-area-inset-bottom)';
+        document.body.appendChild(probe);
+        const safeBottom = getComputedStyle(probe).paddingBottom;
+        document.body.removeChild(probe);
+        const shellRect = shell ? shell.getBoundingClientRect() : null;
+        const lines = [
+            'standalone: ' + (window.navigator.standalone === true ? 'YES' : window.navigator.standalone === false ? 'no' : 'n/a'),
+            'innerHeight: ' + window.innerHeight,
+            'visualViewport.h: ' + (window.visualViewport ? Math.round(window.visualViewport.height) : 'n/a'),
+            'safe-area-bottom: ' + safeBottom,
+            'shell bottom: ' + (shellRect ? Math.round(shellRect.bottom) : 'n/a'),
+            'shell height: ' + (shellRect ? Math.round(shellRect.height) : 'n/a'),
+        ];
+        const badge = document.createElement('div');
+        badge.textContent = lines.join(' | ');
+        badge.style.cssText = 'position:fixed;top:calc(env(safe-area-inset-top) + 4px);left:4px;right:4px;z-index:99999;background:rgba(255,0,0,0.85);color:#fff;font-size:9px;font-family:monospace;padding:4px 6px;border-radius:6px;pointer-events:none;white-space:normal;';
+        document.body.appendChild(badge);
+    }, 800);
+});
 </script>
 </body>
 </html>
