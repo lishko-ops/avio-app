@@ -15,7 +15,7 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body, #root { height: 100%; margin: 0; overscroll-behavior: none; background: #15121C; }
+  html, body, #root { height: 100%; margin: 0; overscroll-behavior: none; background: #fff; }
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
   .avio-scroll::-webkit-scrollbar { display: none; }
   .avio-scroll { -ms-overflow-style: none; scrollbar-width: none; }
@@ -66,7 +66,7 @@ const { useState, useMemo, useEffect, useRef } = React;
 const THEME = {
     ink: '#15121C', inkLine: 'rgba(255,255,255,0.10)',
     surface: '#211D2A',
-    paper: '#15121C', paperLine: 'rgba(255,255,255,0.10)',
+    paper: '#fff', paperLine: 'rgba(255,255,255,0.10)',
     coral: '#10B981', violet: '#6C4CFC', violetSoft: 'rgba(108,76,252,0.20)',
     gold: '#F5A623', textDark: '#F8F4EC', textLight: '#F3EFFA',
     muted: '#93899A', mutedDark: '#B7AFC3',
