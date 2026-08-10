@@ -2588,29 +2588,6 @@ function App() {
 }
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App, null));
 
-window.addEventListener('load', () => {
-    setTimeout(() => {
-        const shell = document.querySelector('div[style*="max-width: 480px"]') || document.querySelector('#root > div');
-        const probe = document.createElement('div');
-        probe.style.paddingBottom = 'env(safe-area-inset-bottom)';
-        document.body.appendChild(probe);
-        const safeBottom = getComputedStyle(probe).paddingBottom;
-        document.body.removeChild(probe);
-        const shellRect = shell ? shell.getBoundingClientRect() : null;
-        const lines = [
-            'standalone: ' + (window.navigator.standalone === true ? 'YES' : window.navigator.standalone === false ? 'no' : 'n/a'),
-            'innerHeight: ' + window.innerHeight,
-            'visualViewport.h: ' + (window.visualViewport ? Math.round(window.visualViewport.height) : 'n/a'),
-            'safe-area-bottom: ' + safeBottom,
-            'shell bottom: ' + (shellRect ? Math.round(shellRect.bottom) : 'n/a'),
-            'shell height: ' + (shellRect ? Math.round(shellRect.height) : 'n/a'),
-        ];
-        const badge = document.createElement('div');
-        badge.textContent = lines.join(' | ');
-        badge.style.cssText = 'position:fixed;top:calc(env(safe-area-inset-top) + 4px);left:4px;right:4px;z-index:99999;background:rgba(255,0,0,0.85);color:#fff;font-size:9px;font-family:monospace;padding:4px 6px;border-radius:6px;pointer-events:none;white-space:normal;';
-        document.body.appendChild(badge);
-    }, 800);
-});
 </script>
 </body>
 </html>
