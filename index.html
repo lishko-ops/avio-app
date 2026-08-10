@@ -1923,15 +1923,19 @@ function App() {
             return React.createElement(React.Fragment, null, scrollContent, reminderBanner, fab);
         })())),
         !(tab === 'connect' && activeConversationId) && React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: `6px 12px 6px` } },
-            [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Calendar' }, { id: 'budget', icon: 'user', label: 'Profile' }].map((t, i) => {
+            (accountType === 'business'
+                ? [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'bookings', icon: 'calendar', label: 'Bookings' }, null, { id: 'connect', icon: 'message', label: 'Messages' }, { id: 'business', icon: 'grid', label: 'Business' }]
+                : [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Bookings' }, { id: 'budget', icon: 'user', label: 'Profile' }]
+            ).map((t, i) => {
                 if (!t) {
                     return React.createElement("div", { key: "create", style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
                         React.createElement("button", { className: "avio-fab-tap", onClick: openUploadFlow, style: { width: 64, height: 40, borderRadius: 20, background: '#fff', border: '1.5px solid #ECECEE', boxShadow: '0 2px 10px rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                             React.createElement(Icon, { name: "rings", size: 22, color: "#161616" })),
                         React.createElement("span", { style: { fontSize: 9.5, color: THEME.coral, fontWeight: 600, whiteSpace: 'nowrap' } }, "Create"));
                 }
-                const active = tab === t.id;
-                return React.createElement("button", { key: t.id, onClick: () => { setTab(t.id); setActiveCat(null); }, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
+                const active = t.id === 'business' ? providerDashboardOpen : tab === t.id;
+                const onNavClick = t.id === 'business' ? () => setProviderDashboardOpen(true) : () => { setTab(t.id); setActiveCat(null); };
+                return React.createElement("button", { key: t.id, onClick: onNavClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
                     React.createElement(Icon, { name: t.icon, size: 22, color: active ? THEME.coral : THEME.muted, fill: active && (t.icon === 'house' || t.icon === 'message') ? THEME.coral : 'none' }),
                     React.createElement("span", { style: { fontSize: 9.5, color: active ? THEME.coral : THEME.muted, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' } }, t.label));
             })),
