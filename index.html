@@ -46,8 +46,8 @@
   .avio-upload-sheet { animation: avioUploadSheetUp 0.25s cubic-bezier(0.32, 0.72, 0, 1); }
   @keyframes avioUploadPageIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   .avio-upload-page { animation: avioUploadPageIn 0.22s ease; }
-  .avio-rail-circle { width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,0.55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,0.18); transition: transform 0.2s ease, background 0.2s ease; }
-  .avio-rail-btn:active .avio-rail-circle { transform: scale(0.94); background: rgba(0,0,0,0.7); }
+  .avio-rail-circle { width: 44px; height: 44px; border-radius: 50%; background: transparent; border: 1.3px solid rgba(255,255,255,0.65); display: flex; align-items: center; justify-content: center; transition: transform 0.2s ease, background 0.2s ease; }
+  .avio-rail-btn:active .avio-rail-circle { transform: scale(0.94); background: rgba(255,255,255,0.12); }
   .avio-rail-btn.share:active .avio-rail-circle { transform: scale(0.94) rotate(8deg); }
   @keyframes avioRailBounce { 0%, 100% { transform: scale(0.94); } 50% { transform: scale(1.05); } }
   .avio-rail-btn.comment:active .avio-rail-circle { animation: avioRailBounce 0.2s ease; }
@@ -82,10 +82,10 @@
 "use strict";
 const { useState, useMemo, useEffect, useRef } = React;
 const THEME = {
-    ink: '#15121C', inkLine: 'rgba(255,255,255,0.10)',
+    ink: '#000000', inkLine: 'rgba(255,255,255,0.10)',
     surface: '#211D2A',
     paper: '#fff', paperLine: 'rgba(255,255,255,0.10)',
-    coral: '#10B981', violet: '#6C4CFC', violetSoft: 'rgba(108,76,252,0.20)',
+    coral: '#97C400', violet: '#6C4CFC', violetSoft: 'rgba(108,76,252,0.20)',
     gold: '#F5A623', textDark: '#F8F4EC', textLight: '#F3EFFA',
     muted: '#93899A', mutedDark: '#B7AFC3',
     blue: '#2E9BFF', turquoise: '#2FD9C4', green: '#3FBF8A',
@@ -892,6 +892,7 @@ function App() {
     const [swipeArrow, setSwipeArrow] = useState(null);
     const [profileDrag, setProfileDrag] = useState(null);
     const [businessProfileTarget, setBusinessProfileTarget] = useState(null);
+    const [bizProfileTab, setBizProfileTab] = useState('videos');
     const [postViewer, setPostViewer] = useState(null);
     const [likeBurst, setLikeBurst] = useState(null);
     const shortTouchRef = useRef(null);
@@ -1264,6 +1265,7 @@ function App() {
     }
     function openBusinessProfile(item) {
         setBusinessProfileTarget(item);
+        setBizProfileTab('videos');
         setProfileDrag({ itemId: item.id, progress: 1, dragging: false });
     }
     function resolveExploreProfileItem(item) {
@@ -1402,6 +1404,7 @@ function App() {
                     if (navigator.vibrate)
                         navigator.vibrate(10);
                     setBusinessProfileTarget(item);
+                    setBizProfileTab('videos');
                     return { ...prev, progress: 1, dragging: false };
                 }
                 setTimeout(() => setProfileDrag((p2) => p2 && p2.itemId === item.id && p2.progress < 1 ? null : p2), 260);
@@ -1642,14 +1645,12 @@ function App() {
                     const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
                     const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
                     return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 } },
-                        React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
+                        React.createElement("span", { style: { position: 'relative', display: 'inline-block' } },
+                            React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
+                            t.id === 'forYou' && React.createElement("span", { style: { position: 'absolute', top: -2, right: -9, width: 6, height: 6, borderRadius: '50%', background: THEME.coral } })),
                         React.createElement("span", { style: { width: active ? 18 : 0, height: 2, borderRadius: 2, background: '#fff', transition: 'width 0.2s' } }));
                 }));
             const actionStack = React.createElement("div", { style: { position: 'absolute', right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 214px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 30, zIndex: 2 } },
-                    React.createElement("div", { style: { position: 'relative', width: 48, height: 48 } },
-                        React.createElement("div", { style: { width: 48, height: 48, borderRadius: '50%', border: '1.5px solid rgba(255,255,255,0.92)', boxShadow: '0 4px 12px rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#fff' } }, item.name.charAt(0)),
-                        React.createElement("button", { onClick: () => toggleFollow(item.id), style: { position: 'absolute', bottom: -5, right: -5, width: 20, height: 20, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.4)' } },
-                            React.createElement(Icon, { name: followed ? "check" : "plus", size: 11, color: THEME.ink }))),
                     (() => {
                         const railDot = React.createElement("span", { style: { position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: '50%', background: THEME.coral, border: '2px solid rgba(0,0,0,0.55)' } });
                         return React.createElement(React.Fragment, null,
@@ -1695,13 +1696,21 @@ function App() {
                     React.createElement("span", { style: { fontSize: 12, color: 'rgba(255,255,255,0.6)' } }, "with"),
                     taggedBusinesses.map((b) => React.createElement("button", { key: b.id, onClick: () => openBusinessProfile(b), style: { fontSize: 12, fontWeight: 600, color: THEME.coral, background: 'rgba(16,185,129,0.15)', borderRadius: 12, padding: '3px 10px' } }, b.name))));
             const primaryTagTarget = taggedBusinesses[0] || item;
+            const topRatedBadge = item.rating >= 4.7 && React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 5, border: `1px solid ${THEME.coral}`, borderRadius: 14, padding: '4px 10px', marginBottom: 8 } },
+                React.createElement(Icon, { name: "star", size: 11, color: THEME.coral, fill: THEME.coral }),
+                React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: THEME.coral } }, "Top Rated"));
+            const bookedRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 } },
+                React.createElement("div", { style: { display: 'flex' } },
+                    [THEME.violet, THEME.blue, THEME.gold].map((c, i) => React.createElement("div", { key: i, style: { width: 26, height: 26, borderRadius: '50%', background: c, border: '2px solid rgba(255,255,255,0.85)', marginLeft: i === 0 ? 0 : -8 } }))),
+                React.createElement("span", { style: { fontSize: 12.5, color: 'rgba(255,255,255,0.85)' } }, "Booked ", React.createElement("span", { style: { color: THEME.coral, fontWeight: 700 } }, item.friendsBooked || 0), " times today"));
             const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 74, bottom: 120, padding: '0 18px', zIndex: 2 } },
-                nameRow, categoryRow2, captionP, discountBadge, taggedRow);
-            const bookCta = React.createElement("div", { className: "avio-pulse", style: { position: 'absolute', left: 18, right: 18, bottom: 70, zIndex: 2, borderRadius: 14, background: '#fff', boxShadow: '0 10px 26px rgba(0,0,0,0.35)' } },
-                React.createElement("button", { onClick: () => openBooking(primaryTagTarget), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 16px' } },
-                    React.createElement(Icon, { name: "calendar", size: 17, color: THEME.coral }),
-                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: THEME.coral } }, "Book Now"),
-                    React.createElement(Icon, { name: "arrowright", size: 15, color: THEME.coral })));
+                topRatedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, bookedRow, discountBadge, taggedRow);
+            const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 70, zIndex: 2, borderRadius: 24, background: 'rgba(0,0,0,0.4)', border: `1.5px solid ${THEME.coral}` } },
+                React.createElement("button", { onClick: () => openBooking(primaryTagTarget), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 16px' } },
+                    React.createElement(Icon, { name: "calendar", size: 17, color: "#fff" }),
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: "#fff" } }, "Book Now"),
+                    React.createElement("span", { style: { width: 1, height: 16, background: 'rgba(255,255,255,0.3)' } }),
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: THEME.coral } }, "$", primaryTagTarget.price || item.price)));
             const isArrowHere = swipeArrow && swipeArrow.itemId === item.id;
             const arrowOverlay = isArrowHere && React.createElement("div", { style: { position: 'absolute', left: 0, top: '50%', zIndex: 5, pointerEvents: 'none', transform: `translate(${-30 + swipeArrow.progress * 60}px,-50%) scale(${0.7 + swipeArrow.progress * 0.5})`, opacity: swipeArrow.progress, transition: swipeArrow.dragging ? 'none' : 'transform 0.25s ease, opacity 0.25s ease' } },
                 React.createElement("div", { style: { width: 54, height: 54, borderRadius: '50%', background: 'rgba(16,185,129,0.22)', boxShadow: `0 0 ${18 + swipeArrow.progress * 20}px ${6 + swipeArrow.progress * 6}px rgba(16,185,129,0.45)`, backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
@@ -1717,8 +1726,7 @@ function App() {
                     backdrop, scrim, brand, actionStack, infoBlock, bookCta),
                 arrowOverlay, burstOverlay);
         }))),
-        tab === 'discover' && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 18px)', right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 } }, !shortsSearchOpen && (React.createElement("button", { onClick: logout, style: { display: 'flex' } },
-            React.createElement(Icon, { name: "user", size: 18, color: "rgba(255,255,255,0.7)" }))), shortsSearchOpen ? (React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '6px 10px', width: 190 } },
+        tab === 'discover' && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 18px)', right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 } }, shortsSearchOpen ? (React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '6px 10px', width: 190 } },
             React.createElement(Icon, { name: "search", size: 14, color: THEME.mutedDark }),
             React.createElement("input", { autoFocus: true, value: shortsQuery, onChange: (e) => setShortsQuery(e.target.value), placeholder: "Search shorts", style: { flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: THEME.textDark, fontSize: 13 } }),
             React.createElement("button", { onClick: () => { setShortsSearchOpen(false); setShortsQuery(''); }, style: { color: THEME.mutedDark, display: 'flex' } },
@@ -2099,8 +2107,9 @@ function App() {
             ).map((t, i) => {
                 if (!t) {
                     return React.createElement("div", { key: "create", style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
-                        React.createElement("button", { className: "avio-fab-tap", onClick: openUploadFlow, style: { width: 64, height: 40, borderRadius: 20, background: '#fff', border: '1.5px solid #ECECEE', boxShadow: '0 2px 10px rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                            React.createElement(Icon, { name: "rings", size: 22, color: "#161616" })));
+                        React.createElement("button", { className: "avio-fab-tap", onClick: openUploadFlow, style: { width: 44, height: 44, borderRadius: 22, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement("svg", { width: 34, height: 34, viewBox: "0 0 34 34" },
+                                React.createElement("circle", { cx: 17, cy: 17, r: 14, fill: "none", stroke: THEME.coral, strokeWidth: 2.4, strokeDasharray: "0.1 5.2", strokeLinecap: "round" }))));
                 }
                 const active = t.id === 'business' ? providerDashboardOpen : tab === t.id;
                 const onNavClick = t.id === 'business' ? () => setProviderDashboardOpen(true) : () => { setTab(t.id); setActiveCat(null); };
@@ -2123,47 +2132,73 @@ function App() {
                     React.createElement(Icon, { name: "arrowleft", size: 20, color: "#161616" })),
                 React.createElement("button", { onClick: () => flashToast('More options — coming soon'), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                     React.createElement("span", { style: { fontSize: 18, color: '#161616', letterSpacing: 1 } }, "•••")));
-            const avatarRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px 0' } },
-                item.image
-                    ? React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } })
-                    : React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: item.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: '#fff', flexShrink: 0 } }, item.name.charAt(0)),
-                React.createElement("div", { style: { minWidth: 0 } },
+            const avatarRow = React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 18px 0' } },
+                React.createElement("div", { style: { position: 'relative', flexShrink: 0 } },
+                    item.image
+                        ? React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
+                        : React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: item.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: '#fff' } }, item.name.charAt(0)),
+                    React.createElement("div", { style: { position: 'absolute', bottom: 1, right: 1, width: 16, height: 16, borderRadius: '50%', background: THEME.coral, border: '3px solid #fff' } })),
+                React.createElement("div", { style: { minWidth: 0, paddingTop: 4 } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
                         React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: '#161616' } }, item.name),
-                        item.verified && React.createElement("div", { style: { width: 15, height: 15, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        item.verified && React.createElement("div", { style: { width: 16, height: 16, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                             React.createElement(Icon, { name: "check", size: 9, color: "#fff" }))),
-                    React.createElement("p", { style: { fontSize: 12.5, color: '#8A8A8E', margin: '2px 0 0' } }, "@", item.name.toLowerCase().replace(/[^a-z0-9]+/g, ''))));
-            const statsRow = React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', padding: '18px 18px 0' } },
-                [{ label: 'Shorts', value: posts.length }, { label: 'Followers', value: followersCount }, { label: 'Following', value: followingCount }].map((s) => React.createElement("div", { key: s.label, style: { textAlign: 'center' } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', margin: 0 } }, s.value),
-                    React.createElement("p", { style: { fontSize: 11, color: '#8A8A8E', marginTop: 2 } }, s.label))));
-            const actionRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, padding: '14px 18px 0' } },
-                React.createElement("button", { onClick: () => toggleFollow(item.id), style: { flex: 1, padding: '10px 0', borderRadius: 20, background: followed ? 'transparent' : THEME.coral, border: followed ? '1px solid #E0E0E0' : 'none', color: followed ? '#161616' : '#fff', fontWeight: 700, fontSize: 13.5 } }, followed ? "Following" : "Follow"),
-                React.createElement("button", { onClick: () => flashToast('Message — coming soon'), style: { width: 40, height: 40, borderRadius: 20, border: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                    React.createElement(Icon, { name: "message", size: 16, color: "#161616" })),
-                React.createElement("button", { onClick: () => shareItem(item), style: { width: 40, height: 40, borderRadius: 20, border: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                    React.createElement(Icon, { name: "sendoutline", size: 15, color: "#161616" })));
-            const bioBlock = React.createElement("div", { style: { padding: '16px 18px 0' } },
-                React.createElement("p", { style: { fontSize: 13, color: '#161616', lineHeight: 1.4, margin: 0 } }, item.blurb),
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 8 } },
-                    React.createElement("span", { style: { fontSize: 12 } }, meta.icon),
-                    React.createElement("span", { style: { fontSize: 12.5, color: '#8A8A8E' } }, item.category)),
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 } },
-                    React.createElement(Icon, { name: "mappin", size: 12, color: '#8A8A8E' }),
-                    React.createElement("span", { style: { fontSize: 12.5, color: '#8A8A8E' } }, item.location)),
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 6 } },
-                    React.createElement(Icon, { name: "star", size: 12, color: THEME.gold, fill: THEME.gold }),
-                    React.createElement("span", { style: { fontSize: 12.5, color: '#161616', fontWeight: 600 } }, item.rating),
-                    React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "(", reviewCount, " reviews)")));
-            const portfolioRow = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginTop: 18, padding: '0 0 100px' } },
-                posts.map((post, i) => React.createElement("button", { key: post.id, onClick: () => openPostViewer(item, posts, i), style: { position: 'relative', aspectRatio: '1 / 1', backgroundImage: post.image ? `url(${post.image})` : `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})`, backgroundSize: 'cover', backgroundPosition: 'center' } },
-                    (post.video || post.videoUrl) && React.createElement("span", { style: { position: 'absolute', top: 6, right: 6 } }, React.createElement(Icon, { name: "playcircle", size: 14, color: "#fff" })))));
-            const bookCta2 = React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 'calc(env(safe-area-inset-bottom) + 18px)', zIndex: 2, borderRadius: 14, background: THEME.coral, boxShadow: '0 10px 26px rgba(0,0,0,0.2)' } },
-                React.createElement("button", { onClick: () => openBooking(item), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 16px' } },
-                    React.createElement(Icon, { name: "calendar", size: 17, color: "#fff" }),
-                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: "#fff" } }, "Book Now")));
+                    React.createElement("p", { style: { fontSize: 12.5, color: '#8A8A8E', margin: '2px 0 0' } }, "@", item.name.toLowerCase().replace(/[^a-z0-9]+/g, ''), ".", (item.location || '').split(',')[0].toLowerCase().replace(/[^a-z0-9]+/g, '')),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 } },
+                        React.createElement(Icon, { name: "mappin", size: 12, color: '#8A8A8E' }),
+                        React.createElement("span", { style: { fontSize: 12.5, color: '#8A8A8E' } }, item.location))));
+            const actionRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, padding: '16px 18px 0' } },
+                React.createElement("button", { onClick: () => toggleFollow(item.id), style: { flex: 1, padding: '13px 0', borderRadius: 24, background: followed ? 'transparent' : THEME.coral, border: followed ? '1px solid #E0E0E0' : 'none', color: followed ? '#161616' : '#fff', fontWeight: 700, fontSize: 14 } }, followed ? "Following" : "Follow"),
+                React.createElement("button", { onClick: () => flashToast('Message — coming soon'), style: { width: 46, height: 46, borderRadius: 12, border: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement(Icon, { name: "sendoutline", size: 17, color: "#161616" })));
+            const statsRow = React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', padding: '20px 18px 0' } },
+                [{ label: 'Posts', value: posts.length }, { label: 'Followers', value: followersCount }, { label: 'Following', value: followingCount }].map((s) => React.createElement("div", { key: s.label, style: { textAlign: 'center' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: '#161616', margin: 0 } }, s.value),
+                    React.createElement("p", { style: { fontSize: 12, color: '#8A8A8E', marginTop: 3 } }, s.label))).concat([
+                    React.createElement("div", { key: "rating", style: { textAlign: 'center' } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 } },
+                            React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: '#161616' } }, item.rating.toFixed(1)),
+                            React.createElement(Icon, { name: "star", size: 15, color: THEME.coral, fill: THEME.coral })),
+                        React.createElement("p", { style: { fontSize: 12, color: '#8A8A8E', marginTop: 3 } }, "Rating"))]));
+            const bioBlock = React.createElement("div", { style: { padding: '18px 18px 0' } },
+                React.createElement("p", { style: { fontSize: 13.5, color: '#161616', lineHeight: 1.5, margin: 0 } }, item.blurb));
+            const BIZ_TABS = [{ id: 'videos', label: 'Videos' }, { id: 'services', label: 'Services' }, { id: 'reviews', label: 'Reviews' }];
+            const tabsRow = React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', marginTop: 22, borderBottom: '1px solid #ECECEE', padding: '0 18px' } },
+                BIZ_TABS.map((t) => {
+                    const active = bizProfileTab === t.id;
+                    return React.createElement("button", { key: t.id, onClick: () => setBizProfileTab(t.id), style: { padding: '0 4px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 } },
+                        React.createElement("span", { style: { fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? '#161616' : '#8A8A8E' } }, t.label),
+                        React.createElement("span", { style: { width: active ? 22 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
+                }));
+            let tabContent;
+            if (bizProfileTab === 'videos') {
+                tabContent = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, padding: '14px 18px 100px' } },
+                    posts.map((post, i) => React.createElement("button", { key: post.id, onClick: () => openPostViewer(item, posts, i), style: { position: 'relative', aspectRatio: '3 / 5', borderRadius: 10, overflow: 'hidden', backgroundImage: post.image ? `url(${post.image})` : `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})`, backgroundSize: 'cover', backgroundPosition: 'center' } },
+                        React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: '16px 5px 5px', background: 'linear-gradient(0deg, rgba(0,0,0,0.6), transparent)', display: 'flex', alignItems: 'center', gap: 4 } },
+                            React.createElement("span", { style: { fontSize: 9, color: "#fff" } }, "▶"),
+                            React.createElement("span", { style: { fontSize: 10.5, fontWeight: 600, color: "#fff" } }, formatCount(parseCount(post.likes || '0')))))));
+            }
+            else if (bizProfileTab === 'services') {
+                const services = getServicesForTarget(item);
+                tabContent = React.createElement("div", { style: { padding: '14px 18px 100px', display: 'flex', flexDirection: 'column', gap: 10 } },
+                    services.map((s, i) => React.createElement("div", { key: i, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 14, border: '1px solid #ECECEE' } },
+                        React.createElement("div", null,
+                            React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: '#161616', margin: 0 } }, s.name),
+                            React.createElement("p", { style: { fontSize: 11.5, color: '#8A8A8E', marginTop: 3 } }, formatDuration(s.durationMin))),
+                        React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: '#161616' } }, money(s.price)))));
+            }
+            else {
+                tabContent = React.createElement("div", { style: { padding: '14px 18px 100px', display: 'flex', flexDirection: 'column', gap: 14 } },
+                    PROFILE_REVIEWS.map((r, i) => React.createElement("div", { key: i, style: { borderBottom: '1px solid #ECECEE', paddingBottom: 14 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                            React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: '#161616' } }, r.name),
+                            React.createElement("span", { style: { fontSize: 11, color: '#8A8A8E' } }, r.time)),
+                        React.createElement("div", { style: { display: 'flex', gap: 2, marginTop: 4 } },
+                            Array.from({ length: 5 }).map((_, si) => React.createElement(Icon, { key: si, name: "star", size: 11, color: THEME.coral, fill: si < r.rating ? THEME.coral : 'none' }))),
+                        React.createElement("p", { style: { fontSize: 12.5, color: '#484848', marginTop: 6, lineHeight: 1.4 } }, r.text))));
+            }
             return React.createElement("div", { key: "bizprofile", onTouchStart: handleBizPanelTouchStart, onTouchMove: handleBizPanelTouchMove, onTouchEnd: handleBizPanelTouchEnd, style: { position: 'absolute', inset: 0, zIndex: 11, background: '#fff', overflowY: 'auto', transform: `translateX(${(1 - P.progress) * 100}%)`, transition: P.dragging ? 'none' : 'transform 0.28s cubic-bezier(0.22,1,0.36,1)' } },
-                header, avatarRow, statsRow, actionRow, bioBlock, portfolioRow, bookCta2);
+                header, avatarRow, actionRow, statsRow, bioBlock, tabsRow, tabContent);
         })(),
         postViewer && (() => {
             const { item, posts, index } = postViewer;
