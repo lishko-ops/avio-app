@@ -924,6 +924,10 @@ function App() {
             return next;
         });
     }
+    useEffect(() => {
+        if (tab !== 'discover')
+            Object.values(shortVideoRefs.current).forEach((v) => { if (v) v.pause(); });
+    }, [tab]);
     const bizPanelTouchRef = useRef(null);
     const lastTapRef = useRef({ time: 0, id: null });
     const [accountType, setAccountType] = useState(() => loadLS('avio_account_type_v2', null) || (() => { try { return localStorage.getItem('avio_account_type'); } catch (e) { return null; } })() || 'personal');
@@ -1674,9 +1678,9 @@ function App() {
             const shareCount = formatCount(Math.round(parseCount(item.likes) * 0.4));
             const saveCount = formatCount(parseCount(item.saves) + (saved ? 1 : 0));
             const backdrop = item.customVideoUrl
-                ? React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) { shortVideoRefs.current[item.id] = el; el.muted = !feedSoundOn; } }, src: item.customVideoUrl, autoPlay: true, muted: !feedSoundOn, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } })
+                ? React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, src: item.customVideoUrl, autoPlay: true, muted: !feedSoundOn, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } })
                 : item.video
-                    ? React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) { shortVideoRefs.current[item.id] = el; el.muted = !feedSoundOn; const p = el.play(); if (p && p.catch) p.catch(() => { }); } }, poster: item.image || undefined, autoPlay: true, muted: !feedSoundOn, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
+                    ? React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, poster: item.image || undefined, autoPlay: true, muted: !feedSoundOn, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
                         React.createElement("source", { src: item.video + '.webm', type: "video/webm" }),
                         React.createElement("source", { src: item.video + '.mp4', type: "video/mp4" }))
                     : item.image
