@@ -1730,14 +1730,14 @@ function App() {
                 React.createElement("div", { style: { display: 'flex' } },
                     CUSTOMER_FACE_PHOTOS.map((src, i) => React.createElement("div", { key: i, style: { width: 26, height: 26, borderRadius: '50%', backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '2px solid rgba(255,255,255,0.85)', marginLeft: i === 0 ? 0 : -9 } }))),
                 React.createElement("span", { style: { fontSize: 13, color: 'rgba(255,255,255,0.85)' } }, "Booked ", React.createElement("span", { style: { color: THEME.coral, fontWeight: 700 } }, item.friendsBooked || 0), " times today"));
-            const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 154, padding: '0 18px', zIndex: 2 } },
+            const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 116, padding: '0 18px', zIndex: 2 } },
                 topRatedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, bookedRow, discountBadge, taggedRow);
-            const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 68, zIndex: 2, borderRadius: 34, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
-                React.createElement("button", { onClick: () => openBooking(primaryTagTarget), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, padding: '20px 16px' } },
-                    React.createElement(Icon, { name: "calendar", size: 28, color: "#fff" }),
-                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: "#fff" } }, "Book Now"),
-                    React.createElement("span", { style: { width: 1, height: 26, background: 'rgba(255,255,255,0.3)' } }),
-                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: THEME.coral } }, "$", primaryTagTarget.price || item.price)));
+            const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 68, zIndex: 2, borderRadius: 22, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
+                React.createElement("button", { onClick: () => openBooking(primaryTagTarget), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 16px' } },
+                    React.createElement(Icon, { name: "calendar", size: 15, color: "#fff" }),
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 13, color: "#fff" } }, "Book Now"),
+                    React.createElement("span", { style: { width: 1, height: 14, background: 'rgba(255,255,255,0.3)' } }),
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 13, color: THEME.coral } }, "$", primaryTagTarget.price || item.price)));
             const isArrowHere = swipeArrow && swipeArrow.itemId === item.id;
             const arrowOverlay = isArrowHere && React.createElement("div", { style: { position: 'absolute', left: 0, top: '50%', zIndex: 5, pointerEvents: 'none', transform: `translate(${-30 + swipeArrow.progress * 60}px,-50%) scale(${0.7 + swipeArrow.progress * 0.5})`, opacity: swipeArrow.progress, transition: swipeArrow.dragging ? 'none' : 'transform 0.25s ease, opacity 0.25s ease' } },
                 React.createElement("div", { style: { width: 54, height: 54, borderRadius: '50%', background: 'rgba(151,196,0,0.22)', boxShadow: `0 0 ${18 + swipeArrow.progress * 20}px ${6 + swipeArrow.progress * 6}px rgba(151,196,0,0.45)`, backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
