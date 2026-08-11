@@ -2811,7 +2811,7 @@ function App() {
                 React.createElement("div", { onClick: (e) => e.stopPropagation(), className: "avio-upload-sheet", style: { width: '100%', background: '#fff', borderRadius: '32px 32px 0 0', padding: '10px 20px calc(env(safe-area-inset-bottom) + 20px)' } },
                     React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#ECECEE', margin: '0 auto 18px' } }),
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: UP.text, margin: 0, textAlign: 'center' } }, "Create Short"),
-                    React.createElement("p", { style: { fontSize: 12.5, color: UP.sub, textAlign: 'center', marginTop: 4 } }, "Share your work and let customers book you."),
+                    React.createElement("p", { style: { fontSize: 12.5, color: UP.sub, textAlign: 'center', marginTop: 4 } }, "Show off your experience and help others book it."),
                     React.createElement("button", { onClick: () => triggerFilePicker(null), style: { width: '100%', marginTop: 18, border: `1.5px dashed ${UP.border}`, borderRadius: 20, padding: '32px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, background: '#FAFAFA' } },
                         React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: '#fff', border: `1px solid ${UP.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "upload", size: 19, color: UP.text })),
                         React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: UP.text, marginTop: 4 } }, "Upload a Video"),
@@ -2840,7 +2840,7 @@ function App() {
                     fieldWrap("Location", React.createElement("input", { value: uploadForm.location, onChange: (e) => setUploadForm((f) => ({ ...f, location: e.target.value })), placeholder: "Los Angeles, CA", style: inputStyle })),
                     fieldWrap("Tags", React.createElement("input", { value: uploadForm.tags, onChange: (e) => setUploadForm((f) => ({ ...f, tags: e.target.value })), placeholder: "#dj #wedding #party", style: inputStyle })),
                     fieldWrap("Price (optional)", React.createElement("input", { value: uploadForm.price, onChange: (e) => setUploadForm((f) => ({ ...f, price: e.target.value })), placeholder: "From $500", inputMode: "numeric", style: inputStyle })),
-                    React.createElement("div", { style: { marginTop: 16 } }, toggleRow("Booking Available", uploadForm.bookingAvailable, () => setUploadForm((f) => ({ ...f, bookingAvailable: !f.bookingAvailable })), "Let customers book you directly")));
+                    React.createElement("div", { style: { marginTop: 16 } }, toggleRow("Booking Available", uploadForm.bookingAvailable, () => setUploadForm((f) => ({ ...f, bookingAvailable: !f.bookingAvailable })), "Let viewers book straight from your post")));
             }
             else if (uploadEditPanel === 2) {
                 editBody = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px 20px' } },
@@ -2857,7 +2857,7 @@ function App() {
                         uploadVideoUrl && React.createElement("video", { src: uploadVideoUrl, autoPlay: true, muted: true, loop: true, playsInline: true, style: { width: '100%', height: '100%', objectFit: 'cover' } }),
                         React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 60%, rgba(0,0,0,0.6) 100%)' } }),
                         React.createElement("div", { style: { position: 'absolute', left: 12, right: 12, bottom: 12 } },
-                            React.createElement("p", { style: { color: '#fff', fontWeight: 700, fontSize: 13, margin: 0 } }, publishForm.businessName || "Your Business"),
+                            React.createElement("p", { style: { color: '#fff', fontWeight: 700, fontSize: 13, margin: 0 } }, "Levi D."),
                             React.createElement("p", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 11, marginTop: 2 } }, uploadForm.caption || "Your caption appears here"))),
                     React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: UP.text, marginTop: 16 } }, "Preview"),
                     React.createElement("p", { style: { fontSize: 11.5, color: UP.sub, marginTop: 2, textAlign: 'center' } }, "This is how your short will appear."));
