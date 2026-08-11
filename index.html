@@ -2193,7 +2193,7 @@ function App() {
                         React.createElement("span", { style: { fontSize: 12, color: THEME.coral, fontWeight: 600, whiteSpace: 'nowrap' } }, "Create"));
                 }
                 const active = t.id === 'business' ? providerDashboardOpen : tab === t.id;
-                const onNavClick = t.id === 'business' ? () => setProviderDashboardOpen(true) : () => { setTab(t.id); setActiveCat(null); };
+                const onNavClick = t.id === 'business' ? () => setProviderDashboardOpen(true) : () => { setProviderDashboardOpen(false); setTab(t.id); setActiveCat(null); };
                 return React.createElement("button", { key: t.id, onClick: onNavClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 } },
                     React.createElement(Icon, { name: t.icon, size: 24, color: active ? THEME.coral : THEME.muted, fill: active && (t.icon === 'house' || t.icon === 'message') ? THEME.coral : 'none' }),
                     React.createElement("span", { style: { fontSize: 12, color: active ? THEME.coral : THEME.muted, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' } }, t.label));
@@ -2554,10 +2554,17 @@ function App() {
         providerDashboardOpen && (() => {
             const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
             const inputStyle3 = { width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none', background: '#fff', fontFamily: 'inherit' };
-            const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${PD.border}` } },
-                React.createElement("button", { onClick: () => setProviderDashboardOpen(false) }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "My Business"),
-                React.createElement("button", { onClick: () => setProfileMenuOpen(true) }, React.createElement(Icon, { name: "sliders", size: 17, color: PD.text })));
+            const header = providerDashboardTab === 'overview'
+                ? React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px` } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
+                        React.createElement("span", { style: { fontSize: 14, color: PD.sub } }, "Good morning,"),
+                        React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: PD.text } }, "My Business"),
+                        React.createElement(Icon, { name: "chevrondown", size: 13, color: PD.sub })),
+                    React.createElement("button", { onClick: () => flashToast('No new notifications') }, React.createElement(Icon, { name: "bell", size: 19, color: PD.text })))
+                : React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${PD.border}` } },
+                    React.createElement("button", { onClick: () => setProviderDashboardTab('overview') }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "My Business"),
+                    React.createElement("button", { onClick: () => setProfileMenuOpen(true) }, React.createElement(Icon, { name: "sliders", size: 17, color: PD.text })));
             const tabsRow = React.createElement("div", { className: "avio-scroll", style: { flexShrink: 0, display: 'flex', gap: 20, padding: '14px 18px 0', borderBottom: `1px solid ${PD.border}`, overflowX: 'auto' } }, [{ id: 'overview', label: 'Overview' }, { id: 'services', label: 'Services' }, { id: 'hours', label: 'Availability' }, { id: 'calendar', label: 'Calendar' }, { id: 'customerPosts', label: 'Customer Posts' }].map((t) => {
                 const active = providerDashboardTab === t.id;
                 return React.createElement("button", { key: t.id, onClick: () => setProviderDashboardTab(t.id), style: { flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
@@ -2568,68 +2575,69 @@ function App() {
             if (providerDashboardTab === 'overview') {
                 const totalBookings = businessBookings.length;
                 const totalRevenue = businessBookings.reduce((sum, b) => sum + b.price, 0);
-                const customerPostsForOverview = feed.filter((f) => f.isCustomerPost && f.verifiedTags && f.verifiedTags.length > 0);
-                const topVideo = customerPostsForOverview.slice().sort((a, c) => parseCount(c.likes) - parseCount(a.likes))[0];
-                const STAT_CARDS = [
-                    { label: 'Bookings', value: totalBookings, delta: '20%' },
-                    { label: 'Revenue', value: money(totalRevenue), delta: '18%' },
-                    { label: 'Profile Views', value: '1.8K', delta: '24%' },
-                    { label: 'Video Views', value: '12.4K', delta: '36%' },
+                const newReviews = 3;
+                const chartVals = [0.35, 0.5, 0.4, 0.62, 0.55, 0.8, 1];
+                const chartW = 280, chartH = 64;
+                const chartPts = chartVals.map((v, i) => [Math.round(i * (chartW / (chartVals.length - 1))), Math.round(chartH - v * (chartH - 6) - 3)]);
+                const linePath = 'M' + chartPts.map((p) => p.join(',')).join(' L');
+                const areaPath = linePath + ` L${chartW},${chartH} L0,${chartH} Z`;
+                const earningsCard = React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 18, padding: 16 } },
+                    React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Total Earnings"),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: PD.text, margin: '6px 0 0' } }, money(totalRevenue || 620)),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 } },
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, "▲ 18%"),
+                        React.createElement("span", { style: { fontSize: 12, color: PD.sub } }, "vs. previous 7 days")),
+                    React.createElement("svg", { width: "100%", height: chartH, viewBox: `0 0 ${chartW} ${chartH}`, style: { marginTop: 14, display: 'block' } },
+                        React.createElement("defs", null,
+                            React.createElement("linearGradient", { id: "bizEarningsFade", x1: "0", y1: "0", x2: "0", y2: "1" },
+                                React.createElement("stop", { offset: "0%", stopColor: THEME.coral, stopOpacity: 0.22 }),
+                                React.createElement("stop", { offset: "100%", stopColor: THEME.coral, stopOpacity: 0 }))),
+                        React.createElement("path", { d: areaPath, fill: "url(#bizEarningsFade)" }),
+                        React.createElement("path", { d: linePath, fill: "none", stroke: THEME.coral, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" })),
+                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 6 } },
+                        ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => React.createElement("span", { key: d, style: { fontSize: 10, color: PD.sub } }, d))));
+                const statsRow = React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 14 } },
+                    [{ value: totalBookings || 24, label: 'New Bookings' }, { value: money(totalRevenue || 620), label: 'Earnings' }, { value: newReviews, label: 'New Reviews' }].map((s) => React.createElement("div", { key: s.label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 10px', textAlign: 'center' } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: PD.text, margin: 0 } }, s.value),
+                        React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: '3px 0 0' } }, s.label))));
+                const QUICK_ACTIONS = [
+                    { label: 'Add Service', icon: 'clock', onClick: () => { setProviderDashboardTab('services'); setServiceFormDraft({ id: null, name: '', durationMinutes: '', price: '' }); } },
+                    { label: 'Add Time', icon: 'clock', onClick: () => setProviderDashboardTab('hours') },
+                    { label: 'Promote', icon: 'tag', onClick: () => flashToast('Promotions — coming soon') },
+                    { label: 'Insights', icon: 'grid', onClick: () => flashToast('Analytics — coming soon') },
+                    { label: 'Payouts', icon: 'wallet', onClick: () => flashToast('Payouts — coming soon') },
                 ];
-                const OVERVIEW_MENU = [
-                    { label: 'Analytics', icon: 'grid', onClick: () => flashToast('Analytics — coming soon') },
-                    { label: 'Services', icon: 'clipboard', onClick: () => setProviderDashboardTab('services') },
-                    { label: 'Customers', icon: 'user', onClick: () => flashToast('Customers — coming soon') },
-                    { label: 'Reviews', icon: 'star', onClick: () => flashToast('Reviews — coming soon') },
-                    { label: 'Availability', icon: 'calendar', onClick: () => setProviderDashboardTab('hours') },
-                    { label: 'Calendar', icon: 'calendar', onClick: () => setProviderDashboardTab('calendar') },
-                    { label: 'Settings', icon: 'sliders', onClick: () => flashToast('Settings — coming soon') },
-                ];
-                const cardShadow = '0 1px 2px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.06)';
-                const identityCard = React.createElement("div", { style: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' } },
-                    React.createElement("button", { onClick: () => flashToast('No new notifications'), style: { position: 'absolute', top: -2, right: 0, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "bell", size: 19, color: PD.text })),
-                    React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: '#fff' } }, "M"),
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 } },
-                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: PD.text, margin: 0 } }, "My Business"),
-                        React.createElement("div", { style: { width: 15, height: 15, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" }))),
-                    React.createElement("p", { style: { fontSize: 12, color: PD.sub, margin: '4px 0 0' } }, "Your business profile"),
-                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 16, width: '100%' } },
-                        React.createElement("button", { onClick: () => flashToast('Edit profile — coming soon'), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 20, background: '#F5F5F5', color: PD.text, fontSize: 12.5, fontWeight: 600 } }, React.createElement(Icon, { name: "clipboard", size: 14, color: PD.text }), "Edit Profile"),
-                        React.createElement("button", { onClick: () => flashToast('Preview — coming soon'), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 20, background: '#F5F5F5', color: PD.text, fontSize: 12.5, fontWeight: 600 } }, React.createElement(Icon, { name: "playcircle", size: 14, color: PD.text }), "Preview")));
-                const statsGrid = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 22 } },
-                    STAT_CARDS.map((s) => React.createElement("div", { key: s.label, style: { padding: 14, borderRadius: 16, background: '#fff', boxShadow: cardShadow } },
-                        React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: 0 } }, s.label),
-                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: PD.text, margin: '4px 0 0' } }, s.value),
-                        React.createElement("p", { style: { fontSize: 11, fontWeight: 600, color: THEME.coral, margin: '3px 0 0' } }, "↑ ", s.delta))));
-                const upcomingPreview = businessBookings.filter((b) => b.status === 'confirmed').slice(0, 3);
-                const upcomingBookingsSection = upcomingPreview.length > 0 && React.createElement("div", { style: { marginTop: 26 } },
+                const quickActionsBar = React.createElement("div", { style: { marginTop: 26 } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
-                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Upcoming Bookings"),
-                        React.createElement("button", { onClick: () => { setProviderDashboardOpen(false); setTab('bookings'); }, style: { fontSize: 11.5, fontWeight: 600, color: THEME.coral } }, "See all")),
-                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } },
-                        upcomingPreview.map((b) => React.createElement("div", { key: b.id, style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, background: '#fff', boxShadow: cardShadow } },
-                            React.createElement("p", { style: { fontSize: 12, fontWeight: 600, color: PD.text, width: 58, flexShrink: 0, margin: 0 } }, b.time),
-                            React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 } }, b.initials),
-                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, b.customerName),
-                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, b.service)),
-                            React.createElement("span", { style: { fontSize: 10.5, fontWeight: 600, color: PD.sub, background: '#F5F5F5', padding: '4px 10px', borderRadius: 10, flexShrink: 0 } }, "Today")))));
-                const topVideoCard = topVideo && React.createElement("div", { style: { marginTop: 24 } },
+                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Quick Actions"),
+                        React.createElement("button", { onClick: () => flashToast('Reorder quick actions — coming soon'), style: { fontSize: 12, fontWeight: 600, color: THEME.coral } }, "Edit")),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#161616', borderRadius: 20, padding: '14px 10px' } },
+                        QUICK_ACTIONS.map((a) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1 } },
+                            React.createElement(Icon, { name: a.icon, size: 17, color: "#fff" }),
+                            React.createElement("span", { style: { fontSize: 9.5, color: 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap' } }, a.label))),
+                        React.createElement("button", { onClick: () => setProfileMenuOpen(true), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1 } },
+                            React.createElement("div", { style: { display: 'flex', gap: 2 } }, [0, 1, 2].map((i) => React.createElement("span", { key: i, style: { width: 3.5, height: 3.5, borderRadius: 2, background: '#fff' } }))),
+                            React.createElement("span", { style: { fontSize: 9.5, color: 'rgba(255,255,255,0.85)' } }, "More"))));
+                const recentActivity = businessBookings.slice(0, 3).map((b, i) => ({ ...b, agoLabel: ['10m ago', '25m ago', '1h ago'][i] || `${i + 1}h ago` }));
+                const recentActivitySection = React.createElement("div", { style: { marginTop: 26 } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
-                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Top Performing Video"),
-                        React.createElement("button", { onClick: () => setProviderDashboardTab('customerPosts'), style: { fontSize: 11.5, fontWeight: 600, color: THEME.coral } }, "View all")),
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, border: `1px solid ${PD.border}` } },
-                        React.createElement("div", { style: { width: 48, height: 48, borderRadius: 10, flexShrink: 0, backgroundImage: topVideo.image ? `url(${topVideo.image})` : 'none', backgroundColor: topVideo.image ? undefined : (topVideo.avatarColor || THEME.violet), backgroundSize: 'cover', backgroundPosition: 'center' } }),
-                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                            React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, topVideo.name),
-                            React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: '2px 0 0' } }, formatCount(parseCount(topVideo.likes)), " views"))));
-                const menuList = React.createElement("div", { style: { marginTop: 26 } },
-                    OVERVIEW_MENU.map((r) => React.createElement("button", { key: r.label, onClick: r.onClick, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderBottom: `1px solid ${PD.border}` } },
-                        React.createElement(Icon, { name: r.icon, size: 18, color: PD.text }),
-                        React.createElement("span", { style: { flex: 1, textAlign: 'left', fontSize: 14, color: PD.text } }, r.label),
-                        React.createElement(Icon, { name: "chevronright", size: 16, color: PD.sub }))));
-                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px', background: '#FAFAFB' } },
-                    identityCard, statsGrid, upcomingBookingsSection, topVideoCard, menuList);
+                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Recent Activity"),
+                        React.createElement("button", { onClick: () => { setProviderDashboardOpen(false); setTab('bookings'); }, style: { fontSize: 12, fontWeight: 600, color: THEME.coral } }, "View all")),
+                    recentActivity.length === 0
+                        ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub } }, "Customer activity will appear here.")
+                        : React.createElement("div", { style: { display: 'flex', flexDirection: 'column' } }, recentActivity.map((b, i) => {
+                            const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
+                            return React.createElement("button", { key: b.id, onClick: () => setBusinessBookingDetail(b), style: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: i < recentActivity.length - 1 ? `1px solid ${PD.border}` : 'none' } },
+                                React.createElement("div", { style: { width: 38, height: 38, borderRadius: '50%', background: '#F0F0F0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "user", size: 17, color: PD.sub })),
+                                React.createElement("div", { style: { flex: 1, minWidth: 0, textAlign: 'left' } },
+                                    React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, b.customerName),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, "Booked · ", b.service)),
+                                React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
+                                    React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: 0 } }, b.agoLabel),
+                                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: st.color, margin: '2px 0 0', textTransform: 'capitalize' } }, b.status)));
+                        })));
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px 20px' } },
+                    earningsCard, statsRow, quickActionsBar, recentActivitySection);
             }
             else if (providerDashboardTab === 'services') {
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
