@@ -1865,7 +1865,7 @@ function App() {
                             React.createElement("p", { style: { fontSize: 11.5, color: BK.sub, margin: '1px 0 0' } }, b.service, " · ", money(b.price))),
                         React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize', flexShrink: 0 } }, b.status));
                 }));
-                const newBookingBtn = React.createElement("button", { onClick: () => flashToast('Adding a manual booking — coming soon'), style: { margin: '18px 18px 0', width: 'calc(100% - 36px)', padding: '13px 0', borderRadius: 14, border: `1.5px dashed ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } }, "+ New Booking");
+                const newBookingBtn = React.createElement("button", { onClick: () => flashToast('Adding a manual booking — coming soon'), style: { margin: '18px 18px 0', width: 'calc(100% - 36px)', padding: '13px 0', borderRadius: 14, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 13.5 } }, "+ New Booking");
                 const scrollContent = React.createElement("div", { className: "avio-scroll", style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 100px)` } },
                     header, tabsRow, dayLabelRow, cards, newBookingBtn);
                 return scrollContent;
@@ -1913,8 +1913,7 @@ function App() {
                 if (!t) {
                     return React.createElement("div", { key: "create", style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
                         React.createElement("button", { className: "avio-fab-tap", onClick: openUploadFlow, style: { width: 64, height: 40, borderRadius: 20, background: '#fff', border: '1.5px solid #ECECEE', boxShadow: '0 2px 10px rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                            React.createElement(Icon, { name: "rings", size: 22, color: "#161616" })),
-                        React.createElement("span", { style: { fontSize: 9.5, color: THEME.coral, fontWeight: 600, whiteSpace: 'nowrap' } }, "Create"));
+                            React.createElement(Icon, { name: "rings", size: 22, color: "#161616" })));
                 }
                 const active = t.id === 'business' ? providerDashboardOpen : tab === t.id;
                 const onNavClick = t.id === 'business' ? () => setProviderDashboardOpen(true) : () => { setTab(t.id); setActiveCat(null); };
@@ -2267,10 +2266,10 @@ function App() {
                 const customerPostsForOverview = feed.filter((f) => f.isCustomerPost && f.verifiedTags && f.verifiedTags.length > 0);
                 const topVideo = customerPostsForOverview.slice().sort((a, c) => parseCount(c.likes) - parseCount(a.likes))[0];
                 const STAT_CARDS = [
-                    { label: 'Bookings', value: totalBookings, delta: '+20%' },
-                    { label: 'Revenue', value: money(totalRevenue), delta: '+18%' },
-                    { label: 'Profile Views', value: '1.8K', delta: '+24%' },
-                    { label: 'Video Views', value: '12.4K', delta: '+36%' },
+                    { label: 'Bookings', value: totalBookings, delta: '20%' },
+                    { label: 'Revenue', value: money(totalRevenue), delta: '18%' },
+                    { label: 'Profile Views', value: '1.8K', delta: '24%' },
+                    { label: 'Video Views', value: '12.4K', delta: '36%' },
                 ];
                 const OVERVIEW_MENU = [
                     { label: 'Analytics', icon: 'grid', onClick: () => flashToast('Analytics — coming soon') },
@@ -2280,18 +2279,35 @@ function App() {
                     { label: 'Availability', icon: 'calendar', onClick: () => setProviderDashboardTab('hours') },
                     { label: 'Settings', icon: 'sliders', onClick: () => flashToast('Settings — coming soon') },
                 ];
-                const greeting = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                    React.createElement("div", null,
-                        React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, margin: 0 } }, "Good morning,"),
-                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 } },
-                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: PD.text, margin: 0 } }, "My Business"),
-                            React.createElement("div", { style: { width: 15, height: 15, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" })))),
-                    React.createElement("button", { onClick: () => flashToast('No new notifications') }, React.createElement(Icon, { name: "bell", size: 19, color: PD.text })));
-                const statsGrid = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 20 } },
-                    STAT_CARDS.map((s) => React.createElement("div", { key: s.label, style: { padding: 14, borderRadius: 16, border: `1px solid ${PD.border}` } },
+                const cardShadow = '0 1px 2px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.06)';
+                const identityCard = React.createElement("div", { style: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' } },
+                    React.createElement("button", { onClick: () => flashToast('No new notifications'), style: { position: 'absolute', top: -2, right: 0, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "bell", size: 19, color: PD.text })),
+                    React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: '#fff' } }, "M"),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: PD.text, margin: 0 } }, "My Business"),
+                        React.createElement("div", { style: { width: 15, height: 15, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" }))),
+                    React.createElement("p", { style: { fontSize: 12, color: PD.sub, margin: '4px 0 0' } }, "Your business profile"),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 16, width: '100%' } },
+                        React.createElement("button", { onClick: () => flashToast('Edit profile — coming soon'), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 20, background: '#F5F5F5', color: PD.text, fontSize: 12.5, fontWeight: 600 } }, React.createElement(Icon, { name: "clipboard", size: 14, color: PD.text }), "Edit Profile"),
+                        React.createElement("button", { onClick: () => flashToast('Preview — coming soon'), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 20, background: '#F5F5F5', color: PD.text, fontSize: 12.5, fontWeight: 600 } }, React.createElement(Icon, { name: "playcircle", size: 14, color: PD.text }), "Preview")));
+                const statsGrid = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 22 } },
+                    STAT_CARDS.map((s) => React.createElement("div", { key: s.label, style: { padding: 14, borderRadius: 16, background: '#fff', boxShadow: cardShadow } },
                         React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: 0 } }, s.label),
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: PD.text, margin: '4px 0 0' } }, s.value),
-                        React.createElement("p", { style: { fontSize: 11, fontWeight: 600, color: THEME.coral, margin: '3px 0 0' } }, s.delta, " this week"))));
+                        React.createElement("p", { style: { fontSize: 11, fontWeight: 600, color: THEME.coral, margin: '3px 0 0' } }, "↑ ", s.delta))));
+                const upcomingPreview = BUSINESS_INCOMING_BOOKINGS.filter((b) => b.status === 'confirmed').slice(0, 3);
+                const upcomingBookingsSection = upcomingPreview.length > 0 && React.createElement("div", { style: { marginTop: 26 } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
+                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Upcoming Bookings"),
+                        React.createElement("button", { onClick: () => { setProviderDashboardOpen(false); setTab('bookings'); }, style: { fontSize: 11.5, fontWeight: 600, color: THEME.coral } }, "See all")),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } },
+                        upcomingPreview.map((b) => React.createElement("div", { key: b.id, style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, background: '#fff', boxShadow: cardShadow } },
+                            React.createElement("p", { style: { fontSize: 12, fontWeight: 600, color: PD.text, width: 58, flexShrink: 0, margin: 0 } }, b.time),
+                            React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 } }, b.initials),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, b.customerName),
+                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, b.service)),
+                            React.createElement("span", { style: { fontSize: 10.5, fontWeight: 600, color: PD.sub, background: '#F5F5F5', padding: '4px 10px', borderRadius: 10, flexShrink: 0 } }, "Today")))));
                 const topVideoCard = topVideo && React.createElement("div", { style: { marginTop: 24 } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
                         React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Top Performing Video"),
@@ -2306,8 +2322,8 @@ function App() {
                         React.createElement(Icon, { name: r.icon, size: 18, color: PD.text }),
                         React.createElement("span", { style: { flex: 1, textAlign: 'left', fontSize: 14, color: PD.text } }, r.label),
                         React.createElement(Icon, { name: "chevronright", size: 16, color: PD.sub }))));
-                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
-                    greeting, statsGrid, topVideoCard, menuList);
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px', background: '#FAFAFB' } },
+                    identityCard, statsGrid, upcomingBookingsSection, topVideoCard, menuList);
             }
             else if (providerDashboardTab === 'services') {
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
@@ -2370,7 +2386,7 @@ function App() {
                                 React.createElement("button", { onClick: () => removeDateOverride(key) }, React.createElement(Icon, { name: "x", size: 14, color: '#D0304A' })));
                         })));
             }
-            return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 10, background: '#fff', display: 'flex', flexDirection: 'column' } }, header, tabsRow, body,
+            return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 10, background: '#fff', display: 'flex', flexDirection: 'column' } }, header, providerDashboardTab !== 'overview' && tabsRow, body,
                 serviceFormDraft && React.createElement("div", { onClick: () => setServiceFormDraft(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 11 } },
                     React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, serviceFormDraft.id ? 'Edit Service' : 'Add Service'),
