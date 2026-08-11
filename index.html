@@ -940,6 +940,9 @@ function App() {
         setBusinessBookingDetail((prev) => prev && prev.id === id ? { ...prev, status } : prev);
         flashToast(status === 'completed' ? 'Marked as completed' : 'Booking cancelled');
     }
+    const [providerDeal, setProviderDeal] = useState(() => loadLS('avio_provider_deal', { enabled: false, label: '20% OFF TODAY' }));
+    const [promoDraftOpen, setPromoDraftOpen] = useState(false);
+    useEffect(() => { saveLS('avio_provider_deal', providerDeal); }, [providerDeal]);
     useEffect(() => { saveLS('avio_provider_services', providerServices); }, [providerServices]);
     useEffect(() => { saveLS('avio_provider_weekly_hours', providerWeeklyHours); }, [providerWeeklyHours]);
     useEffect(() => { saveLS('avio_provider_date_overrides', providerDateOverrides); }, [providerDateOverrides]);
@@ -1761,8 +1764,11 @@ function App() {
             const topRatedBadge = item.rating >= 4.7 && React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 5, border: `1px solid ${THEME.coral}`, borderRadius: 12, padding: '4px 10px', marginBottom: 8 } },
                 React.createElement(Icon, { name: "star", size: 10, color: THEME.coral, fill: THEME.coral }),
                 React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: THEME.coral } }, "Top Rated"));
+            const dealBadge = (item.mine && providerDeal.enabled) && React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(248,244,236,0.92)', borderRadius: 18, padding: '6px 12px', marginTop: 10 } },
+                React.createElement("span", { style: { fontSize: 13 } }, "🎁"),
+                React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, providerDeal.label));
             const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 'calc(env(safe-area-inset-bottom) + 130px)', padding: '0 18px', zIndex: 2 } },
-                topRatedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, taggedRow);
+                topRatedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, taggedRow, dealBadge);
             const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(env(safe-area-inset-bottom) + 82px)', zIndex: 2, borderRadius: 24, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
                 React.createElement("button", { onClick: () => openBooking(primaryTagTarget), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: '12px 18px' } },
                     React.createElement(Icon, { name: "calendar", size: 18, color: "#fff" }),
@@ -1828,6 +1834,19 @@ function App() {
                 const active = exploreQuickFilter === f.id;
                 return React.createElement("button", { key: f.id, onClick: () => setExploreQuickFilter(f.id), style: { flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 18, background: active ? THEME.coral : '#F5F5F5', border: `1px solid ${active ? THEME.coral : '#F0F0F0'}`, color: active ? '#fff' : '#8A8A8E' } }, f.label);
             }));
+            const dealItems = feed.filter((f) => f.mine && providerDeal.enabled);
+            const dealsSection = dealItems.length > 0 && React.createElement("div", { style: { marginTop: 18 } },
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: '#161616', margin: 0, padding: '0 18px' } }, "🔥 Today's Deals"),
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 10, padding: '10px 18px 0', overflowX: 'auto' } },
+                    dealItems.map((d) => {
+                        const dMeta = CATEGORY_META[d.category] || { grad: ['#3F3F5C', '#1E1E30'] };
+                        return React.createElement("button", { key: d.id, onClick: () => openBusinessProfile(d), style: { flexShrink: 0, width: 150, textAlign: 'left', borderRadius: 16, overflow: 'hidden', border: `1px solid ${THEME.coral}`, background: '#fff' } },
+                            React.createElement("div", { style: { position: 'relative', aspectRatio: '4 / 3', background: `linear-gradient(160deg, ${dMeta.grad[0]}, ${dMeta.grad[1]})` } },
+                                React.createElement("span", { style: { position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 8, background: THEME.coral, color: '#fff' } }, providerDeal.label)),
+                            React.createElement("div", { style: { padding: '8px 10px 10px' } },
+                                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 12.5, color: '#161616', margin: 0 } }, d.name),
+                                React.createElement("p", { style: { fontSize: 11, color: '#8A8A8E', marginTop: 2 } }, d.location)));
+                    })));
             const categoryRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 16, padding: '18px 18px 4px', overflowX: 'auto' } }, categories.map((c) => {
                 const active = exploreCategory === c.id;
                 const size = active ? 62 : 52;
@@ -1867,7 +1886,7 @@ function App() {
                 return React.createElement("div", { key: item.id, role: "button", tabIndex: 0, onClick: () => openBooking({ id: item.id, name: item.title, price: item.price, category: item.categoryLabel }), style: { textAlign: 'left', background: '#fff', borderRadius: 16, overflow: 'hidden', border: '1px solid #F0F0F0', boxShadow: '0 2px 10px rgba(0,0,0,0.04)', cursor: 'pointer' } }, imageBlock, textBlock);
             });
             const grid = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '16px 18px 0' } }, cards);
-            return React.createElement(React.Fragment, null, header, searchBar, quickFilterRow, categoryRow, categoryDots, tabsRow, grid);
+            return React.createElement(React.Fragment, null, header, searchBar, quickFilterRow, dealsSection, categoryRow, categoryDots, tabsRow, grid);
         })())),
         tab === 'browse' && exploreSearchOpen && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 5, display: 'flex', flexDirection: 'column' } }, (() => {
             const trending = [
@@ -2220,6 +2239,9 @@ function App() {
                             React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: '#161616' } }, item.rating.toFixed(1)),
                             React.createElement(Icon, { name: "star", size: 15, color: THEME.coral, fill: THEME.coral })),
                         React.createElement("p", { style: { fontSize: 12, color: '#8A8A8E', marginTop: 3 } }, "Rating"))]));
+            const profileDealBadge = ((item.mine || item.id === MY_PROVIDER_ID) && providerDeal.enabled) && React.createElement("div", { style: { margin: '18px 18px 0', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(151,196,0,0.12)', borderRadius: 18, padding: '6px 12px' } },
+                React.createElement("span", { style: { fontSize: 13 } }, "🎁"),
+                React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, providerDeal.label));
             const bioBlock = React.createElement("div", { style: { padding: '18px 18px 0' } },
                 React.createElement("p", { style: { fontSize: 13.5, color: '#161616', lineHeight: 1.5, margin: 0 } }, item.blurb));
             const BIZ_TABS = [{ id: 'videos', label: 'Videos' }, { id: 'services', label: 'Services' }, { id: 'reviews', label: 'Reviews' }];
@@ -2260,7 +2282,7 @@ function App() {
                         React.createElement("p", { style: { fontSize: 12.5, color: '#484848', marginTop: 6, lineHeight: 1.4 } }, r.text))));
             }
             return React.createElement("div", { key: "bizprofile", onTouchStart: handleBizPanelTouchStart, onTouchMove: handleBizPanelTouchMove, onTouchEnd: handleBizPanelTouchEnd, style: { position: 'absolute', inset: 0, zIndex: 11, background: '#fff', overflowY: 'auto', transform: `translateX(${(1 - P.progress) * 100}%)`, transition: P.dragging ? 'none' : 'transform 0.28s cubic-bezier(0.22,1,0.36,1)' } },
-                header, avatarRow, actionRow, statsRow, bioBlock, tabsRow, tabContent);
+                header, avatarRow, actionRow, statsRow, bioBlock, profileDealBadge, tabsRow, tabContent);
         })(),
         postViewer && (() => {
             const { item, posts, index } = postViewer;
@@ -2582,7 +2604,7 @@ function App() {
                 const QUICK_ACTIONS = [
                     { label: 'Add Service', icon: 'clock', onClick: () => { setProviderDashboardTab('services'); setServiceFormDraft({ id: null, name: '', durationMinutes: '', price: '' }); } },
                     { label: 'Add Time', icon: 'clock', onClick: () => setProviderDashboardTab('hours') },
-                    { label: 'Promote', icon: 'tag', onClick: () => flashToast('Promotions — coming soon') },
+                    { label: 'Promote', icon: 'tag', onClick: () => setPromoDraftOpen(true) },
                     { label: 'Insights', icon: 'grid', onClick: () => flashToast('Analytics — coming soon') },
                     { label: 'Payouts', icon: 'wallet', onClick: () => flashToast('Payouts — coming soon') },
                 ];
@@ -2754,6 +2776,23 @@ function App() {
                             React.createElement("input", { type: "time", value: hoursOverrideDraft.start, onChange: (e) => setHoursOverrideDraft({ ...hoursOverrideDraft, start: e.target.value }), style: { ...inputStyle3, flex: 1 } }),
                             React.createElement("input", { type: "time", value: hoursOverrideDraft.end, onChange: (e) => setHoursOverrideDraft({ ...hoursOverrideDraft, end: e.target.value }), style: { ...inputStyle3, flex: 1 } })),
                         React.createElement("button", { onClick: () => saveDateOverride(hoursOverrideDraft.date, hoursOverrideDraft.closed ? null : { start: hoursOverrideDraft.start, end: hoursOverrideDraft.end }), style: { width: '100%', height: 50, borderRadius: 25, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5 } }, "Save Override")));
+        })(),
+        providerDashboardOpen && promoDraftOpen && (() => {
+            const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const inputStyle3 = { width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none', background: '#fff', fontFamily: 'inherit' };
+            return React.createElement("div", { onClick: () => setPromoDraftOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 11 } },
+                    React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, "Today's Deal"),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 } },
+                            React.createElement("div", null,
+                                React.createElement("p", { style: { fontSize: 13, fontWeight: 600, color: PD.text, margin: 0 } }, "Show deal on my videos"),
+                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "Appears on your posts, profile and Today's Deals")),
+                            React.createElement("button", { onClick: () => setProviderDeal({ ...providerDeal, enabled: !providerDeal.enabled }), style: { width: 44, height: 26, borderRadius: 13, background: providerDeal.enabled ? THEME.coral : '#E5E5EA', position: 'relative', flexShrink: 0 } },
+                                React.createElement("div", { style: { position: 'absolute', top: 2, left: providerDeal.enabled ? 20 : 2, width: 22, height: 22, borderRadius: 11, background: '#fff', transition: 'left 0.15s' } }))),
+                        React.createElement("div", { style: { marginBottom: 20 } },
+                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Deal Label"),
+                            React.createElement("input", { value: providerDeal.label, onChange: (e) => setProviderDeal({ ...providerDeal, label: e.target.value }), placeholder: "e.g. 20% OFF TODAY", style: inputStyle3 })),
+                        React.createElement("button", { onClick: () => { setPromoDraftOpen(false); flashToast(providerDeal.enabled ? 'Deal is live' : 'Deal turned off'); }, style: { width: '100%', height: 50, borderRadius: 25, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5 } }, "Done")));
         })(),
         commentItem && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } }, (() => {
             const seeded = seedComments(Math.max(0, feed.findIndex((f) => f.id === commentItem.id)));
