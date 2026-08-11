@@ -2175,7 +2175,7 @@ function App() {
             return scrollContent;
         })())),
         !(tab === 'connect' && activeConversationId) && React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#000', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: `6px 12px 10px` } },
-            [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Bookings' }, { id: 'budget', icon: 'user', label: 'Profile' }]
+            [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Bookings' }, accountType === 'business' ? { id: 'business', icon: 'grid', label: 'Business' } : { id: 'budget', icon: 'user', label: 'Profile' }]
             .map((t, i) => {
                 if (!t) {
                     return React.createElement("div", { key: "create", style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 } },
@@ -2184,8 +2184,8 @@ function App() {
                                 React.createElement("circle", { cx: 16, cy: 16, r: 13.5, fill: "none", stroke: THEME.coral, strokeWidth: 2.4, strokeDasharray: "1 5.2", strokeLinecap: "round" }))),
                         React.createElement("span", { style: { fontSize: 12, color: THEME.coral, fontWeight: 600, whiteSpace: 'nowrap' } }, "Create"));
                 }
-                const active = tab === t.id;
-                const onNavClick = () => { setTab(t.id); setActiveCat(null); };
+                const active = t.id === 'business' ? providerDashboardOpen : tab === t.id;
+                const onNavClick = t.id === 'business' ? () => setProviderDashboardOpen(true) : () => { setTab(t.id); setActiveCat(null); };
                 return React.createElement("button", { key: t.id, onClick: onNavClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 } },
                     React.createElement(Icon, { name: t.icon, size: 24, color: active ? THEME.coral : THEME.muted, fill: active && (t.icon === 'house' || t.icon === 'message') ? THEME.coral : 'none' }),
                     React.createElement("span", { style: { fontSize: 12, color: active ? THEME.coral : THEME.muted, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' } }, t.label));
@@ -2359,7 +2359,7 @@ function App() {
                         React.createElement(Icon, { name: "x", size: 18, color: '#8A8A8E' }))),
                 sheetContent);
         })())),
-        profileMenuOpen && (React.createElement("div", { onClick: () => setProfileMenuOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } },
+        profileMenuOpen && (React.createElement("div", { onClick: () => setProfileMenuOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 12 } },
             React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `10px 8px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '75%', overflowY: 'auto' } },
                 React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#ECECEE', margin: '0 auto 10px' } }),
                 (() => {
@@ -2549,7 +2549,7 @@ function App() {
             const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${PD.border}` } },
                 React.createElement("button", { onClick: () => setProviderDashboardOpen(false) }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "My Business"),
-                React.createElement("div", { style: { width: 17 } }));
+                React.createElement("button", { onClick: () => setProfileMenuOpen(true) }, React.createElement(Icon, { name: "sliders", size: 17, color: PD.text })));
             const tabsRow = React.createElement("div", { className: "avio-scroll", style: { flexShrink: 0, display: 'flex', gap: 20, padding: '14px 18px 0', borderBottom: `1px solid ${PD.border}`, overflowX: 'auto' } }, [{ id: 'overview', label: 'Overview' }, { id: 'services', label: 'Services' }, { id: 'hours', label: 'Availability' }, { id: 'customerPosts', label: 'Customer Posts' }].map((t) => {
                 const active = providerDashboardTab === t.id;
                 return React.createElement("button", { key: t.id, onClick: () => setProviderDashboardTab(t.id), style: { flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
