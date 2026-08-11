@@ -497,7 +497,7 @@ const FEED = [
     { id: 'f7', category: 'Parties', name: 'Nova Sound DJs', location: 'Los Angeles, CA', rating: 4.8, price: 350, likes: '2.7K', comments: 95, saves: '4.1K', blurb: 'Wedding and club DJ sets with full sound and lighting rig.', verified: true, distance: '4.2 mi', openStatus: 'Available Today', hashtags: ['#dj', '#losangeles', '#nightlife'], friendsBooked: 31, avatarColor: '#6C4CFC', discount: 'FREE CONSULTATION' },
     { id: 'f8', category: 'Beauty', name: 'Bare Skin Makeup Co.', location: 'Phoenix, AZ', rating: 4.9, price: 130, likes: '1.5K', comments: 61, saves: '2.3K', blurb: 'Natural glam and airbrush makeup for any event.', verified: false, distance: '0.8 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#makeup', '#phoenix', '#airbrush'], friendsBooked: 11, avatarColor: '#3FA6BF' },
 ];
-const FEED_VIDEO_IDS = new Set(['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8']);
+const FEED_VIDEO_IDS = new Set(['f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8']);
 FEED.forEach((item) => {
     const catId = CATEGORY_LABEL_TO_ID[item.category] || 'home';
     item.image = item.image || nextCategoryPhoto(catId);
