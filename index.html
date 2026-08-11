@@ -496,7 +496,7 @@ function ToggleSwitch({ on, onChange }) {
         React.createElement("span", { style: { position: 'absolute', top: 2, left: on ? 20 : 2, width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.28)', transition: 'left 0.22s cubic-bezier(0.34,1.56,0.64,1)' } }));
 }
 const FEED = [
-    { id: 'f0', category: 'Beauty', name: 'Fade House', location: 'Miami, FL', rating: 4.9, price: 35, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Clean fade. Sharp lines. Precision cuts. Premium experience.', verified: true, distance: '0.5 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#miami', '#fade'], friendsBooked: 120, avatarColor: '#161616', image: 'assets/explore/barbershop.jpg' },
+    { id: 'f0', category: 'Beauty', name: 'Fade House', location: 'Miami, FL', rating: 4.9, price: 35, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Clean fade. Sharp lines. Precision cuts. Premium experience.', verified: true, distance: '0.5 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#miami', '#fade'], friendsBooked: 120, avatarColor: '#161616' },
     { id: 'f1', category: 'Home Services', name: 'Sparkle Squad Cleaning', location: 'Denver, CO', rating: 4.8, price: 120, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Deep clean, move-in/move-out, eco-friendly products.', verified: true, distance: '1.2 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#cleaning', '#denver', '#freshhome'], friendsBooked: 8, avatarColor: '#3F6FBF' },
     { id: 'f2', category: 'Home Services', name: 'Fresh Start Cleaners', location: 'Miami, FL', rating: 4.9, price: 90, likes: '892', comments: 18, saves: '1.4K', blurb: 'Residential and post-construction cleaning.', verified: true, distance: '2.4 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#cleaning', '#miami', '#ecofriendly'], friendsBooked: 5, avatarColor: '#3FBF8A' },
     { id: 'f3', category: 'Beauty', name: 'Glow by Mia', location: 'Austin, TX', rating: 4.7, price: 150, likes: '2.1K', comments: 76, saves: '3.6K', blurb: 'Balayage and color correction specialist.', verified: true, distance: '0.6 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#balayage', '#austin', '#haircolor'], friendsBooked: 14, avatarColor: '#8FBF3F' },
@@ -506,13 +506,6 @@ const FEED = [
     { id: 'f7', category: 'Parties', name: 'Nova Sound DJs', location: 'Los Angeles, CA', rating: 4.8, price: 350, likes: '2.7K', comments: 95, saves: '4.1K', blurb: 'Wedding and club DJ sets with full sound and lighting rig.', verified: true, distance: '4.2 mi', openStatus: 'Available Today', hashtags: ['#dj', '#losangeles', '#nightlife'], friendsBooked: 31, avatarColor: '#6C4CFC' },
     { id: 'f8', category: 'Beauty', name: 'Bare Skin Makeup Co.', location: 'Phoenix, AZ', rating: 4.9, price: 130, likes: '1.5K', comments: 61, saves: '2.3K', blurb: 'Natural glam and airbrush makeup for any event.', verified: false, distance: '0.8 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#makeup', '#phoenix', '#airbrush'], friendsBooked: 11, avatarColor: '#3FA6BF' },
 ];
-const FEED_VIDEO_IDS = new Set(['f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8']);
-FEED.forEach((item) => {
-    const catId = CATEGORY_LABEL_TO_ID[item.category] || 'home';
-    item.image = item.image || nextCategoryPhoto(catId);
-    if (FEED_VIDEO_IDS.has(item.id))
-        item.video = 'assets/shorts/' + item.id;
-});
 const CATEGORIES = [
     { id: 'shorts', label: 'All shorts', count: 31, icon: 'compass', color: '#2E9BFF' },
     { id: 'beauty', label: 'Beauty', count: 14, icon: 'bottle', color: '#F5134F' },
