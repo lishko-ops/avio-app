@@ -1640,15 +1640,16 @@ function App() {
                     ? React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
                     : React.createElement("div", { style: { position: 'absolute', inset: 0, background: `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 84, opacity: 0.9 } }, meta.icon);
             const scrim = React.createElement("div", { style: { position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.15) 22%, rgba(0,0,0,0.15) 45%, rgba(0,0,0,0.55) 72%, rgba(0,0,0,0.92) 100%)' } });
-            const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 16, right: 60, zIndex: 2, display: 'flex', alignItems: 'center', gap: 14 } },
+            const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 16, right: 60, zIndex: 2, display: 'flex', alignItems: 'flex-end', gap: 14 } },
                 [{ id: 'forYou', label: 'Book Me' }, { id: 'following', label: 'Following' }, { id: 'filters', label: 'Filters' }].map((t) => {
                     const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
                     const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
+                    const isMain = t.id === 'forYou';
                     return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 } },
                         React.createElement("span", { style: { position: 'relative', display: 'inline-block' } },
-                            React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
-                            t.id === 'forYou' && React.createElement("span", { style: { position: 'absolute', top: -2, right: -9, width: 6, height: 6, borderRadius: '50%', background: THEME.coral } })),
-                        React.createElement("span", { style: { width: active ? 18 : 0, height: 2, borderRadius: 2, background: '#fff', transition: 'width 0.2s' } }));
+                            React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 23 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
+                            isMain && React.createElement("span", { style: { position: 'absolute', top: 0, right: -11, width: 7, height: 7, borderRadius: '50%', background: THEME.coral } })),
+                        React.createElement("span", { style: { width: active ? (isMain ? 26 : 18) : 0, height: 2, borderRadius: 2, background: '#fff', transition: 'width 0.2s' } }));
                 }));
             const actionStack = React.createElement("div", { style: { position: 'absolute', right: 14, bottom: 'calc(env(safe-area-inset-bottom) + 214px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 30, zIndex: 2 } },
                     (() => {
