@@ -3,12 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
-<title>AVIOBNS — Watch it. Book it.</title>
+<title>Bookvado — Watch it. Book it.</title>
 <meta name="theme-color" content="#ffffff" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="AVIOBNS" />
+<meta name="apple-mobile-web-app-title" content="Bookvado" />
 <meta name="format-detection" content="telephone=no" />
+<link rel="apple-touch-icon" href="assets/brand/icon-1024.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="assets/brand/icon-180.png" />
+<link rel="icon" type="image/png" href="assets/brand/icon-1024.png" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
@@ -71,7 +74,7 @@
 </head>
 <body>
 <div id="root"></div>
-<div id="fallback">Loading AVIO…</div>
+<div id="fallback">Loading Bookvado…</div>
 <script>
   window.addEventListener("error", function(e){
     var f = document.getElementById("fallback");
@@ -1438,7 +1441,7 @@ function App() {
         setCommentDraft('');
     }
     async function shareItem(item) {
-        const shareData = { title: item.name, text: `Check out ${item.name} on AVIO`, url: window.location.href };
+        const shareData = { title: item.name, text: `Check out ${item.name} on Bookvado`, url: window.location.href };
         if (navigator.share) {
             try {
                 await navigator.share(shareData);
@@ -1470,8 +1473,9 @@ function App() {
                 refs[i - 1].current.focus(); }, style: { width: 44, height: 52, textAlign: 'center', fontSize: 20, fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, color: '#161616', background: '#FAFAFA', border: '1px solid #E5E5E5', borderRadius: 12 } })));
     if (showSplash) {
         return authFrame(React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative' } },
-            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#161616', margin: 0, letterSpacing: 1.5 } }, "AVIOBNS"),
-            React.createElement("p", { style: { fontSize: 12, color: '#8A8A8E', marginTop: 8, letterSpacing: 0.3 } }, "Watch it. Book it."),
+            React.createElement("img", { src: "assets/brand/icon-180.png", alt: "Bookvado", style: { width: 64, height: 64, borderRadius: 16 } }),
+            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: '#161616', margin: '10px 0 0', letterSpacing: 0.5 } }, "Bookvado"),
+            React.createElement("p", { style: { fontSize: 12, color: '#8A8A8E', marginTop: 6, letterSpacing: 0.3 } }, "Watch it. Book it."),
             React.createElement("div", { style: { position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom) + 48px)', display: 'flex', alignItems: 'center', gap: 4 } },
                 React.createElement("div", { className: "avio-splash-dot", style: { width: 16, height: 4, borderRadius: 2, background: '#161616' } }),
                 React.createElement("div", { style: { width: 30, height: 4, borderRadius: 2, background: '#EFEFEF' } }))));
@@ -1479,7 +1483,9 @@ function App() {
     if (!session) {
         return authFrame(React.createElement(React.Fragment, null,
             authView === 'welcome' && (React.createElement("div", { className: "avio-auth-page", style: { flex: 1, display: 'flex', flexDirection: 'column', padding: `calc(env(safe-area-inset-top) + 26px) 24px calc(env(safe-area-inset-bottom) + 22px)`, overflowY: 'auto' } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: '#161616', letterSpacing: 1.5, textAlign: 'center', margin: 0 } }, "AVIOBNS"),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 } },
+                    React.createElement("img", { src: "assets/brand/icon-180.png", alt: "Bookvado", style: { width: 22, height: 22, borderRadius: 6 } }),
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: '#161616', letterSpacing: 1 } }, "BOOKVADO")),
                 React.createElement("div", { style: { marginTop: 26 } },
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 32, color: '#161616', lineHeight: 1.15, margin: 0 } }, "See it.", React.createElement("br"), "Book it."),
                     React.createElement("p", { style: { fontSize: 13.5, color: '#8A8A8E', marginTop: 10, maxWidth: 280 } }, "Discover services through short videos and book instantly.")),
@@ -1499,7 +1505,7 @@ function App() {
                     React.createElement("button", { className: "avio-press", onClick: () => goAuth('login'), style: authMethodBtn }, "Log In"),
                     React.createElement("button", { className: "avio-press", onClick: () => flashToast('Apple Sign-In needs a real backend'), style: { ...authMethodBtn, marginTop: 6 } }, "Continue with Apple"),
                     React.createElement("button", { className: "avio-press", onClick: () => flashToast('Google Sign-In needs a real backend'), style: authMethodBtn }, "Continue with Google"),
-                    React.createElement("p", { style: { fontSize: 10.5, color: '#B5B5B8', textAlign: 'center', marginTop: 6, lineHeight: 1.5 } }, "By continuing, you agree to Aviobns Terms and Privacy Policy.")))),
+                    React.createElement("p", { style: { fontSize: 10.5, color: '#B5B5B8', textAlign: 'center', marginTop: 6, lineHeight: 1.5 } }, "By continuing, you agree to Bookvado Terms and Privacy Policy.")))),
             authView === 'login' && (React.createElement("div", { className: "avio-auth-page", style: { flex: 1, display: 'flex', flexDirection: 'column', padding: `calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px)`, overflowY: 'auto' } },
                 authBack(() => goAuth('welcome')),
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#161616', margin: 0 } }, "Welcome back"),
@@ -1518,10 +1524,10 @@ function App() {
                     React.createElement("button", { className: "avio-press", onClick: () => flashToast('Apple Sign-In needs a real backend'), style: authMethodBtn }, "Continue with Apple"),
                     React.createElement("button", { className: "avio-press", onClick: () => flashToast('Google Sign-In needs a real backend'), style: authMethodBtn }, "Continue with Google")),
                 React.createElement("button", { className: "avio-press", onClick: () => flashToast('Face ID needs a real device'), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14, fontSize: 12.5, color: '#8A8A8E' } }, React.createElement(Icon, { name: "faceid", size: 15, color: "#8A8A8E" }), "Log in with Face ID"),
-                React.createElement("button", { onClick: () => goAuth('create'), style: { marginTop: 'auto', paddingTop: 20, fontSize: 13, color: '#8A8A8E', textAlign: 'center' } }, "New to Aviobns? ", React.createElement("span", { style: { color: THEME.coral, fontWeight: 700 } }, "Create account")))),
+                React.createElement("button", { onClick: () => goAuth('create'), style: { marginTop: 'auto', paddingTop: 20, fontSize: 13, color: '#8A8A8E', textAlign: 'center' } }, "New to Bookvado? ", React.createElement("span", { style: { color: THEME.coral, fontWeight: 700 } }, "Create account")))),
             authView === 'create' && (React.createElement("div", { className: "avio-auth-page", style: { flex: 1, display: 'flex', flexDirection: 'column', padding: `calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px)`, overflowY: 'auto' } },
                 authBack(() => goAuth('welcome')),
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#161616', margin: 0 } }, "Join Aviobns"),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#161616', margin: 0 } }, "Join Bookvado"),
                 React.createElement("p", { style: { fontSize: 13, color: '#8A8A8E', marginTop: 6, marginBottom: 22 } }, "Discover. Book. Grow."),
                 React.createElement("div", { style: { display: 'flex', gap: 10 } },
                     React.createElement("div", { style: { flex: 1 } },
@@ -1555,7 +1561,7 @@ function App() {
                     React.createElement("button", { onClick: resendVerificationCode, disabled: resendSeconds > 0, style: { color: resendSeconds > 0 ? '#C7C7CC' : THEME.coral, fontWeight: 700 } }, "Resend")),
                 React.createElement("button", { onClick: () => goAuth('create'), style: { marginTop: 14, fontSize: 12.5, color: '#8A8A8E', alignSelf: 'center' } }, isPhoneLikeIdentifier(authDraft.identifier) ? "Change phone number" : "Change email"))),
             authView === 'account-type' && (React.createElement("div", { className: "avio-auth-page", style: { flex: 1, display: 'flex', flexDirection: 'column', padding: `calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px)`, overflowY: 'auto' } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#161616', margin: 0 } }, "How will you use Aviobns?"),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#161616', margin: 0 } }, "How will you use Bookvado?"),
                 React.createElement("p", { style: { fontSize: 13, color: '#8A8A8E', marginTop: 6, marginBottom: 24 } }, "You can change this later."),
                 React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 14 } },
                     ACCOUNT_TYPE_CARDS.map((c) => {
@@ -1589,7 +1595,7 @@ function App() {
                     React.createElement("div", { className: "avio-check-pop avio-ring-pulse", style: { width: 68, height: 68, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                         React.createElement(Icon, { name: "check", size: 28, color: "#fff" }))),
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#161616', margin: '18px 0 0' } }, "You're all set!"),
-                React.createElement("p", { style: { fontSize: 13.5, color: '#8A8A8E', marginTop: 8 } }, accountType === 'business' ? "Let's start growing your business." : "Let's personalize your Aviobns experience."),
+                React.createElement("p", { style: { fontSize: 13.5, color: '#8A8A8E', marginTop: 8 } }, accountType === 'business' ? "Let's start growing your business." : "Let's personalize your Bookvado experience."),
                 React.createElement("button", { className: "avio-press", onClick: login, style: { ...authPrimaryBtn, marginTop: 32, maxWidth: 280 } }, "Start Exploring"))),
             authView === 'forgot-1' && (React.createElement("div", { className: "avio-auth-page", style: { flex: 1, display: 'flex', flexDirection: 'column', padding: `calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px)` } },
                 authBack(() => goAuth('login')),
