@@ -1190,13 +1190,13 @@ function App() {
     function removeDateOverride(key) {
         setProviderDateOverrides((prev) => { const next = { ...prev }; delete next[key]; return next; });
     }
-    function openBooking(item) {
+    function openBooking(item, preselectedService) {
         setPostViewer(null);
         setBusinessProfileTarget(null);
         setProfileDrag(null);
         setBookingTarget(item);
-        setBookingStep('service');
-        setSelectedService(null);
+        setBookingStep(preselectedService ? 'datetime' : 'service');
+        setSelectedService(preselectedService || null);
         setBookingCalMonth(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
         setBookingSelectedDay(new Date().getDate());
         setSelTime(null);
@@ -2207,11 +2207,13 @@ function App() {
             else if (bizProfileTab === 'services') {
                 const services = getServicesForTarget(item);
                 tabContent = React.createElement("div", { style: { padding: '14px 18px 100px', display: 'flex', flexDirection: 'column', gap: 10 } },
-                    services.map((s, i) => React.createElement("div", { key: i, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 14, border: '1px solid #ECECEE' } },
+                    services.map((s, i) => React.createElement("button", { key: i, onClick: () => openBooking(item, s), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 14, border: '1px solid #ECECEE', textAlign: 'left' } },
                         React.createElement("div", null,
                             React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: '#161616', margin: 0 } }, s.name),
                             React.createElement("p", { style: { fontSize: 11.5, color: '#8A8A8E', marginTop: 3 } }, formatDuration(s.durationMin))),
-                        React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: '#161616' } }, money(s.price)))));
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                            React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: '#161616' } }, money(s.price)),
+                            React.createElement(Icon, { name: "chevronright", size: 15, color: '#B5B5B8' })))));
             }
             else {
                 tabContent = React.createElement("div", { style: { padding: '14px 18px 100px', display: 'flex', flexDirection: 'column', gap: 14 } },
