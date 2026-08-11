@@ -1689,7 +1689,6 @@ function App() {
             React.createElement(Icon, { name: shortsFeedTab === 'following' ? "user" : "search", size: 22, color: THEME.mutedDark }),
             React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : `No shorts match "${shortsQuery}"`),
             shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('forYou'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Browse Book Me"))) : filteredFeed.map((item) => {
-            const meta = CATEGORY_META[item.category];
             const liked = likedIds.has(item.id);
             const followed = followedIds.has(item.id);
             const saved = savedShorts.has(item.id);
@@ -1705,7 +1704,7 @@ function App() {
                         React.createElement("source", { src: item.video + '.mp4', type: "video/mp4" }))
                     : item.image
                     ? React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
-                    : React.createElement("div", { style: { position: 'absolute', inset: 0, background: `linear-gradient(160deg, ${meta.grad[0]}, ${meta.grad[1]})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 84, opacity: 0.9 } }, meta.icon);
+                    : React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#000' } });
             const scrim = React.createElement("div", { style: { position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.38) 22%, rgba(0,0,0,0.4) 45%, rgba(0,0,0,0.68) 72%, rgba(0,0,0,0.94) 100%)' } });
             const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 56, zIndex: 2, display: 'flex', alignItems: 'flex-end', gap: 11 } },
                 [{ id: 'forYou', label: 'Book Me' }, { id: 'following', label: 'Following' }, { id: 'filters', label: 'Filters' }].map((t) => {
