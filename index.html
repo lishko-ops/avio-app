@@ -113,6 +113,11 @@ function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
         user: React.createElement(React.Fragment, null,
             React.createElement("circle", { cx: "12", cy: "7.6", r: "3.8", ...solid }),
             React.createElement("path", { d: "M4.6 20.2c.4-4.1 3.6-6.9 7.4-6.9s7 2.8 7.4 6.9c.1.7-.5 1.3-1.2 1.3H5.8c-.7 0-1.3-.6-1.2-1.3z", ...solid })),
+        users: React.createElement(React.Fragment, null,
+            React.createElement("circle", { cx: "8.5", cy: "8", r: "3.2", ...solid }),
+            React.createElement("path", { d: "M2.2 19.5c.4-3.5 3-5.9 6.3-5.9s5.9 2.4 6.3 5.9c.1.6-.4 1.1-1 1.1H3.2c-.6 0-1.1-.5-1-1.1z", ...solid }),
+            React.createElement("circle", { cx: "16.3", cy: "7.4", r: "2.6", ...solid }),
+            React.createElement("path", { d: "M15 13.7c2.6.5 4.6 2.7 5 5.6.1.6-.4 1.2-1 1.2h-2.4", ...solid })),
         grid: React.createElement(React.Fragment, null,
             React.createElement("rect", { x: "3", y: "3", width: "8", height: "8", rx: "2.2", ...solid }),
             React.createElement("rect", { x: "13", y: "3", width: "8", height: "8", rx: "2.2", ...solid }),
@@ -1760,14 +1765,17 @@ function App() {
                     React.createElement("span", { style: { fontSize: 12, color: 'rgba(255,255,255,0.6)' } }, "with"),
                     taggedBusinesses.map((b) => React.createElement("button", { key: b.id, onClick: () => openBusinessProfile(b), style: { fontSize: 12, fontWeight: 600, color: THEME.coral, background: 'rgba(151,196,0,0.15)', borderRadius: 12, padding: '3px 10px' } }, b.name))));
             const primaryTagTarget = taggedBusinesses[0] || item;
-            const topRatedBadge = item.rating >= 4.7 && React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 5, border: `1px solid ${THEME.coral}`, borderRadius: 12, padding: '4px 10px', marginBottom: 8 } },
-                React.createElement(Icon, { name: "star", size: 10, color: THEME.coral, fill: THEME.coral }),
-                React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: THEME.coral } }, "Top Rated"));
+            const bookedCount = parseCount(item.likes).toLocaleString();
+            const bookedBadge = React.createElement("div", { style: { display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, background: 'rgba(0,0,0,0.35)', border: `1px solid ${THEME.coral}`, borderRadius: 14, padding: '7px 14px', marginBottom: 8 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                    React.createElement(Icon, { name: "users", size: 14, color: THEME.coral }),
+                    React.createElement("span", { style: { fontSize: 14.5, fontWeight: 700, color: THEME.coral } }, bookedCount)),
+                React.createElement("span", { style: { fontSize: 10, fontWeight: 600, color: THEME.coral, marginLeft: 20 } }, "Booked"));
             const dealBadge = (item.mine && providerDeal.enabled) && React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(248,244,236,0.92)', borderRadius: 18, padding: '6px 12px', marginTop: 10 } },
                 React.createElement("span", { style: { fontSize: 13 } }, "🎁"),
                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, providerDeal.label));
             const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 'calc(env(safe-area-inset-bottom) + 130px)', padding: '0 18px', zIndex: 2 } },
-                topRatedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, taggedRow, dealBadge);
+                bookedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, taggedRow, dealBadge);
             const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(env(safe-area-inset-bottom) + 82px)', zIndex: 2, borderRadius: 24, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
                 React.createElement("button", { onClick: () => openBooking(primaryTagTarget), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: '12px 18px' } },
                     React.createElement(Icon, { name: "calendar", size: 18, color: "#fff" }),
