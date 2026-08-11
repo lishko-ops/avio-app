@@ -1529,9 +1529,9 @@ function App() {
                 refs[i - 1].current.focus(); }, style: { width: 44, height: 52, textAlign: 'center', fontSize: 20, fontFamily: 'JetBrains Mono, monospace', fontWeight: 600, color: '#161616', background: '#FAFAFA', border: '1px solid #E5E5E5', borderRadius: 12 } })));
     if (showSplash) {
         return authFrame(React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative' } },
-            React.createElement("img", { src: "assets/brand/icon-180.png", alt: "Bookvado", style: { width: 64, height: 64, borderRadius: 16 } }),
-            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: '#161616', margin: '10px 0 0', letterSpacing: 0.5 } }, "Bookvado"),
-            React.createElement("p", { style: { fontSize: 12, color: '#8A8A8E', marginTop: 6, letterSpacing: 0.3 } }, "Watch it. Book it."),
+            React.createElement("img", { src: "assets/brand/icon-180.png", alt: "Bookvado", style: { width: 108, height: 108, borderRadius: 26 } }),
+            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: '#161616', margin: '16px 0 0', letterSpacing: 0.5 } }, "Bookvado"),
+            React.createElement("p", { style: { fontSize: 14, color: '#8A8A8E', marginTop: 7, letterSpacing: 0.3 } }, "Watch it. Book it."),
             React.createElement("div", { style: { position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom) + 48px)', display: 'flex', alignItems: 'center', gap: 4 } },
                 React.createElement("div", { className: "avio-splash-dot", style: { width: 16, height: 4, borderRadius: 2, background: '#161616' } }),
                 React.createElement("div", { style: { width: 30, height: 4, borderRadius: 2, background: '#EFEFEF' } }))));
@@ -1539,9 +1539,9 @@ function App() {
     if (!session) {
         return authFrame(React.createElement(React.Fragment, null,
             authView === 'welcome' && (React.createElement("div", { className: "avio-auth-page", style: { flex: 1, display: 'flex', flexDirection: 'column', padding: `calc(env(safe-area-inset-top) + 26px) 24px calc(env(safe-area-inset-bottom) + 22px)`, overflowY: 'auto' } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 } },
-                    React.createElement("img", { src: "assets/brand/icon-180.png", alt: "Bookvado", style: { width: 22, height: 22, borderRadius: 6 } }),
-                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: '#161616', letterSpacing: 1 } }, "BOOKVADO")),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 } },
+                    React.createElement("img", { src: "assets/brand/icon-180.png", alt: "Bookvado", style: { width: 34, height: 34, borderRadius: 9 } }),
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 21, color: '#161616', letterSpacing: 1 } }, "BOOKVADO")),
                 React.createElement("div", { style: { marginTop: 26 } },
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 32, color: '#161616', lineHeight: 1.15, margin: 0 } }, "See it.", React.createElement("br"), "Book it."),
                     React.createElement("p", { style: { fontSize: 13.5, color: '#8A8A8E', marginTop: 10, maxWidth: 280 } }, "Discover services through short videos and book instantly.")),
