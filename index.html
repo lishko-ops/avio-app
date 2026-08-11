@@ -623,7 +623,7 @@ const ACCOUNT_TYPE_CARDS = [
 ];
 function App() {
     var _a;
-    const [session, setSession] = useState(() => { try { return localStorage.getItem('avio_session'); } catch (e) { return null; } });
+    const [session, setSession] = useState(() => { try { return localStorage.getItem('avio_session_v2'); } catch (e) { return null; } });
     const [showSplash, setShowSplash] = useState(true);
     const [authView, setAuthView] = useState('welcome');
     const [authDraft, setAuthDraft] = useState({ firstName: '', lastName: '', identifier: '', password: '', otp: ['', '', '', '', '', ''] });
@@ -998,14 +998,14 @@ function App() {
     function login() {
         const s = 'session_' + Date.now();
         try {
-            localStorage.setItem('avio_session', s);
+            localStorage.setItem('avio_session_v2', s);
         }
         catch (e) { }
         setSession(s);
     }
     function logout() {
         try {
-            localStorage.removeItem('avio_session');
+            localStorage.removeItem('avio_session_v2');
         }
         catch (e) { }
         setSession(null);
