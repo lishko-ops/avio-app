@@ -939,6 +939,14 @@ function App() {
     const [providerDashboardTab, setProviderDashboardTab] = useState('overview');
     const [serviceFormDraft, setServiceFormDraft] = useState(null);
     const [hoursOverrideDraft, setHoursOverrideDraft] = useState(null);
+    const [businessBookings, setBusinessBookings] = useState(BUSINESS_INCOMING_BOOKINGS);
+    const [businessBookingDetail, setBusinessBookingDetail] = useState(null);
+    const [businessCalendarDay, setBusinessCalendarDay] = useState(() => new Date().getDate());
+    function updateBusinessBookingStatus(id, status) {
+        setBusinessBookings((prev) => prev.map((b) => b.id === id ? { ...b, status } : b));
+        setBusinessBookingDetail((prev) => prev && prev.id === id ? { ...prev, status } : prev);
+        flashToast(status === 'completed' ? 'Marked as completed' : 'Booking cancelled');
+    }
     useEffect(() => { saveLS('avio_provider_services', providerServices); }, [providerServices]);
     useEffect(() => { saveLS('avio_provider_weekly_hours', providerWeeklyHours); }, [providerWeeklyHours]);
     useEffect(() => { saveLS('avio_provider_date_overrides', providerDateOverrides); }, [providerDateOverrides]);
@@ -2110,10 +2118,10 @@ function App() {
 
             if (accountType === 'business') {
                 const BIZ_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'pending', label: 'Pending' }, { id: 'past', label: 'Past' }];
-                const shown = BUSINESS_INCOMING_BOOKINGS.filter((b) => bookingsSubTab === 'past' ? false : b.status === bookingsSubTab || (bookingsSubTab === 'upcoming' && b.status === 'confirmed'));
+                const shown = businessBookings.filter((b) => bookingsSubTab === 'past' ? false : b.status === bookingsSubTab || (bookingsSubTab === 'upcoming' && b.status === 'confirmed'));
                 const header = React.createElement("div", { style: { padding: '0 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: BK.text, margin: 0 } }, "Bookings"),
-                    React.createElement("button", { onClick: () => flashToast('Calendar view — coming soon') }, React.createElement(Icon, { name: "calendar", size: 20, color: BK.text })));
+                    React.createElement("button", { onClick: () => { setProviderDashboardOpen(true); setProviderDashboardTab('calendar'); } }, React.createElement(Icon, { name: "calendar", size: 20, color: BK.text })));
                 const tabsRow = React.createElement("div", { style: { display: 'flex', gap: 20, padding: '18px 18px 0', borderBottom: `1px solid ${BK.border}` } }, BIZ_TABS.map((t) => {
                     const active = bookingsSubTab === t.id;
                     return React.createElement("button", { key: t.id, onClick: () => setBookingsSubTab(t.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
@@ -2126,7 +2134,7 @@ function App() {
                     React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: BK.text, margin: 0 } }, bookingsSubTab === 'past' ? "No past appointments yet" : `No ${bookingsSubTab} appointments`));
                 const cards = shown.length === 0 ? emptyState : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '0 18px' } }, shown.map((b, i) => {
                     const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
-                    return React.createElement("div", { key: b.id, className: "avio-card-in", style: { animationDelay: `${i * 0.04}s`, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: `1px solid ${BK.border}`, borderRadius: 18, padding: 12, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
+                    return React.createElement("button", { key: b.id, onClick: () => setBusinessBookingDetail(b), className: "avio-card-in", style: { animationDelay: `${i * 0.04}s`, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: '#fff', border: `1px solid ${BK.border}`, borderRadius: 18, padding: 12, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
                         React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: BK.text, width: 62, flexShrink: 0, margin: 0 } }, b.time),
                         React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.initials),
                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
@@ -2550,7 +2558,7 @@ function App() {
                 React.createElement("button", { onClick: () => setProviderDashboardOpen(false) }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "My Business"),
                 React.createElement("button", { onClick: () => setProfileMenuOpen(true) }, React.createElement(Icon, { name: "sliders", size: 17, color: PD.text })));
-            const tabsRow = React.createElement("div", { className: "avio-scroll", style: { flexShrink: 0, display: 'flex', gap: 20, padding: '14px 18px 0', borderBottom: `1px solid ${PD.border}`, overflowX: 'auto' } }, [{ id: 'overview', label: 'Overview' }, { id: 'services', label: 'Services' }, { id: 'hours', label: 'Availability' }, { id: 'customerPosts', label: 'Customer Posts' }].map((t) => {
+            const tabsRow = React.createElement("div", { className: "avio-scroll", style: { flexShrink: 0, display: 'flex', gap: 20, padding: '14px 18px 0', borderBottom: `1px solid ${PD.border}`, overflowX: 'auto' } }, [{ id: 'overview', label: 'Overview' }, { id: 'services', label: 'Services' }, { id: 'hours', label: 'Availability' }, { id: 'calendar', label: 'Calendar' }, { id: 'customerPosts', label: 'Customer Posts' }].map((t) => {
                 const active = providerDashboardTab === t.id;
                 return React.createElement("button", { key: t.id, onClick: () => setProviderDashboardTab(t.id), style: { flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
                     React.createElement("span", { style: { fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? PD.text : PD.sub, whiteSpace: 'nowrap' } }, t.label),
@@ -2558,8 +2566,8 @@ function App() {
             }));
             let body;
             if (providerDashboardTab === 'overview') {
-                const totalBookings = BUSINESS_INCOMING_BOOKINGS.length;
-                const totalRevenue = BUSINESS_INCOMING_BOOKINGS.reduce((sum, b) => sum + b.price, 0);
+                const totalBookings = businessBookings.length;
+                const totalRevenue = businessBookings.reduce((sum, b) => sum + b.price, 0);
                 const customerPostsForOverview = feed.filter((f) => f.isCustomerPost && f.verifiedTags && f.verifiedTags.length > 0);
                 const topVideo = customerPostsForOverview.slice().sort((a, c) => parseCount(c.likes) - parseCount(a.likes))[0];
                 const STAT_CARDS = [
@@ -2574,6 +2582,7 @@ function App() {
                     { label: 'Customers', icon: 'user', onClick: () => flashToast('Customers — coming soon') },
                     { label: 'Reviews', icon: 'star', onClick: () => flashToast('Reviews — coming soon') },
                     { label: 'Availability', icon: 'calendar', onClick: () => setProviderDashboardTab('hours') },
+                    { label: 'Calendar', icon: 'calendar', onClick: () => setProviderDashboardTab('calendar') },
                     { label: 'Settings', icon: 'sliders', onClick: () => flashToast('Settings — coming soon') },
                 ];
                 const cardShadow = '0 1px 2px rgba(0,0,0,0.04), 0 4px 14px rgba(0,0,0,0.06)';
@@ -2592,7 +2601,7 @@ function App() {
                         React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: 0 } }, s.label),
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: PD.text, margin: '4px 0 0' } }, s.value),
                         React.createElement("p", { style: { fontSize: 11, fontWeight: 600, color: THEME.coral, margin: '3px 0 0' } }, "↑ ", s.delta))));
-                const upcomingPreview = BUSINESS_INCOMING_BOOKINGS.filter((b) => b.status === 'confirmed').slice(0, 3);
+                const upcomingPreview = businessBookings.filter((b) => b.status === 'confirmed').slice(0, 3);
                 const upcomingBookingsSection = upcomingPreview.length > 0 && React.createElement("div", { style: { marginTop: 26 } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
                         React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Upcoming Bookings"),
@@ -2654,6 +2663,44 @@ function App() {
                                     React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: '4px 0 0' } }, views, " views · ", bookingsGenerated, " bookings generated")),
                                 React.createElement("button", { onClick: () => flashToast('Reported — our team will review this post'), style: { fontSize: 11, fontWeight: 700, color: '#D0304A', flexShrink: 0, padding: '6px 10px', borderRadius: 10, border: '1px solid #F5D5DA' } }, "Report"));
                         })));
+            }
+            else if (providerDashboardTab === 'calendar') {
+                const today = new Date();
+                const y = today.getFullYear(), m = today.getMonth();
+                const firstWeekday = new Date(y, m, 1).getDay();
+                const daysInMonth = new Date(y, m + 1, 0).getDate();
+                const monthLabel = today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                const cells = [...Array(firstWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+                const dayBookings = businessCalendarDay === today.getDate() ? businessBookings.filter((b) => b.status !== 'cancelled') : [];
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
+                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, marginBottom: 12 } }, monthLabel),
+                    React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 8 } },
+                        ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => React.createElement("p", { key: i, style: { fontSize: 10.5, fontWeight: 700, color: PD.sub, textAlign: 'center', margin: 0 } }, d))),
+                    React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 } },
+                        cells.map((day, i) => {
+                            if (!day)
+                                return React.createElement("div", { key: i });
+                            const isToday = day === today.getDate();
+                            const isSelected = day === businessCalendarDay;
+                            const hasBookings = day === today.getDate() && businessBookings.some((b) => b.status !== 'cancelled');
+                            return React.createElement("button", { key: i, onClick: () => setBusinessCalendarDay(day), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '6px 0' } },
+                                React.createElement("span", { style: { width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, fontWeight: isSelected ? 700 : 500, background: isSelected ? THEME.coral : 'transparent', color: isSelected ? '#fff' : (isToday ? THEME.coral : PD.text) } }, day),
+                                React.createElement("span", { style: { width: 4, height: 4, borderRadius: 2, background: hasBookings ? THEME.coral : 'transparent' } }));
+                        })),
+                    React.createElement("div", { style: { marginTop: 22 } },
+                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, marginBottom: 10 } }, businessCalendarDay === today.getDate() ? "Today's Bookings" : "Bookings"),
+                        dayBookings.length === 0
+                            ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub } }, "No bookings on this day.")
+                            : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, dayBookings.map((b) => {
+                                const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
+                                return React.createElement("button", { key: b.id, onClick: () => setBusinessBookingDetail(b), style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, border: `1px solid ${PD.border}`, textAlign: 'left', width: '100%' } },
+                                    React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: PD.text, width: 58, flexShrink: 0, margin: 0 } }, b.time),
+                                    React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 } }, b.initials),
+                                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, b.customerName),
+                                        React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, b.service, " · ", money(b.price))),
+                                    React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize', flexShrink: 0 } }, b.status));
+                            }))));
             }
             else {
                 const overrideKeys = Object.keys(providerDateOverrides).sort();
@@ -2852,6 +2899,33 @@ function App() {
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Date & Time"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, `${b.date} · ${b.time}`)),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Location"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616', textAlign: 'right', maxWidth: 200 } }, b.address)),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: '1px solid #ECECEE' } }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, "Total"), React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: '#161616' } }, money(b.total)))),
+                React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, actions.map((a, i) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px 4px', borderBottom: i < actions.length - 1 ? '1px solid #F5F5F5' : 'none' } },
+                    React.createElement(Icon, { name: a.icon, size: 16, color: a.danger ? '#D0304A' : '#161616' }),
+                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: a.danger ? '#D0304A' : '#161616' } }, a.label)))));
+        })())),
+        businessBookingDetail && (React.createElement("div", { onClick: () => setBusinessBookingDetail(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } }, (() => {
+            const b = businessBookingDetail;
+            const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
+            const actions = [{ icon: 'message', label: 'Message Customer', onClick: () => flashToast('Messaging ' + b.customerName) }];
+            if (b.status === 'confirmed' || b.status === 'pending') {
+                actions.push({ icon: 'clock', label: 'Reschedule', onClick: () => flashToast('Reschedule — coming soon') });
+                actions.push({ icon: 'check', label: 'Mark Complete', onClick: () => updateBusinessBookingStatus(b.id, 'completed') });
+                actions.push({ icon: 'x', label: 'Cancel Booking', danger: true, onClick: () => updateBusinessBookingStatus(b.id, 'cancelled') });
+            }
+            return React.createElement("div", { onClick: (e) => e.stopPropagation(), className: "avio-filter-sheet", style: { width: '100%', background: '#fff', borderRadius: '24px 24px 0 0', padding: `14px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '85%', overflowY: 'auto' } },
+                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#ECECEE', margin: '0 auto 14px' } }),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12 } },
+                    React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, b.initials),
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: '#161616', margin: 0, fontFamily: 'Space Grotesk, sans-serif' } }, b.customerName),
+                        React.createElement("p", { style: { fontSize: 12.5, color: '#8A8A8E', marginTop: 2 } }, b.service)),
+                    React.createElement("button", { onClick: () => setBusinessBookingDetail(null) }, React.createElement(Icon, { name: "x", size: 18, color: "#8A8A8E" }))),
+                React.createElement("div", { style: { marginTop: 14 } },
+                    React.createElement("span", { style: { fontSize: 11, fontWeight: 700, padding: '5px 11px', borderRadius: 12, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize' } }, b.status)),
+                React.createElement("div", { style: { marginTop: 16, background: '#FAFAFA', borderRadius: 14, padding: 14 } },
+                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Date & Time"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, `Today · ${b.time}`)),
+                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Service"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, b.service)),
+                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: '1px solid #ECECEE' } }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, "Price"), React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: '#161616' } }, money(b.price)))),
                 React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, actions.map((a, i) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px 4px', borderBottom: i < actions.length - 1 ? '1px solid #F5F5F5' : 'none' } },
                     React.createElement(Icon, { name: a.icon, size: 16, color: a.danger ? '#D0304A' : '#161616' }),
                     React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: a.danger ? '#D0304A' : '#161616' } }, a.label)))));
