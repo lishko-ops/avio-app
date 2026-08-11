@@ -1702,13 +1702,13 @@ function App() {
                                     railDot),
                                 React.createElement("span", { style: { fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, shareCount)));
                     })());
-            const nameRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-                React.createElement("button", { onClick: () => openBusinessProfile(item), style: { display: 'flex', alignItems: 'center', gap: 6 } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: '#fff', margin: 0 } }, item.name),
-                    item.verified && React.createElement("div", { style: { width: 15, height: 15, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                        React.createElement(Icon, { name: "check", size: 9, color: THEME.ink }))));
-            const categoryRow2 = React.createElement("p", { style: { fontSize: 12.5, color: 'rgba(255,255,255,0.75)', margin: '3px 0 0' } }, item.location);
-            const captionP = React.createElement("p", { style: { fontSize: 12.5, color: '#fff', marginTop: 8, maxWidth: 280, lineHeight: 1.4 } }, item.blurb);
+            const nameRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 7 } },
+                React.createElement("button", { onClick: () => openBusinessProfile(item), style: { display: 'flex', alignItems: 'center', gap: 7 } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: '#fff', margin: 0 } }, item.name),
+                    item.verified && React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement(Icon, { name: "check", size: 10, color: THEME.ink }))));
+            const categoryRow2 = React.createElement("p", { style: { fontSize: 13.5, color: 'rgba(255,255,255,0.75)', margin: '4px 0 0' } }, item.location);
+            const captionP = React.createElement("p", { style: { fontSize: 13.5, color: '#fff', marginTop: 10, maxWidth: 280, lineHeight: 1.4 } }, item.blurb);
             const discountBadge = item.discount && React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(248,244,236,0.92)', borderRadius: 18, padding: '6px 12px', marginTop: 12 } },
                 React.createElement("span", { style: { fontSize: 13 } }, "\uD83C\uDF81"),
                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, item.discount));
@@ -1723,21 +1723,21 @@ function App() {
                     React.createElement("span", { style: { fontSize: 12, color: 'rgba(255,255,255,0.6)' } }, "with"),
                     taggedBusinesses.map((b) => React.createElement("button", { key: b.id, onClick: () => openBusinessProfile(b), style: { fontSize: 12, fontWeight: 600, color: THEME.coral, background: 'rgba(151,196,0,0.15)', borderRadius: 12, padding: '3px 10px' } }, b.name))));
             const primaryTagTarget = taggedBusinesses[0] || item;
-            const topRatedBadge = item.rating >= 4.7 && React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 4, border: `1px solid ${THEME.coral}`, borderRadius: 12, padding: '3px 8px', marginBottom: 6 } },
-                React.createElement(Icon, { name: "star", size: 9, color: THEME.coral, fill: THEME.coral }),
-                React.createElement("span", { style: { fontSize: 10.5, fontWeight: 600, color: THEME.coral } }, "Top Rated"));
-            const bookedRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 } },
+            const topRatedBadge = item.rating >= 4.7 && React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 5, border: `1px solid ${THEME.coral}`, borderRadius: 12, padding: '4px 10px', marginBottom: 8 } },
+                React.createElement(Icon, { name: "star", size: 10, color: THEME.coral, fill: THEME.coral }),
+                React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: THEME.coral } }, "Top Rated"));
+            const bookedRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 } },
                 React.createElement("div", { style: { display: 'flex' } },
-                    CUSTOMER_FACE_PHOTOS.map((src, i) => React.createElement("div", { key: i, style: { width: 22, height: 22, borderRadius: '50%', backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '1.5px solid rgba(255,255,255,0.85)', marginLeft: i === 0 ? 0 : -8 } }))),
-                React.createElement("span", { style: { fontSize: 12, color: 'rgba(255,255,255,0.85)' } }, "Booked ", React.createElement("span", { style: { color: THEME.coral, fontWeight: 700 } }, item.friendsBooked || 0), " times today"));
-            const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 108, padding: '0 18px', zIndex: 2 } },
+                    CUSTOMER_FACE_PHOTOS.map((src, i) => React.createElement("div", { key: i, style: { width: 26, height: 26, borderRadius: '50%', backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center', border: '2px solid rgba(255,255,255,0.85)', marginLeft: i === 0 ? 0 : -9 } }))),
+                React.createElement("span", { style: { fontSize: 13, color: 'rgba(255,255,255,0.85)' } }, "Booked ", React.createElement("span", { style: { color: THEME.coral, fontWeight: 700 } }, item.friendsBooked || 0), " times today"));
+            const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 116, padding: '0 18px', zIndex: 2 } },
                 topRatedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, bookedRow, discountBadge, taggedRow);
-            const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 64, zIndex: 2, borderRadius: 22, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
-                React.createElement("button", { onClick: () => openBooking(primaryTagTarget), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 16px' } },
-                    React.createElement(Icon, { name: "calendar", size: 15, color: "#fff" }),
-                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 13, color: "#fff" } }, "Book Now"),
-                    React.createElement("span", { style: { width: 1, height: 14, background: 'rgba(255,255,255,0.3)' } }),
-                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 13, color: THEME.coral } }, "$", primaryTagTarget.price || item.price)));
+            const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 68, zIndex: 2, borderRadius: 24, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
+                React.createElement("button", { onClick: () => openBooking(primaryTagTarget), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px 16px' } },
+                    React.createElement(Icon, { name: "calendar", size: 17, color: "#fff" }),
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: "#fff" } }, "Book Now"),
+                    React.createElement("span", { style: { width: 1, height: 16, background: 'rgba(255,255,255,0.3)' } }),
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: THEME.coral } }, "$", primaryTagTarget.price || item.price)));
             const isArrowHere = swipeArrow && swipeArrow.itemId === item.id;
             const arrowOverlay = isArrowHere && React.createElement("div", { style: { position: 'absolute', left: 0, top: '50%', zIndex: 5, pointerEvents: 'none', transform: `translate(${-30 + swipeArrow.progress * 60}px,-50%) scale(${0.7 + swipeArrow.progress * 0.5})`, opacity: swipeArrow.progress, transition: swipeArrow.dragging ? 'none' : 'transform 0.25s ease, opacity 0.25s ease' } },
                 React.createElement("div", { style: { width: 54, height: 54, borderRadius: '50%', background: 'rgba(151,196,0,0.22)', boxShadow: `0 0 ${18 + swipeArrow.progress * 20}px ${6 + swipeArrow.progress * 6}px rgba(151,196,0,0.45)`, backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
