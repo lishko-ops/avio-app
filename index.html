@@ -667,9 +667,6 @@ function App() {
         return () => clearTimeout(t);
     }, [authView, resendSeconds]);
     const [tab, setTab] = useState('discover');
-    useEffect(() => {
-        document.body.style.background = (session && !showSplash && tab === 'discover') ? '#000' : '#fff';
-    }, [session, showSplash, tab]);
     const [activeCat, setActiveCat] = useState(null);
     const [shortsSearchOpen, setShortsSearchOpen] = useState(false);
     const [shortsQuery, setShortsQuery] = useState('');
@@ -939,6 +936,9 @@ function App() {
     const [providerDashboardTab, setProviderDashboardTab] = useState('overview');
     const [serviceFormDraft, setServiceFormDraft] = useState(null);
     const [hoursOverrideDraft, setHoursOverrideDraft] = useState(null);
+    useEffect(() => {
+        document.body.style.background = (session && !showSplash && tab === 'discover' && !providerDashboardOpen) ? '#000' : '#fff';
+    }, [session, showSplash, tab, providerDashboardOpen]);
     const [businessBookings, setBusinessBookings] = useState(BUSINESS_INCOMING_BOOKINGS);
     const [businessBookingDetail, setBusinessBookingDetail] = useState(null);
     const [businessCalendarDay, setBusinessCalendarDay] = useState(() => new Date().getDate());
