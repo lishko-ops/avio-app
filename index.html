@@ -843,7 +843,7 @@ function App() {
         e.target.value = '';
     }
     function publishShort() {
-        const isCustomerPost = accountType === 'personal';
+        const isCustomerPost = true;
         const taggedVisits = isCustomerPost ? getTaggableBusinesses().filter((v) => taggedBusinessIds.includes(v.id)) : [];
         if (isCustomerPost && !taggedVisits.length)
             return;
@@ -2874,27 +2874,25 @@ function App() {
                     React.createElement("button", { onClick: () => setUploadStep('edit') }, React.createElement(Icon, { name: "arrowleft", size: 17, color: UP.text })),
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: UP.text, margin: 0, flex: 1, textAlign: 'center', marginRight: 17 } }, "Publish Short")),
                 React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
-                    accountType === 'personal'
-                        ? fieldWrap("Tag Business", (() => {
-                            const taggable = getTaggableBusinesses();
-                            if (!taggable.length)
-                                return React.createElement("p", { style: { fontSize: 12.5, color: UP.sub, lineHeight: 1.5 } }, "You don't have any completed bookings in the last 7 days. Book a business, and once your appointment happens you can tag them in a post about your experience.");
-                            return React.createElement(React.Fragment, null,
-                                React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: UP.sub, letterSpacing: 0.3, textTransform: 'uppercase', marginBottom: 10 } }, "Recent Visits"),
-                                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, taggable.map((v) => {
-                                    const active = taggedBusinessIds.includes(v.id);
-                                    return React.createElement("button", { key: v.id, onClick: () => toggleTaggedBusiness(v.id), style: { display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, border: `1.5px solid ${active ? THEME.coral : UP.border}`, background: active ? '#FAFAFA' : '#fff' } },
-                                        v.image
-                                            ? React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, backgroundImage: `url(${v.image})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } })
-                                            : React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, background: v.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 } }, v.name.charAt(0)),
-                                        React.createElement("div", { style: { flex: 1, textAlign: 'left', minWidth: 0 } },
-                                            React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: UP.text, margin: 0 } }, v.name),
-                                            React.createElement("p", { style: { fontSize: 11.5, color: UP.sub, margin: '2px 0 0' } }, v.service, " · Visited ", v.bookingDateLabel)),
-                                        React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: THEME.coral, flexShrink: 0 } }, "✓ Eligible"),
-                                        React.createElement("div", { style: { width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" })));
-                                })));
-                        })())
-                        : fieldWrap("Business Name", React.createElement("input", { value: publishForm.businessName, onChange: (e) => setPublishForm((f) => ({ ...f, businessName: e.target.value })), placeholder: "Nova Sound DJs", style: inputStyle })),
+                    fieldWrap("Tag Business", (() => {
+                        const taggable = getTaggableBusinesses();
+                        if (!taggable.length)
+                            return React.createElement("p", { style: { fontSize: 12.5, color: UP.sub, lineHeight: 1.5 } }, "You don't have any completed bookings in the last 7 days. Book a business, and once your appointment happens you can tag them in a post about your experience.");
+                        return React.createElement(React.Fragment, null,
+                            React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: UP.sub, letterSpacing: 0.3, textTransform: 'uppercase', marginBottom: 10 } }, "Recent Visits"),
+                            React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, taggable.map((v) => {
+                                const active = taggedBusinessIds.includes(v.id);
+                                return React.createElement("button", { key: v.id, onClick: () => toggleTaggedBusiness(v.id), style: { display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, border: `1.5px solid ${active ? THEME.coral : UP.border}`, background: active ? '#FAFAFA' : '#fff' } },
+                                    v.image
+                                        ? React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, backgroundImage: `url(${v.image})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } })
+                                        : React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, background: v.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 } }, v.name.charAt(0)),
+                                    React.createElement("div", { style: { flex: 1, textAlign: 'left', minWidth: 0 } },
+                                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: UP.text, margin: 0 } }, v.name),
+                                        React.createElement("p", { style: { fontSize: 11.5, color: UP.sub, margin: '2px 0 0' } }, v.service, " · Visited ", v.bookingDateLabel)),
+                                    React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: THEME.coral, flexShrink: 0 } }, "✓ Eligible"),
+                                    React.createElement("div", { style: { width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" })));
+                            })));
+                    })()),
                     fieldWrap("Short Description", React.createElement("textarea", { value: publishForm.shortDescription, onChange: (e) => setPublishForm((f) => ({ ...f, shortDescription: e.target.value })), rows: 3, maxLength: 150, placeholder: "Professional DJ services for weddings, clubs, private events and more.", style: { ...inputStyle, resize: 'none' } })),
                     fieldWrap("Offer (optional)", React.createElement("input", { value: publishForm.offer || uploadForm.offer, onChange: (e) => setPublishForm((f) => ({ ...f, offer: e.target.value })), placeholder: "10% OFF for first time bookings", style: inputStyle })),
                     fieldWrap("Booking Link", React.createElement("button", { onClick: () => flashToast('Booking page linked automatically'), style: { ...inputStyle, textAlign: 'left', color: publishForm.bookingLink ? UP.text : UP.sub, display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, publishForm.bookingLink || "Set your booking page", React.createElement(Icon, { name: "chevronright", size: 13, color: UP.sub }))),
@@ -2905,7 +2903,7 @@ function App() {
                             React.createElement("span", { style: { fontSize: 11, fontWeight: active ? 700 : 500, color: active ? THEME.coral : UP.sub } }, v.label));
                     })))),
                 React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${UP.border}` } },
-                    React.createElement("button", { disabled: accountType === 'personal' && taggedBusinessIds.length === 0, onClick: publishShort, style: { width: '100%', height: 54, borderRadius: 27, background: (accountType === 'personal' && taggedBusinessIds.length === 0) ? '#E5E5EA' : THEME.coral, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "Publish Short")));
+                    React.createElement("button", { disabled: taggedBusinessIds.length === 0, onClick: publishShort, style: { width: '100%', height: 54, borderRadius: 27, background: taggedBusinessIds.length === 0 ? '#E5E5EA' : THEME.coral, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "Publish Short")));
             const successStep = uploadStep === 'success' && React.createElement("div", { className: "avio-upload-page", style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', textAlign: 'center' } },
                 React.createElement("div", { style: { width: 76, height: 76, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 } }, React.createElement(Icon, { name: "check", size: 32, color: "#fff" })),
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: '#161616', margin: 0 } }, "Your short is live!"),
