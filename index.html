@@ -1726,9 +1726,9 @@ function App() {
             const topRatedBadge = item.rating >= 4.7 && React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 5, border: `1px solid ${THEME.coral}`, borderRadius: 12, padding: '4px 10px', marginBottom: 8 } },
                 React.createElement(Icon, { name: "star", size: 10, color: THEME.coral, fill: THEME.coral }),
                 React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: THEME.coral } }, "Top Rated"));
-            const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 'calc(env(safe-area-inset-bottom) + 114px)', padding: '0 18px', zIndex: 2 } },
+            const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 'calc(env(safe-area-inset-bottom) + 130px)', padding: '0 18px', zIndex: 2 } },
                 topRatedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, discountBadge, taggedRow);
-            const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(env(safe-area-inset-bottom) + 66px)', zIndex: 2, borderRadius: 24, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
+            const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(env(safe-area-inset-bottom) + 82px)', zIndex: 2, borderRadius: 24, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
                 React.createElement("button", { onClick: () => openBooking(primaryTagTarget), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, padding: '12px 18px' } },
                     React.createElement(Icon, { name: "calendar", size: 18, color: "#fff" }),
                     React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: "#fff" } }, "Book Now"),
