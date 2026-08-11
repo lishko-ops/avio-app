@@ -1632,9 +1632,22 @@ function App() {
     }
     return (React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', position: 'fixed', top: 0, bottom: 0, height: '100dvh', overflow: 'hidden', background: THEME.paper, boxShadow: '0 0 40px rgba(0,0,0,0.08)' } },
         React.createElement("input", { ref: fileInputRef, type: "file", accept: "video/*", style: { display: 'none' }, onChange: handleFileChosen }),
-        tab === 'discover' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
+        tab === 'discover' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
+            React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16, zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 11 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 11 } },
+                    [{ id: 'forYou', label: 'Book Me' }, { id: 'following', label: 'Following' }, { id: 'filters', label: 'Filters' }].map((t) => {
+                        const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
+                        const isMain = t.id === 'forYou';
+                        const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
+                        return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
+                            React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 13.5, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
+                            React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: '#fff', transition: 'width 0.2s' } }));
+                    })),
+                React.createElement("button", { onClick: () => setShortsSearchOpen(true), style: { display: 'flex', paddingBottom: 4 } },
+                    React.createElement(Icon, { name: "search", size: 20, color: "#fff" }))),
             React.createElement(Icon, { name: shortsFeedTab === 'following' ? "user" : "search", size: 22, color: THEME.mutedDark }),
-            React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : `No shorts match "${shortsQuery}"`))) : filteredFeed.map((item) => {
+            React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : `No shorts match "${shortsQuery}"`),
+            shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('forYou'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Browse Book Me"))) : filteredFeed.map((item) => {
             const meta = CATEGORY_META[item.category];
             const liked = likedIds.has(item.id);
             const followed = followedIds.has(item.id);
@@ -2693,8 +2706,10 @@ function App() {
             const headerBlock = React.createElement("div", { style: { flexShrink: 0, padding: '10px 18px 0' } },
                 React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#E5E5E5', margin: '0 auto 14px' } }),
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("button", { onClick: () => setFilterSheetOpen(false), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement(Icon, { name: "x", size: 18, color: '#161616' })),
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: '#161616', margin: 0 } }, "Filters"),
-                    React.createElement("button", { onClick: resetFilters, style: { fontSize: 13.5, fontWeight: 600, color: '#8A8A8E' } }, "Reset")));
+                    React.createElement("button", { onClick: resetFilters, style: { fontSize: 13.5, fontWeight: 600, color: '#8A8A8E', flexShrink: 0 } }, "Reset")));
             const chipRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 20, overflowX: 'auto', padding: '18px 18px 6px', alignItems: 'center' } },
                 visibleCats.map((c) => {
                     const active = filterCat === c.id;
