@@ -49,7 +49,7 @@
   .avio-upload-sheet { animation: avioUploadSheetUp 0.25s cubic-bezier(0.32, 0.72, 0, 1); }
   @keyframes avioUploadPageIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   .avio-upload-page { animation: avioUploadPageIn 0.22s ease; }
-  .avio-rail-circle { width: 40px; height: 40px; border-radius: 50%; background: transparent; border: 1.2px solid rgba(255,255,255,0.65); display: flex; align-items: center; justify-content: center; transition: transform 0.2s ease, background 0.2s ease; }
+  .avio-rail-circle { width: 50px; height: 50px; border-radius: 50%; background: transparent; border: 1px solid rgba(255,255,255,0.5); display: flex; align-items: center; justify-content: center; transition: transform 0.2s ease, background 0.2s ease; }
   .avio-rail-btn:active .avio-rail-circle { transform: scale(0.94); background: rgba(255,255,255,0.12); }
   .avio-rail-btn.share:active .avio-rail-circle { transform: scale(0.94) rotate(8deg); }
   @keyframes avioRailBounce { 0%, 100% { transform: scale(0.94); } 50% { transform: scale(1.05); } }
@@ -1677,30 +1677,30 @@ function App() {
                             isMain && React.createElement("span", { style: { position: 'absolute', top: 0, right: -9, width: 6, height: 6, borderRadius: '50%', background: THEME.coral } })),
                         React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: '#fff', transition: 'width 0.2s' } }));
                 }));
-            const actionStack = React.createElement("div", { style: { position: 'absolute', right: 16, bottom: 'calc(env(safe-area-inset-bottom) + 208px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, zIndex: 2 } },
+            const actionStack = React.createElement("div", { style: { position: 'absolute', right: '8%', bottom: 'calc(env(safe-area-inset-bottom) + 208px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, zIndex: 2 } },
                     (() => {
-                        const railDot = React.createElement("span", { style: { position: 'absolute', bottom: 0, right: 0, width: 10, height: 10, borderRadius: '50%', background: THEME.coral, border: '2px solid rgba(0,0,0,0.55)' } });
+                        const railDot = React.createElement("span", { style: { position: 'absolute', bottom: 8, right: -1, width: 9, height: 9, borderRadius: '50%', background: THEME.coral } });
                         return React.createElement(React.Fragment, null,
-                            React.createElement("button", { className: "avio-rail-btn", onClick: () => toggleLike(item.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: '#fff' } },
+                            React.createElement("button", { className: "avio-rail-btn", onClick: () => toggleLike(item.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: '#fff' } },
                                 React.createElement("div", { style: { position: 'relative' } },
                                     React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "diamond", size: 22, color: liked ? THEME.coral : '#fff', fill: liked ? THEME.coral : 'none' })),
                                     railDot),
                                 React.createElement("span", { style: { fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, likeCount)),
-                            React.createElement("button", { className: "avio-rail-btn comment", onClick: () => openComments(item), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: '#fff' } },
+                            React.createElement("button", { className: "avio-rail-btn comment", onClick: () => openComments(item), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: '#fff' } },
                                 React.createElement("div", { style: { position: 'relative' } },
-                                    React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "message", size: 18, color: "#fff" })),
+                                    React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "message", size: 22, color: "#fff" })),
                                     railDot),
                                 React.createElement("span", { style: { fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, commentCount)),
-                            React.createElement("button", { className: "avio-rail-btn", onClick: () => toggleSaveShort(item.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: '#fff' } },
+                            React.createElement("button", { className: "avio-rail-btn", onClick: () => toggleSaveShort(item.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: '#fff' } },
                                 React.createElement("div", { style: { position: 'relative' } },
-                                    React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "bookmark", size: 17, color: saved ? THEME.coral : "#fff", fill: saved ? THEME.coral : 'none' })),
+                                    React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "bookmark", size: 22, color: saved ? THEME.coral : "#fff", fill: saved ? THEME.coral : 'none' })),
                                     railDot),
                                 React.createElement("span", { style: { fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, saveCount)),
-                            React.createElement("button", { className: "avio-rail-btn share", onClick: () => shareItem(item), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: '#fff' } },
+                            React.createElement("button", { className: "avio-rail-btn share", onClick: () => shareItem(item), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: '#fff' } },
                                 React.createElement("div", { style: { position: 'relative' } },
-                                    React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "sendoutline", size: 18, color: "#fff" })),
+                                    React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "sendoutline", size: 22, color: "#fff" })),
                                     railDot),
-                                React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, shareCount)));
+                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, shareCount)));
                     })());
             const nameRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
                 React.createElement("button", { onClick: () => openBusinessProfile(item), style: { display: 'flex', alignItems: 'center', gap: 6 } },
