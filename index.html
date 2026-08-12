@@ -1057,6 +1057,8 @@ function App() {
     const bizPanelTouchRef = useRef(null);
     const lastTapRef = useRef({ time: 0, id: null });
     const [accountType, setAccountType] = useState(() => loadLS('avio_account_type_v2', null) || (() => { try { return localStorage.getItem('avio_account_type'); } catch (e) { return null; } })() || 'personal');
+    const [hasBusinessProfile, setHasBusinessProfile] = useState(() => loadLS('avio_has_business_profile', false) || loadLS('avio_account_type_v2', null) === 'business');
+    useEffect(() => { saveLS('avio_has_business_profile', hasBusinessProfile); }, [hasBusinessProfile]);
     const [providerServices, setProviderServices] = useState(() => loadLS('avio_provider_services', DEFAULT_MY_SERVICES));
     const [providerWeeklyHours, setProviderWeeklyHours] = useState(() => loadLS('avio_provider_weekly_hours', DEFAULT_WEEKLY_HOURS));
     const [providerDateOverrides, setProviderDateOverrides] = useState(() => loadLS('avio_provider_date_overrides', {}));
@@ -1287,7 +1289,22 @@ function App() {
         }
         catch (e) { }
         saveLS('avio_account_type_v2', accountType);
+        if (accountType === 'business')
+            setHasBusinessProfile(true);
         goAuth(accountType === 'personal' ? 'interests' : 'business-verify');
+    }
+    function switchAccountMode(mode) {
+        if (mode === accountType)
+            return;
+        setAccountType(mode);
+        saveLS('avio_account_type_v2', mode);
+        try {
+            localStorage.setItem('avio_account_type', mode);
+        }
+        catch (e) { }
+        if (mode === 'personal')
+            setProviderDashboardOpen(false);
+        flashToast(`Switched to ${mode === 'business' ? 'Business' : 'Customer'} Mode`);
     }
     function toggleBizService(name) {
         setBizOnboarding((prev) => ({ ...prev, services: prev.services.includes(name) ? prev.services.filter((s) => s !== name) : [...prev.services, name] }));
@@ -2117,7 +2134,16 @@ function App() {
                     ? React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
                     : React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#000' } });
             const scrim = React.createElement("div", { style: { position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.38) 22%, rgba(0,0,0,0.4) 45%, rgba(0,0,0,0.68) 72%, rgba(0,0,0,0.94) 100%)' } });
-            const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 56, zIndex: 2, display: 'flex', alignItems: 'flex-end', gap: 11 } },
+            const modeSwitcher = hasBusinessProfile && React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: '50%', transform: 'translateX(-50%)', zIndex: 2, display: 'flex', alignItems: 'center', border: `1.5px solid ${THEME.coral}`, borderRadius: 20, padding: 2, background: 'rgba(0,0,0,0.35)' } },
+                [{ id: 'business', label: 'Business', icon: 'calendar' }, { id: 'personal', label: 'Customer', icon: 'user' }].map((m, i) => {
+                    const active = accountType === m.id;
+                    return React.createElement(React.Fragment, { key: m.id },
+                        i === 1 && React.createElement("div", { style: { width: 1, height: 16, background: 'rgba(255,255,255,0.25)' } }),
+                        React.createElement("button", { onClick: () => switchAccountMode(m.id), style: { display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 18 } },
+                            React.createElement(Icon, { name: m.icon, size: 14, color: active ? THEME.coral : 'rgba(255,255,255,0.75)' }),
+                            React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: active ? THEME.coral : 'rgba(255,255,255,0.75)' } }, m.label)));
+                }));
+            const brand = React.createElement("div", { style: { position: 'absolute', top: hasBusinessProfile ? 'calc(env(safe-area-inset-top) + 50px)' : 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 56, zIndex: 2, display: 'flex', alignItems: 'flex-end', gap: 11 } },
                 [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'filters', label: 'Filters' }].map((t) => {
                     const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
                     const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
@@ -2193,7 +2219,7 @@ function App() {
                 React.createElement(Icon, { name: "diamond", size: 90, color: THEME.coral, fill: THEME.coral }));
             return React.createElement("div", { key: item.id, ref: (el) => { if (el) shortItemRefs.current[item.id] = el; }, "data-short-id": item.id, onTouchStart: (e) => handleShortTouchStart(e, item), onTouchMove: (e) => handleShortTouchMove(e, item), onTouchEnd: (e) => handleShortTouchEnd(e, item), style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
                 React.createElement("div", { style: { position: 'absolute', inset: 0, transform: `translateX(${-dragProgress * 46}px)`, opacity: 1 - dragProgress * 0.35, transition: innerTransition } },
-                    backdrop, scrim, brand, actionStack, infoBlock, bookCta),
+                    backdrop, scrim, modeSwitcher, brand, actionStack, infoBlock, bookCta),
                 arrowOverlay, burstOverlay);
         }))),
         tab === 'discover' && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 18px)', right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 } },
