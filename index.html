@@ -1899,9 +1899,10 @@ function App() {
                 React.createElement(Icon, { name: "users", size: 11, color: THEME.coral }),
                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#fff" } }, bookedCount),
                 React.createElement("span", { style: { fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.75)' } }, "Booked"));
-            const dealBadge = (item.mine && providerDeal.enabled) && React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(248,244,236,0.92)', borderRadius: 18, padding: '6px 12px', marginTop: 10 } },
+            const activeDealLabel = item.mine ? (providerDeal.enabled ? providerDeal.label : null) : (item.deal && item.deal.enabled ? item.deal.label : null);
+            const dealBadge = activeDealLabel && React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(248,244,236,0.92)', borderRadius: 18, padding: '6px 12px', marginTop: 10 } },
                 React.createElement("span", { style: { fontSize: 13 } }, "🎁"),
-                React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, providerDeal.label));
+                React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, activeDealLabel));
             const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 'calc(env(safe-area-inset-bottom) + 130px)', padding: '0 18px', zIndex: 2 } },
                 bookedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, taggedRow, dealBadge);
             const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(env(safe-area-inset-bottom) + 82px)', zIndex: 2, borderRadius: 24, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
@@ -2477,9 +2478,10 @@ function App() {
                 React.createElement("button", { onClick: () => toggleFollow(item.id), style: { flex: 1, padding: '13px 0', borderRadius: 24, background: followed ? 'transparent' : '#161616', border: followed ? '1px solid #E0E0E0' : 'none', color: followed ? '#161616' : '#fff', fontWeight: 700, fontSize: 14 } }, followed ? "Following" : "Follow"),
                 React.createElement("button", { onClick: () => flashToast('Message — coming soon'), style: { width: 46, height: 46, borderRadius: 14, border: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                     React.createElement(Icon, { name: "messageoutline", size: 18, color: "#161616" })));
-            const profileDealBadge = ((item.mine || item.id === MY_PROVIDER_ID) && providerDeal.enabled) && React.createElement("div", { style: { margin: '16px 18px 0', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(151,196,0,0.12)', borderRadius: 18, padding: '6px 12px' } },
+            const activeProfileDealLabel = (item.mine || item.id === MY_PROVIDER_ID) ? (providerDeal.enabled ? providerDeal.label : null) : (item.deal && item.deal.enabled ? item.deal.label : null);
+            const profileDealBadge = activeProfileDealLabel && React.createElement("div", { style: { margin: '16px 18px 0', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(151,196,0,0.12)', borderRadius: 18, padding: '6px 12px' } },
                 React.createElement("span", { style: { fontSize: 13 } }, "🎁"),
-                React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, providerDeal.label));
+                React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, activeProfileDealLabel));
             const BIZ_TABS = [{ id: 'videos', label: 'Thrillz' }, { id: 'services', label: 'Services' }, { id: 'reviews', label: 'All Comments' }];
             const tabsRow = React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', marginTop: 22, borderBottom: '1px solid #ECECEE', padding: '0 18px' } },
                 BIZ_TABS.map((t) => {
