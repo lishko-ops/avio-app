@@ -1064,7 +1064,6 @@ function App() {
     useEffect(() => { saveLS('avio_provider_breaks', providerBreaks); }, [providerBreaks]);
     useEffect(() => { saveLS('avio_provider_unavailable', providerUnavailable); }, [providerUnavailable]);
     useEffect(() => { saveLS('avio_provider_time_off', providerTimeOff); }, [providerTimeOff]);
-    useEffect(() => { if (providerDashboardTab !== 'hours') setScheduleView('menu'); }, [providerDashboardTab]);
     const [scheduleView, setScheduleView] = useState('menu');
     const [editDayIdx, setEditDayIdx] = useState(null);
     const [breakDraft, setBreakDraft] = useState(null);
@@ -1072,6 +1071,7 @@ function App() {
     const [timeOffDraft, setTimeOffDraft] = useState(null);
     const [providerDashboardOpen, setProviderDashboardOpen] = useState(false);
     const [providerDashboardTab, setProviderDashboardTab] = useState('overview');
+    useEffect(() => { if (providerDashboardTab !== 'hours') setScheduleView('menu'); }, [providerDashboardTab]);
     const [serviceFormDraft, setServiceFormDraft] = useState(null);
     const [hoursOverrideDraft, setHoursOverrideDraft] = useState(null);
     const [providerStaff, setProviderStaff] = useState(() => loadLS('avio_provider_staff', DEFAULT_STAFF));
