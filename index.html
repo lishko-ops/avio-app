@@ -2458,10 +2458,12 @@ function App() {
                         React.createElement(Icon, { name: "star", size: 13, color: THEME.coral, fill: THEME.coral }),
                         React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: '#161616' } }, item.rating.toFixed(1)),
                         React.createElement("span", { style: { fontSize: 12.5, color: '#8A8A8E' } }, `(${reviewCount} reviews)`))));
-            const statsRow = React.createElement("div", { style: { display: 'flex', gap: 36, padding: '20px 18px 0' } },
-                [{ label: 'Bookings', value: bookingsCount }, { label: 'Followers', value: followersCount }].map((s) => React.createElement("div", { key: s.label, style: { textAlign: 'center' } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: '#161616', margin: 0 } }, s.value),
-                    React.createElement("p", { style: { fontSize: 12, color: '#8A8A8E', marginTop: 3 } }, s.label))));
+            const statsRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 44, padding: '20px 18px 0' } },
+                [{ label: 'Bookings', value: bookingsCount }, { label: 'Followers', value: followersCount }].map((s, i) => React.createElement(React.Fragment, { key: s.label },
+                    i === 1 && React.createElement("div", { style: { width: 1, height: 30, background: '#ECECEE' } }),
+                    React.createElement("div", { style: { textAlign: 'center' } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: '#161616', margin: 0 } }, s.value),
+                        React.createElement("p", { style: { fontSize: 12, color: '#8A8A8E', marginTop: 3 } }, s.label)))));
             const actionRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, padding: '16px 18px 0' } },
                 React.createElement("button", { onClick: () => toggleFollow(item.id), style: { flex: 1, padding: '13px 0', borderRadius: 24, background: followed ? 'transparent' : '#161616', border: followed ? '1px solid #E0E0E0' : 'none', color: followed ? '#161616' : '#fff', fontWeight: 700, fontSize: 14 } }, followed ? "Following" : "Follow"),
                 React.createElement("button", { onClick: () => flashToast('Message — coming soon'), style: { width: 46, height: 46, borderRadius: 14, border: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
