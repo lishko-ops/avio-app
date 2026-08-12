@@ -527,14 +527,17 @@ function ToggleSwitch({ on, onChange }) {
 const FEED = [
     { id: 'f0', category: 'Beauty', name: 'Fade House', location: 'Miami, FL', rating: 4.9, price: 35, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Clean fade. Sharp lines. Precision cuts. Premium experience.', verified: true, distance: '0.5 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#miami', '#fade'], friendsBooked: 120, avatarColor: '#161616',
         staff: [{ id: 'f0-staff-jessie', name: 'Jessie', customHours: null }, { id: 'f0-staff-jackie', name: 'Jackie', customHours: null }] },
-    { id: 'f1', category: 'Home Services', name: 'Sparkle Squad Cleaning', location: 'Denver, CO', rating: 4.8, price: 120, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Deep clean, move-in/move-out, eco-friendly products.', verified: true, distance: '1.2 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#cleaning', '#denver', '#freshhome'], friendsBooked: 8, avatarColor: '#3F6FBF' },
+    { id: 'f1', category: 'Home Services', name: 'Sparkle Squad Cleaning', location: 'Denver, CO', rating: 4.8, price: 120, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Deep clean, move-in/move-out, eco-friendly products.', verified: true, distance: '1.2 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#cleaning', '#denver', '#freshhome'], friendsBooked: 8, avatarColor: '#3F6FBF',
+        deal: { enabled: true, label: '15% OFF TODAY' } },
     { id: 'f2', category: 'Home Services', name: 'Fresh Start Cleaners', location: 'Miami, FL', rating: 4.9, price: 90, likes: '892', comments: 18, saves: '1.4K', blurb: 'Residential and post-construction cleaning.', verified: true, distance: '2.4 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#cleaning', '#miami', '#ecofriendly'], friendsBooked: 5, avatarColor: '#3FBF8A' },
     { id: 'f3', category: 'Beauty', name: 'Glow by Mia', location: 'Austin, TX', rating: 4.7, price: 150, likes: '2.1K', comments: 76, saves: '3.6K', blurb: 'Balayage and color correction specialist.', verified: true, distance: '0.6 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#balayage', '#austin', '#haircolor'], friendsBooked: 14, avatarColor: '#8FBF3F' },
     { id: 'f4', category: 'Beauty', name: 'Kiana Frost MUA', location: 'Brooklyn, NY', rating: 5.0, price: 220, likes: '3.4K', comments: 130, saves: '5.2K', blurb: 'Bridal and editorial makeup artistry.', verified: true, distance: '0.9 mi', openStatus: 'Booking Fast · 3 slots left', hashtags: ['#bridalmakeup', '#brooklyn', '#glam'], friendsBooked: 22, avatarColor: '#BF6B3F' },
     { id: 'f5', category: 'Parties', name: 'Belle Noir Events', location: 'Chicago, IL', rating: 4.6, price: 400, likes: '640', comments: 24, saves: '980', blurb: 'Full-service party planning and styling.', verified: false, distance: '3.1 mi', openStatus: 'Open Now · Closes 9PM', hashtags: ['#eventplanning', '#chicago', '#luxury'], friendsBooked: 6, avatarColor: '#F5134F' },
-    { id: 'f6', category: 'Restaurants', name: "Camille's Table", location: 'New Orleans, LA', rating: 4.9, price: 85, likes: '1.8K', comments: 58, saves: '2.9K', blurb: "Chef's tasting menu, seasonal ingredients.", verified: true, distance: '1.5 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#neworleans', '#tastingmenu', '#chef'], friendsBooked: 19, avatarColor: '#F5A623' },
+    { id: 'f6', category: 'Restaurants', name: "Camille's Table", location: 'New Orleans, LA', rating: 4.9, price: 85, likes: '1.8K', comments: 58, saves: '2.9K', blurb: "Chef's tasting menu, seasonal ingredients.", verified: true, distance: '1.5 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#neworleans', '#tastingmenu', '#chef'], friendsBooked: 19, avatarColor: '#F5A623',
+        deal: { enabled: true, label: '20% OFF TODAY' } },
     { id: 'f7', category: 'Parties', name: 'Nova Sound DJs', location: 'Los Angeles, CA', rating: 4.8, price: 350, likes: '2.7K', comments: 95, saves: '4.1K', blurb: 'Wedding and club DJ sets with full sound and lighting rig.', verified: true, distance: '4.2 mi', openStatus: 'Available Today', hashtags: ['#dj', '#losangeles', '#nightlife'], friendsBooked: 31, avatarColor: '#6C4CFC' },
-    { id: 'f8', category: 'Beauty', name: 'Bare Skin Makeup Co.', location: 'Phoenix, AZ', rating: 4.9, price: 130, likes: '1.5K', comments: 61, saves: '2.3K', blurb: 'Natural glam and airbrush makeup for any event.', verified: false, distance: '0.8 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#makeup', '#phoenix', '#airbrush'], friendsBooked: 11, avatarColor: '#3FA6BF' },
+    { id: 'f8', category: 'Beauty', name: 'Bare Skin Makeup Co.', location: 'Phoenix, AZ', rating: 4.9, price: 130, likes: '1.5K', comments: 61, saves: '2.3K', blurb: 'Natural glam and airbrush makeup for any event.', verified: false, distance: '0.8 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#makeup', '#phoenix', '#airbrush'], friendsBooked: 11, avatarColor: '#3FA6BF',
+        deal: { enabled: true, label: '$25 OFF TODAY' } },
 ];
 const CATEGORIES = [
     { id: 'shorts', label: 'All shorts', count: 31, icon: 'compass', color: '#2E9BFF' },
@@ -1966,18 +1969,24 @@ function App() {
                 const active = exploreQuickFilter === f.id;
                 return React.createElement("button", { key: f.id, onClick: () => setExploreQuickFilter(f.id), style: { flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 18, background: active ? THEME.coral : '#F5F5F5', border: `1px solid ${active ? THEME.coral : '#F0F0F0'}`, color: active ? '#fff' : '#8A8A8E' } }, f.label);
             }));
-            const dealItems = feed.filter((f) => f.mine && providerDeal.enabled);
+            const dealItems = [
+                ...(providerDeal.enabled ? feed.filter((f) => f.mine) : []),
+                ...feed.filter((f) => f.deal && f.deal.enabled),
+            ];
             const dealsSection = dealItems.length > 0 && React.createElement("div", { style: { marginTop: 18 } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: '#161616', margin: 0, padding: '0 18px' } }, "🔥 Today's Deals"),
-                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 10, padding: '10px 18px 0', overflowX: 'auto' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', margin: 0 } }, "🔥 Today's Deals"),
+                    React.createElement("span", { style: { fontSize: 11.5, color: '#8A8A8E' } }, "Ends tonight")),
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 12, padding: '12px 18px 4px', overflowX: 'auto' } },
                     dealItems.map((d) => {
-                        const dMeta = CATEGORY_META[d.category] || { grad: ['#3F3F5C', '#1E1E30'] };
-                        return React.createElement("button", { key: d.id, onClick: () => openBusinessProfile(d), style: { flexShrink: 0, width: 150, textAlign: 'left', borderRadius: 16, overflow: 'hidden', border: `1px solid ${THEME.coral}`, background: '#fff' } },
-                            React.createElement("div", { style: { position: 'relative', aspectRatio: '4 / 3', background: `linear-gradient(160deg, ${dMeta.grad[0]}, ${dMeta.grad[1]})` } },
-                                React.createElement("span", { style: { position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 8, background: THEME.coral, color: '#fff' } }, providerDeal.label)),
-                            React.createElement("div", { style: { padding: '8px 10px 10px' } },
-                                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 12.5, color: '#161616', margin: 0 } }, d.name),
-                                React.createElement("p", { style: { fontSize: 11, color: '#8A8A8E', marginTop: 2 } }, d.location)));
+                        const label = d.mine ? providerDeal.label : d.deal.label;
+                        return React.createElement("button", { key: d.id, onClick: () => openBusinessProfile(d), style: { flexShrink: 0, width: 152, textAlign: 'left', borderRadius: 18, overflow: 'hidden', border: '1px solid #F0F0F0', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
+                            React.createElement("div", { style: { position: 'relative', aspectRatio: '4 / 3', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 10px' } },
+                                React.createElement("span", { style: { position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: '50%', background: THEME.coral } }),
+                                React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 800, fontSize: 19, color: THEME.coral, textAlign: 'center', lineHeight: 1.15 } }, label)),
+                            React.createElement("div", { style: { padding: '9px 10px 11px' } },
+                                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12.5, color: '#161616', margin: 0 } }, d.name),
+                                React.createElement("p", { style: { fontSize: 10.5, color: '#8A8A8E', marginTop: 2 } }, d.category, " · ", d.location)));
                     })));
             const categoryRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 16, padding: '18px 18px 4px', overflowX: 'auto' } }, categories.map((c) => {
                 const active = exploreCategory === c.id;
