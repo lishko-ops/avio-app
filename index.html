@@ -501,6 +501,7 @@ const DEFAULT_MY_SERVICES = [
     { id: 'ps3', name: 'Haircut + Beard', durationMinutes: 45, price: 30 },
     { id: 'ps4', name: 'Haircut + Shave', durationMinutes: 60, price: 40 },
 ];
+const DEFAULT_STAFF = [];
 function AnimatedNumber({ value, format }) {
     const [display, setDisplay] = useState(0);
     useEffect(() => {
@@ -524,7 +525,8 @@ function ToggleSwitch({ on, onChange }) {
         React.createElement("span", { style: { position: 'absolute', top: 2, left: on ? 20 : 2, width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.28)', transition: 'left 0.22s cubic-bezier(0.34,1.56,0.64,1)' } }));
 }
 const FEED = [
-    { id: 'f0', category: 'Beauty', name: 'Fade House', location: 'Miami, FL', rating: 4.9, price: 35, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Clean fade. Sharp lines. Precision cuts. Premium experience.', verified: true, distance: '0.5 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#miami', '#fade'], friendsBooked: 120, avatarColor: '#161616' },
+    { id: 'f0', category: 'Beauty', name: 'Fade House', location: 'Miami, FL', rating: 4.9, price: 35, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Clean fade. Sharp lines. Precision cuts. Premium experience.', verified: true, distance: '0.5 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#miami', '#fade'], friendsBooked: 120, avatarColor: '#161616',
+        staff: [{ id: 'f0-staff-jessie', name: 'Jessie', customHours: null }, { id: 'f0-staff-jackie', name: 'Jackie', customHours: null }] },
     { id: 'f1', category: 'Home Services', name: 'Sparkle Squad Cleaning', location: 'Denver, CO', rating: 4.8, price: 120, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Deep clean, move-in/move-out, eco-friendly products.', verified: true, distance: '1.2 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#cleaning', '#denver', '#freshhome'], friendsBooked: 8, avatarColor: '#3F6FBF' },
     { id: 'f2', category: 'Home Services', name: 'Fresh Start Cleaners', location: 'Miami, FL', rating: 4.9, price: 90, likes: '892', comments: 18, saves: '1.4K', blurb: 'Residential and post-construction cleaning.', verified: true, distance: '2.4 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#cleaning', '#miami', '#ecofriendly'], friendsBooked: 5, avatarColor: '#3FBF8A' },
     { id: 'f3', category: 'Beauty', name: 'Glow by Mia', location: 'Austin, TX', rating: 4.7, price: 150, likes: '2.1K', comments: 76, saves: '3.6K', blurb: 'Balayage and color correction specialist.', verified: true, distance: '0.6 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#balayage', '#austin', '#haircolor'], friendsBooked: 14, avatarColor: '#8FBF3F' },
@@ -986,6 +988,9 @@ function App() {
     const [providerDashboardTab, setProviderDashboardTab] = useState('overview');
     const [serviceFormDraft, setServiceFormDraft] = useState(null);
     const [hoursOverrideDraft, setHoursOverrideDraft] = useState(null);
+    const [providerStaff, setProviderStaff] = useState(() => loadLS('avio_provider_staff', DEFAULT_STAFF));
+    const [staffFormDraft, setStaffFormDraft] = useState(null);
+    useEffect(() => { saveLS('avio_provider_staff', providerStaff); }, [providerStaff]);
     useEffect(() => {
         document.body.style.background = (session && !showSplash && tab === 'discover' && !providerDashboardOpen) ? '#000' : '#fff';
     }, [session, showSplash, tab, providerDashboardOpen]);
@@ -1101,6 +1106,7 @@ function App() {
     }, [filteredFeed, tab, feedSoundOn]);
     const [bookingStep, setBookingStep] = useState('service');
     const [selectedService, setSelectedService] = useState(null);
+    const [selectedStaff, setSelectedStaff] = useState(null);
     const [bookingCalMonth, setBookingCalMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
     const [bookingSelectedDay, setBookingSelectedDay] = useState(() => new Date().getDate());
     const [selTime, setSelTime] = useState(null);
@@ -1269,14 +1275,14 @@ function App() {
             return providerDateOverrides[key];
         return providerWeeklyHours[dateObj.getDay()] || null;
     }
-    function generateAvailableSlots(providerId, dateObj, durationMinutes) {
-        const hours = getProviderHoursForDate(providerId, dateObj);
+    function generateAvailableSlots(providerId, dateObj, durationMinutes, staff) {
+        const hours = (staff && staff.customHours) ? (staff.customHours[dateObj.getDay()] || null) : getProviderHoursForDate(providerId, dateObj);
         if (!hours || !durationMinutes)
             return [];
         const dayStart = timeStrToMinutes(hours.start);
         const dayEnd = timeStrToMinutes(hours.end);
         const dayBookings = bookings
-            .filter((b) => b.providerId === providerId && b.day === dateObj.getDate() && b.month === dateObj.getMonth() && b.year === dateObj.getFullYear() && (b.status === 'confirmed' || b.status === 'pending'))
+            .filter((b) => b.providerId === providerId && b.day === dateObj.getDate() && b.month === dateObj.getMonth() && b.year === dateObj.getFullYear() && (b.status === 'confirmed' || b.status === 'pending') && (staff ? b.staffId === staff.id : true))
             .map((b) => { const start = timeLabelToMinutes(b.time); return { start, end: start + (b.durationMinutes || 30) }; })
             .sort((a, b) => a.start - b.start);
         const slots = [];
@@ -1289,6 +1295,22 @@ function App() {
         if (dayEnd - cursor >= durationMinutes)
             slots.push(cursor);
         return slots.map((m) => ({ minutes: m, label: minutesToTimeLabel(m) }));
+    }
+    function getStaffForTarget(item) {
+        if (!item)
+            return [];
+        return item.id === MY_PROVIDER_ID ? providerStaff : (item.staff || []);
+    }
+    function addOrUpdateStaff(draft) {
+        setProviderStaff((prev) => {
+            if (draft.id)
+                return prev.map((s) => s.id === draft.id ? { ...s, name: draft.name, customHours: draft.customHours } : s);
+            return [...prev, { id: 'staff' + Date.now(), name: draft.name, customHours: draft.customHours }];
+        });
+        setStaffFormDraft(null);
+    }
+    function deleteStaff(id) {
+        setProviderStaff((prev) => prev.filter((s) => s.id !== id));
     }
     function addOrUpdateService(draft) {
         setProviderServices((prev) => {
@@ -1316,8 +1338,10 @@ function App() {
         setBusinessProfileTarget(null);
         setProfileDrag(null);
         setBookingTarget(item);
-        setBookingStep(preselectedService ? 'datetime' : 'service');
+        const hasStaff = getStaffForTarget(item).length > 0;
+        setBookingStep(preselectedService ? (hasStaff ? 'staff' : 'datetime') : 'service');
         setSelectedService(preselectedService || null);
+        setSelectedStaff(null);
         setBookingCalMonth(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
         setBookingSelectedDay(new Date().getDate());
         setSelTime(null);
@@ -1342,7 +1366,7 @@ function App() {
             providerId: bookingTarget.id, durationMinutes: selectedService.durationMin,
             date: label, day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), time: minutesToTimeLabel(selTime), total, status: 'confirmed',
             address: bookingTarget.location || 'Address shared after booking', duration: formatDuration(selectedService.durationMin), logoText: initials,
-            confirmationNumber, paymentMethod,
+            confirmationNumber, paymentMethod, staffId: selectedStaff ? selectedStaff.id : null, staffName: selectedStaff ? selectedStaff.name : null,
         };
         setBookings((prev) => [booking, ...prev]);
         setBalance((b) => Math.max(0, b - total));
@@ -2610,8 +2634,9 @@ function App() {
             const total = selectedService ? Math.round((selectedService.price + tax) * 100) / 100 : 0;
             const initials2 = bookingTarget.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
             const paymentLabel = { apple: 'Apple Pay', card: 'Credit/Debit Card', google: 'Google Pay', saved: 'Saved Card', gift: 'Gift Card', promo: 'Promo Code' }[paymentMethod] || '—';
-            const STEP_TITLES = { service: 'Book Now', datetime: 'Select Date & Time', info: 'Your Information', payment: 'Payment', confirm: 'Confirm Booking', success: '' };
-            const STEP_ORDER = ['service', 'datetime', 'info', 'payment', 'confirm'];
+            const staffOptions = getStaffForTarget(bookingTarget);
+            const STEP_TITLES = { service: 'Book Now', staff: 'Choose Your Barber', datetime: 'Select Date & Time', info: 'Your Information', payment: 'Payment', confirm: 'Confirm Booking', success: '' };
+            const STEP_ORDER = staffOptions.length > 0 ? ['service', 'staff', 'datetime', 'info', 'payment', 'confirm'] : ['service', 'datetime', 'info', 'payment', 'confirm'];
             function goBack() {
                 const idx = STEP_ORDER.indexOf(bookingStep);
                 if (idx <= 0) { closeBookingFlow(); return; }
@@ -2649,6 +2674,21 @@ function App() {
                                 React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" }))));
                     })));
             }
+            else if (bookingStep === 'staff') {
+                const staffChoices = [{ id: null, name: 'Any Available', subtitle: 'First open slot with any team member' }, ...staffOptions.map((s) => ({ id: s.id, name: s.name, subtitle: s.customHours ? 'Custom hours' : null }))];
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
+                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: BF.text, marginBottom: 10 } }, "Who would you like to book with?"),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, staffChoices.map((o) => {
+                        const active = (selectedStaff ? selectedStaff.id : null) === o.id;
+                        const oInitials = o.id === null ? '★' : o.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+                        return React.createElement("button", { key: o.id || 'any', onClick: () => setSelectedStaff(o.id === null ? null : staffOptions.find((s) => s.id === o.id)), style: { display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, border: `1.5px solid ${active ? THEME.coral : BF.border}`, background: active ? '#FAFAFA' : '#fff' } },
+                            React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', background: o.id === null ? THEME.coral : '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, flexShrink: 0 } }, oInitials),
+                            React.createElement("div", { style: { flex: 1, textAlign: 'left' } },
+                                React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BF.text, margin: 0 } }, o.name),
+                                o.subtitle && React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 2 } }, o.subtitle)),
+                            React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" })));
+                    })));
+            }
             else if (bookingStep === 'datetime') {
                 const weekdayRow2 = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginTop: 8 } }, ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => React.createElement("div", { key: i, style: { textAlign: 'center', fontSize: 11, color: BF.sub } }, d)));
                 const monthGrid2 = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: 6, marginTop: 6 } }, calCells2.map((day, i) => {
@@ -2667,7 +2707,7 @@ function App() {
                     React.createElement("button", { onClick: () => setBookingCalMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1)), style: { width: 28, height: 28, borderRadius: '50%', border: `1px solid ${BF.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 12, color: BF.text })),
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: BF.text, margin: 0 } }, bookingCalMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })),
                     React.createElement("button", { onClick: () => setBookingCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1)), style: { width: 28, height: 28, borderRadius: '50%', border: `1px solid ${BF.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement("span", { style: { display: 'flex', transform: 'rotate(180deg)' } }, React.createElement(Icon, { name: "arrowleft", size: 12, color: BF.text }))));
-                const availableSlots = selectedService ? generateAvailableSlots(bookingTarget.id, selectedDateObj, selectedService.durationMin) : [];
+                const availableSlots = selectedService ? generateAvailableSlots(bookingTarget.id, selectedDateObj, selectedService.durationMin, selectedStaff) : [];
                 const timeGrid = React.createElement("div", { style: { marginTop: 22 } },
                     React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: BF.text, marginBottom: 10 } }, "Select Time"),
                     availableSlots.length === 0
@@ -2714,6 +2754,7 @@ function App() {
                                 React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BF.text, margin: 0 } }, bookingTarget.name),
                                 React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 2 } }, selectedService ? selectedService.name : ''))),
                         React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: `1px solid #ECECEE` } }, [
+                            ...(staffOptions.length > 0 ? [['Barber', selectedStaff ? selectedStaff.name : 'Any Available']] : []),
                             ['Date', selectedDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })],
                             ['Time', selTime != null ? minutesToTimeLabel(selTime) : '—'],
                             ['Duration', selectedService ? formatDuration(selectedService.durationMin) : '—'],
@@ -2737,7 +2778,7 @@ function App() {
                             React.createElement("div", { style: { width: 44, height: 44, borderRadius: 12, background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, flexShrink: 0 } }, b.logoText),
                             React.createElement("div", null, React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BF.text, margin: 0 } }, b.business), React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 2 } }, b.service))),
                         React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: '1px solid #ECECEE', display: 'flex', flexDirection: 'column', gap: 6 } },
-                            row2('📅', `${b.date} · ${b.time}`), row2('📍', b.address), row2('💳', money(b.total)), row2('#', b.confirmationNumber))),
+                            b.staffName && row2('💈', b.staffName), row2('📅', `${b.date} · ${b.time}`), row2('📍', b.address), row2('💳', money(b.total)), row2('#', b.confirmationNumber))),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', width: '100%', marginTop: 22 } },
                         [['calendar', 'Add to Calendar', () => addToAppleCalendar(b)], ['message', 'Message', () => flashToast('Messaging ' + b.business)], ['send', 'Directions', () => flashToast('Opening directions to ' + b.address)], ['share', 'Share', () => flashToast('Share link copied')]].map(([icon, label, onClick]) => React.createElement("button", { key: label, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 } }, React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: icon, size: 17, color: BF.text })), React.createElement("span", { style: { fontSize: 10, color: BF.sub } }, label)))),
                     React.createElement("button", { onClick: closeBookingFlow, style: { width: '100%', height: 54, borderRadius: 27, background: THEME.coral, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', marginTop: 28 } }, "Done"));
@@ -2746,7 +2787,9 @@ function App() {
             const ctaStyle = (ready) => ({ width: '100%', height: 52, borderRadius: 26, background: ready ? THEME.coral : '#EDEDED', color: ready ? '#fff' : '#B5B5B8', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' });
             const footerWrap = (node) => React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${BF.border}` } }, node);
             if (bookingStep === 'service')
-                footer = footerWrap(React.createElement("button", { disabled: !selectedService, onClick: () => setBookingStep('datetime'), style: ctaStyle(!!selectedService) }, "Continue"));
+                footer = footerWrap(React.createElement("button", { disabled: !selectedService, onClick: () => setBookingStep(staffOptions.length > 0 ? 'staff' : 'datetime'), style: ctaStyle(!!selectedService) }, "Continue"));
+            else if (bookingStep === 'staff')
+                footer = footerWrap(React.createElement("button", { onClick: () => setBookingStep('datetime'), style: ctaStyle(true) }, "Continue"));
             else if (bookingStep === 'datetime')
                 footer = footerWrap(React.createElement("button", { disabled: selTime == null, onClick: () => setBookingStep('info'), style: ctaStyle(selTime != null) }, "Continue"));
             else if (bookingStep === 'info') {
@@ -2773,7 +2816,7 @@ function App() {
                     React.createElement("button", { onClick: () => setProviderDashboardTab('overview') }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "My Business"),
                     React.createElement("button", { onClick: () => setProfileMenuOpen(true) }, React.createElement(Icon, { name: "sliders", size: 17, color: PD.text })));
-            const tabsRow = React.createElement("div", { className: "avio-scroll", style: { flexShrink: 0, display: 'flex', gap: 20, padding: '14px 18px 0', borderBottom: `1px solid ${PD.border}`, overflowX: 'auto' } }, [{ id: 'overview', label: 'Overview' }, { id: 'services', label: 'Services' }, { id: 'hours', label: 'Availability' }, { id: 'calendar', label: 'Calendar' }, { id: 'customerPosts', label: 'Customer Posts' }].map((t) => {
+            const tabsRow = React.createElement("div", { className: "avio-scroll", style: { flexShrink: 0, display: 'flex', gap: 20, padding: '14px 18px 0', borderBottom: `1px solid ${PD.border}`, overflowX: 'auto' } }, [{ id: 'overview', label: 'Overview' }, { id: 'services', label: 'Services' }, { id: 'hours', label: 'Availability' }, { id: 'team', label: 'Team' }, { id: 'calendar', label: 'Calendar' }, { id: 'customerPosts', label: 'Customer Posts' }].map((t) => {
                 const active = providerDashboardTab === t.id;
                 return React.createElement("button", { key: t.id, onClick: () => setProviderDashboardTab(t.id), style: { flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
                     React.createElement("span", { style: { fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? PD.text : PD.sub, whiteSpace: 'nowrap' } }, t.label),
@@ -2859,6 +2902,24 @@ function App() {
                             React.createElement("div", { style: { display: 'flex', gap: 8 } },
                                 React.createElement("button", { onClick: () => setServiceFormDraft({ id: s.id, name: s.name, durationMinutes: s.durationMinutes, price: s.price }), style: { width: 32, height: 32, borderRadius: 16, border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "clipboard", size: 14, color: PD.text })),
                                 React.createElement("button", { onClick: () => deleteService(s.id), style: { width: 32, height: 32, borderRadius: 16, border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 14, color: '#D0304A' })))))));
+            }
+            else if (providerDashboardTab === 'team') {
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `16px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
+                    React.createElement("p", { style: { fontSize: 12, color: PD.sub, lineHeight: 1.5, marginBottom: 16 } }, "Add the barbers or staff on your team so customers can pick who they want to book with. Each person can keep your shop's hours or set their own. If your team is empty, customers just book with your business directly."),
+                    React.createElement("button", { onClick: () => setStaffFormDraft({ id: null, name: '', customHours: null }), style: { width: '100%', padding: '12px 0', borderRadius: 14, border: `1.5px dashed ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5, marginBottom: 16 } }, "+ Add Staff"),
+                    providerStaff.length === 0
+                        ? React.createElement("p", { style: { fontSize: 13, color: PD.sub, textAlign: 'center', marginTop: 24 } }, "No staff yet — customers will just book with your business directly.")
+                        : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, providerStaff.map((s) => {
+                            const staffInitials = s.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+                            return React.createElement("div", { key: s.id, style: { display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, border: `1px solid ${PD.border}` } },
+                                React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, flexShrink: 0 } }, staffInitials),
+                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                    React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, s.name),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 3 } }, s.customHours ? 'Custom hours' : "Uses shop's hours")),
+                                React.createElement("div", { style: { display: 'flex', gap: 8 } },
+                                    React.createElement("button", { onClick: () => setStaffFormDraft({ id: s.id, name: s.name, customHours: s.customHours }), style: { width: 32, height: 32, borderRadius: 16, border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "clipboard", size: 14, color: PD.text })),
+                                    React.createElement("button", { onClick: () => deleteStaff(s.id), style: { width: 32, height: 32, borderRadius: 16, border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 14, color: '#D0304A' }))));
+                        })));
             }
             else if (providerDashboardTab === 'customerPosts') {
                 const customerPosts = feed.filter((f) => f.isCustomerPost && f.verifiedTags && f.verifiedTags.length > 0);
@@ -2983,6 +3044,37 @@ function App() {
                             React.createElement("input", { type: "time", value: hoursOverrideDraft.start, onChange: (e) => setHoursOverrideDraft({ ...hoursOverrideDraft, start: e.target.value }), style: { ...inputStyle3, flex: 1 } }),
                             React.createElement("input", { type: "time", value: hoursOverrideDraft.end, onChange: (e) => setHoursOverrideDraft({ ...hoursOverrideDraft, end: e.target.value }), style: { ...inputStyle3, flex: 1 } })),
                         React.createElement("button", { onClick: () => saveDateOverride(hoursOverrideDraft.date, hoursOverrideDraft.closed ? null : { start: hoursOverrideDraft.start, end: hoursOverrideDraft.end }), style: { width: '100%', height: 50, borderRadius: 25, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5 } }, "Save Override")));
+        })(),
+        providerDashboardOpen && staffFormDraft && (() => {
+            const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const inputStyle3 = { width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none', background: '#fff', fontFamily: 'inherit' };
+            const hasCustom = !!staffFormDraft.customHours;
+            function setStaffDay(dayIdx, hoursOrNull) {
+                setStaffFormDraft((prev) => ({ ...prev, customHours: { ...prev.customHours, [dayIdx]: hoursOrNull } }));
+            }
+            return React.createElement("div", { onClick: () => setStaffFormDraft(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 11 } },
+                    React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxHeight: '85%', overflowY: 'auto', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, staffFormDraft.id ? 'Edit Staff' : 'Add Staff'),
+                        React.createElement("div", { style: { marginBottom: 14 } },
+                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Name"),
+                            React.createElement("input", { value: staffFormDraft.name, onChange: (e) => setStaffFormDraft({ ...staffFormDraft, name: e.target.value }), placeholder: "e.g. Jamie Rivera", style: inputStyle3 })),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 } },
+                            React.createElement("div", null,
+                                React.createElement("p", { style: { fontSize: 13, fontWeight: 600, color: PD.text, margin: 0 } }, "Custom hours"),
+                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "Off uses your shop's hours")),
+                            React.createElement("button", { onClick: () => setStaffFormDraft((prev) => ({ ...prev, customHours: prev.customHours ? null : { ...providerWeeklyHours } })), style: { width: 44, height: 26, borderRadius: 13, background: hasCustom ? THEME.coral : '#E5E5EA', position: 'relative' } },
+                                React.createElement("div", { style: { position: 'absolute', top: 2, left: hasCustom ? 20 : 2, width: 22, height: 22, borderRadius: 11, background: '#fff', transition: 'left 0.15s' } }))),
+                        hasCustom && React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 } }, WEEKDAY_LABELS.map((label, dayIdx) => {
+                            const hours = staffFormDraft.customHours[dayIdx];
+                            return React.createElement("div", { key: dayIdx, style: { border: `1px solid ${PD.border}`, borderRadius: 14, padding: 12 } },
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                                    React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: PD.text } }, label),
+                                    React.createElement("button", { onClick: () => setStaffDay(dayIdx, hours ? null : { start: '09:00', end: '17:00' }), style: { fontSize: 12, fontWeight: 700, color: hours ? THEME.coral : PD.sub, padding: '6px 12px', borderRadius: 12, background: hours ? 'rgba(151,196,0,0.1)' : '#F5F5F5' } }, hours ? 'Open' : 'Closed')),
+                                hours && React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 10 } },
+                                    React.createElement("input", { type: "time", value: hours.start, onChange: (e) => setStaffDay(dayIdx, { ...hours, start: e.target.value }), style: { ...inputStyle3, flex: 1 } }),
+                                    React.createElement("input", { type: "time", value: hours.end, onChange: (e) => setStaffDay(dayIdx, { ...hours, end: e.target.value }), style: { ...inputStyle3, flex: 1 } })));
+                        })),
+                        React.createElement("button", { disabled: !staffFormDraft.name.trim(), onClick: () => addOrUpdateStaff({ id: staffFormDraft.id, name: staffFormDraft.name.trim(), customHours: staffFormDraft.customHours }), style: { width: '100%', height: 50, borderRadius: 25, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5 } }, "Save Staff")));
         })(),
         providerDashboardOpen && promoDraftOpen && (() => {
             const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
