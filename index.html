@@ -2443,7 +2443,7 @@ function App() {
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14 } },
                     React.createElement("button", { onClick: () => shareItem(item), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                         React.createElement(Icon, { name: "upload", size: 19, color: "#161616" })),
-                    React.createElement("button", { onClick: () => flashToast('More options — coming soon'), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement("button", { onClick: () => item.id === MY_PROVIDER_ID ? setProfileMenuOpen(true) : flashToast('More options — coming soon'), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                         React.createElement("span", { style: { fontSize: 18, color: '#161616', letterSpacing: 1 } }, "•••"))));
             const avatarRow = React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 18px 0' } },
                 React.createElement("div", { style: { position: 'relative', flexShrink: 0 } },
@@ -2881,10 +2881,7 @@ function App() {
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#161616', borderRadius: 20, padding: '14px 10px' } },
                         QUICK_ACTIONS.map((a) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1 } },
                             React.createElement(Icon, { name: a.icon, size: 17, color: "#fff" }),
-                            React.createElement("span", { style: { fontSize: 9.5, color: 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap' } }, a.label))),
-                        React.createElement("button", { onClick: () => setProfileMenuOpen(true), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1 } },
-                            React.createElement("div", { style: { display: 'flex', gap: 2 } }, [0, 1, 2].map((i) => React.createElement("span", { key: i, style: { width: 3.5, height: 3.5, borderRadius: 2, background: '#fff' } }))),
-                            React.createElement("span", { style: { fontSize: 9.5, color: 'rgba(255,255,255,0.85)' } }, "More"))));
+                            React.createElement("span", { style: { fontSize: 9.5, color: 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap' } }, a.label)))));
                 const upcomingPreview = businessBookings.filter((b) => b.status === 'confirmed' || b.status === 'pending').slice(0, 3);
                 const upcomingBookingsSection = React.createElement("div", { style: { marginTop: 26 } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
