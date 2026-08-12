@@ -840,10 +840,6 @@ function App() {
     const fileInputRef = useRef(null);
     const uploadFileRef = useRef(null);
     const discoverScrollRef = useRef(null);
-    const bizProfileScrollRef = useRef(null);
-    const bizThrillzRef = useRef(null);
-    const bizServicesRef = useRef(null);
-    const bizCommentsRef = useRef(null);
     const [uploadOpen, setUploadOpen] = useState(false);
     const [uploadStep, setUploadStep] = useState('options');
     const [uploadVideoUrl, setUploadVideoUrl] = useState(null);
@@ -2438,13 +2434,6 @@ function App() {
             const taggedPosts = feed.filter((f) => (f.taggedBusinessIds || []).includes(item.id)).map((f) => ({ id: f.id, image: f.image, videoUrl: f.customVideoUrl || null, likes: f.likes, taggedBy: f.name }));
             const posts = [...taggedPosts, ...getProviderPosts(item)];
             const services = getServicesForTarget(item);
-            function scrollToBizSection(sectionRef, tabId) {
-                setBizProfileTab(tabId);
-                if (sectionRef.current && bizProfileScrollRef.current) {
-                    const top = sectionRef.current.offsetTop - 8;
-                    bizProfileScrollRef.current.scrollTo({ top, behavior: 'smooth' });
-                }
-            }
             const header = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 0` } },
                 React.createElement("button", { onClick: closeBusinessProfile, style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                     React.createElement(Icon, { name: "arrowleft", size: 20, color: "#161616" })),
@@ -2480,15 +2469,15 @@ function App() {
             const profileDealBadge = ((item.mine || item.id === MY_PROVIDER_ID) && providerDeal.enabled) && React.createElement("div", { style: { margin: '16px 18px 0', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(151,196,0,0.12)', borderRadius: 18, padding: '6px 12px' } },
                 React.createElement("span", { style: { fontSize: 13 } }, "🎁"),
                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, providerDeal.label));
-            const BIZ_TABS = [{ id: 'videos', label: 'Thrillz', ref: bizThrillzRef }, { id: 'services', label: 'Services', ref: bizServicesRef }, { id: 'reviews', label: 'All Comments', ref: bizCommentsRef }];
+            const BIZ_TABS = [{ id: 'videos', label: 'Thrillz' }, { id: 'services', label: 'Services' }, { id: 'reviews', label: 'All Comments' }];
             const tabsRow = React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', marginTop: 22, borderBottom: '1px solid #ECECEE', padding: '0 18px' } },
                 BIZ_TABS.map((t) => {
                     const active = bizProfileTab === t.id;
-                    return React.createElement("button", { key: t.id, onClick: () => scrollToBizSection(t.ref, t.id), style: { padding: '0 4px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 } },
+                    return React.createElement("button", { key: t.id, onClick: () => setBizProfileTab(t.id), style: { padding: '0 4px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 } },
                         React.createElement("span", { style: { fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? '#161616' : '#8A8A8E' } }, t.label),
                         React.createElement("span", { style: { width: active ? 22 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
                 }));
-            const thrillzSection = React.createElement("div", { ref: bizThrillzRef, style: { padding: '18px 18px 0' } },
+            const thrillzSection = React.createElement("div", { style: { padding: '18px 18px 0' } },
                 React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 } },
                     posts.slice(0, 6).map((post, i) => React.createElement("button", { key: post.id, onClick: () => openPostViewer(item, posts, i), style: { position: 'relative', aspectRatio: '3 / 5', borderRadius: 10, overflow: 'hidden', background: '#000' } },
                         React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: '16px 5px 5px', background: 'linear-gradient(0deg, rgba(0,0,0,0.6), transparent)', display: 'flex', alignItems: 'center', gap: 4 } },
@@ -2496,7 +2485,7 @@ function App() {
                             React.createElement("span", { style: { fontSize: 10.5, fontWeight: 600, color: "#fff" } }, formatCount(parseCount(post.likes || '0'))))))),
                 posts.length > 0 && React.createElement("button", { onClick: () => { closeBusinessProfile(); setTab('discover'); setShortsFeedTab('forYou'); }, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 14, padding: '10px 0', fontSize: 13, fontWeight: 700, color: THEME.coral } },
                     "View all thrillz", React.createElement(Icon, { name: "chevronright", size: 14, color: THEME.coral })));
-            const servicesSection = React.createElement("div", { ref: bizServicesRef, style: { padding: '30px 18px 0' } },
+            const servicesSection = React.createElement("div", { style: { padding: '18px 18px 0' } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', margin: 0 } }, "Services"),
                     services.length > 4 && React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, "View all")),
@@ -2510,7 +2499,7 @@ function App() {
                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 } },
                             React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: '#161616' } }, money(s.price)),
                             React.createElement(Icon, { name: "chevronright", size: 15, color: '#B5B5B8' }))))));
-            const commentsSection = React.createElement("div", { ref: bizCommentsRef, style: { padding: '30px 18px 24px' } },
+            const commentsSection = React.createElement("div", { style: { padding: '18px 18px 24px' } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', margin: 0 } }, "All Comments"),
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4 } },
@@ -2530,8 +2519,9 @@ function App() {
                             React.createElement("span", { style: { fontSize: 11, color: '#8A8A8E' } }, r.likes))))),
                 React.createElement("button", { onClick: () => flashToast('All comments — coming soon'), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 16, padding: '10px 0', fontSize: 13, fontWeight: 700, color: THEME.coral } },
                     `View all ${reviewCount} comments`, React.createElement(Icon, { name: "chevronright", size: 14, color: THEME.coral })));
-            return React.createElement("div", { key: "bizprofile", ref: bizProfileScrollRef, onTouchStart: handleBizPanelTouchStart, onTouchMove: handleBizPanelTouchMove, onTouchEnd: handleBizPanelTouchEnd, style: { position: 'absolute', inset: 0, zIndex: 11, background: '#fff', overflowY: 'auto', paddingBottom: 40, transform: `translateX(${(1 - P.progress) * 100}%)`, transition: P.dragging ? 'none' : 'transform 0.28s cubic-bezier(0.22,1,0.36,1)' } },
-                header, avatarRow, statsRow, actionRow, profileDealBadge, tabsRow, thrillzSection, servicesSection, commentsSection);
+            const activeSection = bizProfileTab === 'services' ? servicesSection : bizProfileTab === 'reviews' ? commentsSection : thrillzSection;
+            return React.createElement("div", { key: "bizprofile", onTouchStart: handleBizPanelTouchStart, onTouchMove: handleBizPanelTouchMove, onTouchEnd: handleBizPanelTouchEnd, style: { position: 'absolute', inset: 0, zIndex: 11, background: '#fff', overflowY: 'auto', paddingBottom: 40, transform: `translateX(${(1 - P.progress) * 100}%)`, transition: P.dragging ? 'none' : 'transform 0.28s cubic-bezier(0.22,1,0.36,1)' } },
+                header, avatarRow, statsRow, actionRow, profileDealBadge, tabsRow, activeSection);
         })(),
         postViewer && (() => {
             const { item, posts, index } = postViewer;
