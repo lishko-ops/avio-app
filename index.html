@@ -282,6 +282,16 @@ function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
             React.createElement("rect", { x: "3.5", y: "3.5", width: "17", height: "17", rx: "5" }),
             React.createElement("circle", { cx: "12", cy: "12", r: "4.2" }),
             React.createElement("circle", { cx: "17.2", cy: "6.8", r: "1.1", ...solid })),
+        trash: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M4 6.5h16M9.5 6.5V4.3a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2.2" }),
+            React.createElement("path", { d: "M6 6.5 6.9 20a1.5 1.5 0 0 0 1.5 1.4h7.2A1.5 1.5 0 0 0 17.1 20L18 6.5" }),
+            React.createElement("path", { d: "M10 10.5v7M14 10.5v7" })),
+        pencil: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M4 20l.9-4.3L15.5 5.1a1.5 1.5 0 0 1 2.1 0l1.3 1.3a1.5 1.5 0 0 1 0 2.1L8.3 19.1z" }),
+            React.createElement("path", { d: "M13.7 6.9l3.4 3.4" })),
+        download: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M12 3v12M12 15l-4-4M12 15l4-4" }),
+            React.createElement("path", { d: "M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" })),
     };
     return React.createElement("svg", { ...common }, paths[name]);
 }
@@ -1020,8 +1030,14 @@ function App() {
     const [swipeArrow, setSwipeArrow] = useState(null);
     const [profileDrag, setProfileDrag] = useState(null);
     const [businessProfileTarget, setBusinessProfileTarget] = useState(null);
+    const [bizDraftsOpen, setBizDraftsOpen] = useState(false);
     const [bizProfileTab, setBizProfileTab] = useState('videos');
     const [postViewer, setPostViewer] = useState(null);
+    const [drafts, setDrafts] = useState([]);
+    const [thrillzManageOpen, setThrillzManageOpen] = useState(false);
+    const [deleteThrillzConfirmOpen, setDeleteThrillzConfirmOpen] = useState(false);
+    const [editThrillzOpen, setEditThrillzOpen] = useState(false);
+    const [editThrillzDraft, setEditThrillzDraft] = useState({ id: null, blurb: '', location: '' });
     const [likeBurst, setLikeBurst] = useState(null);
     const shortTouchRef = useRef(null);
     const shortVideoRefs = useRef({});
@@ -1349,6 +1365,64 @@ function App() {
     }
     function closePostViewer() {
         setPostViewer(null);
+        setThrillzManageOpen(false);
+        setDeleteThrillzConfirmOpen(false);
+        setEditThrillzOpen(false);
+    }
+    function downloadThrillzPost(post) {
+        const url = post.videoUrl || (post.video ? `${post.video}.mp4` : null) || post.image;
+        if (!url) {
+            flashToast('Nothing to save');
+            return;
+        }
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `thrillz-${post.id || Date.now()}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        flashToast('Saved to device');
+    }
+    function openEditThrillz(post) {
+        const full = feed.find((f) => f.id === post.id);
+        if (!full)
+            return;
+        setEditThrillzDraft({ id: full.id, blurb: full.blurb || '', location: full.location || '' });
+        setEditThrillzOpen(true);
+        setThrillzManageOpen(false);
+    }
+    function saveEditThrillz() {
+        setFeed((prev) => prev.map((f) => f.id === editThrillzDraft.id ? { ...f, blurb: editThrillzDraft.blurb, location: editThrillzDraft.location } : f));
+        setEditThrillzOpen(false);
+        flashToast('Thrillz updated');
+    }
+    function moveThrillzToDrafts(post) {
+        const full = feed.find((f) => f.id === post.id);
+        if (!full)
+            return;
+        setDrafts((prev) => [full, ...prev]);
+        setFeed((prev) => prev.filter((f) => f.id !== post.id));
+        closePostViewer();
+        flashToast('Moved to Drafts');
+    }
+    function deleteThrillz(post) {
+        setFeed((prev) => prev.filter((f) => f.id !== post.id));
+        setDrafts((prev) => prev.filter((f) => f.id !== post.id));
+        setDeleteThrillzConfirmOpen(false);
+        closePostViewer();
+        flashToast('Thrillz deleted');
+    }
+    function repostDraft(id) {
+        const full = drafts.find((f) => f.id === id);
+        if (!full)
+            return;
+        setFeed((prev) => [full, ...prev]);
+        setDrafts((prev) => prev.filter((f) => f.id !== id));
+        flashToast('Reposted to Thrillz');
+    }
+    function deleteDraft(id) {
+        setDrafts((prev) => prev.filter((f) => f.id !== id));
+        flashToast('Draft deleted');
     }
     function getProviderHoursForDate(providerId, dateObj) {
         if (providerId !== MY_PROVIDER_ID)
@@ -2526,7 +2600,7 @@ function App() {
                 : gridItems.length === 0
                     ? React.createElement("p", { style: { fontSize: 13, color: L.sub, textAlign: 'center', padding: '32px 0' } }, profileTab === 'videos' ? "No videos yet — tap Create to post your first short." : profileTab === 'saved' ? "Nothing saved yet." : "Nothing liked yet.")
                     : React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginTop: 3 } },
-                        gridItems.map((f) => React.createElement("button", { key: f.id, onClick: () => { setTab('discover'); setShortsFeedTab('forYou'); }, style: { position: 'relative', aspectRatio: '1 / 1', backgroundImage: f.image ? `url(${f.image})` : 'none', backgroundColor: f.image ? undefined : (f.avatarColor || THEME.violet), backgroundSize: 'cover', backgroundPosition: 'center' } },
+                        gridItems.map((f, i) => React.createElement("button", { key: f.id, onClick: () => profileTab === 'videos' ? openPostViewer({ id: 'me-customer', name: 'Levi Dery', avatarColor: THEME.violet, mine: true }, myVideos.map((v) => ({ id: v.id, image: v.image, video: v.video, videoUrl: v.customVideoUrl || null, likes: v.likes })), i) : (() => { setTab('discover'); setShortsFeedTab('forYou'); })(), style: { position: 'relative', aspectRatio: '1 / 1', backgroundImage: f.image ? `url(${f.image})` : 'none', backgroundColor: f.image ? undefined : (f.avatarColor || THEME.violet), backgroundSize: 'cover', backgroundPosition: 'center' } },
                             React.createElement("div", { style: { position: 'absolute', left: 6, bottom: 6, display: 'flex', alignItems: 'center', gap: 3 } },
                                 React.createElement("span", { style: { fontSize: 9, color: '#fff' } }, "▶"),
                                 React.createElement("span", { style: { fontSize: 10, color: '#fff', fontWeight: 600 } }, f.likes)))));
@@ -2608,7 +2682,8 @@ function App() {
             const bookingsCount = formatCount(parseCount(item.likes));
             const reviewCount = formatCount(Math.max(12, Math.round(parseCount(item.likes) / 9)));
             const taggedPosts = feed.filter((f) => (f.taggedBusinessIds || []).includes(item.id)).map((f) => ({ id: f.id, image: f.image, videoUrl: f.customVideoUrl || null, likes: f.likes, taggedBy: f.name }));
-            const posts = [...taggedPosts, ...getProviderPosts(item)];
+            const myPosts = feed.filter((f) => f.mine).map((f) => ({ id: f.id, image: f.image, video: f.video, videoUrl: f.customVideoUrl || null, likes: f.likes }));
+            const posts = item.mine ? myPosts : [...taggedPosts, ...getProviderPosts(item)];
             const services = item.id === MY_PROVIDER_ID
                 ? providerServices.map((s) => ({ name: s.name, durationMin: s.durationMinutes, price: s.price }))
                 : getServicesForTarget(item);
@@ -2661,12 +2736,17 @@ function App() {
                         React.createElement("span", { style: { width: active ? 22 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
                 }));
             const thrillzSection = React.createElement("div", { style: { padding: '18px 18px 0' } },
-                React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1.5, background: '#fff' } },
-                    posts.slice(0, 8).map((post, i) => React.createElement("button", { key: post.id, onClick: () => openPostViewer(item, posts, i), style: { position: 'relative', aspectRatio: '3 / 5', overflow: 'hidden', background: '#000' } },
-                        React.createElement("div", { style: { position: 'absolute', left: 4, bottom: 4, display: 'flex', alignItems: 'center', gap: 2 } },
-                            React.createElement("span", { style: { fontSize: 7.5, color: "#fff" } }, "▶"),
-                            React.createElement("span", { style: { fontSize: 8.5, fontWeight: 600, color: "#fff" } }, formatCount(parseCount(post.likes || '0'))))))),
-                posts.length > 0 && React.createElement("button", { onClick: () => { closeBusinessProfile(); setTab('discover'); setShortsFeedTab('forYou'); }, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 14, padding: '10px 0', fontSize: 13, fontWeight: 700, color: THEME.coral } },
+                item.mine && React.createElement("button", { onClick: () => setBizDraftsOpen(true), style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 } },
+                    React.createElement(Icon, { name: "folder", size: 14, color: '#8A8A8E' }),
+                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#8A8A8E' } }, `Drafts (${drafts.length})`)),
+                posts.length === 0
+                    ? React.createElement("p", { style: { fontSize: 12.5, color: '#8A8A8E', textAlign: 'center', padding: '24px 0' } }, "No Thrillz posted yet — tap Create to post your first one.")
+                    : React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1.5, background: '#fff' } },
+                        posts.slice(0, 8).map((post, i) => React.createElement("button", { key: post.id, onClick: () => openPostViewer(item, posts, i), style: { position: 'relative', aspectRatio: '3 / 5', overflow: 'hidden', background: '#000' } },
+                            React.createElement("div", { style: { position: 'absolute', left: 4, bottom: 4, display: 'flex', alignItems: 'center', gap: 2 } },
+                                React.createElement("span", { style: { fontSize: 7.5, color: "#fff" } }, "▶"),
+                                React.createElement("span", { style: { fontSize: 8.5, fontWeight: 600, color: "#fff" } }, formatCount(parseCount(post.likes || '0'))))))),
+                posts.length > 0 && !item.mine && React.createElement("button", { onClick: () => { closeBusinessProfile(); setTab('discover'); setShortsFeedTab('forYou'); }, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 14, padding: '10px 0', fontSize: 13, fontWeight: 700, color: THEME.coral } },
                     "View all thrillz", React.createElement(Icon, { name: "chevronright", size: 14, color: THEME.coral })));
             const servicesSection = React.createElement("div", { style: { padding: '18px 18px 0' } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
@@ -2720,7 +2800,10 @@ function App() {
                 React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 18, right: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
                     React.createElement("button", { onClick: closePostViewer, style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                         React.createElement(Icon, { name: "arrowleft", size: 20, color: "#fff" })),
-                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#fff' } }, `${index + 1} / ${posts.length}`)),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14 } },
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#fff' } }, `${index + 1} / ${posts.length}`),
+                        item.mine && React.createElement("button", { onClick: () => setThrillzManageOpen(true), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement("span", { style: { fontSize: 19, color: '#fff', letterSpacing: 1, lineHeight: 1 } }, "•••")))),
                 index > 0 && React.createElement("button", { onClick: () => goTo(index - 1), style: { position: 'absolute', left: 0, top: 0, bottom: 0, width: '30%' } }),
                 index < posts.length - 1 && React.createElement("button", { onClick: () => goTo(index + 1), style: { position: 'absolute', right: 0, top: 0, bottom: 0, width: '30%' } }),
                 React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 'calc(env(safe-area-inset-bottom) + 18px)' } },
@@ -2730,10 +2813,51 @@ function App() {
                             : React.createElement("div", { style: { width: 32, height: 32, borderRadius: '50%', background: item.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 } }, item.name.charAt(0)),
                         React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: '#fff' } }, item.name),
                         React.createElement("span", { style: { fontSize: 12, color: 'rgba(255,255,255,0.7)' } }, post.likes, " likes")),
-                    React.createElement("button", { onClick: () => openBooking(item), style: { width: '100%', borderRadius: 14, background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 16px' } },
+                    !item.mine && React.createElement("button", { onClick: () => openBooking(item), style: { width: '100%', borderRadius: 14, background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 16px' } },
                         React.createElement(Icon, { name: "calendar", size: 17, color: "#fff" }),
-                        React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: "#fff" } }, "Book Now"))));
+                        React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: "#fff" } }, "Book Now"))),
+                item.mine && thrillzManageOpen && React.createElement("div", { onClick: () => setThrillzManageOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
+                    React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `10px 8px calc(env(safe-area-inset-bottom) + 14px)` } },
+                        React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#ECECEE', margin: '0 auto 10px' } }),
+                        [
+                            { id: 'save', icon: 'download', label: 'Save to device', onClick: () => { downloadThrillzPost(post); setThrillzManageOpen(false); } },
+                            { id: 'edit', icon: 'pencil', label: 'Edit Thrillz', onClick: () => openEditThrillz(post) },
+                            { id: 'draft', icon: 'folder', label: 'Move to Drafts', onClick: () => moveThrillzToDrafts(post) },
+                            { id: 'delete', icon: 'trash', label: 'Delete Thrillz', danger: true, onClick: () => { setThrillzManageOpen(false); setDeleteThrillzConfirmOpen(true); } },
+                        ].map((opt) => React.createElement("button", { key: opt.id, onClick: opt.onClick, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 10px', borderBottom: opt.id !== 'delete' ? '1px solid #F0F0F0' : 'none' } },
+                            React.createElement(Icon, { name: opt.icon, size: 18, color: opt.danger ? '#D0304A' : '#161616' }),
+                            React.createElement("span", { style: { fontSize: 14.5, fontWeight: 500, color: opt.danger ? '#D0304A' : '#161616' } }, opt.label))))),
+                item.mine && deleteThrillzConfirmOpen && React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 14, padding: '0 32px' } },
+                    React.createElement("div", { style: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 20, padding: 22, textAlign: 'center' } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', margin: 0 } }, "Delete this Thrillz?"),
+                        React.createElement("p", { style: { fontSize: 12.5, color: '#8A8A8E', marginTop: 8, lineHeight: 1.45 } }, "This will permanently delete your Thrillz. This action cannot be undone."),
+                        React.createElement("button", { onClick: () => deleteThrillz(post), style: { width: '100%', marginTop: 18, padding: '13px 0', borderRadius: 24, background: '#D0304A', color: '#fff', fontWeight: 700, fontSize: 14 } }, "Delete"),
+                        React.createElement("button", { onClick: () => setDeleteThrillzConfirmOpen(false), style: { width: '100%', marginTop: 10, padding: '13px 0', borderRadius: 24, background: '#F5F5F5', color: '#161616', fontWeight: 700, fontSize: 14 } }, "Cancel"))),
+                item.mine && editThrillzOpen && React.createElement("div", { onClick: () => setEditThrillzOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-end', zIndex: 14 } },
+                    React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                        React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#ECECEE', margin: '0 auto 14px' } }),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', marginBottom: 14 } }, "Edit Thrillz"),
+                        React.createElement("label", { style: { fontSize: 11.5, fontWeight: 600, color: '#8A8A8E', marginBottom: 6, display: 'block' } }, "Caption"),
+                        React.createElement("textarea", { value: editThrillzDraft.blurb, onChange: (e) => setEditThrillzDraft((d) => ({ ...d, blurb: e.target.value })), rows: 3, style: { width: '100%', border: '1px solid #E5E5E5', borderRadius: 12, padding: 12, fontSize: 13.5, color: '#161616', outline: 'none', resize: 'none', fontFamily: 'inherit' } }),
+                        React.createElement("label", { style: { fontSize: 11.5, fontWeight: 600, color: '#8A8A8E', margin: '14px 0 6px', display: 'block' } }, "Location"),
+                        React.createElement("input", { value: editThrillzDraft.location, onChange: (e) => setEditThrillzDraft((d) => ({ ...d, location: e.target.value })), style: { width: '100%', border: '1px solid #E5E5E5', borderRadius: 12, padding: '12px 14px', fontSize: 13.5, color: '#161616', outline: 'none' } }),
+                        React.createElement("button", { onClick: saveEditThrillz, style: { width: '100%', marginTop: 18, padding: '14px 0', borderRadius: 26, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5 } }, "Save Changes"))));
         })(),
+        bizDraftsOpen && React.createElement("div", { onClick: () => setBizDraftsOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 12 } },
+            React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `10px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '75%', overflowY: 'auto' } },
+                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#ECECEE', margin: '0 auto 10px' } }),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: '#161616', margin: 0 } }, "Drafts"),
+                    React.createElement("button", { onClick: () => setBizDraftsOpen(false) }, React.createElement(Icon, { name: "x", size: 18, color: '#8A8A8E' }))),
+                drafts.length === 0
+                    ? React.createElement("p", { style: { fontSize: 13, color: '#8A8A8E', marginTop: 24, textAlign: 'center' } }, "No drafts yet.")
+                    : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 } }, drafts.map((f) => React.createElement("div", { key: f.id, style: { display: 'flex', alignItems: 'center', gap: 12, background: '#F7F7F8', borderRadius: 14, padding: 10 } },
+                        React.createElement("div", { style: { width: 48, height: 48, borderRadius: 10, flexShrink: 0, backgroundImage: f.image ? `url(${f.image})` : 'none', backgroundColor: f.image ? undefined : THEME.violet, backgroundSize: 'cover', backgroundPosition: 'center' } }),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("p", { style: { fontSize: 13, fontWeight: 600, color: '#161616', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, f.blurb || f.name),
+                            React.createElement("p", { style: { fontSize: 11, color: '#8A8A8E', marginTop: 2 } }, f.category, " · ", f.location)),
+                        React.createElement("button", { onClick: () => repostDraft(f.id), style: { fontSize: 12, fontWeight: 700, color: THEME.coral, flexShrink: 0 } }, "Repost"),
+                        React.createElement("button", { onClick: () => deleteDraft(f.id), style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "trash", size: 15, color: "#B5B5B8" }))))))),
         profileSheetOpen && (React.createElement("div", { onClick: () => setProfileSheetOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } }, (() => {
             const titles = { bookings: 'Past Bookings', saved: 'Saved Businesses', reviews: 'Reviews', videos: 'My Short Videos', drafts: 'Drafts' };
             let sheetContent;
@@ -2741,7 +2865,7 @@ function App() {
                 const myVideos = feed.filter((f) => f.mine);
                 sheetContent = myVideos.length > 0
                     ? React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginTop: 14 } },
-                        myVideos.map((f) => React.createElement("button", { key: f.id, onClick: () => { setProfileSheetOpen(false); setTab('discover'); setShortsFeedTab('forYou'); }, style: { position: 'relative', aspectRatio: '1 / 1', backgroundImage: f.image ? `url(${f.image})` : 'none', backgroundColor: f.image ? undefined : (f.avatarColor || THEME.violet), backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 3 } },
+                        myVideos.map((f, i) => React.createElement("button", { key: f.id, onClick: () => { setProfileSheetOpen(false); openPostViewer({ id: 'me-customer', name: 'Levi Dery', avatarColor: THEME.violet, mine: true }, myVideos.map((v) => ({ id: v.id, image: v.image, video: v.video, videoUrl: v.customVideoUrl || null, likes: v.likes })), i); }, style: { position: 'relative', aspectRatio: '1 / 1', backgroundImage: f.image ? `url(${f.image})` : 'none', backgroundColor: f.image ? undefined : (f.avatarColor || THEME.violet), backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: 3 } },
                             f.verifiedTags && f.verifiedTags.length > 0 && React.createElement("div", { style: { position: 'absolute', top: 6, left: 6, width: 16, height: 16, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "check", size: 9, color: "#fff" })),
                             React.createElement("div", { style: { position: 'absolute', left: 6, bottom: 6, display: 'flex', alignItems: 'center', gap: 3 } },
                                 React.createElement("span", { style: { fontSize: 9, color: '#fff' } }, "▶"),
@@ -2780,7 +2904,15 @@ function App() {
                     React.createElement("p", { style: { fontSize: 12.5, color: '#161616', marginTop: 8, lineHeight: 1.4 } }, r.text))));
             }
             else {
-                sheetContent = React.createElement("p", { style: { fontSize: 13, color: '#8A8A8E', marginTop: 24, textAlign: 'center' } }, "No drafts yet.");
+                sheetContent = drafts.length === 0
+                    ? React.createElement("p", { style: { fontSize: 13, color: '#8A8A8E', marginTop: 24, textAlign: 'center' } }, "No drafts yet.")
+                    : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 } }, drafts.map((f) => React.createElement("div", { key: f.id, style: { display: 'flex', alignItems: 'center', gap: 12, background: '#F7F7F8', borderRadius: 14, padding: 10 } },
+                        React.createElement("div", { style: { width: 48, height: 48, borderRadius: 10, flexShrink: 0, backgroundImage: f.image ? `url(${f.image})` : 'none', backgroundColor: f.image ? undefined : THEME.violet, backgroundSize: 'cover', backgroundPosition: 'center' } }),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("p", { style: { fontSize: 13, fontWeight: 600, color: '#161616', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, f.blurb || f.name),
+                            React.createElement("p", { style: { fontSize: 11, color: '#8A8A8E', marginTop: 2 } }, f.category, " · ", f.location)),
+                        React.createElement("button", { onClick: () => repostDraft(f.id), style: { fontSize: 12, fontWeight: 700, color: THEME.coral, flexShrink: 0 } }, "Repost"),
+                        React.createElement("button", { onClick: () => deleteDraft(f.id), style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "trash", size: 15, color: "#B5B5B8" })))));
             }
             return React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `10px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '80%', overflowY: 'auto' } },
                 React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#ECECEE', margin: '0 auto 10px' } }),
