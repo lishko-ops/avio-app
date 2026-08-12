@@ -661,12 +661,37 @@ const ACCOUNT_TYPE_CARDS = [
     { id: 'personal', title: "I'm a Customer", subtitle: 'Discover & book', desc: 'Scroll services, discover businesses and book what you love.', words: ['WATCH', 'BOOK', 'SHARE'], icon: 'user' },
     { id: 'business', title: "I'm a Business", subtitle: 'Showcase & grow', desc: 'Show your work and turn views into bookings.', words: ['POST', 'BOOK', 'GROW'], icon: 'grid' },
 ];
+const BIZ_CATEGORIES = ['Barber', 'Hair Salon / Hairstylist', 'Nails', 'Lashes', 'Makeup', 'Beauty', 'Tattoo / Piercing', 'Fitness / Personal Training', 'Photography / Videography', 'DJ / Events', 'Auto Services', 'Cleaning', 'Home Services', 'Real Estate', 'Rentals', 'Other'];
+const BIZ_SERVICES_BY_CATEGORY = {
+    'Barber': ['Haircut', 'Skin Fade', 'Beard Trim', 'Lineup', 'Kids Cut', 'Haircut + Beard', 'Other'],
+    'Hair Salon / Hairstylist': ['Haircut', 'Blowout', 'Color', 'Balayage', 'Highlights', 'Extensions', 'Other'],
+    'Nails': ['Manicure', 'Pedicure', 'Gel Nails', 'Acrylics', 'Nail Art', 'Other'],
+    'Lashes': ['Classic Lashes', 'Volume Lashes', 'Lash Lift', 'Lash Tint', 'Lash Fill', 'Other'],
+    'Makeup': ['Everyday Makeup', 'Bridal Makeup', 'Special Event', 'Makeup Lesson', 'Other'],
+    'Beauty': ['Facial', 'Waxing', 'Brows', 'Skincare Treatment', 'Spray Tan', 'Other'],
+    'Tattoo / Piercing': ['Small Tattoo', 'Large Tattoo', 'Cover-Up', 'Ear Piercing', 'Body Piercing', 'Other'],
+    'Fitness / Personal Training': ['1-on-1 Training', 'Group Class', 'Nutrition Coaching', 'Virtual Session', 'Other'],
+    'Photography / Videography': ['Portrait Session', 'Event Coverage', 'Product Shoot', 'Video Edit', 'Other'],
+    'DJ / Events': ['Wedding DJ', 'Club Set', 'Private Party', 'MC Services', 'Other'],
+    'Auto Services': ['Detailing', 'Oil Change', 'Tire Service', 'Car Wash', 'Other'],
+    'Cleaning': ['Standard Clean', 'Deep Clean', 'Move-In / Move-Out', 'Office Cleaning', 'Other'],
+    'Home Services': ['Handyman', 'Plumbing', 'Electrical', 'Landscaping', 'Other'],
+    'Real Estate': ['Buying', 'Selling', 'Renting', 'Property Management', 'Other'],
+    'Rentals': ['Equipment Rental', 'Venue Rental', 'Vehicle Rental', 'Other'],
+    'Other': ['Other'],
+};
+const BIZ_LOCATION_MODES = ['At my business location', 'I travel to customers', 'Online / Virtual', 'Multiple locations'];
 function App() {
     var _a;
     const [session, setSession] = useState(() => { try { return localStorage.getItem('avio_session_v2'); } catch (e) { return null; } });
     const [showSplash, setShowSplash] = useState(true);
     const [authView, setAuthView] = useState('welcome');
     const [authDraft, setAuthDraft] = useState({ firstName: '', lastName: '', identifier: '', password: '', otp: ['', '', '', '', '', ''] });
+    const [bizOnboarding, setBizOnboarding] = useState({ businessName: '', category: '', services: [], locationMode: '', address: '', description: '' });
+    const [bizCategoryPickerOpen, setBizCategoryPickerOpen] = useState(false);
+    const [bizCategorySearch, setBizCategorySearch] = useState('');
+    const [businessProfile, setBusinessProfile] = useState(() => loadLS('avio_business_profile', null));
+    useEffect(() => { if (businessProfile) saveLS('avio_business_profile', businessProfile); }, [businessProfile]);
     const [authError, setAuthError] = useState('');
     const [showAuthPassword, setShowAuthPassword] = useState(false);
     const [resendSeconds, setResendSeconds] = useState(28);
@@ -1176,7 +1201,19 @@ function App() {
         }
         catch (e) { }
         saveLS('avio_account_type_v2', accountType);
-        goAuth(accountType === 'personal' ? 'interests' : 'complete');
+        goAuth(accountType === 'personal' ? 'interests' : 'business-details');
+    }
+    function toggleBizService(name) {
+        setBizOnboarding((prev) => ({ ...prev, services: prev.services.includes(name) ? prev.services.filter((s) => s !== name) : [...prev.services, name] }));
+    }
+    function selectBizCategory(cat) {
+        setBizOnboarding((prev) => ({ ...prev, category: cat, services: [] }));
+        setBizCategoryPickerOpen(false);
+        setBizCategorySearch('');
+    }
+    function confirmBusinessDetails() {
+        setBusinessProfile({ ...bizOnboarding });
+        goAuth('complete');
     }
     function toggleInterest(id) {
         setSelectedInterests((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
@@ -1649,6 +1686,47 @@ function App() {
                                 c.words.map((w) => React.createElement("span", { key: w, style: { fontSize: 10, fontWeight: 700, letterSpacing: 0.5, color: '#B5B5B8' } }, w))));
                     })),
                 React.createElement("button", { className: "avio-press", onClick: confirmAccountType, style: { ...authPrimaryBtn, marginTop: 'auto' } }, "Continue →"))),
+            authView === 'business-details' && (React.createElement("div", { className: "avio-auth-page", style: { flex: 1, display: 'flex', flexDirection: 'column', padding: `calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px)`, overflowY: 'auto' } },
+                authBack(() => goAuth('account-type')),
+                React.createElement("div", { style: { width: '100%', height: 4, borderRadius: 2, background: '#F0F0F0', marginBottom: 22 } },
+                    React.createElement("div", { style: { width: '85%', height: '100%', borderRadius: 2, background: THEME.coral } })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#161616', margin: 0 } }, "What does your business do?"),
+                React.createElement("p", { style: { fontSize: 13, color: '#8A8A8E', marginTop: 6, marginBottom: 22, lineHeight: 1.5 } }, "Help us understand your business so we can set up the right tools, bookings, and audience for you."),
+                React.createElement("label", { style: authLabel }, "Business Name"),
+                React.createElement("input", { className: "avio-auth-input", type: "text", placeholder: "Enter your business name", value: bizOnboarding.businessName, onChange: (e) => setBizOnboarding((d) => ({ ...d, businessName: e.target.value })), style: authInputStyle }),
+                React.createElement("label", { style: { ...authLabel, marginTop: 16 } }, "Business Category"),
+                React.createElement("button", { className: "avio-auth-input", onClick: () => setBizCategoryPickerOpen(true), style: { ...authInputStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' } },
+                    React.createElement("span", { style: { color: bizOnboarding.category ? '#161616' : '#B5B5B8' } }, bizOnboarding.category || 'Select a category'),
+                    React.createElement(Icon, { name: "chevrondown", size: 14, color: "#8A8A8E" })),
+                React.createElement("label", { style: { ...authLabel, marginTop: 16 } }, "What do you offer?"),
+                bizOnboarding.category
+                    ? React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
+                        (BIZ_SERVICES_BY_CATEGORY[bizOnboarding.category] || []).map((s) => {
+                            const active = bizOnboarding.services.includes(s);
+                            return React.createElement("button", { key: s, className: "avio-pill", onClick: () => toggleBizService(s), style: { display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 20, background: active ? '#161616' : '#F5F5F5', color: active ? '#fff' : '#161616', fontSize: 12.5, fontWeight: 600 } },
+                                s, active && React.createElement("span", { style: { color: THEME.coral, fontWeight: 700, fontSize: 11 } }, "✓"));
+                        }))
+                    : React.createElement("p", { style: { fontSize: 12, color: '#B5B5B8', padding: '8px 0' } }, "Select a category first"),
+                React.createElement("label", { style: { ...authLabel, marginTop: 20 } }, "Where do you provide your services?"),
+                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+                    BIZ_LOCATION_MODES.map((m) => {
+                        const active = bizOnboarding.locationMode === m;
+                        return React.createElement("button", { key: m, onClick: () => setBizOnboarding((d) => ({ ...d, locationMode: m })), style: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : '1px solid #E5E5E5', textAlign: 'left' } },
+                            React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement("div", { style: { width: 7, height: 7, borderRadius: '50%', background: '#fff' } })),
+                            React.createElement("span", { style: { fontSize: 13.5, color: '#161616' } }, m));
+                    })),
+                React.createElement("label", { style: { ...authLabel, marginTop: 20 } }, "Business Location / Service Area"),
+                React.createElement("input", { className: "avio-auth-input", type: "text", placeholder: "Enter your address or service area", value: bizOnboarding.address, onChange: (e) => setBizOnboarding((d) => ({ ...d, address: e.target.value })), style: authInputStyle }),
+                React.createElement("label", { style: { ...authLabel, marginTop: 16 } }, "Short Description"),
+                React.createElement("textarea", { value: bizOnboarding.description, onChange: (e) => setBizOnboarding((d) => ({ ...d, description: e.target.value.slice(0, 120) })), maxLength: 120, rows: 3, placeholder: "Tell customers what you do...", style: { ...authInputStyle, resize: 'none' } }),
+                React.createElement("p", { style: { fontSize: 10.5, color: '#B5B5B8', textAlign: 'right', marginTop: 4 } }, `${bizOnboarding.description.length}/120`),
+                React.createElement("button", { className: "avio-press", disabled: !bizOnboarding.businessName.trim() || !bizOnboarding.category, onClick: confirmBusinessDetails, style: { ...authPrimaryBtn, marginTop: 24, opacity: (!bizOnboarding.businessName.trim() || !bizOnboarding.category) ? 0.5 : 1 } }, "Continue →"))),
+            authView === 'business-details' && bizCategoryPickerOpen && React.createElement("div", { onClick: () => setBizCategoryPickerOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 20 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxHeight: '70%', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', marginBottom: 14 } }, "Select a category"),
+                    React.createElement("input", { autoFocus: true, value: bizCategorySearch, onChange: (e) => setBizCategorySearch(e.target.value), placeholder: "Search categories", style: { ...authInputStyle, marginBottom: 12 } }),
+                    React.createElement("div", { className: "avio-scroll", style: { overflowY: 'auto', display: 'flex', flexDirection: 'column' } },
+                        BIZ_CATEGORIES.filter((c) => c.toLowerCase().includes(bizCategorySearch.trim().toLowerCase())).map((c) => React.createElement("button", { key: c, onClick: () => selectBizCategory(c), style: { textAlign: 'left', padding: '13px 4px', borderBottom: '1px solid #F5F5F5', fontSize: 14, color: '#161616', fontWeight: bizOnboarding.category === c ? 700 : 400 } }, c))))),
             authView === 'interests' && (React.createElement("div", { className: "avio-auth-page", style: { flex: 1, display: 'flex', flexDirection: 'column', padding: `calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px)`, overflowY: 'auto' } },
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#161616', margin: 0 } }, "What do you want to discover?"),
                 React.createElement("p", { style: { fontSize: 13, color: '#8A8A8E', marginTop: 6, marginBottom: 22 } }, "Pick a few. You can change this anytime."),
