@@ -1856,7 +1856,7 @@ function App() {
                         return React.createElement(React.Fragment, null,
                             React.createElement("button", { className: "avio-rail-btn", onClick: () => toggleLike(item.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: '#fff' } },
                                 React.createElement("div", { style: { position: 'relative' } },
-                                    React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "diamond", size: 22, color: liked ? THEME.coral : '#fff', fill: liked ? THEME.coral : 'none' }))),
+                                    React.createElement("div", { className: "avio-rail-circle" }, React.createElement("span", { style: { fontSize: 22, lineHeight: 1, transform: liked ? 'scale(1.12)' : 'scale(1)', transition: 'transform 0.15s ease' } }, "💎"))),
                                 React.createElement("span", { style: { fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, likeCount)),
                             React.createElement("button", { className: "avio-rail-btn comment", onClick: () => openComments(item), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: '#fff' } },
                                 React.createElement("div", { style: { position: 'relative' } },
