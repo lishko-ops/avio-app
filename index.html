@@ -265,6 +265,23 @@ function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
             React.createElement("circle", { cx: "9", cy: "10.5", r: "0.9", ...solid }),
             React.createElement("circle", { cx: "15", cy: "10.5", r: "0.9", ...solid }),
             React.createElement("path", { d: "M9 15c.9.7 1.9 1 3 1s2.1-.3 3-1" })),
+        shield: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M12 3l7 3v5.2c0 4.8-3 8.9-7 10.3-4-1.4-7-5.5-7-10.3V6l7-3z" }),
+            React.createElement("path", { d: "M8.7 12.2l2.1 2.1 4.3-4.3" })),
+        store: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M4 9.5 5 4h14l1 5.5" }),
+            React.createElement("path", { d: "M4 9.5a2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0 2.5 2.5 0 0 0 5 0" }),
+            React.createElement("path", { d: "M5.5 11v9h13v-9" }),
+            React.createElement("path", { d: "M10 20v-5h4v5" })),
+        bank: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M3.5 9.5 12 4l8.5 5.5" }),
+            React.createElement("path", { d: "M4.5 9.5h15v2h-15z", ...solid }),
+            React.createElement("path", { d: "M5.5 11.5V19M9.5 11.5V19M14.5 11.5V19M18.5 11.5V19" }),
+            React.createElement("path", { d: "M4 19h16v2H4z", ...solid })),
+        instagram: React.createElement(React.Fragment, null,
+            React.createElement("rect", { x: "3.5", y: "3.5", width: "17", height: "17", rx: "5" }),
+            React.createElement("circle", { cx: "12", cy: "12", r: "4.2" }),
+            React.createElement("circle", { cx: "17.2", cy: "6.8", r: "1.1", ...solid })),
     };
     return React.createElement("svg", { ...common }, paths[name]);
 }
@@ -694,17 +711,39 @@ const BIZ_SERVICES_BY_CATEGORY = {
     'Other': ['Other'],
 };
 const BIZ_LOCATION_MODES = ['At my business location', 'I travel to customers', 'Online / Virtual', 'All'];
+const BIZ_PAYOUT_METHODS = ['Bank Account', 'Debit Card', 'PayPal'];
+const BIZ_PROOF_OPTIONS = [
+    { id: 'website', icon: 'globe', title: 'Website', desc: 'Add your official website' },
+    { id: 'social', icon: 'instagram', title: 'Social Media', desc: 'Connect your Instagram or business profile' },
+    { id: 'license', icon: 'clipboard', title: 'License or Document', desc: 'Upload your business license or registration' },
+    { id: 'photo', icon: 'store', title: 'Business Photo', desc: 'Add a photo of your storefront, workspace or tools' },
+];
+function bizStepDots(activeStep, allDone) {
+    return React.createElement("div", { style: { display: 'flex', alignItems: 'center', marginBottom: 14 } },
+        Array.from({ length: 8 }, (_, i) => i + 1).map((n, i) => {
+            const done = allDone || n < activeStep;
+            const active = !allDone && n === activeStep;
+            const circle = React.createElement("div", { key: 'c' + n, style: { width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: done ? THEME.coral : '#fff', border: `2px solid ${done || active ? THEME.coral : '#E5E5E5'}` } },
+                done ? React.createElement(Icon, { name: 'check', size: 12, color: '#fff' }) : React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: active ? THEME.coral : '#B5B5B8' } }, n));
+            return i === 0 ? circle : React.createElement(React.Fragment, { key: 'w' + n },
+                React.createElement("div", { style: { flex: 1, height: 2, background: (allDone || n - 1 < activeStep) ? THEME.coral : '#E5E5E5' } }),
+                circle);
+        }));
+}
 function App() {
     var _a;
     const [session, setSession] = useState(() => { try { return localStorage.getItem('avio_session_v2'); } catch (e) { return null; } });
     const [showSplash, setShowSplash] = useState(true);
     const [authView, setAuthView] = useState('welcome');
     const [authDraft, setAuthDraft] = useState({ firstName: '', lastName: '', identifier: '', password: '', otp: ['', '', '', '', '', ''] });
-    const [bizOnboarding, setBizOnboarding] = useState({ businessName: '', category: '', services: [], locationMode: '', address: '', description: '' });
+    const [bizOnboarding, setBizOnboarding] = useState({ businessName: '', category: '', services: [], locationMode: '', address: '', serviceArea: '', travelToCustomers: false, description: '' });
     const [bizCategoryPickerOpen, setBizCategoryPickerOpen] = useState(false);
     const [bizCategorySearch, setBizCategorySearch] = useState('');
     const [businessProfile, setBusinessProfile] = useState(() => loadLS('avio_business_profile', null));
     useEffect(() => { if (businessProfile) saveLS('avio_business_profile', businessProfile); }, [businessProfile]);
+    const [bizVerify, setBizVerify] = useState({ phone: '', phoneOtp: ['', '', '', '', '', ''], phoneOtpSent: false, phoneVerified: false, changingPhone: false, proofMethod: null, proofValue: '', proofDone: false, payoutMethod: 'Bank Account', payoutPickerOpen: false, submitting: false, error: '' });
+    const [businessVerified, setBusinessVerified] = useState(() => loadLS('avio_business_verified', false));
+    useEffect(() => { saveLS('avio_business_verified', businessVerified); }, [businessVerified]);
     const [authError, setAuthError] = useState('');
     const [showAuthPassword, setShowAuthPassword] = useState(false);
     const [resendSeconds, setResendSeconds] = useState(28);
@@ -713,6 +752,7 @@ function App() {
     const [showForgotPassword, setShowForgotPassword] = useState(false);
     const otpRefs = useMemo(() => Array.from({ length: 6 }, () => React.createRef()), []);
     const forgotOtpRefs = useMemo(() => Array.from({ length: 6 }, () => React.createRef()), []);
+    const bizPhoneOtpRefs = useMemo(() => Array.from({ length: 6 }, () => React.createRef()), []);
     useEffect(() => {
         const t = setTimeout(() => setShowSplash(false), 1000);
         return () => clearTimeout(t);
@@ -1237,7 +1277,58 @@ function App() {
         const chosenServices = bizOnboarding.services.filter((s) => s !== 'Other');
         if (chosenServices.length > 0)
             setProviderServices(chosenServices.map((s, i) => ({ id: 'ps' + (i + 1), name: s, durationMinutes: 30, price: 35 })));
-        goAuth('complete');
+        goAuth('business-verify');
+    }
+    function sendBizPhoneCode() {
+        if (!bizVerify.phone.trim()) {
+            setBizVerify((v) => ({ ...v, error: 'Enter a phone number' }));
+            return;
+        }
+        setBizVerify((v) => ({ ...v, phoneOtpSent: true, error: '' }));
+        flashToast('Code sent');
+    }
+    function verifyBizPhoneCode() {
+        if (bizVerify.phoneOtp.join('').length !== 6) {
+            setBizVerify((v) => ({ ...v, error: 'Enter the 6-digit code' }));
+            return;
+        }
+        setBizVerify((v) => ({ ...v, phoneVerified: true, changingPhone: false, error: '' }));
+    }
+    function selectBizPayout(method) {
+        setBizVerify((v) => ({ ...v, payoutMethod: method, payoutPickerOpen: false }));
+    }
+    function submitBusinessVerification() {
+        if (bizVerify.submitting)
+            return;
+        if (!bizOnboarding.businessName.trim() || !bizOnboarding.category || !bizOnboarding.address.trim()) {
+            setBizVerify((v) => ({ ...v, error: 'Complete your business information' }));
+            return;
+        }
+        const phoneOk = isPhoneLikeIdentifier(authDraft.identifier) || bizVerify.phoneVerified;
+        if (!phoneOk) {
+            setBizVerify((v) => ({ ...v, error: 'Verify your phone number' }));
+            return;
+        }
+        const proofOk = bizVerify.proofMethod === 'website' ? bizVerify.proofValue.trim().length > 0 : bizVerify.proofMethod ? bizVerify.proofDone : false;
+        if (!proofOk) {
+            setBizVerify((v) => ({ ...v, error: 'Choose at least one way to verify your business' }));
+            return;
+        }
+        setBizVerify((v) => ({ ...v, submitting: true, error: '' }));
+        setTimeout(() => {
+            setBusinessVerified(true);
+            setBizVerify((v) => ({ ...v, submitting: false }));
+            goAuth('business-verified');
+        }, 1200);
+    }
+    function goToBusinessDashboard() {
+        setProviderDashboardOpen(true);
+        setProviderDashboardTab('overview');
+        login();
+    }
+    function goToBusinessProfileFromOnboarding() {
+        login();
+        openMyBusinessProfile();
     }
     function toggleInterest(id) {
         setSelectedInterests((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
@@ -1440,7 +1531,7 @@ function App() {
             locationMode: bizOnboarding.locationMode || '',
             rating: 4.9,
             likes: '850',
-            verified: true,
+            verified: businessVerified,
             mine: true,
         });
     }
@@ -1766,12 +1857,145 @@ function App() {
                 React.createElement("textarea", { value: bizOnboarding.description, onChange: (e) => setBizOnboarding((d) => ({ ...d, description: e.target.value.slice(0, 120) })), maxLength: 120, rows: 3, placeholder: "Tell customers what you do...", style: { ...authInputStyle, resize: 'none' } }),
                 React.createElement("p", { style: { fontSize: 10.5, color: '#B5B5B8', textAlign: 'right', marginTop: 4 } }, `${bizOnboarding.description.length}/120`),
                 React.createElement("button", { className: "avio-press", disabled: !bizOnboarding.businessName.trim() || !bizOnboarding.category, onClick: confirmBusinessDetails, style: { ...authPrimaryBtn, marginTop: 24, opacity: (!bizOnboarding.businessName.trim() || !bizOnboarding.category) ? 0.5 : 1 } }, "Continue →"))),
-            authView === 'business-details' && bizCategoryPickerOpen && React.createElement("div", { onClick: () => setBizCategoryPickerOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 20 } },
+            (authView === 'business-details' || authView === 'business-verify') && bizCategoryPickerOpen && React.createElement("div", { onClick: () => setBizCategoryPickerOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 20 } },
                 React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxHeight: '70%', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', marginBottom: 14 } }, "Select a category"),
                     React.createElement("input", { autoFocus: true, value: bizCategorySearch, onChange: (e) => setBizCategorySearch(e.target.value), placeholder: "Search categories", style: { ...authInputStyle, marginBottom: 12 } }),
                     React.createElement("div", { className: "avio-scroll", style: { overflowY: 'auto', display: 'flex', flexDirection: 'column' } },
                         BIZ_CATEGORIES.filter((c) => c.toLowerCase().includes(bizCategorySearch.trim().toLowerCase())).map((c) => React.createElement("button", { key: c, onClick: () => selectBizCategory(c), style: { textAlign: 'left', padding: '13px 4px', borderBottom: '1px solid #F5F5F5', fontSize: 14, color: '#161616', fontWeight: bizOnboarding.category === c ? 700 : 400 } }, c))))),
+            authView === 'business-verify' && (() => {
+                const bizCard = { background: '#fff', border: '1px solid #ECECEE', borderRadius: 18, padding: 16, marginTop: 16 };
+                const cardHeading = (icon, text) => React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 } },
+                    React.createElement(Icon, { name: icon, size: 16, color: THEME.coral }),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14.5, color: '#161616', margin: 0 } }, text));
+                const phoneAlreadyVerified = isPhoneLikeIdentifier(authDraft.identifier);
+                const phoneVerifiedNow = bizVerify.changingPhone ? bizVerify.phoneVerified : (phoneAlreadyVerified || bizVerify.phoneVerified);
+                const header = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 } },
+                    React.createElement("button", { onClick: () => goAuth('business-details'), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement(Icon, { name: "arrowleft", size: 19, color: "#161616" })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: '#161616', margin: 0 } }, "Create Business Account"));
+                const titleRow = React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 } },
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral, margin: '0 0 4px' } }, "Step 7 of 8"),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 23, color: '#161616', margin: 0, lineHeight: 1.2 } }, "Let's verify your business"),
+                        React.createElement("p", { style: { fontSize: 12.5, color: '#8A8A8E', marginTop: 6, lineHeight: 1.5 } }, "This helps keep BookVado trusted and our community safe.")),
+                    React.createElement("div", { style: { width: 52, height: 52, borderRadius: 16, background: 'rgba(151,196,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement(Icon, { name: "shield", size: 26, color: THEME.coral })));
+                const section1 = React.createElement("div", { style: bizCard },
+                    cardHeading('store', '1. Business information'),
+                    React.createElement("label", { style: authLabel }, "Business Name"),
+                    React.createElement("input", { className: "avio-auth-input", type: "text", placeholder: "Enter your business name", value: bizOnboarding.businessName, onChange: (e) => setBizOnboarding((d) => ({ ...d, businessName: e.target.value })), style: { ...authInputStyle, marginBottom: 14 } }),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginBottom: 14 } },
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("label", { style: authLabel }, "Category"),
+                            React.createElement("button", { onClick: () => setBizCategoryPickerOpen(true), style: { ...authInputStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' } },
+                                React.createElement("span", { style: { fontSize: 13, color: bizOnboarding.category ? '#161616' : '#B5B5B8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, bizOnboarding.category || 'Select'),
+                                React.createElement(Icon, { name: "chevrondown", size: 13, color: "#8A8A8E" }))),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("label", { style: authLabel }, "Business Address"),
+                            React.createElement("div", { style: { position: 'relative' } },
+                                React.createElement("input", { className: "avio-auth-input", type: "text", placeholder: "Enter business address", value: bizOnboarding.address, onChange: (e) => setBizOnboarding((d) => ({ ...d, address: e.target.value })), style: { ...authInputStyle, paddingRight: 32 } }),
+                                React.createElement("div", { style: { position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)' } }, React.createElement(Icon, { name: "mappin", size: 15, color: "#8A8A8E" }))))),
+                    React.createElement("label", { style: authLabel }, "Service Area (optional)"),
+                    React.createElement("div", { style: { position: 'relative', marginBottom: 12 } },
+                        React.createElement("input", { className: "avio-auth-input", type: "text", placeholder: "e.g. Miami, FL or within 15 miles", value: bizOnboarding.serviceArea, onChange: (e) => setBizOnboarding((d) => ({ ...d, serviceArea: e.target.value })), style: { ...authInputStyle, paddingRight: 32 } }),
+                        React.createElement("div", { style: { position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)' } }, React.createElement(Icon, { name: "mappin", size: 15, color: "#8A8A8E" }))),
+                    React.createElement("button", { onClick: () => setBizOnboarding((d) => ({ ...d, travelToCustomers: !d.travelToCustomers })), style: { display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' } },
+                        React.createElement("div", { style: { width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${bizOnboarding.travelToCustomers ? THEME.coral : '#D1D1D6'}`, background: bizOnboarding.travelToCustomers ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, bizOnboarding.travelToCustomers && React.createElement(Icon, { name: "check", size: 11, color: "#fff" })),
+                        React.createElement("span", { style: { fontSize: 12.5, color: '#161616' } }, "I provide services at customers' locations")));
+                const section2 = React.createElement("div", { style: bizCard },
+                    cardHeading('phone', '2. Verify your phone number'),
+                    phoneVerifiedNow
+                        ? React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                                React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "check", size: 10, color: "#fff" })),
+                                React.createElement("span", { style: { fontSize: 13, color: '#161616', fontWeight: 500 } }, "Phone verified")),
+                            React.createElement("button", { onClick: () => setBizVerify((v) => ({ ...v, changingPhone: true, phoneVerified: false, phoneOtpSent: false, phoneOtp: ['', '', '', '', '', ''] })), style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "Change"))
+                        : React.createElement("div", null,
+                            React.createElement("input", { className: "avio-auth-input", type: "tel", placeholder: "Enter your phone number", value: bizVerify.phone, onChange: (e) => setBizVerify((v) => ({ ...v, phone: e.target.value })), style: authInputStyle }),
+                            !bizVerify.phoneOtpSent
+                                ? React.createElement("button", { onClick: sendBizPhoneCode, style: { marginTop: 10, fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "Send Code")
+                                : React.createElement("div", { style: { marginTop: 10 } },
+                                    otpBoxes(bizVerify.phoneOtp, bizPhoneOtpRefs, (i, val) => setBizVerify((v) => { const otp = [...v.phoneOtp]; otp[i] = val; return { ...v, phoneOtp: otp }; })),
+                                    React.createElement("button", { onClick: verifyBizPhoneCode, style: { marginTop: 10, fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "Verify"))));
+                const section3 = React.createElement("div", { style: bizCard },
+                    cardHeading('shield', '3. Show proof of your business'),
+                    React.createElement("p", { style: { fontSize: 12, color: '#8A8A8E', margin: '-6px 0 12px' } }, "Choose at least one option."),
+                    React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } },
+                        BIZ_PROOF_OPTIONS.map((opt) => {
+                            const active = bizVerify.proofMethod === opt.id;
+                            return React.createElement("button", { key: opt.id, onClick: () => setBizVerify((v) => ({ ...v, proofMethod: opt.id })), style: { textAlign: 'center', padding: '14px 8px', borderRadius: 14, border: `1.5px solid ${active ? THEME.coral : '#ECECEE'}`, background: active ? 'rgba(151,196,0,0.06)' : '#fff' } },
+                                React.createElement(Icon, { name: opt.icon, size: 20, color: "#161616" }),
+                                React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: '#161616', margin: '8px 0 2px' } }, opt.title),
+                                React.createElement("p", { style: { fontSize: 10, color: '#8A8A8E', lineHeight: 1.3 } }, opt.desc),
+                                React.createElement("div", { style: { width: 16, height: 16, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : '#fff', margin: '8px auto 0', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, active && React.createElement(Icon, { name: "check", size: 9, color: "#fff" })));
+                        })),
+                    bizVerify.proofMethod && React.createElement("div", { style: { marginTop: 12 } },
+                        bizVerify.proofMethod === 'website'
+                            ? React.createElement("input", { className: "avio-auth-input", type: "text", placeholder: "https://yourbusiness.com", value: bizVerify.proofValue, onChange: (e) => setBizVerify((v) => ({ ...v, proofValue: e.target.value })), style: authInputStyle })
+                            : React.createElement("button", { onClick: () => setBizVerify((v) => ({ ...v, proofDone: true })), style: { width: '100%', padding: '11px 0', borderRadius: 12, border: `1.5px dashed ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 12.5 } },
+                                bizVerify.proofDone
+                                    ? (bizVerify.proofMethod === 'social' ? "✓ Instagram connected" : bizVerify.proofMethod === 'license' ? "✓ Document uploaded" : "✓ Photo added")
+                                    : (bizVerify.proofMethod === 'social' ? "Connect Instagram" : bizVerify.proofMethod === 'license' ? "Upload Document" : "Add Photo"))));
+                const section4 = React.createElement("div", { style: bizCard },
+                    cardHeading('bank', '4. Payout information'),
+                    React.createElement("p", { style: { fontSize: 12, color: '#8A8A8E', margin: '-6px 0 12px' } }, "How would you like to receive payouts?"),
+                    React.createElement("button", { onClick: () => setBizVerify((v) => ({ ...v, payoutPickerOpen: true })), style: { ...authInputStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                            React.createElement("span", { style: { fontSize: 13.5, color: '#161616', fontWeight: 500 } }, bizVerify.payoutMethod),
+                            bizVerify.payoutMethod === 'Bank Account' && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral, background: 'rgba(151,196,0,0.12)', borderRadius: 8, padding: '2px 7px' } }, "Recommended")),
+                        React.createElement(Icon, { name: "chevrondown", size: 13, color: "#8A8A8E" })));
+                const nextBox = React.createElement("div", { style: { marginTop: 16, background: 'rgba(151,196,0,0.08)', borderRadius: 16, padding: 14, display: 'flex', alignItems: 'center', gap: 12 } },
+                    React.createElement(Icon, { name: "clock", size: 18, color: THEME.coral }),
+                    React.createElement("div", { style: { flex: 1 } },
+                        React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: '#161616', margin: 0 } }, "What happens next?"),
+                        React.createElement("p", { style: { fontSize: 11.5, color: '#8A8A8E', marginTop: 2, lineHeight: 1.4 } }, "We'll review your information. You'll get a notification when your business is verified.")),
+                    React.createElement("div", { style: { width: 26, height: 26, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 13, color: "#fff" })));
+                const lockLine = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "lock", size: 12, color: "#B5B5B8" }),
+                    React.createElement("span", { style: { fontSize: 11, color: '#8A8A8E' } }, "Your information is encrypted and secure."));
+                return React.createElement("div", { className: "avio-auth-page", style: { flex: 1, display: 'flex', flexDirection: 'column', padding: `calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px)`, overflowY: 'auto' } },
+                    header, bizStepDots(7, false), titleRow, section1, section2, section3, section4, nextBox, lockLine,
+                    bizVerify.error && React.createElement("p", { style: { color: '#D0304A', fontSize: 12, textAlign: 'center', marginTop: 10 } }, bizVerify.error),
+                    React.createElement("button", { className: "avio-press", disabled: bizVerify.submitting, onClick: submitBusinessVerification, style: { width: '100%', background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 15, padding: '15px 0', borderRadius: 26, marginTop: 16, opacity: bizVerify.submitting ? 0.7 : 1 } }, bizVerify.submitting ? "Verifying…" : "Submit"));
+            })(),
+            authView === 'business-verify' && bizVerify.payoutPickerOpen && React.createElement("div", { onClick: () => setBizVerify((v) => ({ ...v, payoutPickerOpen: false })), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 20 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', marginBottom: 14 } }, "How would you like to receive payouts?"),
+                    BIZ_PAYOUT_METHODS.map((m) => React.createElement("button", { key: m, onClick: () => selectBizPayout(m), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left', padding: '13px 4px', borderBottom: '1px solid #F5F5F5' } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                            React.createElement("span", { style: { fontSize: 14, color: '#161616', fontWeight: bizVerify.payoutMethod === m ? 700 : 400 } }, m),
+                            m === 'Bank Account' && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral, background: 'rgba(151,196,0,0.12)', borderRadius: 8, padding: '2px 7px' } }, "Recommended")),
+                        bizVerify.payoutMethod === m && React.createElement(Icon, { name: "check", size: 15, color: THEME.coral }))))),
+            authView === 'business-verified' && React.createElement("div", { className: "avio-auth-page", style: { flex: 1, display: 'flex', flexDirection: 'column', padding: `calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px)`, overflowY: 'auto' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 } },
+                    React.createElement("button", { onClick: () => goAuth('business-verify'), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement(Icon, { name: "arrowleft", size: 19, color: "#161616" })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: '#161616', margin: 0 } }, "Create Business Account")),
+                bizStepDots(8, true),
+                React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral, margin: '6px 0 4px' } }, "Step 8 of 8"),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#161616', margin: 0 } }, "You're verified!"),
+                React.createElement("p", { style: { fontSize: 13, color: '#8A8A8E', marginTop: 6 } }, "Your business has been successfully submitted and verified."),
+                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 32 } },
+                    React.createElement("div", { style: { position: 'relative', width: 140, height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        [[-54, -40, 0], [56, -34, 0.15], [-48, 40, 0.3], [58, 38, 0.45], [0, -62, 0.6], [6, 62, 0.75]].map(([dx, dy, delay], i) => React.createElement("span", { key: i, className: "avio-check-pop", style: { position: 'absolute', left: `calc(50% + ${dx}px)`, top: `calc(50% + ${dy}px)`, width: i % 2 ? 6 : 4, height: i % 2 ? 6 : 4, borderRadius: '50%', background: THEME.coral, opacity: 0.55, animationDelay: `${delay}s`, animationFillMode: 'backwards' } })),
+                        React.createElement("div", { style: { width: 116, height: 116, borderRadius: '50%', background: 'rgba(151,196,0,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement("div", { className: "avio-check-pop avio-ring-pulse", style: { width: 88, height: 88, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                                React.createElement(Icon, { name: "check", size: 40, color: "#fff" })))),
+                    React.createElement("span", { style: { marginTop: 14, fontSize: 12.5, fontWeight: 700, color: THEME.coral, background: 'rgba(151,196,0,0.12)', borderRadius: 14, padding: '5px 16px' } }, "Verified")),
+                React.createElement("div", { style: { marginTop: 28, display: 'flex', flexDirection: 'column' } },
+                    [
+                        ['Your business is now verified', 'You can start receiving bookings and payments.'],
+                        ["You're all set to go", 'Explore your dashboard and manage your business.'],
+                        ['Thank you for being part of BookVado', "We're excited to help your business grow."],
+                    ].map(([title, sub], i, arr) => React.createElement("div", { key: title, style: { display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 0', borderBottom: i < arr.length - 1 ? '1px solid #ECECEE' : 'none' } },
+                        React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${THEME.coral}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 } }, React.createElement(Icon, { name: "check", size: 11, color: THEME.coral })),
+                        React.createElement("div", null,
+                            React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: '#161616', margin: 0 } }, title),
+                            React.createElement("p", { style: { fontSize: 12, color: '#8A8A8E', marginTop: 3, lineHeight: 1.4 } }, sub))))),
+                React.createElement("div", { style: { marginTop: 'auto', paddingTop: 20, display: 'flex', flexDirection: 'column', gap: 10 } },
+                    React.createElement("button", { className: "avio-press", onClick: goToBusinessDashboard, style: { width: '100%', background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 15, padding: '15px 0', borderRadius: 26 } }, "Go to Dashboard"),
+                    React.createElement("button", { className: "avio-press", onClick: goToBusinessProfileFromOnboarding, style: { width: '100%', background: '#fff', color: '#161616', fontWeight: 700, fontSize: 15, padding: '15px 0', borderRadius: 26, border: '1px solid #E5E5E5' } }, "View My Profile"))),
             authView === 'interests' && (React.createElement("div", { className: "avio-auth-page", style: { flex: 1, display: 'flex', flexDirection: 'column', padding: `calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px)`, overflowY: 'auto' } },
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#161616', margin: 0 } }, "What do you want to discover?"),
                 React.createElement("p", { style: { fontSize: 13, color: '#8A8A8E', marginTop: 6, marginBottom: 22 } }, "Pick a few. You can change this anytime."),
@@ -2814,6 +3038,7 @@ function App() {
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
                         React.createElement("span", { style: { fontSize: 14, color: PD.sub } }, "Good morning,"),
                         React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: PD.text } }, bizOnboarding.businessName.trim() || 'My Business'),
+                        businessVerified && React.createElement("div", { style: { width: 14, height: 14, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" })),
                         React.createElement(Icon, { name: "chevrondown", size: 13, color: PD.sub })),
                     React.createElement("button", { onClick: () => flashToast('No new notifications') }, React.createElement(Icon, { name: "bell", size: 19, color: PD.text })))
                 : React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${PD.border}` } },
