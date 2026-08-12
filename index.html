@@ -332,6 +332,29 @@ const CONVERSATIONS_SEED = [
     { id: 'c7', name: 'Loc Queen', category: 'Loctician', rating: 5.0, verified: false, online: true, unread: 2, initials: 'LQ', responseTime: '~5 min',
         messages: [{ id: 'm1', from: 'them', text: "I'll send you some styles", time: 'Sun' }] },
 ];
+const BUSINESS_CONVERSATIONS_SEED = [
+    { id: 'bc1', name: 'Olivia Martinez', initials: 'OM', avatarColor: '#BF6B3F', online: true, unread: 1,
+        booking: { date: 'Fri, May 24', time: '3:00 PM', service: 'Haircut & Blowout', price: 85 },
+        messages: [
+            { id: 'm1', from: 'them', text: "Hi! I'd like to book an appointment.", time: '9:41 AM' },
+            { id: 'm2', from: 'me', text: 'Hi Olivia! Thanks for reaching out. How about Friday at 3:00 PM?', time: '9:43 AM' },
+            { id: 'm3', from: 'them', text: 'That works perfect!', time: '9:44 AM' },
+            { id: 'm4', from: 'me', text: "Great! I've confirmed your booking. See you then 🙌", time: '9:45 AM' },
+            { id: 'm5', from: 'them', text: 'Thank you! 🖤', time: '9:45 AM' },
+        ] },
+    { id: 'bc2', name: 'David Johnson', initials: 'DJ', avatarColor: '#3F6FBF', online: true, unread: 0,
+        messages: [{ id: 'm1', from: 'them', text: 'Thanks! See you tomorrow.', time: '9:30 AM' }] },
+    { id: 'bc3', name: 'Sarah Thompson', initials: 'ST', avatarColor: '#7A2E52', online: false, unread: 2,
+        messages: [{ id: 'm1', from: 'them', text: 'Do you have any availability this Friday?', time: 'Yesterday' }] },
+    { id: 'bc4', name: 'Michael Brown', initials: 'MB', avatarColor: '#5A2E7A', online: false, unread: 0,
+        messages: [{ id: 'm1', from: 'them', text: 'Can I reschedule my appointment?', time: 'Yesterday' }] },
+    { id: 'bc5', name: 'Emily Davis', initials: 'ED', avatarColor: '#2B4C5C', online: false, unread: 0,
+        messages: [{ id: 'm1', from: 'me', text: 'Perfect, see you then!', time: 'Mon' }] },
+    { id: 'bc6', name: 'James Wilson', initials: 'JW', avatarColor: '#3FBF8A', online: false, unread: 0,
+        messages: [{ id: 'm1', from: 'them', text: 'Appreciate the great service!', time: 'Mon' }] },
+    { id: 'bc7', name: 'Sophia Lee', initials: 'SL', avatarColor: '#F5A623', online: false, unread: 1,
+        messages: [{ id: 'm1', from: 'them', text: 'How much for a beard trim?', time: 'Sun' }] },
+];
 const CATEGORY_PHOTOS = {
     beauty: ['assets/explore/brow-arc.jpg', 'assets/explore/makeup-promo.jpg', 'assets/explore/barbershop.jpg'],
     home: ['assets/explore/real-estate.jpg'],
@@ -733,6 +756,7 @@ function App() {
         }
     }
     const [conversations, setConversations] = useState(() => CONVERSATIONS_SEED.map((c) => ({ ...c, messages: c.messages.map((m) => ({ ...m })) })));
+    const [businessConversations, setBusinessConversations] = useState(() => BUSINESS_CONVERSATIONS_SEED.map((c) => ({ ...c, messages: c.messages.map((m) => ({ ...m })) })));
     const [activeConversationId, setActiveConversationId] = useState(null);
     const [connectFilter, setConnectFilter] = useState('all');
     const [connectSearch, setConnectSearch] = useState('');
@@ -742,19 +766,22 @@ function App() {
     const connectTouchRef = useRef(null);
     function openConversation(id) {
         setActiveConversationId(id);
-        setConversations((prev) => prev.map((c) => c.id === id ? { ...c, unread: 0 } : c));
+        const setter = accountType === 'business' ? setBusinessConversations : setConversations;
+        setter((prev) => prev.map((c) => c.id === id ? { ...c, unread: 0 } : c));
     }
     function sendConnectMessage() {
         if (!connectDraft.trim() || !activeConversationId)
             return;
         const text = connectDraft.trim();
-        setConversations((prev) => prev.map((c) => c.id === activeConversationId ? { ...c, messages: [...c.messages, { id: 'm' + Date.now(), from: 'me', text, time: 'Just now' }] } : c));
+        const setter = accountType === 'business' ? setBusinessConversations : setConversations;
+        setter((prev) => prev.map((c) => c.id === activeConversationId ? { ...c, messages: [...c.messages, { id: 'm' + Date.now(), from: 'me', text, time: 'Just now' }] } : c));
         setConnectDraft('');
     }
     function insertBookingCard() {
         if (!activeConversationId)
             return;
-        setConversations((prev) => prev.map((c) => c.id === activeConversationId ? { ...c, messages: [...c.messages, { id: 'm' + Date.now(), from: 'me', type: 'booking', service: c.category, price: 65, duration: '45 min', date: 'Sat · 12:00 PM', time: 'Just now' }] } : c));
+        const setter = accountType === 'business' ? setBusinessConversations : setConversations;
+        setter((prev) => prev.map((c) => c.id === activeConversationId ? { ...c, messages: [...c.messages, { id: 'm' + Date.now(), from: 'me', type: 'booking', service: c.category, price: 65, duration: '45 min', date: 'Sat · 12:00 PM', time: 'Just now' }] } : c));
         flashToast('Booking card sent');
     }
     function togglePin(id) {
@@ -766,9 +793,9 @@ function App() {
         });
         setSwipedRowId(null);
     }
-    function markConversationUnread(id) { setConversations((prev) => prev.map((c) => c.id === id ? { ...c, unread: Math.max(1, c.unread) } : c)); setSwipedRowId(null); flashToast('Marked as unread'); }
+    function markConversationUnread(id) { const setter = accountType === 'business' ? setBusinessConversations : setConversations; setter((prev) => prev.map((c) => c.id === id ? { ...c, unread: Math.max(1, c.unread) } : c)); setSwipedRowId(null); flashToast('Marked as unread'); }
     function muteConversation() { setSwipedRowId(null); flashToast('Conversation muted'); }
-    function archiveConversation(id) { setConversations((prev) => prev.filter((c) => c.id !== id)); setSwipedRowId(null); flashToast('Conversation archived'); }
+    function archiveConversation(id) { const setter = accountType === 'business' ? setBusinessConversations : setConversations; setter((prev) => prev.filter((c) => c.id !== id)); setSwipedRowId(null); flashToast('Conversation archived'); }
     function handleRowTouchStart(e, id) { connectTouchRef.current = { id, x: e.touches[0].clientX }; }
     function handleRowTouchEnd(e) {
         if (!connectTouchRef.current)
@@ -1924,6 +1951,102 @@ function App() {
         })())),
         tab === 'connect' && (React.createElement("div", { style: { height: '100%', position: 'relative', background: '#fff' } }, (() => {
             const CN = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            if (accountType === 'business') {
+                const bizActiveConversation = businessConversations.find((c) => c.id === activeConversationId);
+                if (bizActiveConversation) {
+                    const c = bizActiveConversation;
+                    const chatHeader = React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 12px) 18px 14px`, borderBottom: `1px solid ${CN.border}`, display: 'flex', alignItems: 'center', gap: 12 } },
+                        React.createElement("button", { onClick: () => setActiveConversationId(null), style: { flexShrink: 0 } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: CN.text })),
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: c.avatarColor || '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, c.initials),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: CN.text, margin: 0 } }, c.name),
+                            React.createElement("p", { style: { fontSize: 12, color: CN.sub, margin: '1px 0 0' } }, "Customer")),
+                        React.createElement("button", { onClick: () => flashToast('More options — coming soon'), style: { fontSize: 18, color: CN.text, letterSpacing: 1, flexShrink: 0 } }, "•••"));
+                    const bookingCard = c.booking && React.createElement("div", { style: { margin: '14px 18px 0', padding: 14, borderRadius: 16, border: `1px solid ${CN.border}`, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12 } },
+                            React.createElement("div", { style: { width: 42, height: 42, borderRadius: 12, background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "calendar", size: 18, color: CN.text })),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: CN.text, margin: 0 } }, "Upcoming Booking"),
+                                React.createElement("p", { style: { fontSize: 11.5, color: CN.sub, margin: '3px 0 0' } }, `${c.booking.date} · ${c.booking.time}`),
+                                React.createElement("p", { style: { fontSize: 11.5, color: CN.sub, margin: '1px 0 0' } }, c.booking.service)),
+                            React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontSize: 15, fontWeight: 700, color: CN.text, flexShrink: 0 } }, money(c.booking.price))),
+                        React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 12 } },
+                            React.createElement("button", { onClick: () => setTab('bookings'), style: { flex: 1, padding: '10px 0', borderRadius: 14, border: `1px solid ${CN.border}`, fontSize: 12.5, fontWeight: 600, color: CN.text } }, "View Booking"),
+                            React.createElement("button", { onClick: () => flashToast('Booking confirmed'), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 14, background: '#161616', color: '#fff', fontSize: 12.5, fontWeight: 700 } }, React.createElement(Icon, { name: "check", size: 12, color: "#fff" }), "Confirm")));
+                    const bubbles = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 } },
+                        React.createElement("p", { style: { textAlign: 'center', fontSize: 11, color: CN.sub, margin: '0 0 4px' } }, "Today"),
+                        c.messages.map((m) => {
+                            const mine = m.from === 'me';
+                            return React.createElement("div", { key: m.id, style: { display: 'flex', alignItems: 'flex-end', gap: 8, justifyContent: mine ? 'flex-end' : 'flex-start' } },
+                                !mine && React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', background: c.avatarColor || '#161616', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 8.5, fontWeight: 700 } }, c.initials),
+                                React.createElement("div", { style: { maxWidth: '74%' } },
+                                    React.createElement("div", { style: { background: mine ? THEME.coral : '#F0F0F0', color: mine ? '#fff' : CN.text, borderRadius: 18, padding: '10px 14px', fontSize: 13.5, lineHeight: 1.35 } }, m.text),
+                                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, justifyContent: mine ? 'flex-end' : 'flex-start' } },
+                                        React.createElement("span", { style: { fontSize: 10, color: CN.sub } }, m.time),
+                                        mine && React.createElement("span", { style: { fontSize: 10.5, color: THEME.coral, fontWeight: 700 } }, "✓✓"))));
+                        }));
+                    const quickActions = [
+                        { icon: 'camera', label: 'Camera', onClick: () => flashToast('Camera — coming soon') },
+                        { icon: 'image', label: 'Photos', onClick: () => flashToast('Photos — coming soon') },
+                        { icon: 'mappin', label: 'Location', onClick: () => flashToast('Location shared') },
+                        { icon: 'calendar', label: 'Booking', onClick: insertBookingCard },
+                        { icon: 'wallet', label: 'Payment', onClick: () => flashToast('Payment — coming soon') },
+                    ];
+                    const inputArea = React.createElement("div", { style: { flexShrink: 0, borderTop: `1px solid ${CN.border}`, padding: `10px 18px calc(env(safe-area-inset-bottom) + 10px)` } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                            React.createElement("button", { onClick: () => flashToast('Attach — coming soon'), style: { width: 30, height: 30, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "plus", size: 15, color: "#fff" })),
+                            React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: '#F5F5F5', borderRadius: 20, padding: '9px 14px', minWidth: 0 } },
+                                React.createElement("input", { value: connectDraft, onChange: (e) => setConnectDraft(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') sendConnectMessage(); }, placeholder: `Message ${c.name}...`, style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: CN.text } }),
+                                React.createElement("button", { onClick: () => flashToast('Emoji — coming soon') }, React.createElement("span", { style: { fontSize: 15 } }, "🙂"))),
+                            React.createElement("button", { onClick: sendConnectMessage, style: { width: 30, height: 30, borderRadius: '50%', background: connectDraft.trim() ? THEME.coral : '#EDEDED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "send", size: 13, color: connectDraft.trim() ? '#fff' : '#B5B5B8' }))),
+                        React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 20, overflowX: 'auto', marginTop: 12 } }, quickActions.map((a) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
+                            React.createElement(Icon, { name: a.icon, size: 18, color: CN.sub }),
+                            React.createElement("span", { style: { fontSize: 9, color: CN.sub } }, a.label)))));
+                    return React.createElement("div", { style: { height: '100%', display: 'flex', flexDirection: 'column' } }, chatHeader, bookingCard, bubbles, inputArea);
+                }
+                const BIZ_FILTERS = [{ id: 'all', label: 'All' }, { id: 'unread', label: 'Unread' }, { id: 'bookings', label: 'Bookings' }];
+                const unreadCount = businessConversations.filter((c) => c.unread > 0).length;
+                const bizFiltered = businessConversations.filter((c) => {
+                    if (connectFilter === 'unread' && c.unread === 0)
+                        return false;
+                    if (connectFilter === 'bookings' && !c.booking)
+                        return false;
+                    const q = connectSearch.trim().toLowerCase();
+                    if (q && !c.name.toLowerCase().includes(q))
+                        return false;
+                    return true;
+                });
+                const header = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 28, color: CN.text, margin: 0 } }, "Messages"),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 18 } },
+                        React.createElement("button", { onClick: () => flashToast('Search — coming soon') }, React.createElement(Icon, { name: "search", size: 20, color: CN.text })),
+                        React.createElement("button", { onClick: () => flashToast('Filter — coming soon') }, React.createElement(Icon, { name: "sliders", size: 20, color: CN.text }))));
+                const filterRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', padding: '16px 18px 0' } }, BIZ_FILTERS.map((f) => {
+                    const active = connectFilter === f.id;
+                    const count = f.id === 'unread' ? unreadCount : 0;
+                    return React.createElement("button", { key: f.id, onClick: () => setConnectFilter(f.id), style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, padding: '9px 16px', borderRadius: 20, background: active ? '#161616' : '#fff', border: active ? 'none' : `1px solid ${CN.border}`, color: active ? '#fff' : CN.text } },
+                        f.label,
+                        count > 0 && React.createElement("span", { style: { minWidth: 18, height: 18, borderRadius: 9, background: '#3FBF6A', color: '#fff', fontSize: 10.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' } }, count));
+                }));
+                const list = React.createElement("div", { style: { marginTop: 10 } }, bizFiltered.length === 0
+                    ? React.createElement("p", { style: { textAlign: 'center', fontSize: 12.5, color: CN.sub, padding: '40px 18px' } }, "No conversations here.")
+                    : bizFiltered.map((c) => {
+                        const lastMsg = c.messages[c.messages.length - 1];
+                        const preview = lastMsg ? (lastMsg.type === 'booking' ? 'Sent a booking card' : `${lastMsg.from === 'me' ? 'You: ' : ''}${lastMsg.text}`) : '';
+                        return React.createElement("button", { key: c.id, onClick: () => openConversation(c.id), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderBottom: `1px solid ${CN.border}`, textAlign: 'left' } },
+                            React.createElement("div", { style: { position: 'relative', width: 52, height: 52, flexShrink: 0 } },
+                                React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', background: c.avatarColor || '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
+                                c.online && React.createElement("div", { style: { position: 'absolute', bottom: 1, right: 1, width: 14, height: 14, borderRadius: '50%', background: '#3FBF6A', border: '2.5px solid #fff' } })),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
+                                    React.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: CN.text } }, c.name),
+                                    React.createElement("span", { style: { fontSize: 11.5, color: CN.sub, flexShrink: 0 } }, lastMsg ? lastMsg.time : '')),
+                                React.createElement("p", { style: { fontSize: 13, color: c.unread > 0 ? CN.text : CN.sub, fontWeight: c.unread > 0 ? 600 : 400, margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, preview)),
+                            c.unread > 0 && React.createElement("span", { style: { minWidth: 22, height: 22, borderRadius: 11, background: '#3FBF6A', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px', flexShrink: 0 } }, c.unread));
+                    }));
+                return React.createElement("div", { className: "avio-scroll", style: { height: '100%', overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 90px)` } },
+                    header, filterRow, list);
+            }
             const activeConversation = conversations.find((c) => c.id === activeConversationId);
             if (activeConversation) {
                 const c = activeConversation;
