@@ -1810,7 +1810,7 @@ function App() {
         tab === 'discover' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
             React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16, zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 11 } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 11 } },
-                    [{ id: 'forYou', label: 'Book Me' }, { id: 'following', label: 'Following' }, { id: 'filters', label: 'Filters' }].map((t) => {
+                    [{ id: 'forYou', label: 'Thrills' }, { id: 'following', label: 'Following' }, { id: 'filters', label: 'Filters' }].map((t) => {
                         const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
                         const isMain = t.id === 'forYou';
                         const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
@@ -1822,7 +1822,7 @@ function App() {
                     React.createElement(Icon, { name: "search", size: 20, color: "#fff" }))),
             React.createElement(Icon, { name: shortsFeedTab === 'following' ? "user" : "search", size: 22, color: THEME.mutedDark }),
             React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : `No shorts match "${shortsQuery}"`),
-            shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('forYou'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Browse Book Me"))) : filteredFeed.map((item) => {
+            shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('forYou'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Browse Thrills"))) : filteredFeed.map((item) => {
             const liked = likedIds.has(item.id);
             const followed = followedIds.has(item.id);
             const saved = savedShorts.has(item.id);
@@ -1841,7 +1841,7 @@ function App() {
                     : React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#000' } });
             const scrim = React.createElement("div", { style: { position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.38) 22%, rgba(0,0,0,0.4) 45%, rgba(0,0,0,0.68) 72%, rgba(0,0,0,0.94) 100%)' } });
             const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 56, zIndex: 2, display: 'flex', alignItems: 'flex-end', gap: 11 } },
-                [{ id: 'forYou', label: 'Book Me' }, { id: 'following', label: 'Following' }, { id: 'filters', label: 'Filters' }].map((t) => {
+                [{ id: 'forYou', label: 'Thrills' }, { id: 'following', label: 'Following' }, { id: 'filters', label: 'Filters' }].map((t) => {
                     const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
                     const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
                     const isMain = t.id === 'forYou';
