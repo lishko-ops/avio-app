@@ -533,18 +533,18 @@ function ToggleSwitch({ on, onChange }) {
         React.createElement("span", { style: { position: 'absolute', top: 2, left: on ? 20 : 2, width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.28)', transition: 'left 0.22s cubic-bezier(0.34,1.56,0.64,1)' } }));
 }
 const FEED = [
-    { id: 'f0', category: 'Beauty', name: 'Fade House', location: 'Miami, FL', rating: 4.9, price: 35, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Clean fade. Sharp lines. Precision cuts. Premium experience.', verified: true, distance: '0.5 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#miami', '#fade'], friendsBooked: 120, avatarColor: '#161616',
+    { id: 'f0', category: 'Beauty', name: 'Fade House', location: 'Miami, FL', rating: 4.9, price: 35, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Clean fade. Sharp lines. Precision cuts. Premium experience.', verified: true, distance: '0.5 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#miami', '#fade'], friendsBooked: 120, avatarColor: '#161616', locationMode: 'At my business location',
         staff: [{ id: 'f0-staff-jessie', name: 'Jessie', customHours: null }, { id: 'f0-staff-jackie', name: 'Jackie', customHours: null }] },
-    { id: 'f1', category: 'Home Services', name: 'Sparkle Squad Cleaning', location: 'Denver, CO', rating: 4.8, price: 120, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Deep clean, move-in/move-out, eco-friendly products.', verified: true, distance: '1.2 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#cleaning', '#denver', '#freshhome'], friendsBooked: 8, avatarColor: '#3F6FBF',
+    { id: 'f1', category: 'Home Services', name: 'Sparkle Squad Cleaning', location: 'Denver, CO', rating: 4.8, price: 120, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Deep clean, move-in/move-out, eco-friendly products.', verified: true, distance: '1.2 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#cleaning', '#denver', '#freshhome'], friendsBooked: 8, avatarColor: '#3F6FBF', locationMode: 'I travel to customers',
         deal: { enabled: true, label: '15% OFF TODAY' } },
-    { id: 'f2', category: 'Home Services', name: 'Fresh Start Cleaners', location: 'Miami, FL', rating: 4.9, price: 90, likes: '892', comments: 18, saves: '1.4K', blurb: 'Residential and post-construction cleaning.', verified: true, distance: '2.4 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#cleaning', '#miami', '#ecofriendly'], friendsBooked: 5, avatarColor: '#3FBF8A' },
-    { id: 'f3', category: 'Beauty', name: 'Glow by Mia', location: 'Austin, TX', rating: 4.7, price: 150, likes: '2.1K', comments: 76, saves: '3.6K', blurb: 'Balayage and color correction specialist.', verified: true, distance: '0.6 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#balayage', '#austin', '#haircolor'], friendsBooked: 14, avatarColor: '#8FBF3F' },
-    { id: 'f4', category: 'Beauty', name: 'Kiana Frost MUA', location: 'Brooklyn, NY', rating: 5.0, price: 220, likes: '3.4K', comments: 130, saves: '5.2K', blurb: 'Bridal and editorial makeup artistry.', verified: true, distance: '0.9 mi', openStatus: 'Booking Fast · 3 slots left', hashtags: ['#bridalmakeup', '#brooklyn', '#glam'], friendsBooked: 22, avatarColor: '#BF6B3F' },
-    { id: 'f5', category: 'Parties', name: 'Belle Noir Events', location: 'Chicago, IL', rating: 4.6, price: 400, likes: '640', comments: 24, saves: '980', blurb: 'Full-service party planning and styling.', verified: false, distance: '3.1 mi', openStatus: 'Open Now · Closes 9PM', hashtags: ['#eventplanning', '#chicago', '#luxury'], friendsBooked: 6, avatarColor: '#F5134F' },
-    { id: 'f6', category: 'Restaurants', name: "Camille's Table", location: 'New Orleans, LA', rating: 4.9, price: 85, likes: '1.8K', comments: 58, saves: '2.9K', blurb: "Chef's tasting menu, seasonal ingredients.", verified: true, distance: '1.5 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#neworleans', '#tastingmenu', '#chef'], friendsBooked: 19, avatarColor: '#F5A623',
+    { id: 'f2', category: 'Home Services', name: 'Fresh Start Cleaners', location: 'Miami, FL', rating: 4.9, price: 90, likes: '892', comments: 18, saves: '1.4K', blurb: 'Residential and post-construction cleaning.', verified: true, distance: '2.4 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#cleaning', '#miami', '#ecofriendly'], friendsBooked: 5, avatarColor: '#3FBF8A', locationMode: 'I travel to customers' },
+    { id: 'f3', category: 'Beauty', name: 'Glow by Mia', location: 'Austin, TX', rating: 4.7, price: 150, likes: '2.1K', comments: 76, saves: '3.6K', blurb: 'Balayage and color correction specialist.', verified: true, distance: '0.6 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#balayage', '#austin', '#haircolor'], friendsBooked: 14, avatarColor: '#8FBF3F', locationMode: 'At my business location' },
+    { id: 'f4', category: 'Beauty', name: 'Kiana Frost MUA', location: 'Brooklyn, NY', rating: 5.0, price: 220, likes: '3.4K', comments: 130, saves: '5.2K', blurb: 'Bridal and editorial makeup artistry.', verified: true, distance: '0.9 mi', openStatus: 'Booking Fast · 3 slots left', hashtags: ['#bridalmakeup', '#brooklyn', '#glam'], friendsBooked: 22, avatarColor: '#BF6B3F', locationMode: 'I travel to customers' },
+    { id: 'f5', category: 'Parties', name: 'Belle Noir Events', location: 'Chicago, IL', rating: 4.6, price: 400, likes: '640', comments: 24, saves: '980', blurb: 'Full-service party planning and styling.', verified: false, distance: '3.1 mi', openStatus: 'Open Now · Closes 9PM', hashtags: ['#eventplanning', '#chicago', '#luxury'], friendsBooked: 6, avatarColor: '#F5134F', locationMode: 'I travel to customers' },
+    { id: 'f6', category: 'Restaurants', name: "Camille's Table", location: 'New Orleans, LA', rating: 4.9, price: 85, likes: '1.8K', comments: 58, saves: '2.9K', blurb: "Chef's tasting menu, seasonal ingredients.", verified: true, distance: '1.5 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#neworleans', '#tastingmenu', '#chef'], friendsBooked: 19, avatarColor: '#F5A623', locationMode: 'At my business location',
         deal: { enabled: true, label: '20% OFF TODAY' } },
-    { id: 'f7', category: 'Parties', name: 'Nova Sound DJs', location: 'Los Angeles, CA', rating: 4.8, price: 350, likes: '2.7K', comments: 95, saves: '4.1K', blurb: 'Wedding and club DJ sets with full sound and lighting rig.', verified: true, distance: '4.2 mi', openStatus: 'Available Today', hashtags: ['#dj', '#losangeles', '#nightlife'], friendsBooked: 31, avatarColor: '#6C4CFC' },
-    { id: 'f8', category: 'Beauty', name: 'Bare Skin Makeup Co.', location: 'Phoenix, AZ', rating: 4.9, price: 130, likes: '1.5K', comments: 61, saves: '2.3K', blurb: 'Natural glam and airbrush makeup for any event.', verified: false, distance: '0.8 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#makeup', '#phoenix', '#airbrush'], friendsBooked: 11, avatarColor: '#3FA6BF',
+    { id: 'f7', category: 'Parties', name: 'Nova Sound DJs', location: 'Los Angeles, CA', rating: 4.8, price: 350, likes: '2.7K', comments: 95, saves: '4.1K', blurb: 'Wedding and club DJ sets with full sound and lighting rig.', verified: true, distance: '4.2 mi', openStatus: 'Available Today', hashtags: ['#dj', '#losangeles', '#nightlife'], friendsBooked: 31, avatarColor: '#6C4CFC', locationMode: 'I travel to customers' },
+    { id: 'f8', category: 'Beauty', name: 'Bare Skin Makeup Co.', location: 'Phoenix, AZ', rating: 4.9, price: 130, likes: '1.5K', comments: 61, saves: '2.3K', blurb: 'Natural glam and airbrush makeup for any event.', verified: false, distance: '0.8 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#makeup', '#phoenix', '#airbrush'], friendsBooked: 11, avatarColor: '#3FA6BF', locationMode: 'I travel to customers',
         deal: { enabled: true, label: '$25 OFF TODAY' } },
 ];
 const CATEGORIES = [
@@ -1083,12 +1083,16 @@ function App() {
         return items;
     }, [exploreCategory, exploreTab, exploreQuickFilter]);
     const filteredFeed = useMemo(() => {
-        const base = shortsFeedTab === 'following' ? feed.filter((item) => followedIds.has(item.id)) : feed;
+        let result = shortsFeedTab === 'following' ? feed.filter((item) => followedIds.has(item.id)) : feed;
         const q = shortsQuery.trim().toLowerCase();
-        if (!q)
-            return base;
-        return base.filter((item) => item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q) || item.location.toLowerCase().includes(q));
-    }, [shortsQuery, shortsFeedTab, followedIds, feed]);
+        if (q)
+            result = result.filter((item) => item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q) || item.location.toLowerCase().includes(q));
+        const LOCATION_TOGGLE_MODES = { inStudio: 'At my business location', atHome: 'I travel to customers', mobile: 'I travel to customers' };
+        const activeLocationModes = new Set(Object.keys(LOCATION_TOGGLE_MODES).filter((id) => filterToggles.has(id)).map((id) => LOCATION_TOGGLE_MODES[id]));
+        if (activeLocationModes.size > 0)
+            result = result.filter((item) => !item.locationMode || item.locationMode === 'All' || activeLocationModes.has(item.locationMode));
+        return result;
+    }, [shortsQuery, shortsFeedTab, followedIds, feed, filterToggles]);
     useEffect(() => {
         if (tab !== 'discover')
             return;
