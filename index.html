@@ -2478,11 +2478,11 @@ function App() {
                         React.createElement("span", { style: { width: active ? 22 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
                 }));
             const thrillzSection = React.createElement("div", { style: { padding: '18px 18px 0' } },
-                React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 } },
-                    posts.slice(0, 6).map((post, i) => React.createElement("button", { key: post.id, onClick: () => openPostViewer(item, posts, i), style: { position: 'relative', aspectRatio: '3 / 5', borderRadius: 10, overflow: 'hidden', background: '#000' } },
-                        React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: '16px 5px 5px', background: 'linear-gradient(0deg, rgba(0,0,0,0.6), transparent)', display: 'flex', alignItems: 'center', gap: 4 } },
-                            React.createElement("span", { style: { fontSize: 9, color: "#fff" } }, "▶"),
-                            React.createElement("span", { style: { fontSize: 10.5, fontWeight: 600, color: "#fff" } }, formatCount(parseCount(post.likes || '0'))))))),
+                React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 } },
+                    posts.slice(0, 8).map((post, i) => React.createElement("button", { key: post.id, onClick: () => openPostViewer(item, posts, i), style: { position: 'relative', aspectRatio: '3 / 5', borderRadius: 6, overflow: 'hidden', background: '#000' } },
+                        React.createElement("div", { style: { position: 'absolute', left: 4, bottom: 4, display: 'flex', alignItems: 'center', gap: 2 } },
+                            React.createElement("span", { style: { fontSize: 7.5, color: "#fff" } }, "▶"),
+                            React.createElement("span", { style: { fontSize: 8.5, fontWeight: 600, color: "#fff" } }, formatCount(parseCount(post.likes || '0'))))))),
                 posts.length > 0 && React.createElement("button", { onClick: () => { closeBusinessProfile(); setTab('discover'); setShortsFeedTab('forYou'); }, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 14, padding: '10px 0', fontSize: 13, fontWeight: 700, color: THEME.coral } },
                     "View all thrillz", React.createElement(Icon, { name: "chevronright", size: 14, color: THEME.coral })));
             const servicesSection = React.createElement("div", { style: { padding: '18px 18px 0' } },
