@@ -402,13 +402,21 @@ const CATEGORY_VIDEOS = {
     restaurants: 'assets/shorts/restaurants',
 };
 const COMMENT_POOL = [
-    { name: 'Jordan', text: 'Booked instantly, worth every penny!', time: '2d', color: '#6C4CFC' },
-    { name: 'Casey', text: 'This looks amazing, saving for later.', time: '18h', color: '#F5A623' },
-    { name: 'Riley', text: 'How far in advance should I book?', time: '9h', color: '#3FA6BF' },
-    { name: 'Morgan', text: 'Followed! Can’t wait to try this.', time: '1d', color: '#F5134F' },
+    { name: 'Jordan', text: 'Booked instantly, worth every penny!', time: '2d', color: '#6C4CFC', likes: 4 },
+    { name: 'Casey', text: 'This looks amazing, saving for later.', time: '18h', color: '#F5A623', likes: 2 },
+    { name: 'Riley', text: 'How far in advance should I book?', time: '9h', color: '#3FA6BF', likes: 1 },
+    { name: 'Morgan', text: 'Followed! Can’t wait to try this.', time: '1d', color: '#F5134F', likes: 3 },
 ];
 function seedComments(index) {
     return [COMMENT_POOL[index % COMMENT_POOL.length], COMMENT_POOL[(index + 1) % COMMENT_POOL.length]];
+}
+const VERIFIED_COMMENT_POOL = [
+    { name: 'Jake T.', text: 'Amazing vibe and great service! The rooftop view is unreal 🔥', time: '2h ago', color: '#3F6FBF', likes: 12 },
+    { name: 'Sophie L.', text: 'Loved this place. Perfect for a night out with friends 💯', time: '4h ago', color: '#7A2E52', likes: 8 },
+    { name: 'Marcus D.', text: 'Booked last minute and it was worth it. Staff was super attentive.', time: '1d ago', color: '#5A2E7A', likes: 6 },
+];
+function seedVerifiedComments(index) {
+    return [VERIFIED_COMMENT_POOL[index % VERIFIED_COMMENT_POOL.length], VERIFIED_COMMENT_POOL[(index + 1) % VERIFIED_COMMENT_POOL.length]];
 }
 const PROFILE_MENU_ITEMS = ['Settings', 'Account', 'Privacy', 'Payment Methods', 'My Wallet', 'Help Center', 'Report a Problem', 'Invite Friends', 'Refer & Earn', 'Appearance', 'Language', 'Terms', 'Privacy Policy', 'Logout'];
 const PROFILE_PHOTOS = ['assets/explore/barbershop.jpg', 'assets/explore/real-estate.jpg', 'assets/explore/dj-battle.jpg', 'assets/explore/brow-arc.jpg', 'assets/explore/makeup-promo.jpg'];
@@ -995,6 +1003,8 @@ function App() {
     const [commentsByItem, setCommentsByItem] = useState({});
     const [commentItem, setCommentItem] = useState(null);
     const [commentDraft, setCommentDraft] = useState('');
+    const [commentTab, setCommentTab] = useState('community');
+    const [likedCommentIds, setLikedCommentIds] = useState(() => new Set());
     const [exploreCategory, setExploreCategory] = useState(null);
     const [exploreTab, setExploreTab] = useState('forYou');
     const [exploreQuickFilter, setExploreQuickFilter] = useState('forYou');
@@ -1665,13 +1675,26 @@ function App() {
             return next;
         });
     }
-    function openComments(item) { setCommentItem(item); setCommentDraft(''); }
+    function openComments(item) { setCommentItem(item); setCommentDraft(''); setCommentTab('community'); }
+    function hasBookedBusiness(businessId) {
+        return bookings.some((b) => b.providerId === businessId && b.status !== 'cancelled');
+    }
     function postComment() {
         const text = commentDraft.trim();
         if (!text || !commentItem)
             return;
-        setCommentsByItem((prev) => ({ ...prev, [commentItem.id]: [...(prev[commentItem.id] || []), { name: 'You', text, time: 'now', color: THEME.coral }] }));
+        const verified = commentTab === 'verified';
+        if (verified && !hasBookedBusiness(commentItem.id))
+            return;
+        setCommentsByItem((prev) => ({ ...prev, [commentItem.id]: [...(prev[commentItem.id] || []), { id: `you-${Date.now()}`, name: 'You', text, time: 'now', color: THEME.coral, likes: 0, verified }] }));
         setCommentDraft('');
+    }
+    function toggleCommentLike(key) {
+        setLikedCommentIds((prev) => {
+            const next = new Set(prev);
+            next.has(key) ? next.delete(key) : next.add(key);
+            return next;
+        });
     }
     async function shareItem(item) {
         const shareData = { title: item.name, text: `Check out ${item.name} on Bookvado`, url: window.location.href };
@@ -3318,29 +3341,62 @@ function App() {
                             React.createElement("input", { value: providerDeal.label, onChange: (e) => setProviderDeal({ ...providerDeal, label: e.target.value }), placeholder: "e.g. 20% OFF TODAY", style: inputStyle3 })),
                         React.createElement("button", { onClick: () => { setPromoDraftOpen(false); flashToast(providerDeal.enabled ? 'Deal is live' : 'Deal turned off'); }, style: { width: '100%', height: 50, borderRadius: 25, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5 } }, "Done")));
         })(),
-        commentItem && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } }, (() => {
-            const seeded = seedComments(Math.max(0, feed.findIndex((f) => f.id === commentItem.id)));
+        commentItem && (React.createElement("div", { onClick: () => setCommentItem(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } }, (() => {
+            const idx = Math.max(0, feed.findIndex((f) => f.id === commentItem.id));
             const added = commentsByItem[commentItem.id] || [];
-            const allComments = [...seeded, ...added];
-            return React.createElement("div", { style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `10px 18px calc(env(safe-area-inset-bottom) + 14px)`, maxHeight: '75%', display: 'flex', flexDirection: 'column' } },
-                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#E5E5EA', margin: '0 auto 14px' } }),
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: '#161616', margin: 0 } }, commentItem.comments + added.length, " Comments"),
-                    React.createElement("button", { onClick: () => setCommentItem(null) },
-                        React.createElement(Icon, { name: "x", size: 18, color: '#8A8A8E' }))),
-                React.createElement("div", { className: "avio-scroll", style: { overflowY: 'auto', marginTop: 14, flex: 1, display: 'flex', flexDirection: 'column', gap: 14 } },
-                    allComments.map((c, i) => (React.createElement("div", { key: i, style: { display: 'flex', gap: 10 } },
-                        React.createElement("div", { style: { width: 32, height: 32, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 12, fontWeight: 700 } }, c.name[0]),
-                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                            React.createElement("p", { style: { margin: 0, fontSize: 12.5 } },
-                                React.createElement("span", { style: { fontWeight: 600, color: '#161616' } }, c.name),
-                                React.createElement("span", { style: { color: '#8A8A8E', marginLeft: 6, fontSize: 11 } }, c.time)),
-                            React.createElement("p", { style: { margin: '2px 0 0', fontSize: 13, color: '#161616' } }, c.text)))))),
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, paddingTop: 12, borderTop: '1px solid #F0F0F0' } },
-                    React.createElement("div", { style: { width: 28, height: 28, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 11, fontWeight: 700 } }, "Y"),
-                    React.createElement("input", { value: commentDraft, onChange: (e) => setCommentDraft(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') postComment(); }, placeholder: "Add a comment...", style: { flex: 1, background: '#F5F5F5', border: '1px solid #F0F0F0', borderRadius: 20, padding: '9px 14px', color: '#161616', fontSize: 13, outline: 'none', minWidth: 0 } }),
-                    React.createElement("button", { onClick: postComment, style: { width: 32, height: 32, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                        React.createElement(Icon, { name: "send", size: 14, color: "#fff" }))));
+            const seededCommunity = seedComments(idx).map((c, i) => ({ ...c, id: `seed-c-${commentItem.id}-${i}`, verified: false }));
+            const seededVerified = seedVerifiedComments(idx).map((c, i) => ({ ...c, id: `seed-v-${commentItem.id}-${i}`, verified: true }));
+            const communityComments = [...seededCommunity, ...added.filter((c) => !c.verified)];
+            const verifiedComments = [...seededVerified, ...added.filter((c) => c.verified)];
+            const activeComments = commentTab === 'verified' ? verifiedComments : communityComments;
+            const canWriteVerified = hasBookedBusiness(commentItem.id);
+            const inputLocked = commentTab === 'verified' && !canWriteVerified;
+            const CT = { bg: '#141416', border: 'rgba(255,255,255,0.09)', text: '#fff', sub: 'rgba(255,255,255,0.45)' };
+            const tabsRow = React.createElement("div", { style: { display: 'flex', marginTop: 16, borderBottom: `1px solid ${CT.border}` } },
+                [
+                    { id: 'community', icon: 'messageoutline', label: 'Community', sub: 'Anyone can comment' },
+                    { id: 'verified', icon: 'lock', label: 'Verified Guests', sub: 'Only if you’ve booked' },
+                ].map((t) => {
+                    const active = commentTab === t.id;
+                    return React.createElement("button", { key: t.id, onClick: () => setCommentTab(t.id), style: { flex: 1, textAlign: 'center', padding: '4px 4px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, borderBottom: active ? `2px solid ${THEME.coral}` : '2px solid transparent', marginBottom: -1 } },
+                        React.createElement(Icon, { name: t.icon, size: 16, color: active ? THEME.coral : CT.sub }),
+                        React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: active ? CT.text : CT.sub } }, t.label),
+                        React.createElement("span", { style: { fontSize: 10.5, color: CT.sub } }, t.sub));
+                }));
+            const commentRow = (c) => {
+                const liked = likedCommentIds.has(c.id);
+                return React.createElement("div", { key: c.id, style: { display: 'flex', gap: 10, padding: '14px 0', borderBottom: `1px solid ${CT.border}` } },
+                    React.createElement("div", { style: { width: 32, height: 32, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 12, fontWeight: 700 } }, c.name[0]),
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 } },
+                            React.createElement("span", { style: { fontWeight: 700, fontSize: 13, color: CT.text } }, c.name),
+                            c.verified && React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 700, color: THEME.coral } }, React.createElement(Icon, { name: "check", size: 9, color: THEME.coral }), "Verified"),
+                            React.createElement("span", { style: { fontSize: 11, color: CT.sub } }, c.time)),
+                        React.createElement("p", { style: { margin: '4px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 } }, c.text),
+                        React.createElement("button", { onClick: () => flashToast('Reply — coming soon'), style: { marginTop: 6, fontSize: 11.5, fontWeight: 600, color: CT.sub } }, "Reply")),
+                    React.createElement("button", { onClick: () => toggleCommentLike(c.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 } },
+                        React.createElement(Icon, { name: "heart", size: 15, color: liked ? THEME.coral : CT.sub, fill: liked ? THEME.coral : 'none' }),
+                        React.createElement("span", { style: { fontSize: 10.5, color: CT.sub } }, (c.likes || 0) + (liked ? 1 : 0))));
+            };
+            return React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: CT.bg, borderRadius: '22px 22px 0 0', padding: `10px 18px calc(env(safe-area-inset-bottom) + 14px)`, maxHeight: '72%', display: 'flex', flexDirection: 'column' } },
+                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.25)', margin: '0 auto 12px' } }),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: CT.text, margin: 0, textAlign: 'center' } }, "Comments"),
+                tabsRow,
+                React.createElement("div", { className: "avio-scroll", style: { overflowY: 'auto', marginTop: 4, flex: 1, display: 'flex', flexDirection: 'column' } },
+                    activeComments.length === 0
+                        ? React.createElement("p", { style: { fontSize: 12.5, color: CT.sub, textAlign: 'center', padding: '24px 0' } }, commentTab === 'verified' ? "No verified guest comments yet." : "No comments yet.")
+                        : activeComments.map(commentRow)),
+                inputLocked
+                    ? React.createElement("div", { style: { marginTop: 14, paddingTop: 12, borderTop: `1px solid ${CT.border}`, textAlign: 'center' } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 } },
+                            React.createElement(Icon, { name: "lock", size: 12, color: CT.sub }),
+                            React.createElement("span", { style: { fontSize: 12, color: CT.sub } }, "Book this place to leave a verified comment.")),
+                        React.createElement("div", { style: { width: '100%', background: 'rgba(255,255,255,0.06)', border: `1px solid ${CT.border}`, borderRadius: 20, padding: '11px 14px', color: CT.sub, fontSize: 13, textAlign: 'left' } }, "Add a comment..."))
+                    : React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${CT.border}` } },
+                        React.createElement("div", { style: { width: 28, height: 28, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 11, fontWeight: 700 } }, "Y"),
+                        React.createElement("input", { value: commentDraft, onChange: (e) => setCommentDraft(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') postComment(); }, placeholder: "Add a comment...", style: { flex: 1, background: 'rgba(255,255,255,0.08)', border: `1px solid ${CT.border}`, borderRadius: 20, padding: '9px 14px', color: CT.text, fontSize: 13, outline: 'none', minWidth: 0 } }),
+                        React.createElement("button", { onClick: postComment, style: { width: 32, height: 32, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                            React.createElement(Icon, { name: "send", size: 14, color: "#fff" }))));
         })())),
         filterSheetOpen && (React.createElement("div", { className: "avio-filter-backdrop", onClick: () => setFilterSheetOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 12, display: 'flex', alignItems: 'flex-end' } }, (() => {
             const gridCatId = filterCat === 'all' ? 'beauty' : filterCat;
