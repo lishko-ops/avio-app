@@ -1042,14 +1042,7 @@ function App() {
     const shortTouchRef = useRef(null);
     const shortVideoRefs = useRef({});
     const shortItemRefs = useRef({});
-    const [feedSoundOn, setFeedSoundOn] = useState(false);
-    function toggleFeedSound() {
-        setFeedSoundOn((s) => {
-            const next = !s;
-            Object.values(shortVideoRefs.current).forEach((v) => { if (v) v.muted = !next; });
-            return next;
-        });
-    }
+    const [feedSoundOn] = useState(true);
     useEffect(() => {
         if (tab !== 'discover')
             Object.values(shortVideoRefs.current).forEach((v) => { if (v) v.pause(); });
@@ -2134,16 +2127,16 @@ function App() {
                     ? React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
                     : React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#000' } });
             const scrim = React.createElement("div", { style: { position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.38) 22%, rgba(0,0,0,0.4) 45%, rgba(0,0,0,0.68) 72%, rgba(0,0,0,0.94) 100%)' } });
-            const modeSwitcher = hasBusinessProfile && React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: '50%', transform: 'translateX(-50%)', zIndex: 2, display: 'flex', alignItems: 'center', border: `1.5px solid ${THEME.coral}`, borderRadius: 20, padding: 2, background: 'rgba(0,0,0,0.35)' } },
+            const modeSwitcher = hasBusinessProfile && React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 10px)', left: '50%', transform: 'translateX(-50%)', zIndex: 2, display: 'flex', alignItems: 'center', border: `1px solid ${THEME.coral}`, borderRadius: 13, padding: 1.5, background: 'rgba(0,0,0,0.35)' } },
                 [{ id: 'business', label: 'Business', icon: 'calendar' }, { id: 'personal', label: 'Customer', icon: 'user' }].map((m, i) => {
                     const active = accountType === m.id;
                     return React.createElement(React.Fragment, { key: m.id },
-                        i === 1 && React.createElement("div", { style: { width: 1, height: 16, background: 'rgba(255,255,255,0.25)' } }),
-                        React.createElement("button", { onClick: () => switchAccountMode(m.id), style: { display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 18 } },
-                            React.createElement(Icon, { name: m.icon, size: 14, color: active ? THEME.coral : 'rgba(255,255,255,0.75)' }),
-                            React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: active ? THEME.coral : 'rgba(255,255,255,0.75)' } }, m.label)));
+                        i === 1 && React.createElement("div", { style: { width: 1, height: 10, background: 'rgba(255,255,255,0.25)' } }),
+                        React.createElement("button", { onClick: () => switchAccountMode(m.id), style: { display: 'flex', alignItems: 'center', gap: 3, padding: '4px 8px', borderRadius: 11 } },
+                            React.createElement(Icon, { name: m.icon, size: 9, color: active ? THEME.coral : 'rgba(255,255,255,0.75)' }),
+                            React.createElement("span", { style: { fontSize: 9.5, fontWeight: 700, color: active ? THEME.coral : 'rgba(255,255,255,0.75)' } }, m.label)));
                 }));
-            const brand = React.createElement("div", { style: { position: 'absolute', top: hasBusinessProfile ? 'calc(env(safe-area-inset-top) + 50px)' : 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 56, zIndex: 2, display: 'flex', alignItems: 'flex-end', gap: 11 } },
+            const brand = React.createElement("div", { style: { position: 'absolute', top: hasBusinessProfile ? 'calc(env(safe-area-inset-top) + 34px)' : 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 56, zIndex: 2, display: 'flex', alignItems: 'flex-end', gap: 11 } },
                 [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'filters', label: 'Filters' }].map((t) => {
                     const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
                     const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
@@ -2223,8 +2216,6 @@ function App() {
                 arrowOverlay, burstOverlay);
         }))),
         tab === 'discover' && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 18px)', right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 } },
-            !shortsSearchOpen && React.createElement("button", { onClick: toggleFeedSound, style: { display: 'flex' } },
-                React.createElement(Icon, { name: feedSoundOn ? "volumeon" : "volumeoff", size: 20, color: "#fff" })),
             shortsSearchOpen ? (React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '6px 10px', width: 190 } },
             React.createElement(Icon, { name: "search", size: 14, color: THEME.mutedDark }),
             React.createElement("input", { autoFocus: true, value: shortsQuery, onChange: (e) => setShortsQuery(e.target.value), placeholder: "Search shorts", style: { flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: THEME.textDark, fontSize: 13 } }),
