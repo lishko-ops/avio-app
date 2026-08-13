@@ -636,6 +636,66 @@ const EXPLORE_ITEMS = [
     })),
 ];
 function money(n) { return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' }); }
+const EARNINGS_WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const EARNINGS_WEEKDAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+function getBookingDate(b) {
+    const now = new Date();
+    if (b.dateGroup === 'today')
+        return now;
+    if (b.dateGroup === 'tomorrow') {
+        const d = new Date(now);
+        d.setDate(d.getDate() + 1);
+        return d;
+    }
+    return new Date(`${b.dateLabel}, ${now.getFullYear()}`);
+}
+function earningsPeriodCutoff(period) {
+    const now = new Date();
+    const d = new Date(now);
+    if (period === '7D')
+        d.setDate(d.getDate() - 7);
+    else if (period === '30D')
+        d.setDate(d.getDate() - 30);
+    else if (period === '3M')
+        d.setMonth(d.getMonth() - 3);
+    else
+        d.setFullYear(d.getFullYear() - 1);
+    return d;
+}
+function computeEarningsStats(list) {
+    const counted = list.filter((b) => b.status !== 'cancelled');
+    const totalEarnings = counted.reduce((sum, b) => sum + b.price, 0);
+    const byDayOfWeek = EARNINGS_WEEKDAYS.map((label) => ({ label, earnings: 0, count: 0, services: {} }));
+    const byService = {};
+    counted.forEach((b) => {
+        const jsDay = getBookingDate(b).getDay();
+        const idx = (jsDay + 6) % 7;
+        const day = byDayOfWeek[idx];
+        day.earnings += b.price;
+        day.count += 1;
+        day.services[b.service] = (day.services[b.service] || 0) + 1;
+        if (!byService[b.service])
+            byService[b.service] = { name: b.service, count: 0, earnings: 0 };
+        byService[b.service].count += 1;
+        byService[b.service].earnings += b.price;
+    });
+    byDayOfWeek.forEach((day) => {
+        let topService = null, topCount = 0;
+        Object.entries(day.services).forEach(([name, c]) => { if (c > topCount) { topCount = c; topService = name; } });
+        day.topService = topService;
+        day.avgBooking = day.count > 0 ? day.earnings / day.count : 0;
+    });
+    const services = Object.values(byService);
+    return {
+        totalEarnings, count: counted.length,
+        avgBooking: counted.length > 0 ? totalEarnings / counted.length : 0,
+        byDayOfWeek, services,
+        bestEarningDay: byDayOfWeek.reduce((best, d) => (!best || d.earnings > best.earnings) ? d : best, null),
+        busiestDay: byDayOfWeek.reduce((best, d) => (!best || d.count > best.count) ? d : best, null),
+        topServiceByCount: services.reduce((best, s) => (!best || s.count > best.count) ? s : best, null),
+        topServiceByEarnings: services.reduce((best, s) => (!best || s.earnings > best.earnings) ? s : best, null),
+    };
+}
 function parseCount(v) {
     if (typeof v === 'number')
         return v;
@@ -1068,6 +1128,7 @@ function App() {
     const [providerDashboardOpen, setProviderDashboardOpen] = useState(false);
     const [providerDashboardTab, setProviderDashboardTab] = useState('overview');
     useEffect(() => { if (providerDashboardTab !== 'hours') setScheduleView('menu'); }, [providerDashboardTab]);
+    useEffect(() => { if (!providerDashboardOpen) { setEarningsInsightsOpen(false); setEarningsSelectedDay(null); setSelectedServiceDetail(null); } }, [providerDashboardOpen]);
     const [serviceFormDraft, setServiceFormDraft] = useState(null);
     const [hoursOverrideDraft, setHoursOverrideDraft] = useState(null);
     const [providerStaff, setProviderStaff] = useState(() => loadLS('avio_provider_staff', DEFAULT_STAFF));
@@ -1079,6 +1140,12 @@ function App() {
     const [businessBookings, setBusinessBookings] = useState(BUSINESS_INCOMING_BOOKINGS);
     const [businessBookingDetail, setBusinessBookingDetail] = useState(null);
     const [businessCalendarDay, setBusinessCalendarDay] = useState(() => new Date().getDate());
+    const [earningsInsightsOpen, setEarningsInsightsOpen] = useState(false);
+    const [earningsPeriod, setEarningsPeriod] = useState('7D');
+    const [earningsSelectedDay, setEarningsSelectedDay] = useState(null);
+    const [dashboardChartSelectedDay, setDashboardChartSelectedDay] = useState(null);
+    const [servicesRankMode, setServicesRankMode] = useState('bookings');
+    const [selectedServiceDetail, setSelectedServiceDetail] = useState(null);
     function updateBusinessBookingStatus(id, status) {
         setBusinessBookings((prev) => prev.map((b) => b.id === id ? { ...b, status } : b));
         setBusinessBookingDetail((prev) => prev && prev.id === id ? { ...prev, status } : prev);
@@ -3329,30 +3396,45 @@ function App() {
             let body;
             if (providerDashboardTab === 'overview') {
                 const totalBookings = businessBookings.length;
-                const totalRevenue = businessBookings.reduce((sum, b) => sum + b.price, 0);
+                const stats = computeEarningsStats(businessBookings);
+                const totalRevenue = stats.totalEarnings;
                 const profileViews = 0;
-                const chartVals = [0.35, 0.5, 0.4, 0.62, 0.55, 0.8, 1];
+                const dayEarnings = stats.byDayOfWeek.map((d) => d.earnings);
+                const maxDayEarning = Math.max(...dayEarnings, 0);
+                const chartVals = dayEarnings.map((e) => maxDayEarning > 0 ? Math.max(0.1, e / maxDayEarning) : 0.1);
                 const chartW = 280, chartH = 64;
                 const chartPts = chartVals.map((v, i) => [Math.round(i * (chartW / (chartVals.length - 1))), Math.round(chartH - v * (chartH - 6) - 3)]);
                 const linePath = 'M' + chartPts.map((p) => p.join(',')).join(' L');
                 const areaPath = linePath + ` L${chartW},${chartH} L0,${chartH} Z`;
-                const earningsCard = React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 18, padding: 16 } },
-                    React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Total Earnings"),
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: PD.text, margin: '6px 0 0' } }, money(totalRevenue || 620)),
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 } },
-                        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, "▲ 18%"),
-                        React.createElement("span", { style: { fontSize: 12, color: PD.sub } }, "vs. previous 7 days")),
+                const selectedDashDay = dashboardChartSelectedDay != null ? stats.byDayOfWeek[dashboardChartSelectedDay] : null;
+                const earningsCard = React.createElement("button", { onClick: () => { setDashboardChartSelectedDay(null); setEarningsInsightsOpen(true); }, style: { display: 'block', width: '100%', textAlign: 'left', border: `1px solid ${PD.border}`, borderRadius: 18, padding: 16 } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                        React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Total Earnings"),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 3 } },
+                            React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: THEME.coral } }, "View insights"),
+                            React.createElement(Icon, { name: "chevronright", size: 12, color: THEME.coral }))),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: PD.text, margin: '6px 0 0' } }, money(totalRevenue)),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, minHeight: 16 } },
+                        selectedDashDay
+                            ? React.createElement("span", { style: { fontSize: 12, color: PD.text } }, `${selectedDashDay.label}: `, React.createElement("strong", null, money(selectedDashDay.earnings)), ` · ${selectedDashDay.count} booking${selectedDashDay.count === 1 ? '' : 's'}`)
+                            : [React.createElement("span", { key: "b", style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, "▲ 18%"),
+                                React.createElement("span", { key: "s", style: { fontSize: 12, color: PD.sub } }, "vs. previous 7 days")]),
                     React.createElement("svg", { width: "100%", height: chartH, viewBox: `0 0 ${chartW} ${chartH}`, style: { marginTop: 14, display: 'block' } },
                         React.createElement("defs", null,
                             React.createElement("linearGradient", { id: "bizEarningsFade", x1: "0", y1: "0", x2: "0", y2: "1" },
                                 React.createElement("stop", { offset: "0%", stopColor: THEME.coral, stopOpacity: 0.22 }),
                                 React.createElement("stop", { offset: "100%", stopColor: THEME.coral, stopOpacity: 0 }))),
                         React.createElement("path", { d: areaPath, fill: "url(#bizEarningsFade)" }),
-                        React.createElement("path", { d: linePath, fill: "none", stroke: THEME.coral, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" })),
+                        React.createElement("path", { d: linePath, fill: "none", stroke: THEME.coral, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }),
+                        chartPts.map((p, i) => React.createElement("circle", {
+                            key: i, cx: p[0], cy: p[1], r: dashboardChartSelectedDay === i ? 5 : 8,
+                            fill: dashboardChartSelectedDay === i ? THEME.coral : 'transparent', stroke: 'none',
+                            onClick: (e) => { e.stopPropagation(); setDashboardChartSelectedDay((prev) => prev === i ? null : i); },
+                        }))),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 6 } },
-                        ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => React.createElement("span", { key: d, style: { fontSize: 10, color: PD.sub } }, d))));
+                        EARNINGS_WEEKDAYS.map((d, i) => React.createElement("span", { key: d, style: { fontSize: 10, fontWeight: dashboardChartSelectedDay === i ? 700 : 400, color: dashboardChartSelectedDay === i ? THEME.coral : PD.sub } }, d))));
                 const statsRow = React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 14 } },
-                    [{ value: totalBookings || 24, label: 'New Bookings' }, { value: money(totalRevenue || 620), label: 'Earnings' }, { value: profileViews, label: 'Profile Views' }].map((s) => React.createElement("div", { key: s.label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 10px', textAlign: 'center' } },
+                    [{ value: totalBookings, label: 'New Bookings' }, { value: money(totalRevenue), label: 'Earnings' }, { value: profileViews, label: 'Profile Views' }].map((s) => React.createElement("div", { key: s.label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 10px', textAlign: 'center' } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: PD.text, margin: 0 } }, s.value),
                         React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: '3px 0 0' } }, s.label))));
                 const QUICK_ACTIONS = [
@@ -3710,6 +3792,159 @@ function App() {
                         React.createElement(Icon, { name: "chevronright", size: 16, color: '#C7C7CC' }))));
             }
             return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 2, background: '#fff', display: 'flex', flexDirection: 'column' } }, header, providerDashboardTab !== 'overview' && tabsRow, body);
+        })(),
+        providerDashboardOpen && earningsInsightsOpen && (() => {
+            const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const closePanel = () => { setEarningsInsightsOpen(false); setEarningsSelectedDay(null); };
+            const filteredBookings = businessBookings.filter((b) => getBookingDate(b) >= earningsPeriodCutoff(earningsPeriod));
+            const stats = computeEarningsStats(filteredBookings);
+            const PERIOD_OPTIONS = ['7D', '30D', '3M', '1Y'];
+            const PERIOD_VS_LABEL = { '7D': 'vs. previous 7 days', '30D': 'vs. previous 30 days', '3M': 'vs. previous 3 months', '1Y': 'vs. previous year' };
+            const maxDayEarning = Math.max(...stats.byDayOfWeek.map((d) => d.earnings), 0);
+            const chartVals = stats.byDayOfWeek.map((d) => maxDayEarning > 0 ? Math.max(0.08, d.earnings / maxDayEarning) : 0.08);
+            const chartW = 320, chartH = 120;
+            const chartPts = chartVals.map((v, i) => [Math.round(i * (chartW / (chartVals.length - 1))), Math.round(chartH - v * (chartH - 10) - 5)]);
+            const linePath = 'M' + chartPts.map((p) => p.join(',')).join(' L');
+            const areaPath = linePath + ` L${chartW},${chartH} L0,${chartH} Z`;
+            const selectedDay = earningsSelectedDay != null ? stats.byDayOfWeek[earningsSelectedDay] : null;
+
+            const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${PD.border}` } },
+                React.createElement("button", { onClick: closePanel }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "Earnings & Insights"));
+
+            const periodFilter = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 18 } },
+                PERIOD_OPTIONS.map((p) => React.createElement("button", { key: p, onClick: () => { setEarningsPeriod(p); setEarningsSelectedDay(null); }, style: { flex: 1, padding: '9px 0', borderRadius: 12, textAlign: 'center', fontSize: 12.5, fontWeight: 700, background: earningsPeriod === p ? THEME.coral : '#F5F5F5', color: earningsPeriod === p ? '#fff' : PD.sub } }, p)));
+
+            const topSection = React.createElement("div", { style: { marginTop: 20 } },
+                React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Total Earnings"),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 34, color: PD.text, margin: '6px 0 0' } }, money(stats.totalEarnings)),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 } },
+                    React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, "▲ 18%"),
+                    React.createElement("span", { style: { fontSize: 12, color: PD.sub } }, PERIOD_VS_LABEL[earningsPeriod])));
+
+            const tooltipCard = selectedDay && React.createElement("div", { style: { marginTop: 12, padding: 14, borderRadius: 14, background: '#FAFAFA', border: `1px solid ${PD.border}` } },
+                React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, EARNINGS_WEEKDAYS_FULL[earningsSelectedDay]),
+                React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginTop: 8 } },
+                    [['Earned', money(selectedDay.earnings)], ['Bookings', String(selectedDay.count)], ['Avg. booking', money(selectedDay.avgBooking)], ['Top service', selectedDay.topService || '—']].map(([k, v]) => React.createElement("div", { key: k },
+                        React.createElement("p", { style: { fontSize: 10.5, color: PD.sub, margin: 0 } }, k),
+                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: '2px 0 0' } }, v)))));
+
+            const chartSection = React.createElement("div", { style: { marginTop: 18 } },
+                React.createElement("svg", { width: "100%", height: chartH, viewBox: `0 0 ${chartW} ${chartH}`, style: { display: 'block' } },
+                    React.createElement("defs", null,
+                        React.createElement("linearGradient", { id: "insightsChartFade", x1: "0", y1: "0", x2: "0", y2: "1" },
+                            React.createElement("stop", { offset: "0%", stopColor: THEME.coral, stopOpacity: 0.22 }),
+                            React.createElement("stop", { offset: "100%", stopColor: THEME.coral, stopOpacity: 0 }))),
+                    React.createElement("path", { d: areaPath, fill: "url(#insightsChartFade)" }),
+                    React.createElement("path", { d: linePath, fill: "none", stroke: THEME.coral, strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round" }),
+                    chartPts.map((p, i) => React.createElement("circle", {
+                        key: i, cx: p[0], cy: p[1], r: earningsSelectedDay === i ? 6 : 10,
+                        fill: earningsSelectedDay === i ? THEME.coral : 'transparent', stroke: 'none',
+                        onClick: () => setEarningsSelectedDay((prev) => prev === i ? null : i),
+                    }))),
+                React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 6 } },
+                    EARNINGS_WEEKDAYS.map((d, i) => React.createElement("span", { key: d, style: { fontSize: 10.5, fontWeight: earningsSelectedDay === i ? 700 : 400, color: earningsSelectedDay === i ? THEME.coral : PD.sub } }, d))),
+                tooltipCard);
+
+            const netEarnings = stats.totalEarnings;
+            const breakdownCard = React.createElement("div", { style: { marginTop: 26, border: `1px solid ${PD.border}`, borderRadius: 18, padding: 16 } },
+                React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Earnings Breakdown"),
+                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 } },
+                    [['Services', stats.totalEarnings, false], ['Tips', 0, false], ['Fees', 0, true], ['Refunds', 0, true]].map(([label, val, neg]) => React.createElement("div", { key: label, style: { display: 'flex', justifyContent: 'space-between' } },
+                        React.createElement("span", { style: { fontSize: 13, color: PD.sub } }, label),
+                        React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: neg && val > 0 ? '#D0304A' : PD.text } }, (neg && val > 0 ? '-' : '') + money(val))))),
+                React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 14, borderTop: `1px solid ${PD.border}` } },
+                    React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: PD.text } }, "Net Earnings"),
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontSize: 20, fontWeight: 700, color: PD.text } }, money(netEarnings))),
+                React.createElement("button", { onClick: () => { setProviderDashboardTab('bookings'); closePanel(); }, style: { marginTop: 14, width: '100%', textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: THEME.coral, padding: '10px 0', borderRadius: 12, background: '#FAFAFA' } }, "View Transactions"));
+
+            const repeatCustomers = (() => {
+                const counts = {};
+                filteredBookings.filter((b) => b.status !== 'cancelled').forEach((b) => { counts[b.customerName] = (counts[b.customerName] || 0) + 1; });
+                return Object.values(counts).filter((c) => c > 1).length;
+            })();
+            const completedCount = filteredBookings.filter((b) => b.status === 'completed').length;
+            const performanceRow = React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 26 } },
+                [['Bookings Completed', String(completedCount)], ['Avg. per Booking', money(stats.avgBooking)], ['Repeat Customers', String(repeatCustomers)]].map(([label, val]) => React.createElement("div", { key: label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 8px', textAlign: 'center' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: PD.text, margin: 0 } }, val),
+                    React.createElement("p", { style: { fontSize: 10.5, color: PD.sub, margin: '3px 0 0' } }, label))));
+
+            const maxBarEarning = Math.max(...stats.byDayOfWeek.map((d) => d.earnings), 1);
+            const dayOfWeekInsights = [];
+            if (stats.busiestDay && stats.busiestDay.count > 0)
+                dayOfWeekInsights.push(`📅 ${stats.busiestDay.label} gets the most bookings · ${stats.busiestDay.count} booking${stats.busiestDay.count === 1 ? '' : 's'}`);
+            if (stats.bestEarningDay && stats.bestEarningDay.earnings > 0)
+                dayOfWeekInsights.push(`💰 ${stats.bestEarningDay.label} is your highest-earning day · ${money(stats.bestEarningDay.earnings)} earned`);
+            const dayOfWeekSection = React.createElement("div", { style: { marginTop: 26 } },
+                React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Performance by Day of Week"),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 8, marginTop: 14, height: 90 } },
+                    stats.byDayOfWeek.map((d, i) => React.createElement("button", { key: d.label, onClick: () => setEarningsSelectedDay((prev) => prev === i ? null : i), style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' } },
+                        React.createElement("div", { style: { width: '100%', maxWidth: 26, height: Math.max(6, Math.round((d.earnings / maxBarEarning) * 66)), borderRadius: 6, background: earningsSelectedDay === i ? THEME.coral : '#EDEDED' } }),
+                        React.createElement("span", { style: { fontSize: 10, marginTop: 6, fontWeight: earningsSelectedDay === i ? 700 : 400, color: earningsSelectedDay === i ? THEME.coral : PD.sub } }, d.label)))),
+                dayOfWeekInsights.length > 0 && React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14 } },
+                    dayOfWeekInsights.map((t, i) => React.createElement("p", { key: i, style: { fontSize: 12.5, color: PD.text, margin: 0 } }, t))));
+
+            const rankedServices = [...stats.services].sort((a, b) => servicesRankMode === 'bookings' ? b.count - a.count : b.earnings - a.earnings);
+            const maxServiceVal = Math.max(...rankedServices.map((s) => servicesRankMode === 'bookings' ? s.count : s.earnings), 1);
+            const servicesSection = React.createElement("div", { style: { marginTop: 26 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Most Booked Services"),
+                    React.createElement("div", { style: { display: 'flex', background: '#F5F5F5', borderRadius: 10, padding: 2 } },
+                        [['bookings', 'Most Booked'], ['earnings', 'Highest Earning']].map(([id, label]) => React.createElement("button", { key: id, onClick: () => setServicesRankMode(id), style: { padding: '5px 9px', borderRadius: 8, fontSize: 10.5, fontWeight: 700, background: servicesRankMode === id ? '#fff' : 'transparent', color: servicesRankMode === id ? PD.text : PD.sub } }, label)))),
+                rankedServices.length === 0
+                    ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, marginTop: 12 } }, "No bookings yet in this period.")
+                    : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 12, marginTop: 14 } },
+                        rankedServices.map((s) => {
+                            const val = servicesRankMode === 'bookings' ? s.count : s.earnings;
+                            const pct = Math.round((val / maxServiceVal) * 100);
+                            return React.createElement("button", { key: s.name, onClick: () => setSelectedServiceDetail(s.name), style: { width: '100%', textAlign: 'left' } },
+                                React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 5 } },
+                                    React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: PD.text } }, s.name),
+                                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: PD.text } }, servicesRankMode === 'bookings' ? `${s.count} booking${s.count === 1 ? '' : 's'}` : money(s.earnings))),
+                                React.createElement("div", { style: { width: '100%', height: 6, borderRadius: 3, background: '#F0F0F0' } },
+                                    React.createElement("div", { style: { width: `${pct}%`, height: '100%', borderRadius: 3, background: THEME.coral } })));
+                        })));
+
+            const smartInsightRows = [];
+            if (stats.topServiceByCount)
+                smartInsightRows.push(['🔥', `${stats.topServiceByCount.name} is your most popular service`, `${stats.topServiceByCount.count} booking${stats.topServiceByCount.count === 1 ? '' : 's'} this period`]);
+            if (stats.topServiceByEarnings)
+                smartInsightRows.push(['📈', `${stats.topServiceByEarnings.name} earns you the most`, `${money(stats.topServiceByEarnings.earnings)} total`]);
+            if (stats.busiestDay && stats.busiestDay.count > 0)
+                smartInsightRows.push(['📅', `${stats.busiestDay.label} is your busiest day`, `${stats.busiestDay.count} booking${stats.busiestDay.count === 1 ? '' : 's'} on average`]);
+            if (stats.bestEarningDay && stats.bestEarningDay.earnings > 0)
+                smartInsightRows.push(['💰', `${stats.bestEarningDay.label} is your best earning day`, `${money(stats.bestEarningDay.earnings)} earned`]);
+            const smartInsights = smartInsightRows.length > 0 && React.createElement("div", { style: { marginTop: 26, marginBottom: 20 } },
+                React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Smart Business Insights"),
+                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 } },
+                    smartInsightRows.map(([emoji, title, sub], i) => React.createElement("div", { key: i, style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, border: `1px solid ${PD.border}` } },
+                        React.createElement("span", { style: { fontSize: 18, flexShrink: 0 } }, emoji),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: PD.text, margin: 0 } }, title),
+                            React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, sub))))));
+
+            const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `0 18px calc(env(safe-area-inset-bottom) + 40px)` } },
+                periodFilter, topSection, chartSection, breakdownCard, performanceRow, dayOfWeekSection, servicesSection, smartInsights);
+
+            return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 6, background: '#fff', display: 'flex', flexDirection: 'column' } }, header, body);
+        })(),
+        providerDashboardOpen && earningsInsightsOpen && selectedServiceDetail && (() => {
+            const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const filteredBookings = businessBookings.filter((b) => getBookingDate(b) >= earningsPeriodCutoff(earningsPeriod));
+            const stats = computeEarningsStats(filteredBookings);
+            const s = stats.services.find((x) => x.name === selectedServiceDetail);
+            if (!s) return null;
+            const dayCounts = EARNINGS_WEEKDAYS.map((label, i) => ({ label, count: stats.byDayOfWeek[i].services[s.name] || 0 }));
+            const topDay = dayCounts.reduce((best, d) => (!best || d.count > best.count) ? d : best, null);
+            const pctOfTotal = stats.count > 0 ? Math.round((s.count / stats.count) * 100) : 0;
+            return React.createElement("div", { onClick: () => setSelectedServiceDetail(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 11 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, s.name),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '16px 24px' } },
+                        [['Total Bookings', String(s.count)], ['Total Earnings', money(s.earnings)], ['Avg. Price', money(s.count > 0 ? s.earnings / s.count : 0)], ['Most Popular Day', topDay && topDay.count > 0 ? topDay.label : '—'], ['% of Total Bookings', `${pctOfTotal}%`]].map(([k, v]) => React.createElement("div", { key: k },
+                            React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: 0 } }, k),
+                            React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: PD.text, margin: '3px 0 0', fontFamily: 'Space Grotesk, sans-serif' } }, v)))),
+                    React.createElement("button", { onClick: () => setSelectedServiceDetail(null), style: { width: '100%', height: 48, borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14, marginTop: 22 } }, "Close")));
         })(),
         providerDashboardOpen && serviceFormDraft && (() => {
             const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
