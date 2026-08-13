@@ -3330,7 +3330,7 @@ function App() {
             if (providerDashboardTab === 'overview') {
                 const totalBookings = businessBookings.length;
                 const totalRevenue = businessBookings.reduce((sum, b) => sum + b.price, 0);
-                const newReviews = 3;
+                const profileViews = 0;
                 const chartVals = [0.35, 0.5, 0.4, 0.62, 0.55, 0.8, 1];
                 const chartW = 280, chartH = 64;
                 const chartPts = chartVals.map((v, i) => [Math.round(i * (chartW / (chartVals.length - 1))), Math.round(chartH - v * (chartH - 6) - 3)]);
@@ -3352,7 +3352,7 @@ function App() {
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 6 } },
                         ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => React.createElement("span", { key: d, style: { fontSize: 10, color: PD.sub } }, d))));
                 const statsRow = React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 14 } },
-                    [{ value: totalBookings || 24, label: 'New Bookings' }, { value: money(totalRevenue || 620), label: 'Earnings' }, { value: newReviews, label: 'New Reviews' }].map((s) => React.createElement("div", { key: s.label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 10px', textAlign: 'center' } },
+                    [{ value: totalBookings || 24, label: 'New Bookings' }, { value: money(totalRevenue || 620), label: 'Earnings' }, { value: profileViews, label: 'Profile Views' }].map((s) => React.createElement("div", { key: s.label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 10px', textAlign: 'center' } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: PD.text, margin: 0 } }, s.value),
                         React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: '3px 0 0' } }, s.label))));
                 const QUICK_ACTIONS = [
