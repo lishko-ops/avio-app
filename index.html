@@ -2758,7 +2758,7 @@ function App() {
                 header, tabsRow, cards, bookAgainBtn);
             return scrollContent;
         })())),
-        !(tab === 'connect' && activeConversationId) && React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#000', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', padding: `4px 12px max(2px, calc(env(safe-area-inset-bottom) - 37px))` } },
+        !(tab === 'connect' && activeConversationId) && React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#000', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', padding: `4px 12px max(0px, calc(env(safe-area-inset-bottom) - 37px))` } },
             (accountType === 'business'
                 ? [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'business', icon: 'grid', label: 'Business' }, { id: 'profile', icon: 'user', label: 'Profile' }]
                 : [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Bookings' }, { id: 'budget', icon: 'user', label: 'Profile' }])
