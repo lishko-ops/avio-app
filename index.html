@@ -2758,24 +2758,26 @@ function App() {
                 header, tabsRow, cards, bookAgainBtn);
             return scrollContent;
         })())),
-        !(tab === 'connect' && activeConversationId) && React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#000', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', padding: `4px 12px max(0px, calc(env(safe-area-inset-bottom) - 37px))` } },
-            (accountType === 'business'
-                ? [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'business', icon: 'grid', label: 'Business' }, { id: 'profile', icon: 'user', label: 'Profile' }]
-                : [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Bookings' }, { id: 'budget', icon: 'user', label: 'Profile' }])
-            .map((t, i) => {
-                if (!t) {
-                    return React.createElement("div", { key: "create", style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 } },
-                        React.createElement("button", { className: "avio-fab-tap", onClick: openUploadFlow, style: { width: 40, height: 40, borderRadius: 20, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                            React.createElement("svg", { width: 40, height: 40, viewBox: "0 0 40 40" },
-                                React.createElement("circle", { cx: 20, cy: 20, r: 18, fill: "none", stroke: THEME.coral, strokeWidth: 3.6, strokeDasharray: "2 3.2", strokeLinecap: "round" }))),
-                        React.createElement("span", { style: { fontSize: 12, color: THEME.coral, fontWeight: 600, whiteSpace: 'nowrap' } }, "Create"));
-                }
-                const active = t.id === 'business' ? providerDashboardOpen : t.id === 'profile' ? (businessProfileTarget != null && businessProfileTarget.id === MY_PROVIDER_ID) : tab === t.id;
-                const onNavClick = t.id === 'business' ? () => setProviderDashboardOpen(true) : t.id === 'profile' ? openMyBusinessProfile : () => { setProviderDashboardOpen(false); setTab(t.id); setActiveCat(null); };
-                return React.createElement("button", { key: t.id, onClick: onNavClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 } },
-                    React.createElement(Icon, { name: t.icon, size: 24, color: active ? THEME.coral : THEME.muted, fill: active && (t.icon === 'house' || t.icon === 'message') ? THEME.coral : 'none' }),
-                    React.createElement("span", { style: { fontSize: 12, color: active ? THEME.coral : THEME.muted, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' } }, t.label));
-            })),
+        !(tab === 'connect' && activeConversationId) && React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#000', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column' } },
+            React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', paddingTop: 4, paddingLeft: 12, paddingRight: 12 } },
+                (accountType === 'business'
+                    ? [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'business', icon: 'grid', label: 'Business' }, { id: 'profile', icon: 'user', label: 'Profile' }]
+                    : [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Bookings' }, { id: 'budget', icon: 'user', label: 'Profile' }])
+                .map((t, i) => {
+                    if (!t) {
+                        return React.createElement("div", { key: "create", style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 } },
+                            React.createElement("button", { className: "avio-fab-tap", onClick: openUploadFlow, style: { width: 40, height: 40, borderRadius: 20, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                                React.createElement("svg", { width: 40, height: 40, viewBox: "0 0 40 40" },
+                                    React.createElement("circle", { cx: 20, cy: 20, r: 18, fill: "none", stroke: THEME.coral, strokeWidth: 3.6, strokeDasharray: "2 3.2", strokeLinecap: "round" }))),
+                            React.createElement("span", { style: { fontSize: 12, color: THEME.coral, fontWeight: 600, whiteSpace: 'nowrap' } }, "Create"));
+                    }
+                    const active = t.id === 'business' ? providerDashboardOpen : t.id === 'profile' ? (businessProfileTarget != null && businessProfileTarget.id === MY_PROVIDER_ID) : tab === t.id;
+                    const onNavClick = t.id === 'business' ? () => setProviderDashboardOpen(true) : t.id === 'profile' ? openMyBusinessProfile : () => { setProviderDashboardOpen(false); setTab(t.id); setActiveCat(null); };
+                    return React.createElement("button", { key: t.id, onClick: onNavClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 } },
+                        React.createElement(Icon, { name: t.icon, size: 24, color: active ? THEME.coral : THEME.muted, fill: active && (t.icon === 'house' || t.icon === 'message') ? THEME.coral : 'none' }),
+                        React.createElement("span", { style: { fontSize: 12, color: active ? THEME.coral : THEME.muted, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' } }, t.label));
+                })),
+            React.createElement("div", { style: { height: 'max(0px, calc(env(safe-area-inset-bottom) - 37px))', flexShrink: 0 } })),
         businessProfileTarget && (() => {
             const item = businessProfileTarget;
             const P = profileDrag && profileDrag.itemId === item.id ? profileDrag : { progress: 1, dragging: false };
