@@ -1843,6 +1843,10 @@ function App() {
                 if (prev.progress >= 0.35) {
                     if (navigator.vibrate)
                         navigator.vibrate(10);
+                    if (accountType === 'personal' && item.mine) {
+                        openCustomerProfile();
+                        return null;
+                    }
                     setBusinessProfileTarget(item);
                     setBizProfileTab('videos');
                     return { ...prev, progress: 1, dragging: false };
