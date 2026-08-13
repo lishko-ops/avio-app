@@ -1170,6 +1170,15 @@ function App() {
         if (tab !== 'discover')
             Object.values(shortVideoRefs.current).forEach((v) => { if (v) v.pause(); });
     }, [tab]);
+    useEffect(() => {
+        const pauseAll = () => { if (document.hidden) Object.values(shortVideoRefs.current).forEach((v) => { if (v) v.pause(); }); };
+        document.addEventListener('visibilitychange', pauseAll);
+        window.addEventListener('pagehide', pauseAll);
+        return () => {
+            document.removeEventListener('visibilitychange', pauseAll);
+            window.removeEventListener('pagehide', pauseAll);
+        };
+    }, []);
     const bizPanelTouchRef = useRef(null);
     const lastTapRef = useRef({ time: 0, id: null });
     const [accountType, setAccountType] = useState(() => loadLS('avio_account_type_v2', null) || (() => { try { return localStorage.getItem('avio_account_type'); } catch (e) { return null; } })() || 'personal');
@@ -1346,6 +1355,11 @@ function App() {
     const [customerProfile, setCustomerProfile] = useState(() => loadLS('avio_customer_profile', { fullName: '', username: '', bio: '', location: '', website: '', email: '' }));
     useEffect(() => { saveLS('avio_customer_profile', customerProfile); }, [customerProfile]);
     const [customerProfileOpen, setCustomerProfileOpen] = useState(false);
+    const feedCoveredByOverlay = !!customerProfileOpen || !!businessProfileTarget || !!postViewer || !!bookingTarget || !!providerDashboardOpen || !!uploadOpen;
+    useEffect(() => {
+        if (feedCoveredByOverlay)
+            Object.values(shortVideoRefs.current).forEach((v) => { if (v) v.pause(); });
+    }, [feedCoveredByOverlay]);
     const [customerProfileView, setCustomerProfileView] = useState('main');
     const [customerProfileDraft, setCustomerProfileDraft] = useState(null);
     const [customerProfileTab, setCustomerProfileTab] = useState('thrillz');
