@@ -1071,9 +1071,10 @@ function App() {
     const [timeOffDraft, setTimeOffDraft] = useState(null);
     const [debugSafeAreaBottom, setDebugSafeAreaBottom] = useState('');
     const navBarRef = useRef(null);
+    const safeAreaProbeRef = useRef(null);
     useEffect(() => {
-        if (navBarRef.current)
-            setDebugSafeAreaBottom(getComputedStyle(navBarRef.current).paddingBottom);
+        if (safeAreaProbeRef.current)
+            setDebugSafeAreaBottom(getComputedStyle(safeAreaProbeRef.current).paddingBottom);
     });
     const [providerDashboardOpen, setProviderDashboardOpen] = useState(false);
     const [providerDashboardTab, setProviderDashboardTab] = useState('overview');
@@ -2764,8 +2765,10 @@ function App() {
                 header, tabsRow, cards, bookAgainBtn);
             return scrollContent;
         })())),
-        !(tab === 'connect' && activeConversationId) && React.createElement("div", { ref: navBarRef, style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#000', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', padding: `4px 12px max(4px, calc(env(safe-area-inset-bottom) - 16px))` } },
-            React.createElement("div", { style: { position: 'absolute', top: -14, left: 4, fontSize: 9, color: 'rgba(255,80,80,0.9)', fontWeight: 700, background: 'rgba(0,0,0,0.6)', padding: '1px 4px', borderRadius: 4 } }, `SA-bottom: ${debugSafeAreaBottom}`),
+        !(tab === 'connect' && activeConversationId) && React.createElement(React.Fragment, null,
+            React.createElement("div", { ref: safeAreaProbeRef, style: { position: 'absolute', bottom: 0, left: 0, width: 0, height: 0, paddingBottom: 'env(safe-area-inset-bottom)', pointerEvents: 'none' } }),
+            React.createElement("div", { ref: navBarRef, style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#000', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', padding: `4px 12px max(2px, calc(env(safe-area-inset-bottom) - 28px))` } },
+            React.createElement("div", { style: { position: 'absolute', top: -14, left: 4, fontSize: 9, color: 'rgba(255,80,80,0.9)', fontWeight: 700, background: 'rgba(0,0,0,0.6)', padding: '1px 4px', borderRadius: 4 } }, `raw SA-bottom: ${debugSafeAreaBottom}`),
             (accountType === 'business'
                 ? [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'business', icon: 'grid', label: 'Business' }, { id: 'profile', icon: 'user', label: 'Profile' }]
                 : [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Bookings' }, { id: 'budget', icon: 'user', label: 'Profile' }])
@@ -2782,7 +2785,7 @@ function App() {
                 return React.createElement("button", { key: t.id, onClick: onNavClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 } },
                     React.createElement(Icon, { name: t.icon, size: 24, color: active ? THEME.coral : THEME.muted, fill: active && (t.icon === 'house' || t.icon === 'message') ? THEME.coral : 'none' }),
                     React.createElement("span", { style: { fontSize: 12, color: active ? THEME.coral : THEME.muted, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' } }, t.label));
-            })),
+            }))),
         businessProfileTarget && (() => {
             const item = businessProfileTarget;
             const P = profileDrag && profileDrag.itemId === item.id ? profileDrag : { progress: 1, dragging: false };
