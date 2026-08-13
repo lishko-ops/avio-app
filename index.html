@@ -2211,7 +2211,7 @@ function App() {
                     ? React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
                     : React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#000' } });
             const scrim = React.createElement("div", { style: { position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.38) 22%, rgba(0,0,0,0.4) 45%, rgba(0,0,0,0.68) 72%, rgba(0,0,0,0.94) 100%)' } });
-            const modeSwitcher = hasBusinessProfile && React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 10px)', left: '50%', transform: 'translateX(-50%)', zIndex: 2, display: 'flex', alignItems: 'center', border: `1px solid ${THEME.coral}`, borderRadius: 13, padding: 1.5, background: 'rgba(0,0,0,0.35)' } },
+            const modeSwitcher = hasBusinessProfile && React.createElement("div", { style: { display: 'flex', alignItems: 'center', border: `1px solid ${THEME.coral}`, borderRadius: 13, padding: 1.5, background: 'rgba(0,0,0,0.35)', marginBottom: 3 } },
                 [{ id: 'business', label: 'Business', icon: 'calendar' }, { id: 'personal', label: 'Customer', icon: 'user' }].map((m, i) => {
                     const active = accountType === m.id;
                     return React.createElement(React.Fragment, { key: m.id },
@@ -2220,17 +2220,19 @@ function App() {
                             React.createElement(Icon, { name: m.icon, size: 9, color: active ? THEME.coral : 'rgba(255,255,255,0.75)' }),
                             React.createElement("span", { style: { fontSize: 9.5, fontWeight: 700, color: active ? THEME.coral : 'rgba(255,255,255,0.75)' } }, m.label)));
                 }));
-            const brand = React.createElement("div", { style: { position: 'absolute', top: hasBusinessProfile ? 'calc(env(safe-area-inset-top) + 34px)' : 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 56, zIndex: 2, display: 'flex', alignItems: 'flex-end', gap: 11 } },
-                [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'filters', label: 'Filters' }].map((t) => {
-                    const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
-                    const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
-                    const isMain = t.id === 'forYou';
-                    return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
-                        React.createElement("span", { style: { position: 'relative', display: 'inline-block' } },
-                            React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
-                            isMain && React.createElement("span", { style: { position: 'absolute', top: 0, right: -9, width: 6, height: 6, borderRadius: '50%', background: THEME.coral } })),
-                        React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: '#fff', transition: 'width 0.2s' } }));
-                }));
+            const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 56, zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 11 } },
+                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'filters', label: 'Filters' }].map((t) => {
+                        const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
+                        const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
+                        const isMain = t.id === 'forYou';
+                        return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
+                            React.createElement("span", { style: { position: 'relative', display: 'inline-block' } },
+                                React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
+                                isMain && React.createElement("span", { style: { position: 'absolute', top: 0, right: -9, width: 6, height: 6, borderRadius: '50%', background: THEME.coral } })),
+                            React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: '#fff', transition: 'width 0.2s' } }));
+                    })),
+                modeSwitcher);
             const actionStack = React.createElement("div", { style: { position: 'absolute', right: '3%', bottom: 'calc(env(safe-area-inset-bottom) + 208px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, zIndex: 2 } },
                     (() => {
                         return React.createElement(React.Fragment, null,
@@ -2296,7 +2298,7 @@ function App() {
                 React.createElement(Icon, { name: "diamond", size: 90, color: THEME.coral, fill: THEME.coral }));
             return React.createElement("div", { key: item.id, ref: (el) => { if (el) shortItemRefs.current[item.id] = el; }, "data-short-id": item.id, onTouchStart: (e) => handleShortTouchStart(e, item), onTouchMove: (e) => handleShortTouchMove(e, item), onTouchEnd: (e) => handleShortTouchEnd(e, item), style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
                 React.createElement("div", { style: { position: 'absolute', inset: 0, transform: `translateX(${-dragProgress * 46}px)`, opacity: 1 - dragProgress * 0.35, transition: innerTransition } },
-                    backdrop, scrim, modeSwitcher, brand, actionStack, infoBlock, bookCta),
+                    backdrop, scrim, brand, actionStack, infoBlock, bookCta),
                 arrowOverlay, burstOverlay);
         }))),
         tab === 'discover' && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 18px)', right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 } },
