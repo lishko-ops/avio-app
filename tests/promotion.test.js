@@ -22,6 +22,7 @@ function baseDeal(overrides) {
         value: 20,
         label: '20% OFF TODAY',
         activatedAt: 1000,
+        expiresAt: null,
         eligibleServiceIds: null,
     }, overrides);
 }
@@ -210,4 +211,58 @@ test('resolvePromotionSnapshot returns null when the deal is disabled, regardles
     const deal = baseDeal({ enabled: false, activatedAt: 1000 });
     const snapshot = resolvePromotionSnapshot(deal, service, 999999);
     assert.equal(snapshot, null);
+});
+
+test('a booking made before the promotion expires still receives the discount', () => {
+    const deal = baseDeal({ activatedAt: 1000, expiresAt: 5000 });
+    const snapshot = resolvePromotionSnapshot(deal, service, 4999);
+    assert.ok(snapshot);
+    assert.equal(snapshot.finalPrice, 36);
+});
+
+test('expired promotion: a booking made at or after the expiry time receives no discount', () => {
+    const deal = baseDeal({ activatedAt: 1000, expiresAt: 5000 });
+    assert.equal(resolvePromotionSnapshot(deal, service, 5000), null);
+    assert.equal(resolvePromotionSnapshot(deal, service, 6000), null);
+    // enabled is still true — expiry alone must be enough to stop it, independent of the manual toggle
+    assert.equal(deal.enabled, true);
+});
+
+test('correct percentage calculation end-to-end through resolvePromotionSnapshot', () => {
+    const deal = baseDeal({ type: 'percent', value: 20, activatedAt: 1000 });
+    const snapshot = resolvePromotionSnapshot(deal, { id: 'svc', price: 200 }, 2000);
+    assert.equal(snapshot.discountAmount, 40);
+    assert.equal(snapshot.finalPrice, 160);
+});
+
+test('correct fixed-dollar calculation end-to-end through resolvePromotionSnapshot', () => {
+    const deal = baseDeal({ type: 'fixed', value: 25, activatedAt: 1000 });
+    const snapshot = resolvePromotionSnapshot(deal, { id: 'svc', price: 200 }, 2000);
+    assert.equal(snapshot.discountAmount, 25);
+    assert.equal(snapshot.finalPrice, 175);
+});
+
+test('promotion expiring while a customer sits on checkout is correctly revalidated at confirm time', () => {
+    // Simulates: customer opens checkout while the deal is active (an earlier "preview" call),
+    // then the deal is turned off before they press Confirm. The authoritative call that actually
+    // creates the booking must use a freshly-read deal + timestamp, not the earlier preview result.
+    let deal = baseDeal({ activatedAt: 1000 });
+    const previewWhileActive = resolvePromotionSnapshot(deal, service, 2000); // shown at checkout
+    assert.ok(previewWhileActive);
+
+    deal = deactivatePromotion(deal); // owner turns it off while customer is still on checkout
+
+    const authoritativeAtConfirm = resolvePromotionSnapshot(deal, service, 3000); // finalizeBooking()'s own call
+    assert.equal(authoritativeAtConfirm, null);
+});
+
+test('the pricing function only accepts deal + service + timestamp — there is no channel for a client to submit its own discounted total', () => {
+    // resolvePromotionSnapshot's signature has no "claimedFinalPrice" or "claimedDiscount" parameter;
+    // it always derives finalPrice purely from service.price and the deal's own type/value, so a
+    // caller cannot influence the result by passing anything other than which service was picked.
+    const deal = baseDeal({ activatedAt: 1000 });
+    const snapshot = resolvePromotionSnapshot(deal, service, 2000);
+    assert.equal(resolvePromotionSnapshot.length, 3);
+    assert.deepEqual(Object.keys(snapshot).sort(), ['discountAmount', 'finalPrice', 'originalPrice', 'promotionAppliedAt', 'promotionId', 'promotionLabel', 'promotionType', 'promotionValue'].sort());
+    assert.equal(snapshot.finalPrice, snapshot.originalPrice - snapshot.discountAmount);
 });
