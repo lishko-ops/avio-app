@@ -2724,7 +2724,7 @@ function App() {
                             React.createElement("span", { style: { fontSize: 12, color: THEME.coral, fontWeight: 600, whiteSpace: 'nowrap' } }, "Create"));
                     }
                     const active = t.id === 'business' ? providerDashboardOpen : t.id === 'profile' ? (businessProfileTarget != null && businessProfileTarget.id === MY_PROVIDER_ID) : t.id === 'budget' ? customerProfileOpen : tab === t.id;
-                    const onNavClick = t.id === 'business' ? () => setProviderDashboardOpen(true) : t.id === 'profile' ? openMyBusinessProfile : t.id === 'budget' ? openCustomerProfile : () => { setProviderDashboardOpen(false); setTab(t.id); setActiveCat(null); };
+                    const onNavClick = t.id === 'business' ? () => { setCustomerProfileOpen(false); setProviderDashboardOpen(true); } : t.id === 'profile' ? () => { setCustomerProfileOpen(false); openMyBusinessProfile(); } : t.id === 'budget' ? openCustomerProfile : () => { setCustomerProfileOpen(false); setProviderDashboardOpen(false); setTab(t.id); setActiveCat(null); };
                     return React.createElement("button", { key: t.id, onClick: onNavClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, flexShrink: 0 } },
                         React.createElement(Icon, { name: t.icon, size: 24, color: active ? THEME.coral : THEME.muted, fill: active && (t.icon === 'house' || t.icon === 'message') ? THEME.coral : 'none' }),
                         React.createElement("span", { style: { fontSize: 12, color: active ? THEME.coral : THEME.muted, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' } }, t.label));
