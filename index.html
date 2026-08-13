@@ -1349,7 +1349,6 @@ function App() {
     const [customerProfileView, setCustomerProfileView] = useState('main');
     const [customerProfileDraft, setCustomerProfileDraft] = useState(null);
     const [customerProfileTab, setCustomerProfileTab] = useState('thrillz');
-    const [customerMenuOpen, setCustomerMenuOpen] = useState(false);
     const [customerFollowSearch, setCustomerFollowSearch] = useState('');
     const [paymentMethod, setPaymentMethod] = useState(null);
     const [agreedToPolicy, setAgreedToPolicy] = useState(false);
@@ -2904,7 +2903,7 @@ function App() {
             const displayName = customerProfile.fullName.trim() || 'Add your name';
             const initial = customerProfile.fullName.trim() ? customerProfile.fullName.trim().charAt(0).toUpperCase() : 'U';
             const profileLink = `bookvado.app/u/${customerProfile.username.trim() || 'me'}`;
-            const TITLES = { followers: 'Followers', following: 'Following', earnings: 'Earnings', editProfile: 'Edit Profile', settings: 'Settings', myThrillz: 'My Thrillz', share: 'Share Profile' };
+            const TITLES = { followers: 'Followers', following: 'Following', earnings: 'Earnings', editProfile: 'Edit Profile', myThrillz: 'My Thrillz', share: 'Share Profile' };
             const openEditProfile = () => { setCustomerProfileDraft({ ...customerProfile }); setCustomerProfileView('editProfile'); };
             const emptyGrid = (text) => React.createElement("p", { style: { fontSize: 13, color: CP.sub, textAlign: 'center', padding: '40px 0' } }, text);
             const grid = (items, emptyText, onTapItem) => items.length === 0
@@ -2973,14 +2972,6 @@ function App() {
                     field("Website", 'website', "yourwebsite.com"),
                     field("Email", 'email', "you@email.com"));
             }
-            else if (customerProfileView === 'settings') {
-                const SETTINGS_ROWS = ['Account', 'Privacy', 'Notifications', 'Security', 'Payment Methods', 'Blocked Accounts', 'Help Center', 'About BookVado'];
-                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 90px)' } },
-                    SETTINGS_ROWS.map((label) => React.createElement("button", { key: label, onClick: () => flashToast(`${label} — coming soon`), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 0', borderBottom: `1px solid ${CP.border}` } },
-                        React.createElement("span", { style: { fontSize: 14, color: CP.text } }, label),
-                        React.createElement(Icon, { name: "chevronright", size: 15, color: CP.sub }))),
-                    React.createElement("button", { onClick: () => { closeCustomerProfile(); logout(); }, style: { width: '100%', textAlign: 'left', padding: '15px 0', fontSize: 14, fontWeight: 700, color: '#D0304A' } }, "Log Out"));
-            }
             else if (customerProfileView === 'share') {
                 const copyLink = () => { try { navigator.clipboard.writeText(profileLink); } catch (e) { } flashToast('Link copied to clipboard'); };
                 const nativeShare = () => shareItem({ name: displayName });
@@ -3026,9 +3017,7 @@ function App() {
                                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: CP.text, margin: 0 } }, s.value),
                                 React.createElement("p", { style: { fontSize: 11.5, color: CP.sub, marginTop: 2 } }, s.label))))),
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 18 } },
-                        React.createElement("button", { onClick: openEditProfile, style: { flex: 1, padding: '12px 0', borderRadius: 20, background: '#161616', color: '#fff', fontSize: 13.5, fontWeight: 700 } }, "Edit Profile"),
-                        React.createElement("button", { onClick: () => setCustomerProfileView('settings'), style: { width: 42, height: 42, borderRadius: 14, border: `1px solid ${CP.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                            React.createElement(Icon, { name: "sliders", size: 17, color: CP.text }))),
+                        React.createElement("button", { onClick: openEditProfile, style: { flex: 1, padding: '12px 0', borderRadius: 20, background: '#161616', color: '#fff', fontSize: 13.5, fontWeight: 700 } }, "Edit Profile")),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', marginTop: 22, borderBottom: `1px solid ${CP.border}` } },
                         TABS.map((t) => {
                             const active = activeTab === t.id;
@@ -3051,7 +3040,7 @@ function App() {
                     ? React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
                         React.createElement("button", { onClick: () => setCustomerProfileView('share'), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                             React.createElement(Icon, { name: "upload", size: 18, color: CP.text })),
-                        React.createElement("button", { onClick: () => setCustomerMenuOpen(true), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement("button", { onClick: () => setProfileMenuOpen(true), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                             React.createElement("span", { style: { fontSize: 18, color: CP.text, letterSpacing: 1 } }, "•••")))
                     : customerProfileView === 'editProfile'
                         ? React.createElement("button", { onClick: () => { setCustomerProfile({ ...customerProfileDraft }); setCustomerProfileView('main'); }, style: { fontSize: 14, fontWeight: 700, color: THEME.coral } }, "Save")
@@ -3060,9 +3049,6 @@ function App() {
             return React.createElement("div", { key: "customerprofile", style: { position: 'absolute', inset: 0, zIndex: 1, background: '#fff', display: 'flex', flexDirection: 'column' } },
                 header, body);
         })(),
-        customerMenuOpen && (React.createElement("div", { onClick: () => setCustomerMenuOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
-            React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `10px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
-                [{ label: 'Share Profile', onClick: () => setCustomerProfileView('share') }, { label: 'Settings', onClick: () => setCustomerProfileView('settings') }].map((item) => React.createElement("button", { key: item.label, onClick: () => { setCustomerMenuOpen(false); item.onClick(); }, style: { width: '100%', textAlign: 'left', padding: '13px 4px', fontSize: 14, color: '#161616', fontWeight: 500, borderBottom: '1px solid #ECECEE' } }, item.label))))),
         modeSwitcherOpen && (React.createElement("div", { onClick: () => setModeSwitcherOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
             React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
                 React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#ECECEE', margin: '0 auto 16px' } }),
