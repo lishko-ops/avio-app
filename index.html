@@ -2330,7 +2330,7 @@ function App() {
             React.createElement("button", { onClick: () => { setShortsSearchOpen(false); setShortsQuery(''); }, style: { color: THEME.mutedDark, display: 'flex' } },
                 React.createElement(Icon, { name: "x", size: 14, color: THEME.mutedDark })))) : (React.createElement("button", { onClick: () => setShortsSearchOpen(true), style: { display: 'flex' } },
                 React.createElement(Icon, { name: "search", size: 20, color: "#fff" }))))),
-        tab === 'browse' && (React.createElement("div", { style: { height: '100%', overflowY: 'auto', background: '#fff', padding: `calc(env(safe-area-inset-top) + 16px) 0 calc(env(safe-area-inset-bottom) + 90px)` } }, (() => {
+        tab === 'browse' && (React.createElement("div", { style: { position: 'absolute', inset: 0, overflowY: 'auto', background: '#fff', padding: `calc(env(safe-area-inset-top) + 16px) 0 calc(env(safe-area-inset-bottom) + 90px)` } }, (() => {
             const categories = CATEGORIES.filter((c) => c.id !== 'shorts');
             const quickFilters = [
                 { id: 'forYou', label: 'For You' },
@@ -2453,7 +2453,7 @@ function App() {
                             React.createElement(Icon, { name: "chevronright", size: 16, color: '#C7C7CC' }))))))
             );
         })())),
-        tab === 'connect' && (React.createElement("div", { style: { height: '100%', position: 'relative', background: '#fff' } }, (() => {
+        tab === 'connect' && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#fff' } }, (() => {
             const CN = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
             if (accountType === 'business') {
                 const bizActiveConversation = businessConversations.find((c) => c.id === activeConversationId);
@@ -2670,7 +2670,7 @@ function App() {
             return React.createElement("div", { className: "avio-scroll", style: { height: '100%', overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 90px)` } },
                 header, searchRow, avatarRow, filterRow, list);
         })())),
-        tab === 'bookings' && (React.createElement("div", { style: { height: '100%', position: 'relative', background: '#fff' } }, (() => {
+        tab === 'bookings' && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#fff' } }, (() => {
             const BK = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
             const today = new Date();
             const nowMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
