@@ -2710,8 +2710,8 @@ function App() {
                 header, tabsRow, cards, bookAgainBtn);
             return scrollContent;
         })())),
-        React.createElement("div", { key: "safeAreaBacking", style: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 'env(safe-area-inset-bottom)', background: '#000', zIndex: 3, pointerEvents: 'none' } }),
-        !(tab === 'connect' && activeConversationId) && React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#000', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column' } },
+        React.createElement("div", { key: "safeAreaBacking", style: { position: 'fixed', left: 0, right: 0, bottom: 0, height: 'calc(env(safe-area-inset-bottom) + 4px)', background: '#000', zIndex: 3, pointerEvents: 'none' } }),
+        !(tab === 'connect' && activeConversationId) && React.createElement("div", { style: { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#000', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column' } },
             React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', paddingTop: 2, paddingLeft: 12, paddingRight: 12 } },
                 (accountType === 'business'
                     ? [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'business', icon: 'grid', label: 'Business' }, { id: 'profile', icon: 'user', label: 'Profile' }]
