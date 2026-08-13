@@ -2758,14 +2758,14 @@ function App() {
 
             let body;
             if (customerProfileView === 'followers') {
-                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 24px)' } },
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 90px)' } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: '#F5F5F5', borderRadius: 12, padding: '10px 12px', marginBottom: 18 } },
                         React.createElement(Icon, { name: "search", size: 15, color: CP.sub }),
                         React.createElement("span", { style: { fontSize: 13.5, color: CP.sub } }, "Search followers")),
                     emptyGrid("No followers yet"));
             }
             else if (customerProfileView === 'following') {
-                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 24px)' } },
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 90px)' } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: '#F5F5F5', borderRadius: 12, padding: '10px 12px', marginBottom: 18 } },
                         React.createElement(Icon, { name: "search", size: 15, color: CP.sub }),
                         React.createElement("input", { value: customerFollowSearch, onChange: (e) => setCustomerFollowSearch(e.target.value), placeholder: "Search following", style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13.5, color: CP.text } })),
@@ -2783,7 +2783,7 @@ function App() {
             }
             else if (customerProfileView === 'earnings') {
                 const rows = [{ label: 'Available Balance', value: 0 }, { label: 'Pending', value: 0 }, { label: 'Paid Out', value: 0 }];
-                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 24px)' } },
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 90px)' } },
                     React.createElement("div", { style: { textAlign: 'center', padding: '18px 0 26px' } },
                         React.createElement("p", { style: { fontSize: 12.5, color: CP.sub, margin: 0 } }, "Total Earned"),
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 34, color: CP.text, margin: '4px 0 0' } }, "$0"),
@@ -2802,7 +2802,7 @@ function App() {
                 const field = (label, key, placeholder) => React.createElement("div", { style: { marginBottom: 18 } },
                     React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: CP.sub, marginBottom: 6 } }, label),
                     React.createElement("input", { value: d[key], onChange: (e) => setCustomerProfileDraft({ ...d, [key]: e.target.value }), placeholder: placeholder, style: { width: '100%', border: `1px solid ${CP.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 14, color: CP.text, outline: 'none', fontFamily: 'inherit' } }));
-                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 24px)' } },
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 90px)' } },
                     React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 22 } },
                         React.createElement("div", { style: { width: 84, height: 84, borderRadius: '50%', background: THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 28, color: '#fff' } }, initial),
                         React.createElement("button", { onClick: () => flashToast('Change photo — coming soon'), style: { marginTop: 10, fontSize: 13, fontWeight: 700, color: THEME.coral } }, "Change Photo")),
@@ -2815,7 +2815,7 @@ function App() {
             }
             else if (customerProfileView === 'settings') {
                 const SETTINGS_ROWS = ['Account', 'Privacy', 'Notifications', 'Security', 'Payment Methods', 'Blocked Accounts', 'Help Center', 'About BookVado'];
-                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 24px)' } },
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 90px)' } },
                     SETTINGS_ROWS.map((label) => React.createElement("button", { key: label, onClick: () => flashToast(`${label} — coming soon`), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 0', borderBottom: `1px solid ${CP.border}` } },
                         React.createElement("span", { style: { fontSize: 14, color: CP.text } }, label),
                         React.createElement(Icon, { name: "chevronright", size: 15, color: CP.sub }))),
@@ -2824,7 +2824,7 @@ function App() {
             else if (customerProfileView === 'share') {
                 const copyLink = () => { try { navigator.clipboard.writeText(profileLink); } catch (e) { } flashToast('Link copied to clipboard'); };
                 const nativeShare = () => shareItem({ name: displayName });
-                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '20px 18px calc(env(safe-area-inset-bottom) + 24px)' } },
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '20px 18px calc(env(safe-area-inset-bottom) + 90px)' } },
                     React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 0 30px' } },
                         React.createElement("div", { style: { width: 84, height: 84, borderRadius: '50%', background: THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 28, color: '#fff', marginBottom: 12 } }, initial),
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: CP.text, margin: 0 } }, displayName),
@@ -2837,7 +2837,7 @@ function App() {
                             React.createElement("span", { style: { fontSize: 11.5, color: CP.text } }, a.label)))));
             }
             else if (customerProfileView === 'myThrillz') {
-                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 24px)' } },
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 90px)' } },
                     grid(custThrillz, "No Thrillz yet", openThrill(custThrillz)));
             }
             else {
@@ -2847,7 +2847,7 @@ function App() {
                 const activeGrid = activeTab === 'thrillz' ? grid(custThrillz, "No Thrillz yet", openThrill(custThrillz))
                     : activeTab === 'saved' ? grid(custSaved, "Nothing saved yet", openThrill(custSaved))
                         : grid(custLiked, "No liked Thrillz yet", openThrill(custLiked));
-                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 24px)' } },
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 90px)' } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14, marginTop: 4 } },
                         React.createElement("div", { style: { position: 'relative', flexShrink: 0 } },
                             React.createElement("div", { style: { width: 84, height: 84, borderRadius: '50%', background: THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: '#fff' } }, initial),
@@ -2897,7 +2897,7 @@ function App() {
                         ? React.createElement("button", { onClick: () => { setCustomerProfile({ ...customerProfileDraft }); setCustomerProfileView('main'); }, style: { fontSize: 14, fontWeight: 700, color: THEME.coral } }, "Save")
                         : React.createElement("div", { style: { width: 34 } }));
 
-            return React.createElement("div", { key: "customerprofile", style: { position: 'absolute', inset: 0, zIndex: 11, background: '#fff', display: 'flex', flexDirection: 'column' } },
+            return React.createElement("div", { key: "customerprofile", style: { position: 'absolute', inset: 0, zIndex: 1, background: '#fff', display: 'flex', flexDirection: 'column' } },
                 header, body);
         })(),
         customerMenuOpen && (React.createElement("div", { onClick: () => setCustomerMenuOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
