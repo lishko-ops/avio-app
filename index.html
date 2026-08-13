@@ -1069,6 +1069,12 @@ function App() {
     const [breakDraft, setBreakDraft] = useState(null);
     const [unavailableDraft, setUnavailableDraft] = useState(null);
     const [timeOffDraft, setTimeOffDraft] = useState(null);
+    const [debugSafeAreaBottom, setDebugSafeAreaBottom] = useState('');
+    const navBarRef = useRef(null);
+    useEffect(() => {
+        if (navBarRef.current)
+            setDebugSafeAreaBottom(getComputedStyle(navBarRef.current).paddingBottom);
+    });
     const [providerDashboardOpen, setProviderDashboardOpen] = useState(false);
     const [providerDashboardTab, setProviderDashboardTab] = useState('overview');
     useEffect(() => { if (providerDashboardTab !== 'hours') setScheduleView('menu'); }, [providerDashboardTab]);
@@ -2758,7 +2764,8 @@ function App() {
                 header, tabsRow, cards, bookAgainBtn);
             return scrollContent;
         })())),
-        !(tab === 'connect' && activeConversationId) && React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#000', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', padding: `4px 12px env(safe-area-inset-bottom)` } },
+        !(tab === 'connect' && activeConversationId) && React.createElement("div", { ref: navBarRef, style: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 4, background: '#000', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', padding: `4px 12px env(safe-area-inset-bottom)` } },
+            React.createElement("div", { style: { position: 'absolute', top: -14, left: 4, fontSize: 9, color: 'rgba(255,80,80,0.9)', fontWeight: 700, background: 'rgba(0,0,0,0.6)', padding: '1px 4px', borderRadius: 4 } }, `SA-bottom: ${debugSafeAreaBottom}`),
             (accountType === 'business'
                 ? [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'business', icon: 'grid', label: 'Business' }, { id: 'profile', icon: 'user', label: 'Profile' }]
                 : [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Bookings' }, { id: 'budget', icon: 'user', label: 'Profile' }])
