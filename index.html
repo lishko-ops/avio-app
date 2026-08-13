@@ -81,6 +81,7 @@
     if (f) { f.style.display = "block"; f.textContent = "Error: " + e.message; }
   });
 </script>
+<script src="promotions.js"></script>
 <script>
 "use strict";
 const { useState, useMemo, useEffect, useRef } = React;
@@ -315,7 +316,7 @@ function getServicesForTarget(item) {
         return [];
     const base = item.price || 50;
     const list = BOOKING_SERVICE_TEMPLATES[item.category] || BOOKING_SERVICE_TEMPLATES.Beauty;
-    return list.map((s, i) => ({ name: s.name, durationMin: s.durationMin, price: Math.max(15, Math.round(base * (BOOKING_SERVICE_MULTIPLIERS[i] || 1))) }));
+    return list.map((s, i) => ({ id: `${item.id}-svc${i}`, name: s.name, durationMin: s.durationMin, price: Math.max(15, Math.round(base * (BOOKING_SERVICE_MULTIPLIERS[i] || 1))) }));
 }
 function formatDuration(min) {
     if (min < 60)
@@ -572,16 +573,16 @@ const FEED = [
     { id: 'f0', category: 'Beauty', name: 'Fade House', location: 'Miami, FL', rating: 4.9, price: 35, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Clean fade. Sharp lines. Precision cuts. Premium experience.', verified: true, distance: '0.5 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#miami', '#fade'], friendsBooked: 120, avatarColor: '#161616', locationMode: 'At my business location',
         staff: [{ id: 'f0-staff-jessie', name: 'Jessie', customHours: null }, { id: 'f0-staff-jackie', name: 'Jackie', customHours: null }] },
     { id: 'f1', category: 'Home Services', name: 'Sparkle Squad Cleaning', location: 'Denver, CO', rating: 4.8, price: 120, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Deep clean, move-in/move-out, eco-friendly products.', verified: true, distance: '1.2 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#cleaning', '#denver', '#freshhome'], friendsBooked: 8, avatarColor: '#3F6FBF', locationMode: 'I travel to customers',
-        deal: { enabled: true, label: '15% OFF TODAY' } },
+        deal: { id: 'deal-f1', enabled: true, type: 'percent', value: 15, label: '15% OFF TODAY', activatedAt: 0, eligibleServiceIds: null } },
     { id: 'f2', category: 'Home Services', name: 'Fresh Start Cleaners', location: 'Miami, FL', rating: 4.9, price: 90, likes: '892', comments: 18, saves: '1.4K', blurb: 'Residential and post-construction cleaning.', verified: true, distance: '2.4 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#cleaning', '#miami', '#ecofriendly'], friendsBooked: 5, avatarColor: '#3FBF8A', locationMode: 'I travel to customers' },
     { id: 'f3', category: 'Beauty', name: 'Glow by Mia', location: 'Austin, TX', rating: 4.7, price: 150, likes: '2.1K', comments: 76, saves: '3.6K', blurb: 'Balayage and color correction specialist.', verified: true, distance: '0.6 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#balayage', '#austin', '#haircolor'], friendsBooked: 14, avatarColor: '#8FBF3F', locationMode: 'At my business location' },
     { id: 'f4', category: 'Beauty', name: 'Kiana Frost MUA', location: 'Brooklyn, NY', rating: 5.0, price: 220, likes: '3.4K', comments: 130, saves: '5.2K', blurb: 'Bridal and editorial makeup artistry.', verified: true, distance: '0.9 mi', openStatus: 'Booking Fast · 3 slots left', hashtags: ['#bridalmakeup', '#brooklyn', '#glam'], friendsBooked: 22, avatarColor: '#BF6B3F', locationMode: 'I travel to customers' },
     { id: 'f5', category: 'Parties', name: 'Belle Noir Events', location: 'Chicago, IL', rating: 4.6, price: 400, likes: '640', comments: 24, saves: '980', blurb: 'Full-service party planning and styling.', verified: false, distance: '3.1 mi', openStatus: 'Open Now · Closes 9PM', hashtags: ['#eventplanning', '#chicago', '#luxury'], friendsBooked: 6, avatarColor: '#F5134F', locationMode: 'I travel to customers' },
     { id: 'f6', category: 'Restaurants', name: "Camille's Table", location: 'New Orleans, LA', rating: 4.9, price: 85, likes: '1.8K', comments: 58, saves: '2.9K', blurb: "Chef's tasting menu, seasonal ingredients.", verified: true, distance: '1.5 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#neworleans', '#tastingmenu', '#chef'], friendsBooked: 19, avatarColor: '#F5A623', locationMode: 'At my business location',
-        deal: { enabled: true, label: '20% OFF TODAY' } },
+        deal: { id: 'deal-f6', enabled: true, type: 'percent', value: 20, label: '20% OFF TODAY', activatedAt: 0, eligibleServiceIds: null } },
     { id: 'f7', category: 'Parties', name: 'Nova Sound DJs', location: 'Los Angeles, CA', rating: 4.8, price: 350, likes: '2.7K', comments: 95, saves: '4.1K', blurb: 'Wedding and club DJ sets with full sound and lighting rig.', verified: true, distance: '4.2 mi', openStatus: 'Available Today', hashtags: ['#dj', '#losangeles', '#nightlife'], friendsBooked: 31, avatarColor: '#6C4CFC', locationMode: 'I travel to customers' },
     { id: 'f8', category: 'Beauty', name: 'Bare Skin Makeup Co.', location: 'Phoenix, AZ', rating: 4.9, price: 130, likes: '1.5K', comments: 61, saves: '2.3K', blurb: 'Natural glam and airbrush makeup for any event.', verified: false, distance: '0.8 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#makeup', '#phoenix', '#airbrush'], friendsBooked: 11, avatarColor: '#3FA6BF', locationMode: 'I travel to customers',
-        deal: { enabled: true, label: '$25 OFF TODAY' } },
+        deal: { id: 'deal-f8', enabled: true, type: 'fixed', value: 25, label: '$25 OFF TODAY', activatedAt: 0, eligibleServiceIds: null } },
 ];
 const CATEGORIES = [
     { id: 'shorts', label: 'All shorts', count: 31, icon: 'compass', color: '#2E9BFF' },
@@ -664,20 +665,25 @@ function earningsPeriodCutoff(period) {
 }
 function computeEarningsStats(list) {
     const counted = list.filter((b) => b.status !== 'cancelled');
-    const totalEarnings = counted.reduce((sum, b) => sum + b.price, 0);
+    // Always uses each booking's own locked finalPrice (never recalculated from a live promotion).
+    const revenues = counted.map((b) => summarizeBookingRevenue(b));
+    const totalEarnings = revenues.reduce((sum, r) => sum + r.net, 0);
+    const grossServiceValue = revenues.reduce((sum, r) => sum + r.gross, 0);
+    const promotionDiscountTotal = revenues.reduce((sum, r) => sum + r.discount, 0);
     const byDayOfWeek = EARNINGS_WEEKDAYS.map((label) => ({ label, earnings: 0, count: 0, services: {} }));
     const byService = {};
-    counted.forEach((b) => {
+    counted.forEach((b, i) => {
+        const net = revenues[i].net;
         const jsDay = getBookingDate(b).getDay();
         const idx = (jsDay + 6) % 7;
         const day = byDayOfWeek[idx];
-        day.earnings += b.price;
+        day.earnings += net;
         day.count += 1;
         day.services[b.service] = (day.services[b.service] || 0) + 1;
         if (!byService[b.service])
             byService[b.service] = { name: b.service, count: 0, earnings: 0 };
         byService[b.service].count += 1;
-        byService[b.service].earnings += b.price;
+        byService[b.service].earnings += net;
     });
     byDayOfWeek.forEach((day) => {
         let topService = null, topCount = 0;
@@ -687,7 +693,7 @@ function computeEarningsStats(list) {
     });
     const services = Object.values(byService);
     return {
-        totalEarnings, count: counted.length,
+        totalEarnings, grossServiceValue, promotionDiscountTotal, count: counted.length,
         avgBooking: counted.length > 0 ? totalEarnings / counted.length : 0,
         byDayOfWeek, services,
         bestEarningDay: byDayOfWeek.reduce((best, d) => (!best || d.earnings > best.earnings) ? d : best, null),
@@ -1151,7 +1157,11 @@ function App() {
         setBusinessBookingDetail((prev) => prev && prev.id === id ? { ...prev, status } : prev);
         flashToast(status === 'completed' ? 'Marked as completed' : 'Booking cancelled');
     }
-    const [providerDeal, setProviderDeal] = useState(() => loadLS('avio_provider_deal', { enabled: false, label: '20% OFF TODAY' }));
+    const [providerDeal, setProviderDeal] = useState(() => {
+        const defaults = { id: 'deal-main', enabled: false, type: 'percent', value: 20, label: '20% OFF TODAY', activatedAt: null, eligibleServiceIds: null };
+        const loaded = loadLS('avio_provider_deal', null);
+        return loaded ? { ...defaults, ...loaded } : defaults;
+    });
     const [promoDraftOpen, setPromoDraftOpen] = useState(false);
     useEffect(() => { saveLS('avio_provider_deal', providerDeal); }, [providerDeal]);
     useEffect(() => { saveLS('avio_provider_services', providerServices); }, [providerServices]);
@@ -1676,9 +1686,13 @@ function App() {
     function finalizeBooking() {
         if (!bookingTarget || !selectedService || selTime == null)
             return;
-        const price = selectedService.price;
-        const tax = Math.round(price * 0.08 * 100) / 100;
-        const total = Math.round((price + tax) * 100) / 100;
+        const bookingCreatedAt = Date.now();
+        const deal = resolveProviderDeal(bookingTarget.id, MY_PROVIDER_ID, providerDeal, FEED);
+        const promo = resolvePromotionSnapshot(deal, selectedService, bookingCreatedAt);
+        const originalPrice = selectedService.price;
+        const finalPrice = promo ? promo.finalPrice : originalPrice;
+        const tax = Math.round(finalPrice * 0.08 * 100) / 100;
+        const total = Math.round((finalPrice + tax) * 100) / 100;
         const d = new Date(bookingCalMonth.getFullYear(), bookingCalMonth.getMonth(), bookingSelectedDay);
         const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const initials = bookingTarget.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
@@ -1689,6 +1703,14 @@ function App() {
             date: label, day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), time: minutesToTimeLabel(selTime), total, status: 'confirmed',
             address: bookingTarget.location || 'Address shared after booking', duration: formatDuration(selectedService.durationMin), logoText: initials,
             confirmationNumber, paymentMethod, staffId: selectedStaff ? selectedStaff.id : null, staffName: selectedStaff ? selectedStaff.name : null,
+            bookingCreatedAt, originalPrice, finalPrice,
+            discountAmount: promo ? promo.discountAmount : 0,
+            promotionApplied: !!promo,
+            promotionId: promo ? promo.promotionId : null,
+            promotionLabel: promo ? promo.promotionLabel : null,
+            promotionType: promo ? promo.promotionType : null,
+            promotionValue: promo ? promo.promotionValue : null,
+            promotionAppliedAt: promo ? promo.promotionAppliedAt : null,
         };
         setBookings((prev) => [booking, ...prev]);
         setBalance((b) => Math.max(0, b - total));
@@ -3171,7 +3193,7 @@ function App() {
                     React.createElement("span", { style: { fontSize: 12 } }, icon), React.createElement("span", { style: { fontSize: 12, color: BF.text } }, text));
             }
             const services = bookingTarget.id === MY_PROVIDER_ID
-                ? providerServices.map((s) => ({ name: s.name, durationMin: s.durationMinutes, price: s.price }))
+                ? providerServices.map((s) => ({ id: s.id, name: s.name, durationMin: s.durationMinutes, price: s.price }))
                 : getServicesForTarget(bookingTarget);
             const today = new Date();
             const calYear2 = bookingCalMonth.getFullYear();
@@ -3181,8 +3203,11 @@ function App() {
             const calCells2 = [...Array(calFirstWeekday2).fill(null), ...Array.from({ length: calDaysInMonth2 }, (_, i) => i + 1)];
             const isPastDay = (day) => new Date(calYear2, calMonthIdx2, day) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
             const selectedDateObj = new Date(calYear2, calMonthIdx2, bookingSelectedDay);
-            const tax = selectedService ? Math.round(selectedService.price * 0.08 * 100) / 100 : 0;
-            const total = selectedService ? Math.round((selectedService.price + tax) * 100) / 100 : 0;
+            const activeDeal = resolveProviderDeal(bookingTarget.id, MY_PROVIDER_ID, providerDeal, FEED);
+            const promoPreview = selectedService ? resolvePromotionSnapshot(activeDeal, selectedService, Date.now()) : null;
+            const priceBeforeTax = selectedService ? (promoPreview ? promoPreview.finalPrice : selectedService.price) : 0;
+            const tax = selectedService ? Math.round(priceBeforeTax * 0.08 * 100) / 100 : 0;
+            const total = selectedService ? Math.round((priceBeforeTax + tax) * 100) / 100 : 0;
             const initials2 = bookingTarget.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
             const paymentLabel = { apple: 'Apple Pay', card: 'Credit/Debit Card', google: 'Google Pay', saved: 'Saved Card', gift: 'Gift Card', promo: 'Promo Code' }[paymentMethod] || '—';
             const staffOptions = getStaffForTarget(bookingTarget);
@@ -3216,13 +3241,17 @@ function App() {
                     React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: BF.text, marginTop: 22, marginBottom: 10 } }, "Choose a service"),
                     React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, services.map((s) => {
                         const active = selectedService && selectedService.name === s.name;
+                        const sPromo = resolvePromotionSnapshot(activeDeal, s, Date.now());
                         return React.createElement("button", { key: s.name, onClick: () => setSelectedService(s), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', borderRadius: 16, border: `1.5px solid ${active ? THEME.coral : BF.border}`, background: active ? '#FAFAFA' : '#fff' } },
                             React.createElement("div", { style: { textAlign: 'left' } },
                                 React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BF.text, margin: 0 } }, s.name),
-                                React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 3 } }, formatDuration(s.durationMin))),
+                                React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 3 } }, formatDuration(s.durationMin)),
+                                sPromo && React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, color: THEME.coral, marginTop: 3 } }, sPromo.promotionLabel)),
                             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
-                                React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: BF.text } }, money(s.price)),
-                                React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" }))));
+                                React.createElement("div", { style: { textAlign: 'right' } },
+                                    sPromo && React.createElement("p", { style: { fontSize: 11, color: BF.sub, textDecoration: 'line-through', margin: 0 } }, money(sPromo.originalPrice)),
+                                    React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: sPromo ? THEME.coral : BF.text } }, money(sPromo ? sPromo.finalPrice : s.price))),
+                                React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" }))));
                     })));
             }
             else if (bookingStep === 'staff') {
@@ -3310,9 +3339,11 @@ function App() {
                             ['Time', selTime != null ? minutesToTimeLabel(selTime) : '—'],
                             ['Duration', selectedService ? formatDuration(selectedService.durationMin) : '—'],
                             ['Location', bookingTarget.location || '—'],
+                            ...(promoPreview ? [['Original Price', money(promoPreview.originalPrice)]] : []),
+                            ...(promoPreview ? [[promoPreview.promotionLabel, '-' + money(promoPreview.discountAmount)]] : []),
                             ['Price', money(total)],
                             ['Payment', paymentLabel],
-                        ].map(([k, v]) => React.createElement("div", { key: k, style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0' } }, React.createElement("span", { style: { fontSize: 12, color: BF.sub } }, k), React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: BF.text } }, v))))),
+                        ].map(([k, v]) => React.createElement("div", { key: k, style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0' } }, React.createElement("span", { style: { fontSize: 12, color: promoPreview && k === promoPreview.promotionLabel ? THEME.coral : BF.sub, fontWeight: promoPreview && k === promoPreview.promotionLabel ? 700 : 400 } }, k), React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: promoPreview && k === promoPreview.promotionLabel ? THEME.coral : BF.text } }, v))))),
                     React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 16, lineHeight: 1.5 } }, "Cancellation Policy: You can cancel or reschedule up to 2 hours before your appointment."),
                     React.createElement("button", { onClick: () => setAgreedToPolicy((v) => !v), style: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 } },
                         React.createElement("div", { style: { width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${agreedToPolicy ? THEME.coral : '#D1D1D6'}`, background: agreedToPolicy ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, agreedToPolicy && React.createElement(Icon, { name: "check", size: 12, color: "#fff" })),
@@ -3329,7 +3360,9 @@ function App() {
                             React.createElement("div", { style: { width: 44, height: 44, borderRadius: 12, background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, flexShrink: 0 } }, b.logoText),
                             React.createElement("div", null, React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BF.text, margin: 0 } }, b.business), React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 2 } }, b.service))),
                         React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: '1px solid #ECECEE', display: 'flex', flexDirection: 'column', gap: 6 } },
-                            b.staffName && row2('💈', b.staffName), row2('📅', `${b.date} · ${b.time}`), row2('📍', b.address), row2('💳', money(b.total)), row2('#', b.confirmationNumber))),
+                            b.staffName && row2('💈', b.staffName), row2('📅', `${b.date} · ${b.time}`), row2('📍', b.address),
+                            b.promotionApplied && row2('🏷', `${b.promotionLabel} · You saved ${money(b.discountAmount)}`),
+                            row2('💳', money(b.total)), row2('#', b.confirmationNumber))),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', width: '100%', marginTop: 22 } },
                         [['calendar', 'Add to Calendar', () => addToAppleCalendar(b)], ['message', 'Message', () => flashToast('Messaging ' + b.business)], ['send', 'Directions', () => flashToast('Opening directions to ' + b.address)], ['share', 'Share', () => flashToast('Share link copied')]].map(([icon, label, onClick]) => React.createElement("button", { key: label, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 } }, React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: icon, size: 17, color: BF.text })), React.createElement("span", { style: { fontSize: 10, color: BF.sub } }, label)))),
                     React.createElement("button", { onClick: closeBookingFlow, style: { width: '100%', height: 54, borderRadius: 27, background: THEME.coral, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', marginTop: 28 } }, "Done"));
@@ -4020,19 +4053,49 @@ function App() {
         providerDashboardOpen && promoDraftOpen && (() => {
             const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
             const inputStyle3 = { width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none', background: '#fff', fontFamily: 'inherit' };
+            const toggleDeal = () => setProviderDeal((prev) => prev.enabled ? deactivatePromotion(prev) : activatePromotion(prev, Date.now()));
+            const setDealField = (field, value) => setProviderDeal((prev) => ({ ...prev, [field]: value }));
+            const allServices = providerDeal.eligibleServiceIds == null;
+            const toggleEligibleService = (id) => setProviderDeal((prev) => {
+                const current = prev.eligibleServiceIds || [];
+                const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+                return { ...prev, eligibleServiceIds: next };
+            });
+            const deletePromotion = () => {
+                setProviderDeal({ id: 'deal-main', enabled: false, type: 'percent', value: 20, label: '20% OFF TODAY', activatedAt: null, eligibleServiceIds: null });
+                setPromoDraftOpen(false);
+                flashToast('Promotion deleted');
+            };
             return React.createElement("div", { onClick: () => setPromoDraftOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 11 } },
-                    React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                    React.createElement("div", { onClick: (e) => e.stopPropagation(), className: "avio-scroll", style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '85%', overflowY: 'auto' } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, "Today's Deal"),
                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 } },
                             React.createElement("div", null,
                                 React.createElement("p", { style: { fontSize: 13, fontWeight: 600, color: PD.text, margin: 0 } }, "Show deal on my videos"),
-                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "Appears on your posts, profile and Today's Deals")),
-                            React.createElement("button", { onClick: () => setProviderDeal({ ...providerDeal, enabled: !providerDeal.enabled }), style: { width: 44, height: 26, borderRadius: 13, background: providerDeal.enabled ? THEME.coral : '#E5E5EA', position: 'relative', flexShrink: 0 } },
+                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, providerDeal.enabled && providerDeal.activatedAt ? `Active since ${new Date(providerDeal.activatedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Appears on your posts, profile and Today\'s Deals')),
+                            React.createElement("button", { onClick: toggleDeal, style: { width: 44, height: 26, borderRadius: 13, background: providerDeal.enabled ? THEME.coral : '#E5E5EA', position: 'relative', flexShrink: 0 } },
                                 React.createElement("div", { style: { position: 'absolute', top: 2, left: providerDeal.enabled ? 20 : 2, width: 22, height: 22, borderRadius: 11, background: '#fff', transition: 'left 0.15s' } }))),
-                        React.createElement("div", { style: { marginBottom: 20 } },
+                        React.createElement("div", { style: { display: 'flex', gap: 10, marginBottom: 16 } },
+                            [['percent', 'Percent Off'], ['fixed', 'Dollar Off']].map(([id, lbl]) => React.createElement("button", { key: id, onClick: () => setDealField('type', id), style: { flex: 1, padding: '10px 0', borderRadius: 12, textAlign: 'center', fontSize: 12.5, fontWeight: 700, background: providerDeal.type === id ? THEME.coral : '#F5F5F5', color: providerDeal.type === id ? '#fff' : PD.sub } }, lbl))),
+                        React.createElement("div", { style: { marginBottom: 16 } },
+                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, providerDeal.type === 'fixed' ? 'Discount Amount ($)' : 'Discount Amount (%)'),
+                            React.createElement("input", { type: "number", inputMode: "decimal", min: "0", max: providerDeal.type === 'percent' ? '100' : undefined, value: providerDeal.value, onChange: (e) => setDealField('value', Number(e.target.value)), placeholder: providerDeal.type === 'fixed' ? 'e.g. 25' : 'e.g. 20', style: inputStyle3 })),
+                        React.createElement("div", { style: { marginBottom: 16 } },
                             React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Deal Label"),
-                            React.createElement("input", { value: providerDeal.label, onChange: (e) => setProviderDeal({ ...providerDeal, label: e.target.value }), placeholder: "e.g. 20% OFF TODAY", style: inputStyle3 })),
-                        React.createElement("button", { onClick: () => { setPromoDraftOpen(false); flashToast(providerDeal.enabled ? 'Deal is live' : 'Deal turned off'); }, style: { width: '100%', height: 50, borderRadius: 25, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5 } }, "Done")));
+                            React.createElement("input", { value: providerDeal.label, onChange: (e) => setDealField('label', e.target.value), placeholder: "e.g. 20% OFF TODAY", style: inputStyle3 })),
+                        React.createElement("div", { style: { marginBottom: 20 } },
+                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Applies To"),
+                            React.createElement("div", { style: { display: 'flex', gap: 10, marginBottom: allServices ? 0 : 10 } },
+                                [[true, 'All Services'], [false, 'Select Services']].map(([isAll, lbl]) => React.createElement("button", { key: lbl, onClick: () => setDealField('eligibleServiceIds', isAll ? null : (providerDeal.eligibleServiceIds || [])), style: { flex: 1, padding: '10px 0', borderRadius: 12, textAlign: 'center', fontSize: 12.5, fontWeight: 700, background: allServices === isAll ? THEME.coral : '#F5F5F5', color: allServices === isAll ? '#fff' : PD.sub } }, lbl))),
+                            !allServices && React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, providerServices.map((s) => {
+                                const checked = (providerDeal.eligibleServiceIds || []).includes(s.id);
+                                return React.createElement("button", { key: s.id, onClick: () => toggleEligibleService(s.id), style: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, border: `1px solid ${PD.border}`, textAlign: 'left' } },
+                                    React.createElement("div", { style: { width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${checked ? THEME.coral : '#D1D1D6'}`, background: checked ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, checked && React.createElement(Icon, { name: "check", size: 11, color: "#fff" })),
+                                    React.createElement("span", { style: { fontSize: 13, color: PD.text, flex: 1 } }, s.name),
+                                    React.createElement("span", { style: { fontSize: 12, color: PD.sub } }, money(s.price)));
+                            }))),
+                        React.createElement("button", { onClick: () => { setPromoDraftOpen(false); flashToast(providerDeal.enabled ? 'Deal is live' : 'Deal turned off'); }, style: { width: '100%', height: 50, borderRadius: 25, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, marginBottom: 12 } }, "Done"),
+                        (providerDeal.enabled || providerDeal.activatedAt) && React.createElement("button", { onClick: deletePromotion, style: { width: '100%', height: 50, borderRadius: 25, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 14.5 } }, "Delete Promotion")));
         })(),
         commentItem && (React.createElement("div", { onClick: () => setCommentItem(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } }, (() => {
             const idx = Math.max(0, feed.findIndex((f) => f.id === commentItem.id));
@@ -4205,6 +4268,8 @@ function App() {
                 React.createElement("div", { style: { marginTop: 16, background: '#FAFAFA', borderRadius: 14, padding: 14 } },
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Date & Time"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, `${b.date} · ${b.time}`)),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Location"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616', textAlign: 'right', maxWidth: 200 } }, b.address)),
+                    b.promotionApplied && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Promotion Applied"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, b.promotionLabel)),
+                    b.promotionApplied && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "You Saved"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, money(b.discountAmount))),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: '1px solid #ECECEE' } }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, "Total"), React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: '#161616' } }, money(b.total)))),
                 React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, actions.map((a, i) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px 4px', borderBottom: i < actions.length - 1 ? '1px solid #F5F5F5' : 'none' } },
                     React.createElement(Icon, { name: a.icon, size: 16, color: a.danger ? '#D0304A' : '#161616' }),
