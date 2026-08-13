@@ -1158,7 +1158,7 @@ function App() {
         flashToast(status === 'completed' ? 'Marked as completed' : 'Booking cancelled');
     }
     const [providerDeal, setProviderDeal] = useState(() => {
-        const defaults = { id: 'deal-main', enabled: false, type: 'percent', value: 20, label: '20% OFF TODAY', activatedAt: null, eligibleServiceIds: null };
+        const defaults = { id: 'deal-main', enabled: false, type: 'percent', value: 20, label: '20% OFF TODAY', activatedAt: null, expiresAt: null, eligibleServiceIds: null };
         const loaded = loadLS('avio_provider_deal', null);
         return loaded ? { ...defaults, ...loaded } : defaults;
     });
@@ -1686,6 +1686,11 @@ function App() {
     function finalizeBooking() {
         if (!bookingTarget || !selectedService || selTime == null)
             return;
+        // This is the single authoritative pricing calculation. It re-reads the deal and
+        // re-derives eligibility from a freshly-read timestamp right here — it never trusts
+        // any promo/price value computed earlier for display on the service or checkout
+        // screens, so a deal that expired or was turned off while the customer sat on
+        // checkout correctly falls through to full price at the moment they confirm.
         const bookingCreatedAt = Date.now();
         const deal = resolveProviderDeal(bookingTarget.id, MY_PROVIDER_ID, providerDeal, FEED);
         const promo = resolvePromotionSnapshot(deal, selectedService, bookingCreatedAt);
@@ -3880,10 +3885,14 @@ function App() {
                 tooltipCard);
 
             const netEarnings = stats.totalEarnings;
-            const breakdownCard = React.createElement("div", { style: { marginTop: 26, border: `1px solid ${PD.border}`, borderRadius: 18, padding: 16 } },
+            const revenueTiles = stats.promotionDiscountTotal > 0 && React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 26 } },
+                [['Gross Sales', money(stats.grossServiceValue)], ['Discounts Given', '-' + money(stats.promotionDiscountTotal)], ['Net Earnings', money(stats.totalEarnings)]].map(([label, val], i) => React.createElement("div", { key: label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '12px 8px', textAlign: 'center' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: i === 1 ? THEME.coral : PD.text, margin: 0 } }, val),
+                    React.createElement("p", { style: { fontSize: 10, color: PD.sub, margin: '3px 0 0' } }, label))));
+            const breakdownCard = React.createElement("div", { style: { marginTop: stats.promotionDiscountTotal > 0 ? 14 : 26, border: `1px solid ${PD.border}`, borderRadius: 18, padding: 16 } },
                 React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Earnings Breakdown"),
                 React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 } },
-                    [['Services', stats.totalEarnings, false], ['Tips', 0, false], ['Fees', 0, true], ['Refunds', 0, true]].map(([label, val, neg]) => React.createElement("div", { key: label, style: { display: 'flex', justifyContent: 'space-between' } },
+                    [['Services', stats.grossServiceValue, false], ...(stats.promotionDiscountTotal > 0 ? [['Promotions', stats.promotionDiscountTotal, true]] : []), ['Tips', 0, false], ['Fees', 0, true], ['Refunds', 0, true]].map(([label, val, neg]) => React.createElement("div", { key: label, style: { display: 'flex', justifyContent: 'space-between' } },
                         React.createElement("span", { style: { fontSize: 13, color: PD.sub } }, label),
                         React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: neg && val > 0 ? '#D0304A' : PD.text } }, (neg && val > 0 ? '-' : '') + money(val))))),
                 React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14, paddingTop: 14, borderTop: `1px solid ${PD.border}` } },
@@ -3957,7 +3966,7 @@ function App() {
                             React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, sub))))));
 
             const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `0 18px calc(env(safe-area-inset-bottom) + 40px)` } },
-                periodFilter, topSection, chartSection, breakdownCard, performanceRow, dayOfWeekSection, servicesSection, smartInsights);
+                periodFilter, topSection, chartSection, revenueTiles, breakdownCard, performanceRow, dayOfWeekSection, servicesSection, smartInsights);
 
             return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 6, background: '#fff', display: 'flex', flexDirection: 'column' } }, header, body);
         })(),
@@ -4062,17 +4071,24 @@ function App() {
                 return { ...prev, eligibleServiceIds: next };
             });
             const deletePromotion = () => {
-                setProviderDeal({ id: 'deal-main', enabled: false, type: 'percent', value: 20, label: '20% OFF TODAY', activatedAt: null, eligibleServiceIds: null });
+                setProviderDeal({ id: 'deal-main', enabled: false, type: 'percent', value: 20, label: '20% OFF TODAY', activatedAt: null, expiresAt: null, eligibleServiceIds: null });
                 setPromoDraftOpen(false);
                 flashToast('Promotion deleted');
             };
+            const toDatetimeLocal = (ms) => {
+                if (!ms) return '';
+                const d = new Date(ms);
+                const pad = (n) => String(n).padStart(2, '0');
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            };
+            const fmtDT = (ms) => new Date(ms).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
             return React.createElement("div", { onClick: () => setPromoDraftOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 11 } },
                     React.createElement("div", { onClick: (e) => e.stopPropagation(), className: "avio-scroll", style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '85%', overflowY: 'auto' } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, "Today's Deal"),
                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 } },
                             React.createElement("div", null,
                                 React.createElement("p", { style: { fontSize: 13, fontWeight: 600, color: PD.text, margin: 0 } }, "Show deal on my videos"),
-                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, providerDeal.enabled && providerDeal.activatedAt ? `Active since ${new Date(providerDeal.activatedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : 'Appears on your posts, profile and Today\'s Deals')),
+                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, providerDeal.enabled && providerDeal.activatedAt ? `Starts ${fmtDT(providerDeal.activatedAt)}${providerDeal.expiresAt ? ' · Ends ' + fmtDT(providerDeal.expiresAt) : ''}` : 'Appears on your posts, profile and Today\'s Deals')),
                             React.createElement("button", { onClick: toggleDeal, style: { width: 44, height: 26, borderRadius: 13, background: providerDeal.enabled ? THEME.coral : '#E5E5EA', position: 'relative', flexShrink: 0 } },
                                 React.createElement("div", { style: { position: 'absolute', top: 2, left: providerDeal.enabled ? 20 : 2, width: 22, height: 22, borderRadius: 11, background: '#fff', transition: 'left 0.15s' } }))),
                         React.createElement("div", { style: { display: 'flex', gap: 10, marginBottom: 16 } },
@@ -4083,6 +4099,12 @@ function App() {
                         React.createElement("div", { style: { marginBottom: 16 } },
                             React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Deal Label"),
                             React.createElement("input", { value: providerDeal.label, onChange: (e) => setDealField('label', e.target.value), placeholder: "e.g. 20% OFF TODAY", style: inputStyle3 })),
+                        React.createElement("div", { style: { marginBottom: 16 } },
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 } },
+                                React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, margin: 0 } }, "Ends (optional)"),
+                                providerDeal.expiresAt && React.createElement("button", { onClick: () => setDealField('expiresAt', null), style: { fontSize: 11, fontWeight: 700, color: THEME.coral } }, "Clear")),
+                            React.createElement("input", { type: "datetime-local", value: toDatetimeLocal(providerDeal.expiresAt), onChange: (e) => setDealField('expiresAt', e.target.value ? new Date(e.target.value).getTime() : null), style: inputStyle3 }),
+                            React.createElement("p", { style: { fontSize: 10.5, color: PD.sub, marginTop: 5 } }, "Leave blank to run until you turn it off manually.")),
                         React.createElement("div", { style: { marginBottom: 20 } },
                             React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Applies To"),
                             React.createElement("div", { style: { display: 'flex', gap: 10, marginBottom: allServices ? 0 : 10 } },
@@ -4271,6 +4293,9 @@ function App() {
                     b.promotionApplied && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Promotion Applied"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, b.promotionLabel)),
                     b.promotionApplied && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "You Saved"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, money(b.discountAmount))),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: '1px solid #ECECEE' } }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, "Total"), React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: '#161616' } }, money(b.total)))),
+                b.promotionApplied && React.createElement("div", { style: { marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                    React.createElement(Icon, { name: "lock", size: 12, color: THEME.coral }),
+                    React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: THEME.coral } }, "This discount is locked to your booking, even if the deal ends.")),
                 React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, actions.map((a, i) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px 4px', borderBottom: i < actions.length - 1 ? '1px solid #F5F5F5' : 'none' } },
                     React.createElement(Icon, { name: a.icon, size: 16, color: a.danger ? '#D0304A' : '#161616' }),
                     React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: a.danger ? '#D0304A' : '#161616' } }, a.label)))));
@@ -4297,7 +4322,13 @@ function App() {
                 React.createElement("div", { style: { marginTop: 16, background: '#FAFAFA', borderRadius: 14, padding: 14 } },
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Date & Time"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, `${b.dateLabel || (b.dateGroup === 'tomorrow' ? 'Tomorrow' : 'Today')} · ${b.time}`)),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Service"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, b.service)),
-                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: '1px solid #ECECEE' } }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, "Price"), React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: '#161616' } }, money(b.price)))),
+                    b.promotionApplied && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Original Price"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, money(b.originalPrice))),
+                    b.promotionApplied && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Promotion"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, b.promotionLabel)),
+                    b.promotionApplied && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Discount"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, '-' + money(b.discountAmount))),
+                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: '1px solid #ECECEE' } }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, b.promotionApplied ? "Total Paid" : "Price"), React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: '#161616' } }, money(b.price)))),
+                b.promotionApplied && React.createElement("div", { style: { marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                    React.createElement(Icon, { name: "lock", size: 12, color: THEME.coral }),
+                    React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: THEME.coral } }, "This discount is locked to this booking and won't change.")),
                 React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, actions.map((a, i) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px 4px', borderBottom: i < actions.length - 1 ? '1px solid #F5F5F5' : 'none' } },
                     React.createElement(Icon, { name: a.icon, size: 16, color: a.danger ? '#D0304A' : '#161616' }),
                     React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: a.danger ? '#D0304A' : '#161616' } }, a.label)))));

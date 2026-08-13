@@ -20,11 +20,16 @@ function isServiceEligibleForDeal(deal, service) {
 
 // bookingCreatedAt is the moment the customer confirms the booking (ms epoch)
 // — never the appointment date/time. Returns a locked promotion snapshot to
-// store on the booking, or null if no promotion applies.
+// store on the booking, or null if no promotion applies. This is the single
+// authoritative pricing calculation: callers must always pass the *current*
+// deal and a *freshly read* bookingCreatedAt at the moment of confirmation —
+// never a value computed earlier and carried forward from an earlier screen.
 function resolvePromotionSnapshot(deal, service, bookingCreatedAt) {
     if (!deal || !deal.enabled)
         return null;
     if (deal.activatedAt == null || !(bookingCreatedAt >= deal.activatedAt))
+        return null;
+    if (deal.expiresAt != null && !(bookingCreatedAt < deal.expiresAt))
         return null;
     if (!service || !(service.price > 0))
         return null;
