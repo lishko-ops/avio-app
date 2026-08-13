@@ -1877,7 +1877,7 @@ function App() {
             flashToast('Link copied to clipboard');
         }
     }
-    const authFrame = (children) =>React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', position: 'fixed', top: 0, bottom: 0, height: '100dvh', overflow: 'hidden', background: '#fff', boxShadow: '0 0 40px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column' } }, children);
+    const authFrame = (children) =>React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', position: 'fixed', top: 0, bottom: 0, overflow: 'hidden', background: '#fff', boxShadow: '0 0 40px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column' } }, children);
     const authBack = (onClick) => React.createElement("button", { onClick: onClick, style: { alignSelf: 'flex-start', color: '#8A8A8E', display: 'flex', marginBottom: 18 } }, React.createElement(Icon, { name: "arrowleft", size: 18, color: '#8A8A8E' }));
     const authLabel = { fontSize: 11.5, fontWeight: 600, color: '#8A8A8E', marginBottom: 6, display: 'block' };
     const authInputStyle = { width: '100%', background: '#fff', border: '1px solid #E5E5E5', borderRadius: 12, padding: '14px 14px', color: '#161616', fontSize: 14.5, outline: 'none' };
@@ -2176,7 +2176,7 @@ function App() {
                 React.createElement("p", { style: { fontSize: 13, color: '#8A8A8E', marginTop: 8 } }, "You can now log in with your new password."),
                 React.createElement("button", { className: "avio-press", onClick: () => goAuth('login'), style: { ...authPrimaryBtn, marginTop: 28, maxWidth: 260 } }, "Log In")))));
     }
-    return (React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', position: 'fixed', top: 0, bottom: 0, height: '100dvh', overflow: 'hidden', background: THEME.paper, boxShadow: '0 0 40px rgba(0,0,0,0.08)' } },
+    return (React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', position: 'fixed', top: 0, bottom: 0, overflow: 'hidden', background: THEME.paper, boxShadow: '0 0 40px rgba(0,0,0,0.08)' } },
         React.createElement("input", { ref: fileInputRef, type: "file", accept: "video/*", style: { display: 'none' }, onChange: handleFileChosen }),
         tab === 'discover' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
             React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16, zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 11 } },
