@@ -70,6 +70,12 @@
   .avio-ring-pulse { animation: avioRingPulse 1.4s ease-out infinite; }
   .avio-pill { transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease; }
   .avio-pill:active { transform: scale(0.96); }
+  @keyframes avioShimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+  .avio-skeleton { background: linear-gradient(90deg, #F0F0F0 25%, #F7F7F7 37%, #F0F0F0 63%); background-size: 400% 100%; animation: avioShimmer 1.4s ease infinite; border-radius: 14px; }
+  @keyframes avioResultsIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .avio-results-in { animation: avioResultsIn 0.26s cubic-bezier(0.22,1,0.36,1) backwards; }
+  @keyframes avioChipPop { 0% { transform: scale(1); } 45% { transform: scale(0.92); } 100% { transform: scale(1); } }
+  .avio-chip-pop { animation: avioChipPop 0.22s ease; }
 </style>
 </head>
 <body>
@@ -635,6 +641,185 @@ const EXPLORE_ITEMS = [
             categoryLabel: ((_a = CATEGORIES.find((c) => c.id === catId)) === null || _a === void 0 ? void 0 : _a.label) || 'Home Services',
         });
     })),
+];
+const AI_SEARCH_CATEGORY_KEYWORDS = [
+    { category: 'Beauty', words: ['barber', 'barbershop', 'haircut', 'hair', 'hairstylist', 'stylist', 'salon', 'nail', 'nails', 'mani', 'pedi', 'makeup', 'mua', 'balayage', 'blowout', 'braid', 'braids', 'massage', 'spa', 'beauty', 'color correction', 'loctician'] },
+    { category: 'Home Services', words: ['clean', 'cleaning', 'cleaner', 'maid', 'apartment', 'move-in', 'move-out', 'housekeeping'] },
+    { category: 'Parties', words: ['dj', 'party', 'event', 'wedding', 'photographer', 'photography', 'photoshoot'] },
+    { category: 'Restaurants', words: ['restaurant', 'brunch', 'dinner', 'date night', 'tasting menu', 'chef', 'reservation'] },
+    { category: 'Educational', words: ['tutor', 'tutoring', 'lesson', 'coaching', 'tutors'] },
+];
+const AI_SEARCH_CITY_NAMES = ['miami', 'denver', 'austin', 'brooklyn', 'chicago', 'new orleans', 'los angeles', 'phoenix'];
+const AI_SEARCH_STOPWORDS = new Set(['find', 'me', 'a', 'an', 'the', 'for', 'near', 'nearby', 'my', 'that', 'who', 'comes', 'to', 'house', 'home', 'today', 'tomorrow', 'tonight', 'under', 'below', 'less', 'than', 'best', 'good', 'available', 'this', 'weekend', 'afternoon', 'evening', 'morning', 'after', 'before', 'with', 'and', 'only', 'show', 'ones', 'some', 'i', 'need', 'someone', 'something', 'fun', 'do', 'looking', 'want', 'is', 'are', 'of', 'in', 'on', 'at', 'nice']);
+function parseAiSearchQuery(rawText, prevContext) {
+    const text = String(rawText || '').toLowerCase();
+    const ctx = prevContext ? { ...prevContext } : { category: null, maxPrice: null, minRating: null, mobile: false, inStudio: false, openNow: false, dealsOnly: false, date: null, location: null, sortBy: null, keywords: [] };
+    const matchedGroup = AI_SEARCH_CATEGORY_KEYWORDS.find((g) => g.words.some((w) => text.includes(w)));
+    if (matchedGroup)
+        ctx.category = matchedGroup.category;
+    const priceMatch = /(?:under|below|less than|max)\s*\$?(\d+)/.exec(text) || /\$(\d+)/.exec(text);
+    if (priceMatch)
+        ctx.maxPrice = parseInt(priceMatch[1], 10);
+    if (/highly rated|top rated|highest rated|\bbest\b/.test(text))
+        ctx.minRating = 4.7;
+    if (/come[s]?\s*to\s*(me|my house|my home|my place)|mobile service|house call|\bmobile\b/.test(text))
+        ctx.mobile = true;
+    if (/in.?studio|at (their|the) (shop|salon|location)/.test(text))
+        ctx.inStudio = true;
+    if (/open now/.test(text))
+        ctx.openNow = true;
+    if (/\bdeal\b|discount|% off|percent off/.test(text))
+        ctx.dealsOnly = true;
+    if (/tonight/.test(text))
+        ctx.date = 'tonight';
+    else if (/tomorrow/.test(text))
+        ctx.date = 'tomorrow';
+    else if (/\btoday\b/.test(text))
+        ctx.date = 'today';
+    else if (/weekend/.test(text))
+        ctx.date = 'weekend';
+    const cityHit = AI_SEARCH_CITY_NAMES.find((c) => text.includes(c));
+    if (/near me|nearby|around me|close to me/.test(text))
+        ctx.location = 'current';
+    else if (cityHit)
+        ctx.location = cityHit;
+    const leftoverWords = text.replace(/[^\w\s]/g, ' ').split(/\s+/).filter((w) => w && !AI_SEARCH_STOPWORDS.has(w) && !/\d/.test(w) && w.length > 2);
+    ctx.keywords = leftoverWords.filter((w) => !AI_SEARCH_CATEGORY_KEYWORDS.some((g) => g.words.includes(w)));
+    return ctx;
+}
+function normalizeAiSearchCandidate(feedList, exploreItem) {
+    if (exploreItem.kind === 'video') {
+        const real = feedList.find((f) => f.id === exploreItem.id.slice(2));
+        if (real)
+            return real;
+    }
+    return {
+        id: exploreItem.id, name: exploreItem.title, category: exploreItem.categoryLabel, image: exploreItem.image,
+        price: exploreItem.price, location: 'Your area', blurb: '', likes: '0', comments: 0,
+        rating: exploreItem.rating || 4.6, verified: false, avatarColor: exploreItem.color,
+        distance: '2.0 mi', openStatus: 'Open Now', locationMode: 'At my business location', hashtags: [],
+    };
+}
+function matchesAiSearchContext(item, ctx) {
+    if (ctx.category && item.category !== ctx.category)
+        return false;
+    if (ctx.maxPrice != null && (item.price || 0) > ctx.maxPrice)
+        return false;
+    if (ctx.minRating != null && (item.rating || 0) < ctx.minRating)
+        return false;
+    if (ctx.mobile && item.locationMode && item.locationMode !== 'I travel to customers')
+        return false;
+    if (ctx.inStudio && item.locationMode && item.locationMode !== 'At my business location')
+        return false;
+    if (ctx.openNow && !(item.openStatus || '').startsWith('Open Now'))
+        return false;
+    if (ctx.dealsOnly && !(item.deal && item.deal.enabled))
+        return false;
+    if (ctx.keywords && ctx.keywords.length) {
+        const hay = `${item.name} ${item.category} ${item.blurb || ''} ${(item.hashtags || []).join(' ')}`.toLowerCase();
+        if (!ctx.keywords.some((k) => hay.includes(k)))
+            return false;
+    }
+    return true;
+}
+function scoreAiSearchCandidate(item, ctx) {
+    let score = (item.rating || 4.5) * 10;
+    const distanceMi = parseFloat(item.distance);
+    score += Math.max(0, 10 - (isNaN(distanceMi) ? 5 : distanceMi));
+    if (item.verified)
+        score += 3;
+    if (item.deal && item.deal.enabled)
+        score += 4;
+    if (ctx.minRating && (item.rating || 0) >= ctx.minRating)
+        score += 5;
+    return score;
+}
+const AI_SEARCH_RELAX_STEPS = [
+    { key: 'maxPrice', clear: (c) => ({ ...c, maxPrice: null }), note: (c) => `I couldn't find anything under $${c.maxPrice}, so here are the closest matches slightly above budget.` },
+    { key: 'keywords', clear: (c) => ({ ...c, keywords: [] }), note: () => "I broadened the search terms to find close matches." },
+    { key: 'minRating', clear: (c) => ({ ...c, minRating: null }), note: () => "I loosened the rating requirement to show you more options." },
+    { key: 'mobile', clear: (c) => ({ ...c, mobile: false }), note: () => "I included businesses that may not travel to you." },
+    { key: 'inStudio', clear: (c) => ({ ...c, inStudio: false }), note: () => "I included businesses regardless of location type." },
+    { key: 'openNow', clear: (c) => ({ ...c, openNow: false }), note: () => "I included options that may not be open right now." },
+    { key: 'dealsOnly', clear: (c) => ({ ...c, dealsOnly: false }), note: () => "I included options without an active deal." },
+    { key: 'category', clear: (c) => ({ ...c, category: null }), note: () => "I expanded the search beyond the exact category to find close matches." },
+];
+function aiSearchRelaxStepHasValue(ctx, key) {
+    if (key === 'keywords')
+        return ctx.keywords && ctx.keywords.length > 0;
+    return !!ctx[key];
+}
+function runAiSearch(candidates, ctx) {
+    let results = candidates.filter((i) => matchesAiSearchContext(i, ctx));
+    let relaxedNote = null;
+    if (results.length === 0) {
+        let relaxedCtx = ctx;
+        for (const step of AI_SEARCH_RELAX_STEPS) {
+            if (aiSearchRelaxStepHasValue(relaxedCtx, step.key)) {
+                relaxedCtx = step.clear(relaxedCtx);
+                const attempt = candidates.filter((i) => matchesAiSearchContext(i, relaxedCtx));
+                if (attempt.length > 0) {
+                    results = attempt;
+                    relaxedNote = step.note(ctx);
+                    break;
+                }
+            }
+        }
+        if (results.length === 0) {
+            results = [...candidates].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 6);
+            relaxedNote = "I couldn't find an exact match, but here are some highly rated options nearby.";
+        }
+    }
+    results = [...results].sort((a, b) => {
+        if (ctx.sortBy === 'distance')
+            return (parseFloat(a.distance) || 5) - (parseFloat(b.distance) || 5);
+        if (ctx.sortBy === 'price')
+            return (a.price || 0) - (b.price || 0);
+        return scoreAiSearchCandidate(b, ctx) - scoreAiSearchCandidate(a, ctx);
+    });
+    return { results, relaxedNote };
+}
+function aiSearchResultBadge(item) {
+    if (item.deal && item.deal.enabled)
+        return { icon: '🔥', label: 'Deal ends tonight', bg: 'rgba(240,90,90,0.12)', color: '#D0304A' };
+    if ((item.rating || 0) >= 4.9)
+        return { icon: '↗', label: 'Trending now', bg: 'rgba(151,196,0,0.12)', color: THEME.coral };
+    const d = parseFloat(item.distance);
+    if (!isNaN(d) && d <= 1)
+        return { icon: '↗', label: 'Popular near you', bg: 'rgba(151,196,0,0.12)', color: THEME.coral };
+    if ((item.openStatus || '').startsWith('Open Now'))
+        return { icon: '⚡', label: 'Available today', bg: 'rgba(46,155,255,0.12)', color: '#2E9BFF' };
+    return { icon: '✨', label: 'Recommended for you', bg: 'rgba(108,76,252,0.12)', color: THEME.violet };
+}
+function relativeDayLabel(ts) {
+    const diffDays = Math.floor((Date.now() - ts) / 86400000);
+    if (diffDays <= 0)
+        return 'Today';
+    if (diffDays === 1)
+        return 'Yesterday';
+    return `${diffDays} days ago`;
+}
+const AI_SEARCH_TRY_SUGGESTIONS = [
+    { icon: 'scissors', label: 'Hair stylist near me', query: 'hair stylist near me', bg: 'rgba(245,19,79,0.10)', color: '#F5134F' },
+    { icon: 'diamond', label: 'Date night ideas', query: 'best date night restaurants tonight', bg: 'rgba(108,76,252,0.10)', color: THEME.violet },
+    { icon: 'user', label: 'Deep tissue massage', query: 'deep tissue massage near me', bg: 'rgba(46,155,255,0.10)', color: '#2E9BFF' },
+    { icon: 'house', label: 'Clean my apartment', query: 'i need someone to clean my apartment tomorrow', bg: 'rgba(63,191,138,0.10)', color: '#3FBF8A' },
+    { icon: 'bottle', label: 'Best brunch spots', query: 'best brunch spots', bg: 'rgba(245,166,35,0.12)', color: THEME.gold },
+    { icon: 'camera', label: 'Photoshoot this weekend', query: 'photographer available this weekend', bg: 'rgba(139,92,246,0.10)', color: THEME.purple },
+];
+const AI_SEARCH_TRENDING = [
+    { id: 'things-to-do', label: 'Things to do near me', count: '12.4K searches', query: 'fun things to do near me', image: 'assets/explore/dj-battle.jpg' },
+    { id: 'balayage', label: 'Balayage specialists', count: '8.7K searches', query: 'balayage specialist near me', image: 'assets/explore/brow-arc.jpg' },
+    { id: 'massage-today', label: 'Massage today', count: '6.2K searches', query: 'massage available today', image: 'assets/explore/barbershop.jpg' },
+    { id: 'brunch', label: 'Best brunch spots', count: '5.1K searches', query: 'best brunch spots', image: 'assets/explore/makeup-promo.jpg' },
+];
+const AI_SEARCH_REFINEMENT_CHIPS = [
+    { id: 'under30', label: 'Under $30', apply: (c) => ({ ...c, maxPrice: 30 }), remove: (c) => ({ ...c, maxPrice: null }) },
+    { id: 'openNow', label: 'Open now', apply: (c) => ({ ...c, openNow: true }), remove: (c) => ({ ...c, openNow: false }) },
+    { id: 'closest', label: 'Closest', apply: (c) => ({ ...c, sortBy: 'distance' }), remove: (c) => ({ ...c, sortBy: null }) },
+    { id: 'topRated', label: 'Top rated', apply: (c) => ({ ...c, minRating: 4.8 }), remove: (c) => ({ ...c, minRating: null }) },
+    { id: 'dealsOnly', label: 'Deals only', apply: (c) => ({ ...c, dealsOnly: true }), remove: (c) => ({ ...c, dealsOnly: false }) },
+    { id: 'mobileService', label: 'Mobile service', apply: (c) => ({ ...c, mobile: true }), remove: (c) => ({ ...c, mobile: false }) },
 ];
 function money(n) { return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' }); }
 const EARNINGS_WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -1229,6 +1414,14 @@ function App() {
     const [exploreBookmarks, setExploreBookmarks] = useState(() => new Set());
     const [exploreSearchOpen, setExploreSearchOpen] = useState(false);
     const [exploreSearchQuery, setExploreSearchQuery] = useState('');
+    const [aiSearchStage, setAiSearchStage] = useState('home');
+    const [aiSearchFilters, setAiSearchFilters] = useState({ location: null, date: null, maxPrice: null });
+    const [aiSearchContext, setAiSearchContext] = useState(null);
+    const [aiSearchResults, setAiSearchResults] = useState([]);
+    const [aiSearchRelaxedNote, setAiSearchRelaxedNote] = useState(null);
+    const [aiActiveRefinements, setAiActiveRefinements] = useState(() => new Set());
+    const [aiRefineDraft, setAiRefineDraft] = useState('');
+    const [aiRecentSearches, setAiRecentSearches] = useState(() => loadLS('avio_ai_recent_searches', []));
     const [filterSheetOpen, setFilterSheetOpen] = useState(false);
     const [filterCat, setFilterCat] = useState('all');
     const [filterSearch, setFilterSearch] = useState('');
@@ -1378,6 +1571,110 @@ function App() {
             return next;
         });
     }
+    function recordAiRecentSearch(text) {
+        setAiRecentSearches((prev) => {
+            const filtered = prev.filter((r) => r.text.toLowerCase() !== text.toLowerCase());
+            const next = [{ id: `${Date.now()}`, text, ts: Date.now() }, ...filtered].slice(0, 8);
+            saveLS('avio_ai_recent_searches', next);
+            return next;
+        });
+    }
+    function removeAiRecentSearch(id) {
+        setAiRecentSearches((prev) => {
+            const next = prev.filter((r) => r.id !== id);
+            saveLS('avio_ai_recent_searches', next);
+            return next;
+        });
+    }
+    function closeAiSearch() {
+        setExploreSearchOpen(false);
+        setExploreSearchQuery('');
+        setAiSearchStage('home');
+        setAiSearchFilters({ location: null, date: null, maxPrice: null });
+        setAiSearchContext(null);
+        setAiSearchResults([]);
+        setAiSearchRelaxedNote(null);
+        setAiActiveRefinements(new Set());
+        setAiRefineDraft('');
+    }
+    function submitAiSearch(queryText) {
+        const text = (queryText != null ? queryText : exploreSearchQuery).trim();
+        if (!text)
+            return;
+        setExploreSearchQuery(text);
+        setAiSearchStage('loading');
+        setAiActiveRefinements(new Set());
+        recordAiRecentSearch(text);
+        setTimeout(() => {
+            const parsed = parseAiSearchQuery(text, null);
+            if (aiSearchFilters.location)
+                parsed.location = aiSearchFilters.location;
+            if (aiSearchFilters.date)
+                parsed.date = aiSearchFilters.date;
+            if (aiSearchFilters.maxPrice)
+                parsed.maxPrice = aiSearchFilters.maxPrice;
+            const { results, relaxedNote } = runAiSearch(aiSearchCandidates, parsed);
+            setAiSearchContext(parsed);
+            setAiSearchResults(results);
+            setAiSearchRelaxedNote(relaxedNote);
+            setAiSearchStage('results');
+        }, 650);
+    }
+    function submitAiRefine() {
+        const text = aiRefineDraft.trim();
+        if (!text || !aiSearchContext)
+            return;
+        setAiRefineDraft('');
+        const parsed = parseAiSearchQuery(text, aiSearchContext);
+        const { results, relaxedNote } = runAiSearch(aiSearchCandidates, parsed);
+        setAiSearchContext(parsed);
+        setAiSearchResults(results);
+        setAiSearchRelaxedNote(relaxedNote);
+    }
+    function updateAiContextField(field, value) {
+        setAiSearchContext((prev) => {
+            if (!prev)
+                return prev;
+            const nextCtx = { ...prev, [field]: value };
+            const { results, relaxedNote } = runAiSearch(aiSearchCandidates, nextCtx);
+            setAiSearchResults(results);
+            setAiSearchRelaxedNote(relaxedNote);
+            return nextCtx;
+        });
+    }
+    function toggleAiRefinementChip(chip) {
+        const isActive = aiActiveRefinements.has(chip.id);
+        setAiActiveRefinements((prev) => {
+            const next = new Set(prev);
+            if (isActive)
+                next.delete(chip.id);
+            else
+                next.add(chip.id);
+            return next;
+        });
+        const baseCtx = aiSearchContext || parseAiSearchQuery(exploreSearchQuery, null);
+        const nextCtx = isActive ? chip.remove(baseCtx) : chip.apply(baseCtx);
+        const { results, relaxedNote } = runAiSearch(aiSearchCandidates, nextCtx);
+        setAiSearchContext(nextCtx);
+        setAiSearchResults(results);
+        setAiSearchRelaxedNote(relaxedNote);
+    }
+    function cycleAiDateFilter() {
+        const options = [null, 'today', 'tomorrow', 'weekend'];
+        setAiSearchFilters((prev) => ({ ...prev, date: options[(options.indexOf(prev.date) + 1) % options.length] }));
+    }
+    function cycleAiPriceFilter() {
+        const options = [null, 30, 50, 100];
+        setAiSearchFilters((prev) => ({ ...prev, maxPrice: options[(options.indexOf(prev.maxPrice) + 1) % options.length] }));
+    }
+    function toggleAiLocationFilter() {
+        setAiSearchFilters((prev) => {
+            const next = prev.location === 'current' ? null : 'current';
+            if (next)
+                flashToast('Using your approximate location');
+            return { ...prev, location: next };
+        });
+    }
     const exploreItems = useMemo(() => {
         let items = EXPLORE_ITEMS;
         if (exploreCategory)
@@ -1394,6 +1691,19 @@ function App() {
             items = items.filter((i) => i.kind === 'business');
         return items;
     }, [exploreCategory, exploreTab, exploreQuickFilter]);
+    const aiSearchCandidates = useMemo(() => {
+        const seenNames = new Set();
+        const list = [];
+        EXPLORE_ITEMS.forEach((ei) => {
+            const item = normalizeAiSearchCandidate(feed, ei);
+            if (seenNames.has(item.name))
+                return;
+            seenNames.add(item.name);
+            list.push(item);
+        });
+        return list;
+    }, [feed]);
+    const aiSearchHasDeals = useMemo(() => aiSearchCandidates.some((i) => i.deal && i.deal.enabled), [aiSearchCandidates]);
     const filteredFeed = useMemo(() => {
         let result = shortsFeedTab === 'following' ? feed.filter((item) => followedIds.has(item.id)) : feed;
         const q = shortsQuery.trim().toLowerCase();
@@ -2614,7 +2924,7 @@ function App() {
                         React.createElement(Icon, { name: "user", size: 16, color: '#161616' }))));
             const searchBar = React.createElement("div", { style: { padding: '0 18px', marginTop: 14 } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: '#F5F5F5', border: '1px solid #F0F0F0', borderRadius: 16, height: 44, padding: '0 14px' } },
-                    React.createElement("button", { onClick: () => setExploreSearchOpen(true), style: { display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 } },
+                    React.createElement("button", { onClick: () => { setAiSearchStage('home'); setExploreSearchOpen(true); }, style: { display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 } },
                         React.createElement(Icon, { name: "search", size: 16, color: '#8A8A8E' }),
                         React.createElement("span", { style: { fontSize: 13, color: '#8A8A8E', flex: 1, textAlign: 'left' } }, "Search services, businesses or creators")),
                     React.createElement("button", { onClick: () => setFilterSheetOpen(true), style: { display: 'flex' } },
@@ -2683,33 +2993,177 @@ function App() {
             const grid = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '16px 18px 0' } }, cards);
             return React.createElement(React.Fragment, null, header, searchBar, quickFilterRow, dealsSection, categoryRow, categoryDots, tabsRow, grid);
         })())),
-        tab === 'browse' && exploreSearchOpen && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 5, display: 'flex', flexDirection: 'column' } }, (() => {
-            const trending = [
-                { label: 'Haircut', icon: 'scissors' },
-                { label: 'Nail Extensions', icon: 'sparkles' },
-                { label: 'Makeup', icon: 'diamond' },
-                { label: 'Barber', icon: 'scissors' },
-                { label: 'Braids', icon: 'bottle' },
-                { label: 'DJ', icon: 'music' },
-                { label: 'Real Estate', icon: 'building' },
-                { label: 'Car Detailing', icon: 'car' },
-            ];
-            const shown = exploreSearchQuery.trim() ? trending.filter((t) => t.label.toLowerCase().includes(exploreSearchQuery.trim().toLowerCase())) : trending;
-            return React.createElement(React.Fragment, null,
-                React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 14px) 18px 12px`, display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid #F0F0F0' } },
-                    React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: '#F5F5F5', border: '1px solid #F0F0F0', borderRadius: 16, height: 44, padding: '0 14px' } },
-                        React.createElement(Icon, { name: "search", size: 16, color: '#8A8A8E' }),
-                        React.createElement("input", { autoFocus: true, value: exploreSearchQuery, onChange: (e) => setExploreSearchQuery(e.target.value), placeholder: "Search services, businesses or creators", style: { flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: '#161616', fontSize: 13 } })),
-                    React.createElement("button", { onClick: () => { setExploreSearchOpen(false); setExploreSearchQuery(''); }, style: { fontSize: 13.5, fontWeight: 600, color: THEME.coral, flexShrink: 0 } }, "Cancel")),
-                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '18px 18px' } },
-                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: '#8A8A8E', letterSpacing: 0.5, textTransform: 'uppercase', margin: '0 0 10px' } }, "Trending"),
-                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column' } }, shown.map((t) => (
-                        React.createElement("button", { key: t.label, onClick: () => { setExploreSearchOpen(false); setExploreSearchQuery(''); flashToast(`Searching "${t.label}"`); }, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px 0', borderBottom: '1px solid #F5F5F5' } },
-                            React.createElement("div", { style: { width: 36, height: 36, borderRadius: 10, background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                                React.createElement(Icon, { name: t.icon, size: 16, color: '#161616' })),
-                            React.createElement("span", { style: { flex: 1, textAlign: 'left', fontSize: 14, color: '#161616', fontWeight: 500 } }, t.label),
-                            React.createElement(Icon, { name: "chevronright", size: 16, color: '#C7C7CC' }))))))
-            );
+        tab === 'browse' && exploreSearchOpen && (React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 5, display: 'flex', flexDirection: 'column' } }, (() => {
+            const stage = aiSearchStage;
+            const ctx = aiSearchContext;
+            const header = React.createElement("div", { style: { flexShrink: 0, position: 'relative', padding: `calc(env(safe-area-inset-top) + 14px) 50px 14px`, textAlign: 'center', borderBottom: '1px solid #F0F0F0' } },
+                React.createElement("button", { onClick: closeAiSearch, style: { position: 'absolute', left: 16, top: 'calc(env(safe-area-inset-top) + 12px)', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "arrowleft", size: 20, color: "#161616" })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: '#161616', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 } }, "AI Search", React.createElement("span", null, "✨")),
+                stage === 'home' && React.createElement("p", { style: { fontSize: 12, color: '#8A8A8E', marginTop: 4 } }, "Find anything. We'll find the best for you."));
+            const dateLabel = { null: 'Any time', today: 'Today', tomorrow: 'Tomorrow', weekend: 'This weekend' }[aiSearchFilters.date];
+            const priceLabel = aiSearchFilters.maxPrice ? `Under $${aiSearchFilters.maxPrice}` : 'Any price';
+            const locationLabel = aiSearchFilters.location === 'current' ? 'Near me' : 'Add location';
+            const searchBox = React.createElement("div", { style: { margin: '18px 18px 0', padding: 16, borderRadius: 24, background: '#fff', border: `1.5px solid ${exploreSearchQuery ? THEME.coral : '#ECECEE'}`, boxShadow: '0 6px 24px rgba(0,0,0,0.05)' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                    React.createElement("input", { autoFocus: stage === 'home', value: exploreSearchQuery, onChange: (e) => setExploreSearchQuery(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter')
+                            submitAiSearch(); }, placeholder: "What are you looking for?", style: { flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: '#161616', fontSize: 15.5, fontWeight: 500 } }),
+                    React.createElement("button", { className: "avio-press", onClick: () => submitAiSearch(), style: { width: 40, height: 40, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement("span", { style: { color: '#fff', fontSize: 17, fontWeight: 700, lineHeight: 1 } }, "↑"))),
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, marginTop: 14, overflowX: 'auto' } },
+                    React.createElement("button", { className: "avio-pill", onClick: toggleAiLocationFilter, style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 14, background: aiSearchFilters.location ? 'rgba(151,196,0,0.12)' : '#F5F5F5', border: `1px solid ${aiSearchFilters.location ? THEME.coral : '#F0F0F0'}` } },
+                        React.createElement(Icon, { name: "mappin", size: 13, color: aiSearchFilters.location ? THEME.coral : '#8A8A8E' }),
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: aiSearchFilters.location ? THEME.coral : '#484848', whiteSpace: 'nowrap' } }, locationLabel)),
+                    React.createElement("button", { className: "avio-pill", onClick: cycleAiDateFilter, style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 14, background: aiSearchFilters.date ? 'rgba(151,196,0,0.12)' : '#F5F5F5', border: `1px solid ${aiSearchFilters.date ? THEME.coral : '#F0F0F0'}` } },
+                        React.createElement(Icon, { name: "calendar", size: 13, color: aiSearchFilters.date ? THEME.coral : '#8A8A8E' }),
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: aiSearchFilters.date ? THEME.coral : '#484848', whiteSpace: 'nowrap' } }, dateLabel)),
+                    React.createElement("button", { className: "avio-pill", onClick: cycleAiPriceFilter, style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 14, background: aiSearchFilters.maxPrice ? 'rgba(151,196,0,0.12)' : '#F5F5F5', border: `1px solid ${aiSearchFilters.maxPrice ? THEME.coral : '#F0F0F0'}` } },
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: aiSearchFilters.maxPrice ? THEME.coral : '#8A8A8E' } }, "$"),
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: aiSearchFilters.maxPrice ? THEME.coral : '#484848', whiteSpace: 'nowrap' } }, priceLabel))));
+            const tryChipsSection = React.createElement("div", { style: { padding: '22px 18px 0' } },
+                React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: '#8A8A8E', margin: '0 0 10px' } }, "Try searching for"),
+                React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } }, AI_SEARCH_TRY_SUGGESTIONS.map((s) => React.createElement("button", { key: s.label, className: "avio-pill avio-press", onClick: () => submitAiSearch(s.query), style: { display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px 7px 7px', borderRadius: 20, background: '#fff', border: '1px solid #ECECEE' } },
+                    React.createElement("div", { style: { width: 26, height: 26, borderRadius: '50%', background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement(Icon, { name: s.icon, size: 13, color: s.color })),
+                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616', whiteSpace: 'nowrap' } }, s.label)))));
+            const recentSearchesCard = aiRecentSearches.length > 0 && React.createElement("div", { style: { margin: '22px 18px 0', borderRadius: 20, border: '1px solid #F0F0F0', padding: '14px 16px' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: '#161616' } }, "Your recent searches"),
+                    React.createElement("button", { onClick: () => flashToast('All recent searches — coming soon') }, React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: THEME.coral } }, "See all"))),
+                React.createElement("div", { style: { marginTop: 6 } }, aiRecentSearches.slice(0, 5).map((r) => React.createElement("div", { key: r.id, style: { display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: '1px solid #F5F5F5' } },
+                    React.createElement(Icon, { name: "clock", size: 14, color: '#B5B5B8' }),
+                    React.createElement("button", { onClick: () => submitAiSearch(r.text), style: { flex: 1, textAlign: 'left', minWidth: 0 } },
+                        React.createElement("span", { style: { fontSize: 13, color: '#161616', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' } }, r.text)),
+                    React.createElement("span", { style: { fontSize: 11, color: '#8A8A8E', flexShrink: 0 } }, relativeDayLabel(r.ts)),
+                    React.createElement("button", { onClick: () => removeAiRecentSearch(r.id), style: { flexShrink: 0, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 12, color: '#B5B5B8' }))))));
+            const trendingSection = React.createElement("div", { style: { marginTop: 26 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px' } },
+                    React.createElement("span", { style: { fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: '#161616' } }, "Trending searches"),
+                    React.createElement("button", { onClick: () => flashToast('All trending searches — coming soon') }, React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: THEME.coral } }, "See all"))),
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 12, padding: '12px 18px 4px', overflowX: 'auto' } }, AI_SEARCH_TRENDING.map((t) => React.createElement("button", { key: t.id, className: "avio-press", onClick: () => submitAiSearch(t.query), style: { flexShrink: 0, width: 150, textAlign: 'left', borderRadius: 18, overflow: 'hidden', position: 'relative', aspectRatio: '4 / 3' } },
+                    React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${t.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } }),
+                    React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.05), rgba(0,0,0,0.65))' } }),
+                    React.createElement("div", { style: { position: 'absolute', top: 8, left: 8, width: 24, height: 24, borderRadius: 8, background: 'rgba(255,255,255,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement("span", { style: { fontSize: 12, color: '#161616' } }, "↗")),
+                    React.createElement("div", { style: { position: 'absolute', left: 10, right: 10, bottom: 10 } },
+                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: '#fff', margin: 0, lineHeight: 1.25 } }, t.label),
+                        React.createElement("p", { style: { fontSize: 10.5, color: 'rgba(255,255,255,0.75)', marginTop: 3 } }, t.count))))));
+            const renderAiPickCard = (item) => {
+                const badge = aiSearchResultBadge(item);
+                return React.createElement("button", { key: item.id, className: "avio-press", onClick: () => openBusinessProfile(item), style: { flexShrink: 0, width: 158, textAlign: 'left', borderRadius: 18, overflow: 'hidden', border: '1px solid #F0F0F0', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
+                    React.createElement("div", { style: { position: 'relative', aspectRatio: '4 / 3', background: item.avatarColor || '#F5F5F5' } },
+                        item.image && React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } }),
+                        item.deal && item.deal.enabled && React.createElement("span", { style: { position: 'absolute', top: 8, left: 8, fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 6, background: 'rgba(0,0,0,0.6)', color: '#fff' } }, item.deal.label),
+                        React.createElement("button", { onClick: (e) => { e.stopPropagation(); toggleBookmark(item.id); }, style: { position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: 8, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement(Icon, { name: "heart", size: 12, color: "#fff", fill: exploreBookmarks.has(item.id) ? '#fff' : 'none' }))),
+                    React.createElement("div", { style: { padding: '10px 11px 12px' } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4 } },
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: '#161616', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.name),
+                            item.verified && React.createElement(Icon, { name: "check", size: 10, color: THEME.coral })),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 3, marginTop: 4 } },
+                            React.createElement(Icon, { name: "star", size: 10, color: THEME.gold, fill: THEME.gold }),
+                            React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: '#161616' } }, (item.rating || 4.6).toFixed(1)),
+                            (item.comments || 0) > 0 && React.createElement("span", { style: { fontSize: 10.5, color: '#8A8A8E' } }, `(${item.comments})`),
+                            React.createElement("span", { style: { fontSize: 10.5, color: '#8A8A8E' } }, ` · ${item.location}`)),
+                        React.createElement("p", { style: { fontSize: 10.5, color: '#8A8A8E', marginTop: 2 } }, item.category),
+                        React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, padding: '3px 8px', borderRadius: 10, background: badge.bg } },
+                            React.createElement("span", { style: { fontSize: 9 } }, badge.icon),
+                            React.createElement("span", { style: { fontSize: 9.5, fontWeight: 700, color: badge.color } }, badge.label))));
+            };
+            const aiPicksItems = [...aiSearchCandidates].sort((a, b) => scoreAiSearchCandidate(b, {}) - scoreAiSearchCandidate(a, {})).slice(0, 8);
+            const aiPicksSection = React.createElement("div", { style: { marginTop: 26 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '0 18px' } },
+                    React.createElement("div", null,
+                        React.createElement("p", { style: { fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: '#161616', margin: 0 } }, "✨ AI picks for you"),
+                        React.createElement("p", { style: { fontSize: 11.5, color: '#8A8A8E', marginTop: 2 } }, "Based on your activity and preferences")),
+                    React.createElement("button", { onClick: () => flashToast('All AI picks — coming soon') }, React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: THEME.coral } }, "See all"))),
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 12, padding: '12px 18px 4px', overflowX: 'auto' } }, aiPicksItems.map(renderAiPickCard)));
+            const loadingSkeleton = React.createElement("div", { style: { padding: '22px 18px' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 } },
+                    React.createElement("span", { style: { fontSize: 14 } }, "✨"),
+                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: 600, color: '#161616' } }, "Finding the best matches for you…")),
+                [0, 1, 2, 3].map((i) => React.createElement("div", { key: i, style: { display: 'flex', gap: 12, marginBottom: 16 } },
+                    React.createElement("div", { className: "avio-skeleton", style: { width: 76, height: 76, flexShrink: 0 } }),
+                    React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 4 } },
+                        React.createElement("div", { className: "avio-skeleton", style: { height: 14, width: '70%' } }),
+                        React.createElement("div", { className: "avio-skeleton", style: { height: 11, width: '50%' } }),
+                        React.createElement("div", { className: "avio-skeleton", style: { height: 11, width: '40%' } })))));
+            if (stage === 'home' || stage === 'loading') {
+                return React.createElement(React.Fragment, null,
+                    header,
+                    React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto' } },
+                        searchBox,
+                        stage === 'loading' ? loadingSkeleton : React.createElement(React.Fragment, null, tryChipsSection, recentSearchesCard, trendingSection, aiPicksSection, React.createElement("div", { style: { height: 30 } }))));
+            }
+            const activeFilterChips = [];
+            if (ctx) {
+                if (ctx.category)
+                    activeFilterChips.push({ key: 'category', label: ctx.category, onRemove: () => updateAiContextField('category', null) });
+                if (ctx.maxPrice != null)
+                    activeFilterChips.push({ key: 'maxPrice', label: `Under $${ctx.maxPrice}`, onRemove: () => updateAiContextField('maxPrice', null) });
+                if (ctx.minRating != null)
+                    activeFilterChips.push({ key: 'minRating', label: 'Highly rated', onRemove: () => updateAiContextField('minRating', null) });
+                if (ctx.mobile)
+                    activeFilterChips.push({ key: 'mobile', label: 'Mobile service', onRemove: () => updateAiContextField('mobile', false) });
+                if (ctx.inStudio)
+                    activeFilterChips.push({ key: 'inStudio', label: 'In studio', onRemove: () => updateAiContextField('inStudio', false) });
+                if (ctx.openNow)
+                    activeFilterChips.push({ key: 'openNow', label: 'Open now', onRemove: () => updateAiContextField('openNow', false) });
+                if (ctx.dealsOnly)
+                    activeFilterChips.push({ key: 'dealsOnly', label: 'Deals only', onRemove: () => updateAiContextField('dealsOnly', false) });
+                if (ctx.date)
+                    activeFilterChips.push({ key: 'date', label: ctx.date.charAt(0).toUpperCase() + ctx.date.slice(1), onRemove: () => updateAiContextField('date', null) });
+                if (ctx.location)
+                    activeFilterChips.push({ key: 'location', label: ctx.location === 'current' ? 'Near me' : ctx.location, onRemove: () => updateAiContextField('location', null) });
+            }
+            const visibleRefinementChips = AI_SEARCH_REFINEMENT_CHIPS.filter((c) => c.id !== 'dealsOnly' || aiSearchHasDeals);
+            const resultsHeader = React.createElement("div", { style: { flexShrink: 0, padding: '14px 18px 0' } },
+                React.createElement("button", { onClick: () => setAiSearchStage('home'), style: { display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '12px 14px', borderRadius: 16, background: '#F5F5F5', border: '1px solid #F0F0F0' } },
+                    React.createElement(Icon, { name: "search", size: 14, color: '#8A8A8E' }),
+                    React.createElement("span", { style: { flex: 1, fontSize: 13.5, fontWeight: 600, color: '#161616', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, exploreSearchQuery),
+                    React.createElement(Icon, { name: "pencil", size: 13, color: '#8A8A8E' })),
+                React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 12, alignItems: 'flex-start' } },
+                    React.createElement("span", { style: { fontSize: 14, flexShrink: 0 } }, "✨"),
+                    React.createElement("p", { style: { fontSize: 12.5, color: '#484848', lineHeight: 1.45, margin: 0 } }, aiSearchRelaxedNote || `I found ${aiSearchResults.length} option${aiSearchResults.length === 1 ? '' : 's'} that match what you're looking for. These are ranked by availability, distance, rating, price, and relevance.`)),
+                activeFilterChips.length > 0 && React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 6, marginTop: 12, overflowX: 'auto' } }, activeFilterChips.map((c) => React.createElement("div", { key: c.key, className: "avio-chip-pop", style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 12, background: '#161616' } },
+                    React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: '#fff' } }, c.label),
+                    React.createElement("button", { onClick: c.onRemove, style: { display: 'flex' } }, React.createElement(Icon, { name: "x", size: 10, color: "#fff" }))))),
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, marginTop: 12, overflowX: 'auto' } }, visibleRefinementChips.map((chip) => {
+                    const active = aiActiveRefinements.has(chip.id);
+                    return React.createElement("button", { key: chip.id, className: "avio-pill", onClick: () => toggleAiRefinementChip(chip), style: { flexShrink: 0, padding: '8px 14px', borderRadius: 16, background: active ? THEME.coral : '#F5F5F5', border: `1px solid ${active ? THEME.coral : '#F0F0F0'}` } },
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: active ? '#fff' : '#484848' } }, chip.label));
+                })));
+            const resultsList = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '14px 18px' } },
+                aiSearchResults.length === 0
+                    ? React.createElement("p", { style: { fontSize: 12.5, color: '#8A8A8E', textAlign: 'center', padding: '40px 0' } }, "No results yet.")
+                    : aiSearchResults.map((item, i) => {
+                        const badge = aiSearchResultBadge(item);
+                        const reviewCount = item.comments || 0;
+                        return React.createElement("button", { key: item.id, onClick: () => openBusinessProfile(item), className: "avio-results-in avio-press", style: { animationDelay: `${Math.min(i, 6) * 0.04}s`, display: 'flex', gap: 12, width: '100%', textAlign: 'left', padding: 12, borderRadius: 18, border: '1px solid #F0F0F0', background: '#fff', marginBottom: 10, boxShadow: '0 2px 10px rgba(0,0,0,0.04)' } },
+                            item.image
+                                ? React.createElement("div", { style: { width: 76, height: 76, borderRadius: 14, flexShrink: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
+                                : React.createElement("div", { style: { width: 76, height: 76, borderRadius: 14, flexShrink: 0, background: item.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: '#fff' } }, item.name.charAt(0)),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
+                                    React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: '#161616' } }, item.name),
+                                    item.verified && React.createElement(Icon, { name: "check", size: 11, color: THEME.coral })),
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 } },
+                                    React.createElement(Icon, { name: "star", size: 11, color: THEME.gold, fill: THEME.gold }),
+                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: '#161616' } }, (item.rating || 4.6).toFixed(1)),
+                                    reviewCount > 0 && React.createElement("span", { style: { fontSize: 11.5, color: '#8A8A8E' } }, `(${reviewCount})`),
+                                    React.createElement("span", { style: { fontSize: 11.5, color: '#8A8A8E' } }, ` · ${item.location}`)),
+                                React.createElement("p", { style: { fontSize: 11.5, color: '#8A8A8E', marginTop: 2 } }, `${item.category} · $${item.price}`),
+                                React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, padding: '3px 8px', borderRadius: 10, background: badge.bg } },
+                                    React.createElement("span", { style: { fontSize: 10 } }, badge.icon),
+                                    React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: badge.color } }, badge.label))),
+                            React.createElement("button", { onClick: (e) => { e.stopPropagation(); toggleBookmark(item.id); }, style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                                React.createElement(Icon, { name: "bookmark", size: 16, color: "#161616", fill: exploreBookmarks.has(item.id) ? '#161616' : 'none' })));
+                    }));
+            const followUpBar = React.createElement("div", { style: { flexShrink: 0, padding: '10px 18px calc(env(safe-area-inset-bottom) + 10px)', borderTop: '1px solid #F0F0F0', display: 'flex', alignItems: 'center', gap: 8, background: '#fff' } },
+                React.createElement("input", { value: aiRefineDraft, onChange: (e) => setAiRefineDraft(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter')
+                        submitAiRefine(); }, placeholder: "Refine your search…", style: { flex: 1, minWidth: 0, background: '#F5F5F5', border: '1px solid #F0F0F0', borderRadius: 14, padding: '11px 14px', fontSize: 13, color: '#161616', outline: 'none' } }),
+                React.createElement("button", { onClick: () => submitAiRefine(), style: { width: 38, height: 38, borderRadius: '50%', background: aiRefineDraft.trim() ? THEME.coral : '#F0F0F0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement("span", { style: { color: aiRefineDraft.trim() ? '#fff' : '#B5B5B8', fontSize: 15, fontWeight: 700 } }, "↑")));
+            return React.createElement(React.Fragment, null, header, resultsHeader, resultsList, followUpBar);
         })())),
         tab === 'connect' && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#fff' } }, (() => {
             const CN = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
