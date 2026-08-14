@@ -748,17 +748,102 @@ function computeEarningsStats(list) {
 // Real period-over-period comparison, never a hardcoded percentage. Returns
 // { pct, isNew } where pct is null and isNew is true when there's no prior-period
 // data to compare against (division by zero would be meaningless, not "0%").
-function computeEarningsComparison(allBookings, period) {
+// metricFn extracts the number to compare from a computeEarningsStats() result;
+// defaults to totalEarnings.
+function computeMetricComparison(allBookings, period, metricFn) {
+    const extract = metricFn || ((s) => s.totalEarnings);
     const now = new Date();
     const currentStart = earningsPeriodCutoff(period, now);
     const previousStart = earningsPeriodCutoff(period, currentStart);
     const currentBookings = allBookings.filter((b) => getBookingDate(b) >= currentStart);
     const previousBookings = allBookings.filter((b) => { const d = getBookingDate(b); return d >= previousStart && d < currentStart; });
-    const currentTotal = computeEarningsStats(currentBookings).totalEarnings;
-    const previousTotal = computeEarningsStats(previousBookings).totalEarnings;
-    if (previousTotal > 0)
-        return { pct: Math.round(((currentTotal - previousTotal) / previousTotal) * 100), isNew: false };
-    return { pct: null, isNew: currentTotal > 0 };
+    const currentVal = extract(computeEarningsStats(currentBookings));
+    const previousVal = extract(computeEarningsStats(previousBookings));
+    if (previousVal > 0)
+        return { pct: Math.round(((currentVal - previousVal) / previousVal) * 100), isNew: false };
+    return { pct: null, isNew: currentVal > 0 };
+}
+function computeEarningsComparison(allBookings, period) {
+    return computeMetricComparison(allBookings, period, (s) => s.totalEarnings);
+}
+function repeatRatePct(stats) {
+    return stats.customers.length > 0 ? Math.round((stats.customers.filter((c) => c.count > 1).length / stats.customers.length) * 100) : 0;
+}
+// Chronological chart buckets for the hero graph, granularity depending on period —
+// never a fixed Mon-Sun week. Real calendar buckets, honest $0 where no bookings exist.
+function computeEarningsChartBuckets(bookings, period) {
+    const now = new Date();
+    const nonCancelled = bookings.filter((b) => b.status !== 'cancelled');
+    const bookingDates = nonCancelled.map((b) => ({ b, d: getBookingDate(b) }));
+    function bucketSum(start, end) {
+        let earnings = 0, count = 0;
+        bookingDates.forEach(({ b, d }) => {
+            if (d >= start && d < end) {
+                const r = summarizeBookingRevenue(b);
+                earnings += r.net;
+                count += 1;
+            }
+        });
+        return { earnings, count };
+    }
+    const buckets = [];
+    if (period === '7D') {
+        for (let i = 6; i >= 0; i--) {
+            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+            const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
+            const { earnings, count } = bucketSum(start, end);
+            buckets.push({ label: EARNINGS_WEEKDAYS[(start.getDay() + 6) % 7], fullLabel: start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), earnings, count, showLabel: true });
+        }
+    }
+    else if (period === '30D') {
+        for (let i = 29; i >= 0; i--) {
+            const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+            const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1);
+            const { earnings, count } = bucketSum(start, end);
+            buckets.push({ label: start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), fullLabel: start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), earnings, count, showLabel: i % 7 === 0 });
+        }
+    }
+    else if (period === '3M') {
+        for (let i = 12; i >= 0; i--) {
+            const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i * 7 + 1);
+            const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - 7);
+            const { earnings, count } = bucketSum(start, end);
+            buckets.push({ label: start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), fullLabel: `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(end.getFullYear(), end.getMonth(), end.getDate() - 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`, earnings, count, showLabel: i % 4 === 0 });
+        }
+    }
+    else {
+        for (let i = 11; i >= 0; i--) {
+            const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+            const { earnings, count } = bucketSum(start, end);
+            buckets.push({ label: start.toLocaleDateString('en-US', { month: 'short' }), fullLabel: start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), earnings, count, showLabel: true });
+        }
+    }
+    return buckets;
+}
+function computePromotionStats(bookings) {
+    const promoBookings = bookings.filter((b) => b.status !== 'cancelled' && b.promotionApplied);
+    const gross = promoBookings.reduce((sum, b) => sum + (b.originalPrice != null ? b.originalPrice : b.price), 0);
+    const discount = promoBookings.reduce((sum, b) => sum + (b.discountAmount || 0), 0);
+    const net = promoBookings.reduce((sum, b) => sum + (b.finalPrice != null ? b.finalPrice : b.price), 0);
+    return { count: promoBookings.length, gross, discount, net, label: promoBookings.length > 0 ? promoBookings[0].promotionLabel : null };
+}
+// Customers with at least one historical booking but none in the current filtered window.
+function computeNonReturningCustomers(allBookings, currentPeriodBookings) {
+    const currentNames = new Set(currentPeriodBookings.filter((b) => b.status !== 'cancelled').map((b) => b.customerName));
+    const allTimeCustomers = {};
+    allBookings.filter((b) => b.status !== 'cancelled').forEach((b) => {
+        const d = getBookingDate(b);
+        if (!allTimeCustomers[b.customerName])
+            allTimeCustomers[b.customerName] = { name: b.customerName, initials: b.initials, avatarColor: b.avatarColor, lastDate: d };
+        else if (d > allTimeCustomers[b.customerName].lastDate)
+            allTimeCustomers[b.customerName].lastDate = d;
+    });
+    return Object.values(allTimeCustomers).filter((c) => !currentNames.has(c.name)).sort((a, b) => b.lastDate - a.lastDate);
+}
+function customerSince(allBookings, customerName) {
+    const dates = allBookings.filter((b) => b.customerName === customerName && b.status !== 'cancelled').map((b) => getBookingDate(b));
+    return dates.length ? new Date(Math.min(...dates.map((d) => d.getTime()))) : null;
 }
 function parseCount(v) {
     if (typeof v === 'number')
@@ -1202,7 +1287,7 @@ function App() {
     const [providerDashboardOpen, setProviderDashboardOpen] = useState(false);
     const [providerDashboardTab, setProviderDashboardTab] = useState('overview');
     useEffect(() => { if (providerDashboardTab !== 'hours') setScheduleView('menu'); }, [providerDashboardTab]);
-    useEffect(() => { if (!providerDashboardOpen) { setEarningsInsightsOpen(false); setEarningsSelectedDay(null); setSelectedServiceDetail(null); setSelectedCustomerDetail(null); setEarningsSelectedTime(null); setAllServicesOpen(false); setAllCustomersOpen(false); setAllTimesOpen(false); setEarningsPerformanceOpen(false); setEarningsCustomerInsightsOpen(false); setEarningsBreakdownDetailOpen(false); } }, [providerDashboardOpen]);
+    useEffect(() => { if (!providerDashboardOpen) { setEarningsInsightsOpen(false); setEarningsTab('overview'); setEarningsChartSelectedIdx(null); setEarningsSelectedDay(null); setSelectedServiceDetail(null); setSelectedCustomerDetail(null); setEarningsSelectedTime(null); setAllServicesOpen(false); setAllCustomersOpen(false); setPromotionDrillDownOpen(false); setRetentionListOpen(false); setInsightsMoreOpen(false); } }, [providerDashboardOpen]);
     const [serviceFormDraft, setServiceFormDraft] = useState(null);
     const [hoursOverrideDraft, setHoursOverrideDraft] = useState(null);
     const [providerStaff, setProviderStaff] = useState(() => loadLS('avio_provider_staff', DEFAULT_STAFF));
@@ -1216,20 +1301,21 @@ function App() {
     const [businessCalendarDay, setBusinessCalendarDay] = useState(() => new Date().getDate());
     const [earningsInsightsOpen, setEarningsInsightsOpen] = useState(false);
     const [earningsPeriod, setEarningsPeriod] = useState('7D');
+    const [earningsTab, setEarningsTab] = useState('overview');
+    const [earningsChartSelectedIdx, setEarningsChartSelectedIdx] = useState(null);
     const [earningsSelectedDay, setEarningsSelectedDay] = useState(null);
     const [dashboardChartSelectedDay, setDashboardChartSelectedDay] = useState(null);
+    const [daysRankMode, setDaysRankMode] = useState('bookings');
     const [servicesRankMode, setServicesRankMode] = useState('bookings');
     const [selectedServiceDetail, setSelectedServiceDetail] = useState(null);
     const [customersRankMode, setCustomersRankMode] = useState('bookings');
     const [selectedCustomerDetail, setSelectedCustomerDetail] = useState(null);
-    const [timesRankMode, setTimesRankMode] = useState('bookings');
     const [earningsSelectedTime, setEarningsSelectedTime] = useState(null);
     const [allServicesOpen, setAllServicesOpen] = useState(false);
     const [allCustomersOpen, setAllCustomersOpen] = useState(false);
-    const [allTimesOpen, setAllTimesOpen] = useState(false);
-    const [earningsPerformanceOpen, setEarningsPerformanceOpen] = useState(false);
-    const [earningsCustomerInsightsOpen, setEarningsCustomerInsightsOpen] = useState(false);
-    const [earningsBreakdownDetailOpen, setEarningsBreakdownDetailOpen] = useState(false);
+    const [promotionDrillDownOpen, setPromotionDrillDownOpen] = useState(false);
+    const [retentionListOpen, setRetentionListOpen] = useState(false);
+    const [insightsMoreOpen, setInsightsMoreOpen] = useState(false);
     function updateBusinessBookingStatus(id, status) {
         setBusinessBookings((prev) => prev.map((b) => b.id === id ? { ...b, status } : b));
         setBusinessBookingDetail((prev) => prev && prev.id === id ? { ...prev, status } : prev);
@@ -3913,26 +3999,33 @@ function App() {
         })(),
         providerDashboardOpen && earningsInsightsOpen && (() => {
             const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
-            const closePanel = () => { setEarningsInsightsOpen(false); setEarningsSelectedDay(null); setEarningsSelectedTime(null); };
+            const closePanel = () => {
+                setEarningsInsightsOpen(false); setEarningsTab('overview'); setEarningsChartSelectedIdx(null);
+                setEarningsSelectedDay(null); setEarningsSelectedTime(null); setSelectedServiceDetail(null);
+                setSelectedCustomerDetail(null); setAllServicesOpen(false); setAllCustomersOpen(false);
+                setPromotionDrillDownOpen(false); setRetentionListOpen(false); setInsightsMoreOpen(false);
+            };
             const filteredBookings = businessBookings.filter((b) => getBookingDate(b) >= earningsPeriodCutoff(earningsPeriod));
             const stats = computeEarningsStats(filteredBookings);
             const comparison = computeEarningsComparison(businessBookings, earningsPeriod);
+            const chartBuckets = computeEarningsChartBuckets(businessBookings, earningsPeriod);
+            const promoStats = computePromotionStats(filteredBookings);
+            const repeatCustomers = stats.customers.filter((c) => c.count > 1).length;
+            const repeatRate = repeatRatePct(stats);
+            const avgCustomerSpend = stats.customers.length > 0 ? stats.totalEarnings / stats.customers.length : 0;
+            const nonReturning = computeNonReturningCustomers(businessBookings, filteredBookings);
             const PERIOD_OPTIONS = ['7D', '30D', '3M', '1Y'];
             const PERIOD_VS_LABEL = { '7D': 'vs. previous 7 days', '30D': 'vs. previous 30 days', '3M': 'vs. previous 3 months', '1Y': 'vs. previous year' };
-            const sectionLabel = (text) => React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, text);
-            const insightCard = (emoji, title, sub) => React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, border: `1px solid ${PD.border}` } },
-                React.createElement("div", { style: { width: 30, height: 30, borderRadius: 9, background: 'rgba(151,196,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 } }, emoji),
-                React.createElement("div", { style: { minWidth: 0 } },
-                    React.createElement("p", { style: { fontSize: 10, color: PD.sub, margin: 0 } }, title),
-                    React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: PD.text, margin: '2px 0 0' } }, sub)));
+            const TABS = [['overview', 'Overview'], ['money', 'Money'], ['performance', 'Performance'], ['customers', 'Customers']];
 
-            const maxDayEarning = Math.max(...stats.byDayOfWeek.map((d) => d.earnings), 0);
-            const chartVals = stats.byDayOfWeek.map((d) => maxDayEarning > 0 ? Math.max(0.08, d.earnings / maxDayEarning) : 0.08);
-            const chartW = 320, chartH = 50;
-            const chartPts = chartVals.map((v, i) => [Math.round(i * (chartW / (chartVals.length - 1))), Math.round(chartH - v * (chartH - 10) - 5)]);
-            const linePath = 'M' + chartPts.map((p) => p.join(',')).join(' L');
-            const areaPath = linePath + ` L${chartW},${chartH} L0,${chartH} Z`;
-            const selectedDay = earningsSelectedDay != null ? stats.byDayOfWeek[earningsSelectedDay] : null;
+            const sectionLabel = (text) => React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, text);
+            const dotRow = (color, label, val, onClick) => React.createElement(onClick ? "button" : "div", { key: label, onClick: onClick, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left', padding: onClick ? '3px 0' : 0 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                    React.createElement("span", { style: { width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 } }),
+                    React.createElement("span", { style: { fontSize: 13, color: PD.text } }, label)),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4 } },
+                    React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: PD.text } }, val),
+                    onClick && React.createElement(Icon, { name: "chevronright", size: 11, color: PD.sub })));
 
             const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: `calc(env(safe-area-inset-top) + 8px) 18px 8px`, borderBottom: `1px solid ${PD.border}` } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12 } },
@@ -3940,33 +4033,32 @@ function App() {
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "Earnings & Insights")),
                 React.createElement("button", { onClick: () => { setProviderDashboardTab('calendar'); closePanel(); } }, React.createElement(Icon, { name: "calendar", size: 17, color: PD.text })));
 
-            const periodFilter = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8 } },
-                PERIOD_OPTIONS.map((p) => React.createElement("button", { key: p, onClick: () => { setEarningsPeriod(p); setEarningsSelectedDay(null); setEarningsSelectedTime(null); }, style: { flex: 1, padding: '6px 0', borderRadius: 10, textAlign: 'center', fontSize: 11.5, fontWeight: 700, background: earningsPeriod === p ? THEME.coral : '#F5F5F5', color: earningsPeriod === p ? '#fff' : PD.sub } }, p)));
+            const periodFilter = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 10 } },
+                PERIOD_OPTIONS.map((p) => React.createElement("button", { key: p, onClick: () => { setEarningsPeriod(p); setEarningsChartSelectedIdx(null); }, style: { flex: 1, padding: '6px 0', borderRadius: 10, textAlign: 'center', fontSize: 11.5, fontWeight: 700, background: earningsPeriod === p ? THEME.coral : '#F5F5F5', color: earningsPeriod === p ? '#fff' : PD.sub } }, p)));
 
             const comparisonBadge = comparison.pct != null
                 ? React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: comparison.pct >= 0 ? THEME.coral : '#D0304A' } }, `${comparison.pct >= 0 ? '▲' : '▼'} ${Math.abs(comparison.pct)}%`)
                 : comparison.isNew ? React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral } }, "New") : null;
-            const topSection = React.createElement("div", { style: { marginTop: 10 } },
-                sectionLabel("Net Earnings"),
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 27, color: PD.text, margin: '4px 0 0' } }, money(stats.totalEarnings)),
-                (comparisonBadge || stats.totalEarnings === 0) && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 } },
-                    comparisonBadge,
-                    React.createElement("span", { style: { fontSize: 11.5, color: PD.sub } }, PERIOD_VS_LABEL[earningsPeriod])));
 
-            const tooltipCard = selectedDay && React.createElement("div", { style: { marginTop: 8, padding: 10, borderRadius: 12, background: '#FAFAFA', border: `1px solid ${PD.border}` } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
-                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: PD.text, margin: 0 } }, EARNINGS_WEEKDAYS_FULL[earningsSelectedDay]),
-                    React.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: THEME.coral, background: 'rgba(151,196,0,0.12)', padding: '2px 7px', borderRadius: 7 } }, "Selected")),
-                React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '6px 12px', marginTop: 6 } },
-                    [['Earned', money(selectedDay.earnings)], ['Bookings', String(selectedDay.count)], ['Avg. booking', money(selectedDay.avgBooking)], ['Top service', selectedDay.topService || '—']].map(([k, v]) => React.createElement("div", { key: k },
-                        React.createElement("p", { style: { fontSize: 9.5, color: PD.sub, margin: 0 } }, k),
-                        React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: PD.text, margin: '1px 0 0' } }, v)))));
+            const maxBucketVal = Math.max(...chartBuckets.map((c) => c.earnings), 0);
+            const chartW = 320, chartH = 64;
+            const chartVals = chartBuckets.map((c) => maxBucketVal > 0 ? Math.max(0.06, c.earnings / maxBucketVal) : 0.06);
+            const chartPts = chartVals.map((v, i) => [Math.round(i * (chartW / Math.max(1, chartVals.length - 1))), Math.round(chartH - v * (chartH - 10) - 5)]);
+            const linePath = chartPts.length ? 'M' + chartPts.map((p) => p.join(',')).join(' L') : '';
+            const areaPath = linePath ? linePath + ` L${chartW},${chartH} L0,${chartH} Z` : '';
+            const selectedBucket = earningsChartSelectedIdx != null ? chartBuckets[earningsChartSelectedIdx] : null;
 
-            const chartSection = React.createElement("div", { style: { marginTop: 8 } },
+            const netEarningsHero = React.createElement("div", { style: { marginTop: 12, border: `1px solid ${PD.border}`, borderRadius: 18, padding: '14px 16px 12px' } },
+                React.createElement("button", { onClick: () => setEarningsTab('money'), style: { width: '100%', textAlign: 'left' } },
+                    sectionLabel("Net Earnings"),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: PD.text, margin: '4px 0 0' } }, money(stats.totalEarnings)),
+                    (comparisonBadge || stats.totalEarnings === 0) && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 } },
+                        comparisonBadge,
+                        React.createElement("span", { style: { fontSize: 11.5, color: PD.sub } }, PERIOD_VS_LABEL[earningsPeriod]))),
                 stats.totalEarnings === 0
-                    ? React.createElement("p", { style: { fontSize: 12, color: PD.sub, padding: '10px 0', textAlign: 'center' } }, "No earnings yet in this period.")
+                    ? React.createElement("p", { style: { fontSize: 12, color: PD.sub, padding: '14px 0 2px', textAlign: 'center' } }, "No earnings yet in this period.")
                     : React.createElement(React.Fragment, null,
-                        React.createElement("svg", { width: "100%", height: chartH, viewBox: `0 0 ${chartW} ${chartH}`, style: { display: 'block' } },
+                        React.createElement("svg", { width: "100%", height: chartH, viewBox: `0 0 ${chartW} ${chartH}`, style: { display: 'block', marginTop: 10 } },
                             React.createElement("defs", null,
                                 React.createElement("linearGradient", { id: "insightsChartFade", x1: "0", y1: "0", x2: "0", y2: "1" },
                                     React.createElement("stop", { offset: "0%", stopColor: THEME.coral, stopOpacity: 0.22 }),
@@ -3974,261 +4066,400 @@ function App() {
                             React.createElement("path", { d: areaPath, fill: "url(#insightsChartFade)" }),
                             React.createElement("path", { d: linePath, fill: "none", stroke: THEME.coral, strokeWidth: 2.5, strokeLinecap: "round", strokeLinejoin: "round" }),
                             chartPts.map((p, i) => React.createElement("circle", {
-                                key: i, cx: p[0], cy: p[1], r: earningsSelectedDay === i ? 5 : 8,
-                                fill: earningsSelectedDay === i ? THEME.coral : 'transparent', stroke: 'none',
-                                onClick: () => setEarningsSelectedDay((prev) => prev === i ? null : i),
+                                key: i, cx: p[0], cy: p[1], r: earningsChartSelectedIdx === i ? 5 : 9,
+                                fill: earningsChartSelectedIdx === i ? THEME.coral : 'transparent', stroke: 'none',
+                                onClick: () => setEarningsChartSelectedIdx((prev) => prev === i ? null : i),
                             }))),
-                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 4 } },
-                            EARNINGS_WEEKDAYS.map((d, i) => React.createElement("span", { key: d, style: { fontSize: 9.5, fontWeight: earningsSelectedDay === i ? 700 : 400, color: earningsSelectedDay === i ? THEME.coral : PD.sub } }, d))),
-                        tooltipCard));
+                        React.createElement("div", { style: { display: 'flex', marginTop: 4 } },
+                            chartBuckets.map((c, i) => React.createElement("span", { key: i, style: { flex: 1, textAlign: 'center', fontSize: 8, overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: earningsChartSelectedIdx === i ? 700 : 400, color: earningsChartSelectedIdx === i ? THEME.coral : PD.sub, visibility: c.showLabel ? 'visible' : 'hidden' } }, c.label))),
+                        selectedBucket && React.createElement("div", { style: { marginTop: 8, padding: 10, borderRadius: 12, background: '#FAFAFA', border: `1px solid ${PD.border}` } },
+                            React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: PD.text, margin: 0 } }, selectedBucket.fullLabel),
+                            React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '3px 0 0' } }, `${money(selectedBucket.earnings)} · ${selectedBucket.count} booking${selectedBucket.count === 1 ? '' : 's'}`))));
 
-            const viewTransactionsButton = React.createElement("button", { onClick: () => { setProviderDashboardTab('bookings'); closePanel(); }, style: { marginTop: 8, width: '100%', textAlign: 'center', fontSize: 11.5, fontWeight: 700, color: THEME.coral, padding: '6px 0', borderRadius: 10, background: '#FAFAFA' } }, "View Transactions  ›");
-            const earningsCard = React.createElement("div", { style: { marginTop: 10, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '12px 14px 10px' } }, topSection, chartSection, viewTransactionsButton);
-
-            const repeatCustomers = stats.customers.filter((c) => c.count > 1).length;
-            const completedCount = filteredBookings.filter((b) => b.status === 'completed').length;
-            const performanceRow = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8 } },
-                [['Bookings Completed', String(completedCount)], ['Avg. per Booking', money(stats.avgBooking)], ['Repeat Customers', String(repeatCustomers)]].map(([label, val]) => React.createElement("div", { key: label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 12, padding: '7px 6px', textAlign: 'center' } },
+            const compactNumbersRow = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 10 } },
+                [['Bookings', String(stats.count)], ['Avg. Booking', money(stats.avgBooking)], ['Repeat Customers', String(repeatCustomers)]].map(([label, val]) => React.createElement("div", { key: label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 12, padding: '7px 6px', textAlign: 'center' } },
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: PD.text, margin: 0 } }, val),
                     React.createElement("p", { style: { fontSize: 8.5, color: PD.sub, margin: '1px 0 0' } }, label))));
 
-            const shortcutCard = (emoji, bg, title, sub, onClick) => React.createElement("button", { onClick: onClick, style: { flex: 1, textAlign: 'left', background: bg, borderRadius: 12, padding: 8, display: 'flex', flexDirection: 'column', minHeight: 62 } },
-                React.createElement("span", { style: { fontSize: 13 } }, emoji),
-                React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, color: PD.text, margin: '5px 0 0', lineHeight: 1.1 } }, title),
-                React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 4, marginTop: 2 } },
-                    React.createElement("span", { style: { fontSize: 8.5, color: PD.sub, lineHeight: 1.15 } }, sub),
-                    React.createElement(Icon, { name: "arrowright", size: 10, color: PD.sub })));
-            const shortcutCardsRow = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8 } },
-                shortcutCard('📈', 'rgba(151,196,0,0.1)', 'Performance', 'Track your growth', () => setEarningsPerformanceOpen(true)),
-                shortcutCard('👥', 'rgba(46,155,255,0.1)', 'Customer Insights', 'Learn about your customers', () => setEarningsCustomerInsightsOpen(true)),
-                shortcutCard('🥧', 'rgba(108,76,252,0.1)', 'Earnings Breakdown', 'See where your earnings come from', () => setEarningsBreakdownDetailOpen(true)));
-
-            const rankedCustomers = [...stats.customers].sort((a, b) => customersRankMode === 'bookings' ? b.count - a.count : b.earnings - a.earnings);
-            const maxCustomerVal = Math.max(...rankedCustomers.map((c) => customersRankMode === 'bookings' ? c.count : c.earnings), 1);
-            const customerRow = (c, i) => {
-                const val = customersRankMode === 'bookings' ? c.count : c.earnings;
-                const pct = Math.round((val / maxCustomerVal) * 100);
-                return React.createElement("button", { key: c.name, onClick: () => setSelectedCustomerDetail(c.name), style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 } },
-                    React.createElement("span", { style: { width: 14, fontSize: 11, fontWeight: 700, color: PD.sub, flexShrink: 0 } }, i + 1),
-                    React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: c.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 9.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
-                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 3 } },
-                            React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: PD.text } }, c.name),
-                            React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: PD.text } }, `${c.count} booking${c.count === 1 ? '' : 's'} · ${money(c.earnings)}`)),
-                        React.createElement("div", { style: { width: '100%', height: 4, borderRadius: 2, background: '#F0F0F0' } },
-                            React.createElement("div", { style: { width: `${pct}%`, height: '100%', borderRadius: 2, background: THEME.coral } }))));
+            const openDayFromWeekday = (weekdayLabel) => {
+                const idx = EARNINGS_WEEKDAYS.indexOf(weekdayLabel);
+                if (idx >= 0) setEarningsSelectedDay(idx);
             };
-            const customersSection = React.createElement("div", { style: { marginTop: 8, border: `1px solid ${PD.border}`, borderRadius: 14, padding: 12 } },
+            const highlightItem = (emoji, label, value, onClick) => value == null ? null : React.createElement("button", { key: label, onClick: onClick, style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' } },
+                React.createElement("div", { style: { width: 30, height: 30, borderRadius: 9, background: 'rgba(151,196,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 } }, emoji),
+                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                    React.createElement("p", { style: { fontSize: 9.5, color: PD.sub, margin: 0 } }, label),
+                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: PD.text, margin: '1px 0 0' } }, value)),
+                React.createElement(Icon, { name: "chevronright", size: 11, color: PD.sub }));
+            const highlightsItems = [
+                stats.busiestDay && stats.busiestDay.count > 0 && highlightItem('📅', 'Best Day', `${stats.busiestDay.label} · ${stats.busiestDay.count} booking${stats.busiestDay.count === 1 ? '' : 's'}`, () => openDayFromWeekday(stats.busiestDay.label)),
+                stats.mostPopularTime && highlightItem('🕙', 'Best Time', `${stats.mostPopularTime.labelFull} · ${stats.mostPopularTime.count} booking${stats.mostPopularTime.count === 1 ? '' : 's'}`, () => setEarningsSelectedTime(stats.mostPopularTime.hour24)),
+                stats.topServiceByEarnings && highlightItem('✂️', 'Top Service', `${stats.topServiceByEarnings.name} · ${money(stats.topServiceByEarnings.earnings)}`, () => setSelectedServiceDetail(stats.topServiceByEarnings.name)),
+                stats.topCustomerByEarnings && highlightItem('⭐', 'Top Customer', `${stats.topCustomerByEarnings.name} · ${money(stats.topCustomerByEarnings.earnings)}`, () => setSelectedCustomerDetail(stats.topCustomerByEarnings.name)),
+            ].filter(Boolean);
+            const highlightsSection = React.createElement("div", { style: { marginTop: 10, border: `1px solid ${PD.border}`, borderRadius: 14, padding: '10px 12px' } },
+                sectionLabel("This Period Highlights"),
+                highlightsItems.length === 0
+                    ? React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 8 } }, "Not enough data yet.")
+                    : React.createElement("div", { style: { display: 'flex', flexDirection: 'column' } }, highlightsItems));
+
+            const primaryInsight = (() => {
+                if (comparison.pct != null && Math.abs(comparison.pct) >= 10) {
+                    const up = comparison.pct >= 0;
+                    return { emoji: up ? '📈' : '📉', text: `Earnings are ${up ? 'up' : 'down'} ${Math.abs(comparison.pct)}% ${PERIOD_VS_LABEL[earningsPeriod]}.` };
+                }
+                if (promoStats.count > 0)
+                    return { emoji: '🏷️', text: `${promoStats.count} booking${promoStats.count === 1 ? '' : 's'} used a promotion, giving back ${money(promoStats.discount)} in discounts.` };
+                if (nonReturning.length > 0)
+                    return { emoji: '👋', text: `${nonReturning.length} customer${nonReturning.length === 1 ? '' : 's'} haven't booked again recently.` };
+                if (stats.topServiceByEarnings)
+                    return { emoji: '🔥', text: `${stats.topServiceByEarnings.name} is your top earner this period at ${money(stats.topServiceByEarnings.earnings)}.` };
+                return { emoji: '💡', text: "Keep booking to unlock more insights about your business." };
+            })();
+            const insightCardMain = React.createElement("div", { style: { marginTop: 10, border: `1px solid ${PD.border}`, borderRadius: 14, padding: '10px 12px' } },
+                sectionLabel("What You Should Know"),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 } },
+                    React.createElement("span", { style: { fontSize: 16 } }, primaryInsight.emoji),
+                    React.createElement("p", { style: { flex: 1, fontSize: 12, color: PD.text, margin: 0, lineHeight: 1.35 } }, primaryInsight.text)),
+                React.createElement("button", { onClick: () => setInsightsMoreOpen(true), style: { marginTop: 8, fontSize: 10.5, fontWeight: 700, color: THEME.coral } }, "See Insights  ›"));
+
+            const overviewBody = React.createElement(React.Fragment, null, netEarningsHero, compactNumbersRow, highlightsSection, insightCardMain);
+
+            const recentTransactions = [...filteredBookings].filter((b) => b.status !== 'cancelled').sort((a, b) => getBookingDate(b) - getBookingDate(a)).slice(0, 3);
+            const moneyBreakdownCard = React.createElement("div", { style: { marginTop: 12, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 16px' } },
+                sectionLabel("Money Breakdown"),
+                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 } },
+                    dotRow('#8FD400', 'Gross Sales', money(stats.grossServiceValue), null),
+                    promoStats.count > 0 && dotRow('#D0304A', 'Discounts & Promotions', '-' + money(promoStats.discount), () => setPromotionDrillDownOpen(true)),
+                    dotRow('#2E9BFF', 'Tips', money(0), null),
+                    dotRow('#D0304A', 'Refunds', money(0), null),
+                    dotRow('#8A8A8E', 'Fees', money(0), null),
+                    dotRow('#8A8A8E', 'Taxes', money(0), null)),
+                React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTop: `1px solid ${PD.border}` } },
+                    React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: PD.text } }, "Net Earnings"),
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontSize: 20, fontWeight: 700, color: PD.text } }, money(stats.totalEarnings))));
+
+            const transactionRow = (b) => React.createElement("div", { key: b.id || (b.customerName + b.time), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' } },
+                React.createElement("div", { style: { minWidth: 0 } },
+                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: PD.text, margin: 0 } }, b.customerName),
+                    React.createElement("p", { style: { fontSize: 10.5, color: PD.sub, margin: '1px 0 0' } }, `${b.service} · ${b.dateLabel || (b.dateGroup === 'tomorrow' ? 'Tomorrow' : 'Today')}`)),
+                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: PD.text, flexShrink: 0 } }, money(summarizeBookingRevenue(b).net)));
+
+            const transactionsCard = React.createElement("div", { style: { marginTop: 12, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 16px' } },
+                sectionLabel("Recent Transactions"),
+                recentTransactions.length === 0
+                    ? React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 8 } }, "No transactions yet.")
+                    : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', marginTop: 6 } }, recentTransactions.map(transactionRow)),
+                React.createElement("button", { onClick: () => { setProviderDashboardTab('bookings'); closePanel(); }, style: { marginTop: 8, fontSize: 10.5, fontWeight: 700, color: THEME.coral } }, "See All Transactions  ›"));
+
+            const moneyBody = React.createElement(React.Fragment, null, moneyBreakdownCard, transactionsCard);
+
+            const maxDayVal = Math.max(...stats.byDayOfWeek.map((d) => daysRankMode === 'bookings' ? d.count : d.earnings), 1);
+            const bestDaysCard = React.createElement("div", { style: { marginTop: 12, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 16px' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    sectionLabel("Best Days"),
+                    React.createElement("div", { style: { display: 'flex', background: '#F5F5F5', borderRadius: 9, padding: 2 } },
+                        [['bookings', 'Bookings'], ['earnings', 'Earnings']].map(([id, label]) => React.createElement("button", { key: id, onClick: () => setDaysRankMode(id), style: { padding: '4px 8px', borderRadius: 7, fontSize: 9.5, fontWeight: 700, background: daysRankMode === id ? '#fff' : 'transparent', color: daysRankMode === id ? PD.text : PD.sub } }, label)))),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6, marginTop: 14, height: 72 } },
+                    stats.byDayOfWeek.map((d, i) => {
+                        const val = daysRankMode === 'bookings' ? d.count : d.earnings;
+                        const strongest = daysRankMode === 'bookings' ? stats.busiestDay : stats.bestEarningDay;
+                        const active = strongest && strongest.label === d.label && val > 0;
+                        return React.createElement("button", { key: d.label, onClick: () => setEarningsSelectedDay(i), style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' } },
+                            React.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: active ? THEME.coral : PD.sub, marginBottom: 3, whiteSpace: 'nowrap' } }, daysRankMode === 'bookings' ? d.count : money(val)),
+                            React.createElement("div", { style: { width: '100%', maxWidth: 22, height: Math.max(4, Math.round((val / maxDayVal) * 42)), borderRadius: 5, background: active ? THEME.coral : '#EDEDED' } }),
+                            React.createElement("span", { style: { fontSize: 9.5, marginTop: 5, fontWeight: active ? 700 : 400, color: active ? THEME.coral : PD.sub } }, d.label));
+                    })));
+
+            const maxTimeVal = Math.max(...stats.byTimeSlot.map((s) => s.count), 1);
+            const bestTimesCard = React.createElement("div", { style: { marginTop: 12, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 16px' } },
+                sectionLabel("Best Times"),
+                stats.byTimeSlot.length === 0
+                    ? React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 8 } }, "Not enough bookings to calculate popular times.")
+                    : React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 5, marginTop: 14, height: 66, overflowX: stats.byTimeSlot.length > 8 ? 'auto' : 'visible' } },
+                        stats.byTimeSlot.map((s) => {
+                            const active = stats.mostPopularTime && s.hour24 === stats.mostPopularTime.hour24;
+                            return React.createElement("button", { key: s.hour24, onClick: () => setEarningsSelectedTime(s.hour24), style: { flex: '1 0 26px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' } },
+                                React.createElement("span", { style: { fontSize: 8.5, fontWeight: 700, color: active ? THEME.coral : PD.sub, marginBottom: 2 } }, s.count),
+                                React.createElement("div", { style: { width: '100%', maxWidth: 12, height: Math.max(3, Math.round((s.count / maxTimeVal) * 16)), borderRadius: 3, background: active ? THEME.coral : '#EDEDED' } }),
+                                React.createElement("span", { style: { fontSize: 7, marginTop: 3, color: active ? THEME.coral : PD.sub } }, s.label));
+                        })));
+
+            const rankedServicesPerf = [...stats.services].sort((a, b) => servicesRankMode === 'bookings' ? b.count - a.count : b.earnings - a.earnings);
+            const maxServiceValPerf = Math.max(...rankedServicesPerf.map((s) => servicesRankMode === 'bookings' ? s.count : s.earnings), 1);
+            const topServicesCard = React.createElement("div", { style: { marginTop: 12, marginBottom: 12, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 16px' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    sectionLabel("Top Services"),
+                    React.createElement("div", { style: { display: 'flex', background: '#F5F5F5', borderRadius: 9, padding: 2 } },
+                        [['bookings', 'Most Booked'], ['earnings', 'Highest Earning']].map(([id, label]) => React.createElement("button", { key: id, onClick: () => setServicesRankMode(id), style: { padding: '4px 8px', borderRadius: 7, fontSize: 9.5, fontWeight: 700, background: servicesRankMode === id ? '#fff' : 'transparent', color: servicesRankMode === id ? PD.text : PD.sub } }, label)))),
+                rankedServicesPerf.length === 0
+                    ? React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 8 } }, "No completed services during this period.")
+                    : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 } }, rankedServicesPerf.slice(0, 3).map((s, i) => {
+                        const val = servicesRankMode === 'bookings' ? s.count : s.earnings;
+                        const pct = Math.round((val / maxServiceValPerf) * 100);
+                        return React.createElement("button", { key: s.name, onClick: () => setSelectedServiceDetail(s.name), style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 } },
+                            React.createElement("span", { style: { width: 14, fontSize: 11, fontWeight: 700, color: PD.sub, flexShrink: 0 } }, i + 1),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 3 } },
+                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: PD.text } }, s.name),
+                                    React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: PD.text } }, `${s.count} booking${s.count === 1 ? '' : 's'} · ${money(s.earnings)}`)),
+                                React.createElement("div", { style: { width: '100%', height: 4, borderRadius: 2, background: '#F0F0F0' } },
+                                    React.createElement("div", { style: { width: `${pct}%`, height: '100%', borderRadius: 2, background: THEME.coral } }))));
+                    })),
+                rankedServicesPerf.length > 3 && React.createElement("button", { onClick: () => setAllServicesOpen(true), style: { marginTop: 8, fontSize: 10.5, fontWeight: 700, color: THEME.coral } }, "See All Services  ›"));
+
+            const performanceBody = React.createElement(React.Fragment, null, bestDaysCard, bestTimesCard, topServicesCard);
+
+            const customersStatsRow = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 12 } },
+                [['Customers', String(stats.customers.length)], ['Repeat %', `${repeatRate}%`], ['Avg. Spend', money(avgCustomerSpend)]].map(([label, val]) => React.createElement("div", { key: label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 12, padding: '7px 6px', textAlign: 'center' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: PD.text, margin: 0 } }, val),
+                    React.createElement("p", { style: { fontSize: 8.5, color: PD.sub, margin: '1px 0 0' } }, label))));
+
+            const rankedCustomersTab = [...stats.customers].sort((a, b) => customersRankMode === 'bookings' ? b.count - a.count : b.earnings - a.earnings);
+            const maxCustomerValTab = Math.max(...rankedCustomersTab.map((c) => customersRankMode === 'bookings' ? c.count : c.earnings), 1);
+            const topCustomersCard = React.createElement("div", { style: { marginTop: 12, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 16px' } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
                     sectionLabel("Top Customers"),
                     React.createElement("div", { style: { display: 'flex', background: '#F5F5F5', borderRadius: 9, padding: 2 } },
-                        [['bookings', 'Most Bookings'], ['earnings', 'Highest Spend']].map(([id, label]) => React.createElement("button", { key: id, onClick: () => setCustomersRankMode(id), style: { padding: '4px 7px', borderRadius: 6, fontSize: 9.5, fontWeight: 700, background: customersRankMode === id ? '#fff' : 'transparent', color: customersRankMode === id ? PD.text : PD.sub } }, label)))),
-                rankedCustomers.length === 0
+                        [['bookings', 'Most Bookings'], ['earnings', 'Highest Spend']].map(([id, label]) => React.createElement("button", { key: id, onClick: () => setCustomersRankMode(id), style: { padding: '4px 8px', borderRadius: 7, fontSize: 9.5, fontWeight: 700, background: customersRankMode === id ? '#fff' : 'transparent', color: customersRankMode === id ? PD.text : PD.sub } }, label)))),
+                rankedCustomersTab.length === 0
                     ? React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 8 } }, "No customer data yet.")
-                    : React.createElement(React.Fragment, null,
-                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 7, marginTop: 8 } }, rankedCustomers.slice(0, 3).map(customerRow)),
-                        rankedCustomers.length > 3 && React.createElement("button", { onClick: () => setAllCustomersOpen(true), style: { marginTop: 7, fontSize: 11, fontWeight: 700, color: THEME.coral } }, "View all customers  ›")));
+                    : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 } }, rankedCustomersTab.slice(0, 3).map((c, i) => {
+                        const val = customersRankMode === 'bookings' ? c.count : c.earnings;
+                        const pct = Math.round((val / maxCustomerValTab) * 100);
+                        return React.createElement("button", { key: c.name, onClick: () => setSelectedCustomerDetail(c.name), style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 } },
+                            React.createElement("span", { style: { width: 14, fontSize: 11, fontWeight: 700, color: PD.sub, flexShrink: 0 } }, i + 1),
+                            React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: c.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 9.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 3 } },
+                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: PD.text } }, c.name),
+                                    React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: PD.text } }, `${c.count} booking${c.count === 1 ? '' : 's'} · ${money(c.earnings)}`)),
+                                React.createElement("div", { style: { width: '100%', height: 4, borderRadius: 2, background: '#F0F0F0' } },
+                                    React.createElement("div", { style: { width: `${pct}%`, height: '100%', borderRadius: 2, background: THEME.coral } }))));
+                    })),
+                rankedCustomersTab.length > 3 && React.createElement("button", { onClick: () => setAllCustomersOpen(true), style: { marginTop: 8, fontSize: 10.5, fontWeight: 700, color: THEME.coral } }, "See All Customers  ›"));
 
-            const maxTimeBarVal = Math.max(...stats.byTimeSlot.map((s) => s.count), 1);
-            const compactTimesCard = React.createElement("div", { style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 14, padding: 10 } },
-                sectionLabel("Best Times of Day"),
-                stats.byTimeSlot.length === 0
-                    ? React.createElement("p", { style: { fontSize: 10, color: PD.sub, marginTop: 6 } }, "Not enough bookings to calculate popular times.")
-                    : React.createElement(React.Fragment, null,
-                        React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 3, marginTop: 8, height: 32 } },
-                            stats.byTimeSlot.map((s) => React.createElement("div", { key: s.hour24, style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' } },
-                                React.createElement("span", { style: { fontSize: 7.5, fontWeight: 700, color: s.hour24 === (stats.mostPopularTime && stats.mostPopularTime.hour24) ? THEME.coral : PD.sub, marginBottom: 1 } }, s.count),
-                                React.createElement("div", { style: { width: '100%', maxWidth: 11, height: Math.max(3, Math.round((s.count / maxTimeBarVal) * 16)), borderRadius: 3, background: s.hour24 === (stats.mostPopularTime && stats.mostPopularTime.hour24) ? THEME.coral : '#EDEDED' } }),
-                                React.createElement("span", { style: { fontSize: 6.5, marginTop: 2, color: PD.sub } }, s.label)))),
-                        stats.mostPopularTime && React.createElement("div", { style: { marginTop: 6, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 8px', borderRadius: 8, background: 'rgba(151,196,0,0.1)' } },
-                            React.createElement("span", { style: { fontSize: 11 } }, "🕙"),
-                            React.createElement("div", { style: { minWidth: 0 } },
-                                React.createElement("p", { style: { fontSize: 8, color: THEME.coral, margin: 0, fontWeight: 600 } }, "Most Popular"),
-                                React.createElement("p", { style: { fontSize: 9, fontWeight: 700, color: PD.text, margin: '1px 0 0' } }, `${stats.mostPopularTime.labelFull} · ${stats.mostPopularTime.count} booking${stats.mostPopularTime.count === 1 ? '' : 's'}`)))));
+            const retentionCard = React.createElement("div", { style: { marginTop: 12, marginBottom: 12, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 16px' } },
+                sectionLabel("Retention"),
+                nonReturning.length === 0
+                    ? React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 8 } }, "All customers with history have booked recently. Nice work.")
+                    : React.createElement("button", { onClick: () => setRetentionListOpen(true), style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 } },
+                        React.createElement("span", { style: { fontSize: 16 } }, "👋"),
+                        React.createElement("p", { style: { flex: 1, fontSize: 12, color: PD.text, margin: 0, lineHeight: 1.35 } }, `${nonReturning.length} customer${nonReturning.length === 1 ? '' : 's'} haven't returned recently.`),
+                        React.createElement(Icon, { name: "chevronright", size: 11, color: PD.sub })));
 
-            const smartInsightRows = [];
-            if (stats.topServiceByCount)
-                smartInsightRows.push(['🔥', 'Most Popular Service', `${stats.topServiceByCount.name} · ${stats.topServiceByCount.count} booking${stats.topServiceByCount.count === 1 ? '' : 's'}`, () => setSelectedServiceDetail(stats.topServiceByCount.name)]);
-            if (stats.topServiceByEarnings)
-                smartInsightRows.push(['📈', 'Highest Revenue Service', `${stats.topServiceByEarnings.name} · ${money(stats.topServiceByEarnings.earnings)}`, () => setSelectedServiceDetail(stats.topServiceByEarnings.name)]);
-            const smartInsightsCard = React.createElement("div", { style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 14, padding: 10 } },
-                sectionLabel("Smart Business Insights"),
-                smartInsightRows.length === 0
-                    ? React.createElement("p", { style: { fontSize: 10, color: PD.sub, marginTop: 6 } }, "Not enough data yet.")
-                    : React.createElement(React.Fragment, null,
-                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 5, marginTop: 6 } },
-                            smartInsightRows.map(([emoji, title, sub, onClick], i) => React.createElement("button", { key: i, onClick: onClick, style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6, padding: 6, borderRadius: 9, border: `1px solid ${PD.border}` } },
-                                React.createElement("span", { style: { fontSize: 12, flexShrink: 0 } }, emoji),
-                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                    React.createElement("p", { style: { fontSize: 9, fontWeight: 700, color: PD.text, margin: 0 } }, title),
-                                    React.createElement("p", { style: { fontSize: 8, color: PD.sub, margin: '1px 0 0' } }, sub)),
-                                React.createElement(Icon, { name: "chevronright", size: 9, color: PD.sub })))),
-                        React.createElement("button", { onClick: () => setEarningsPerformanceOpen(true), style: { marginTop: 6, fontSize: 10, fontWeight: 700, color: THEME.coral } }, "View all insights  ›")));
+            const customersBody = React.createElement(React.Fragment, null, customersStatsRow, topCustomersCard, retentionCard);
 
-            const bottomRow = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8, marginBottom: 10 } }, compactTimesCard, smartInsightsCard);
+            const activeBody = earningsTab === 'money' ? moneyBody : earningsTab === 'performance' ? performanceBody : earningsTab === 'customers' ? customersBody : overviewBody;
 
-            const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `0 18px calc(env(safe-area-inset-bottom) + 24px)` } },
-                periodFilter, earningsCard, performanceRow, shortcutCardsRow, customersSection, bottomRow);
+            const bottomNav = React.createElement("div", { style: { flexShrink: 0, display: 'flex', gap: 6, padding: `8px 18px calc(env(safe-area-inset-bottom) + 8px)`, borderTop: `1px solid ${PD.border}`, background: '#fff' } },
+                TABS.map(([id, label]) => React.createElement("button", { key: id, onClick: () => setEarningsTab(id), style: { flex: 1, padding: '8px 0', borderRadius: 11, textAlign: 'center', fontSize: 11.5, fontWeight: 700, background: earningsTab === id ? THEME.coral : '#F5F5F5', color: earningsTab === id ? '#fff' : PD.sub } }, label)));
 
-            return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 6, background: '#fff', display: 'flex', flexDirection: 'column' } }, header, body);
+            const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `0 18px 12px` } },
+                periodFilter, activeBody);
+
+            return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 6, background: '#fff', display: 'flex', flexDirection: 'column' } }, header, body, bottomNav);
         })(),
-        providerDashboardOpen && earningsInsightsOpen && earningsPerformanceOpen && (() => {
+        providerDashboardOpen && earningsInsightsOpen && earningsSelectedDay != null && (() => {
             const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
-            const sectionLabel = (text) => React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, text);
-            const insightCard = (emoji, title, sub) => React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, border: `1px solid ${PD.border}` } },
-                React.createElement("div", { style: { width: 30, height: 30, borderRadius: 9, background: 'rgba(151,196,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 } }, emoji),
-                React.createElement("div", { style: { minWidth: 0 } },
-                    React.createElement("p", { style: { fontSize: 10, color: PD.sub, margin: 0 } }, title),
-                    React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: PD.text, margin: '2px 0 0' } }, sub)));
+            const close = () => setEarningsSelectedDay(null);
             const filteredBookings = businessBookings.filter((b) => getBookingDate(b) >= earningsPeriodCutoff(earningsPeriod));
             const stats = computeEarningsStats(filteredBookings);
-            const close = () => { setEarningsPerformanceOpen(false); setEarningsSelectedDay(null); setEarningsSelectedTime(null); };
-
-            const maxBarCount = Math.max(...stats.byDayOfWeek.map((d) => d.count), 1);
-            const dayOfWeekSection = React.createElement("div", { style: { marginTop: 4 } },
-                sectionLabel("Performance by Day of Week"),
-                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6, marginTop: 16, height: 78 } },
-                    stats.byDayOfWeek.map((d, i) => React.createElement("button", { key: d.label, onClick: () => setEarningsSelectedDay((prev) => prev === i ? null : i), style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' } },
-                        React.createElement("span", { style: { fontSize: 9.5, fontWeight: 700, color: earningsSelectedDay === i ? THEME.coral : PD.sub, marginBottom: 3 } }, d.count),
-                        React.createElement("div", { style: { width: '100%', maxWidth: 24, height: Math.max(5, Math.round((d.count / maxBarCount) * 46)), borderRadius: 5, background: earningsSelectedDay === i ? THEME.coral : '#EDEDED' } }),
-                        React.createElement("span", { style: { fontSize: 10, marginTop: 6, fontWeight: earningsSelectedDay === i ? 700 : 400, color: earningsSelectedDay === i ? THEME.coral : PD.sub } }, d.label)))),
-                earningsSelectedDay != null && (() => {
-                    const d = stats.byDayOfWeek[earningsSelectedDay];
-                    return React.createElement("div", { style: { marginTop: 12, padding: 14, borderRadius: 14, background: '#FAFAFA', border: `1px solid ${PD.border}` } },
-                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, EARNINGS_WEEKDAYS_FULL[earningsSelectedDay]),
-                        React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginTop: 8 } },
-                            [['Earned', money(d.earnings)], ['Bookings', String(d.count)], ['Avg. booking', money(d.avgBooking)], ['Top service', d.topService || '—']].map(([k, v]) => React.createElement("div", { key: k },
-                                React.createElement("p", { style: { fontSize: 10.5, color: PD.sub, margin: 0 } }, k),
-                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: '2px 0 0' } }, v)))));
-                })(),
-                (stats.busiestDay && stats.busiestDay.count > 0) && React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 14 } },
-                    insightCard('📅', 'Busiest Day', `${stats.busiestDay.label} · ${stats.busiestDay.count} booking${stats.busiestDay.count === 1 ? '' : 's'}`),
-                    insightCard('💰', 'Top Earning Day', `${stats.bestEarningDay.label} · ${money(stats.bestEarningDay.earnings)}`)));
-
-            const maxTimeBarVal = Math.max(...stats.byTimeSlot.map((s) => timesRankMode === 'bookings' ? s.count : s.earnings), 1);
-            const selectedTimeSlot = earningsSelectedTime != null ? stats.byTimeSlot.find((s) => s.hour24 === earningsSelectedTime) : null;
-            const timesSection = React.createElement("div", { style: { marginTop: 26, border: `1px solid ${PD.border}`, borderRadius: 18, padding: 16 } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                    sectionLabel("Best Times of Day"),
-                    React.createElement("div", { style: { display: 'flex', background: '#F5F5F5', borderRadius: 10, padding: 2 } },
-                        [['bookings', 'Most Booked'], ['earnings', 'Highest Earning']].map(([id, label]) => React.createElement("button", { key: id, onClick: () => setTimesRankMode(id), style: { padding: '5px 9px', borderRadius: 8, fontSize: 10.5, fontWeight: 700, background: timesRankMode === id ? '#fff' : 'transparent', color: timesRankMode === id ? PD.text : PD.sub } }, label)))),
-                stats.byTimeSlot.length === 0
-                    ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, marginTop: 12 } }, "Not enough bookings to calculate popular times.")
-                    : React.createElement(React.Fragment, null,
-                        React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6, marginTop: 16, height: 78, overflowX: stats.byTimeSlot.length > 7 ? 'auto' : 'visible' } },
-                            stats.byTimeSlot.map((s) => {
-                                const val = timesRankMode === 'bookings' ? s.count : s.earnings;
-                                const active = earningsSelectedTime === s.hour24;
-                                return React.createElement("button", { key: s.hour24, onClick: () => setEarningsSelectedTime((prev) => prev === s.hour24 ? null : s.hour24), style: { flex: '1 0 30px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' } },
-                                    React.createElement("span", { style: { fontSize: 9.5, fontWeight: 700, color: active ? THEME.coral : PD.sub, marginBottom: 3, whiteSpace: 'nowrap' } }, timesRankMode === 'bookings' ? s.count : money(val)),
-                                    React.createElement("div", { style: { width: '100%', maxWidth: 22, height: Math.max(5, Math.round((val / maxTimeBarVal) * 46)), borderRadius: 5, background: active ? THEME.coral : '#EDEDED' } }),
-                                    React.createElement("span", { style: { fontSize: 9.5, marginTop: 6, fontWeight: active ? 700 : 400, color: active ? THEME.coral : PD.sub, whiteSpace: 'nowrap' } }, s.label));
-                            })),
-                        selectedTimeSlot && React.createElement("div", { style: { marginTop: 12, padding: 14, borderRadius: 14, background: '#FAFAFA', border: `1px solid ${PD.border}` } },
-                            React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, selectedTimeSlot.labelFull),
-                            React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '8px 14px', marginTop: 8 } },
-                                [['Bookings', String(selectedTimeSlot.count)], ['Revenue', money(selectedTimeSlot.earnings)], ['Avg. booking', money(selectedTimeSlot.avgBooking)], ['Top service', selectedTimeSlot.topService || '—']].map(([k, v]) => React.createElement("div", { key: k },
-                                    React.createElement("p", { style: { fontSize: 10.5, color: PD.sub, margin: 0 } }, k),
-                                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: '2px 0 0' } }, v))))),
-                        React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 14 } },
-                            stats.mostPopularTime && insightCard('🕙', 'Most Popular Time', `${stats.mostPopularTime.labelFull} · ${stats.mostPopularTime.count} booking${stats.mostPopularTime.count === 1 ? '' : 's'}`),
-                            stats.highestEarningTime && insightCard('💰', 'Highest Earning Time', `${stats.highestEarningTime.labelFull} · ${money(stats.highestEarningTime.earnings)}`))));
-
-            const rankedServices = [...stats.services].sort((a, b) => servicesRankMode === 'bookings' ? b.count - a.count : b.earnings - a.earnings);
-            const maxServiceVal = Math.max(...rankedServices.map((s) => servicesRankMode === 'bookings' ? s.count : s.earnings), 1);
-            const servicesSection = React.createElement("div", { style: { marginTop: 26, marginBottom: 20 } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                    sectionLabel("Most Booked Services"),
-                    React.createElement("div", { style: { display: 'flex', background: '#F5F5F5', borderRadius: 10, padding: 2 } },
-                        [['bookings', 'Most Booked'], ['earnings', 'Highest Earning']].map(([id, label]) => React.createElement("button", { key: id, onClick: () => setServicesRankMode(id), style: { padding: '5px 9px', borderRadius: 8, fontSize: 10.5, fontWeight: 700, background: servicesRankMode === id ? '#fff' : 'transparent', color: servicesRankMode === id ? PD.text : PD.sub } }, label)))),
-                rankedServices.length === 0
-                    ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, marginTop: 12 } }, "No completed services during this period.")
-                    : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 14, marginTop: 14 } }, rankedServices.map((s, i) => {
-                        const val = servicesRankMode === 'bookings' ? s.count : s.earnings;
-                        const pct = Math.round((val / maxServiceVal) * 100);
-                        return React.createElement("button", { key: s.name, onClick: () => setSelectedServiceDetail(s.name), style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10 } },
-                            React.createElement("span", { style: { width: 18, fontSize: 12, fontWeight: 700, color: PD.sub, flexShrink: 0 } }, i + 1),
-                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 5 } },
-                                    React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: PD.text } }, s.name),
-                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: PD.text } }, `${s.count} booking${s.count === 1 ? '' : 's'} · ${money(s.earnings)}`)),
-                                React.createElement("div", { style: { width: '100%', height: 6, borderRadius: 3, background: '#F0F0F0' } },
-                                    React.createElement("div", { style: { width: `${pct}%`, height: '100%', borderRadius: 3, background: THEME.coral } }))));
-                    })));
-
+            const d = stats.byDayOfWeek[earningsSelectedDay];
+            const dayBookings = filteredBookings.filter((b) => b.status !== 'cancelled' && (getBookingDate(b).getDay() + 6) % 7 === earningsSelectedDay);
+            const serviceCounts = {};
+            dayBookings.forEach((b) => { serviceCounts[b.service] = (serviceCounts[b.service] || 0) + 1; });
+            const topServices = Object.entries(serviceCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+            const timeCounts = {};
+            dayBookings.forEach((b) => {
+                const min = parseTimeLabelToMinutes(b.time);
+                if (min != null) { const h = Math.floor(min / 60); timeCounts[h] = (timeCounts[h] || 0) + 1; }
+            });
+            const topTimes = Object.entries(timeCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+            return React.createElement("div", { onClick: close, style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxHeight: '80vh', overflowY: 'auto', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, EARNINGS_WEEKDAYS_FULL[earningsSelectedDay]),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '16px 24px' } },
+                        [['Bookings', String(d.count)], ['Revenue', money(d.earnings)], ['Avg. Booking', money(d.avgBooking)]].map(([k, v]) => React.createElement("div", { key: k },
+                            React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: 0 } }, k),
+                            React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: PD.text, margin: '3px 0 0', fontFamily: 'Space Grotesk, sans-serif' } }, v)))),
+                    topServices.length > 0 && React.createElement("div", { style: { marginTop: 18 } },
+                        React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Top Services"),
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 } },
+                            topServices.map(([name, count]) => React.createElement("button", { key: name, onClick: () => { setEarningsSelectedDay(null); setSelectedServiceDetail(name); }, style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 0' } },
+                                React.createElement("span", { style: { fontSize: 12.5, color: PD.text } }, name),
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4 } },
+                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: PD.text } }, `${count} booking${count === 1 ? '' : 's'}`),
+                                    React.createElement(Icon, { name: "chevronright", size: 10, color: PD.sub })))))),
+                    topTimes.length > 0 && React.createElement("div", { style: { marginTop: 16 } },
+                        React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Top Times"),
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 } },
+                            topTimes.map(([hour, count]) => React.createElement("button", { key: hour, onClick: () => { setEarningsSelectedDay(null); setEarningsSelectedTime(parseInt(hour, 10)); }, style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 0' } },
+                                React.createElement("span", { style: { fontSize: 12.5, color: PD.text } }, hourBucketLabelFull(parseInt(hour, 10))),
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4 } },
+                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: PD.text } }, `${count} booking${count === 1 ? '' : 's'}`),
+                                    React.createElement(Icon, { name: "chevronright", size: 10, color: PD.sub })))))),
+                    React.createElement("button", { onClick: close, style: { width: '100%', height: 48, borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14, marginTop: 22 } }, "Close")));
+        })(),
+        providerDashboardOpen && earningsInsightsOpen && earningsSelectedTime != null && (() => {
+            const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const close = () => setEarningsSelectedTime(null);
+            const filteredBookings = businessBookings.filter((b) => getBookingDate(b) >= earningsPeriodCutoff(earningsPeriod));
+            const stats = computeEarningsStats(filteredBookings);
+            const slot = stats.byTimeSlot.find((s) => s.hour24 === earningsSelectedTime);
+            if (!slot) return null;
+            const slotBookings = filteredBookings.filter((b) => b.status !== 'cancelled' && (() => { const m = parseTimeLabelToMinutes(b.time); return m != null && Math.floor(m / 60) === earningsSelectedTime; })());
+            const spendDiffPct = stats.avgBooking > 0 ? Math.round(((slot.avgBooking - stats.avgBooking) / stats.avgBooking) * 100) : 0;
+            return React.createElement("div", { onClick: close, style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxHeight: '80vh', overflowY: 'auto', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, slot.labelFull),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '16px 24px' } },
+                        [['Bookings', String(slot.count)], ['Revenue', money(slot.earnings)], ['Avg. Booking', money(slot.avgBooking)]].map(([k, v]) => React.createElement("div", { key: k },
+                            React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: 0 } }, k),
+                            React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: PD.text, margin: '3px 0 0', fontFamily: 'Space Grotesk, sans-serif' } }, v)))),
+                    slot.count > 0 && React.createElement("div", { style: { marginTop: 14, padding: 10, borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                        React.createElement("p", { style: { fontSize: 11.5, color: PD.text, margin: 0, lineHeight: 1.35 } }, spendDiffPct === 0 ? `Bookings at this time spend about the same as your average.` : `Bookings at this time spend ${Math.abs(spendDiffPct)}% ${spendDiffPct >= 0 ? 'more' : 'less'} than your average booking.`)),
+                    slotBookings.length > 0 && React.createElement("div", { style: { marginTop: 18 } },
+                        React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Bookings"),
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 } },
+                            slotBookings.map((b, i) => React.createElement("div", { key: i, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                                React.createElement("div", { style: { minWidth: 0 } },
+                                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: PD.text, margin: 0 } }, b.customerName),
+                                    React.createElement("p", { style: { fontSize: 10.5, color: PD.sub, margin: '1px 0 0' } }, `${b.service} · ${b.dateLabel || (b.dateGroup === 'tomorrow' ? 'Tomorrow' : 'Today')}`)),
+                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: PD.text } }, money(summarizeBookingRevenue(b).net)))))),
+                    React.createElement("button", { onClick: close, style: { width: '100%', height: 48, borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14, marginTop: 22 } }, "Close")));
+        })(),
+        providerDashboardOpen && earningsInsightsOpen && selectedServiceDetail && (() => {
+            const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const PERIOD_VS_LABEL = { '7D': 'vs. previous 7 days', '30D': 'vs. previous 30 days', '3M': 'vs. previous 3 months', '1Y': 'vs. previous year' };
+            const close = () => setSelectedServiceDetail(null);
+            const filteredBookings = businessBookings.filter((b) => getBookingDate(b) >= earningsPeriodCutoff(earningsPeriod));
+            const stats = computeEarningsStats(filteredBookings);
+            const s = stats.services.find((x) => x.name === selectedServiceDetail);
+            if (!s) return null;
+            const dayCounts = EARNINGS_WEEKDAYS.map((label, i) => ({ label, count: stats.byDayOfWeek[i].services[s.name] || 0 }));
+            const topDay = dayCounts.reduce((best, d) => (!best || d.count > best.count) ? d : best, null);
+            const svcBookings = filteredBookings.filter((b) => b.status !== 'cancelled' && b.service === s.name);
+            const svcTimeCounts = {};
+            svcBookings.forEach((b) => { const m = parseTimeLabelToMinutes(b.time); if (m != null) { const h = Math.floor(m / 60); svcTimeCounts[h] = (svcTimeCounts[h] || 0) + 1; } });
+            const topTimeEntry = Object.entries(svcTimeCounts).sort((a, b) => b[1] - a[1])[0];
+            const pctOfRevenue = stats.totalEarnings > 0 ? Math.round((s.earnings / stats.totalEarnings) * 100) : 0;
+            const trend = computeMetricComparison(businessBookings, earningsPeriod, (st) => { const svc = st.services.find((x) => x.name === s.name); return svc ? svc.earnings : 0; });
+            return React.createElement("div", { onClick: close, style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 14 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxHeight: '80vh', overflowY: 'auto', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, s.name),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '16px 24px' } },
+                        [['Bookings', String(s.count)], ['Revenue', money(s.earnings)], ['Avg. Price', money(s.count > 0 ? s.earnings / s.count : 0)], ['% of Revenue', `${pctOfRevenue}%`], ['Best Day', topDay && topDay.count > 0 ? topDay.label : '—'], ['Best Time', topTimeEntry ? hourBucketLabelFull(parseInt(topTimeEntry[0], 10)) : '—']].map(([k, v]) => React.createElement("div", { key: k },
+                            React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: 0 } }, k),
+                            React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: PD.text, margin: '3px 0 0', fontFamily: 'Space Grotesk, sans-serif' } }, v)))),
+                    trend.pct != null && React.createElement("div", { style: { marginTop: 14, display: 'flex', alignItems: 'center', gap: 6 } },
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: trend.pct >= 0 ? THEME.coral : '#D0304A' } }, `${trend.pct >= 0 ? '↑' : '↓'} ${Math.abs(trend.pct)}%`),
+                        React.createElement("span", { style: { fontSize: 11.5, color: PD.sub } }, PERIOD_VS_LABEL[earningsPeriod])),
+                    React.createElement("button", { onClick: close, style: { width: '100%', height: 48, borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14, marginTop: 22 } }, "Close")));
+        })(),
+        providerDashboardOpen && earningsInsightsOpen && selectedCustomerDetail && (() => {
+            const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const close = () => setSelectedCustomerDetail(null);
+            const filteredBookings = businessBookings.filter((b) => getBookingDate(b) >= earningsPeriodCutoff(earningsPeriod));
+            const stats = computeEarningsStats(filteredBookings);
+            const c = stats.customers.find((x) => x.name === selectedCustomerDetail);
+            if (!c) return null;
+            const custBookingsAllTime = businessBookings.filter((b) => b.customerName === selectedCustomerDetail && b.status !== 'cancelled').sort((a, b) => getBookingDate(b) - getBookingDate(a));
+            const favoriteService = (() => {
+                const counts = {};
+                custBookingsAllTime.forEach((b) => { counts[b.service] = (counts[b.service] || 0) + 1; });
+                let best = null, bestCount = 0;
+                Object.entries(counts).forEach(([name, n]) => { if (n > bestCount) { best = name; bestCount = n; } });
+                return best;
+            })();
+            const since = customerSince(businessBookings, selectedCustomerDetail);
+            const lastBooking = custBookingsAllTime[0];
+            const recentBookings = custBookingsAllTime.slice(0, 3);
+            return React.createElement("div", { onClick: close, style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 14 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxHeight: '80vh', overflowY: 'auto', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 } },
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', flexShrink: 0, background: c.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, margin: 0 } }, c.name)),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '16px 24px' } },
+                        [['Bookings', String(c.count)], ['Total Spent', money(c.earnings)], ['Avg. Booking', money(c.count > 0 ? c.earnings / c.count : 0)], ['Favorite Service', favoriteService || '—'], ['Last Booking', lastBooking ? (lastBooking.dateLabel || (lastBooking.dateGroup === 'tomorrow' ? 'Tomorrow' : 'Today')) : '—'], ['Customer Since', since ? since.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—']].map(([k, v]) => React.createElement("div", { key: k },
+                            React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: 0 } }, k),
+                            React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: PD.text, margin: '3px 0 0', fontFamily: 'Space Grotesk, sans-serif' } }, v)))),
+                    recentBookings.length > 0 && React.createElement("div", { style: { marginTop: 18 } },
+                        React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Recent Bookings"),
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 } },
+                            recentBookings.map((b, i) => React.createElement("div", { key: i, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                                React.createElement("div", { style: { minWidth: 0 } },
+                                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: PD.text, margin: 0 } }, b.service),
+                                    React.createElement("p", { style: { fontSize: 10.5, color: PD.sub, margin: '1px 0 0' } }, b.dateLabel || (b.dateGroup === 'tomorrow' ? 'Tomorrow' : 'Today'))),
+                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: PD.text } }, money(summarizeBookingRevenue(b).net))))),
+                        custBookingsAllTime.length > 3 && React.createElement("button", { onClick: () => { close(); setProviderDashboardTab('bookings'); setEarningsInsightsOpen(false); }, style: { marginTop: 8, fontSize: 10.5, fontWeight: 700, color: THEME.coral } }, "View full history  ›")),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 22 } },
+                        React.createElement("button", { onClick: () => flashToast('Messaging ' + c.name), style: { flex: 1, height: 48, borderRadius: 24, border: `1.5px solid ${PD.border}`, color: PD.text, fontWeight: 700, fontSize: 14 } }, "Message"),
+                        React.createElement("button", { onClick: close, style: { flex: 1, height: 48, borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14 } }, "Close"))));
+        })(),
+        providerDashboardOpen && earningsInsightsOpen && promotionDrillDownOpen && (() => {
+            const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const close = () => setPromotionDrillDownOpen(false);
+            const filteredBookings = businessBookings.filter((b) => getBookingDate(b) >= earningsPeriodCutoff(earningsPeriod));
+            const promoStats = computePromotionStats(filteredBookings);
+            return React.createElement("div", { onClick: close, style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 12 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 4 } }, "Promotion Performance"),
+                    promoStats.label && React.createElement("p", { style: { fontSize: 12, color: PD.sub, margin: '0 0 16px' } }, promoStats.label),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '16px 24px' } },
+                        [['Bookings', String(promoStats.count)], ['Original Value', money(promoStats.gross)], ['Discounts Given', '-' + money(promoStats.discount)], ['Revenue After Discount', money(promoStats.net)]].map(([k, v]) => React.createElement("div", { key: k },
+                            React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: 0 } }, k),
+                            React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: PD.text, margin: '3px 0 0', fontFamily: 'Space Grotesk, sans-serif' } }, v)))),
+                    React.createElement("button", { onClick: close, style: { width: '100%', height: 48, borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14, marginTop: 22 } }, "Close")));
+        })(),
+        providerDashboardOpen && earningsInsightsOpen && retentionListOpen && (() => {
+            const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const close = () => setRetentionListOpen(false);
+            const filteredBookings = businessBookings.filter((b) => getBookingDate(b) >= earningsPeriodCutoff(earningsPeriod));
+            const nonReturning = computeNonReturningCustomers(businessBookings, filteredBookings);
             return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 12, background: '#fff', display: 'flex', flexDirection: 'column' } },
                 React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${PD.border}` } },
                     React.createElement("button", { onClick: close }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "Performance")),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "Haven't Returned Recently")),
                 React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `16px 18px calc(env(safe-area-inset-bottom) + 24px)` } },
-                    dayOfWeekSection, timesSection, servicesSection));
-        })(),
-        providerDashboardOpen && earningsInsightsOpen && earningsCustomerInsightsOpen && (() => {
-            const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
-            const filteredBookings = businessBookings.filter((b) => getBookingDate(b) >= earningsPeriodCutoff(earningsPeriod));
-            const stats = computeEarningsStats(filteredBookings);
-            const close = () => setEarningsCustomerInsightsOpen(false);
-            const repeatCustomers = stats.customers.filter((c) => c.count > 1).length;
-            const repeatRate = stats.customers.length > 0 ? Math.round((repeatCustomers / stats.customers.length) * 100) : 0;
-            const avgSpend = stats.customers.length > 0 ? stats.totalEarnings / stats.customers.length : 0;
-            const summaryRow = React.createElement("div", { style: { display: 'flex', gap: 10 } },
-                [['Total Customers', String(stats.customers.length)], ['Repeat Rate', `${repeatRate}%`], ['Avg. Spend', money(avgSpend)]].map(([label, val]) => React.createElement("div", { key: label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '13px 6px', textAlign: 'center' } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, margin: 0 } }, val),
-                    React.createElement("p", { style: { fontSize: 10, color: PD.sub, margin: '3px 0 0' } }, label))));
-            const rankedCustomers = [...stats.customers].sort((a, b) => customersRankMode === 'bookings' ? b.count - a.count : b.earnings - a.earnings);
-            const maxCustomerVal = Math.max(...rankedCustomers.map((c) => customersRankMode === 'bookings' ? c.count : c.earnings), 1);
-            const listSection = React.createElement("div", { style: { marginTop: 20 } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                    React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "All Customers"),
-                    React.createElement("div", { style: { display: 'flex', background: '#F5F5F5', borderRadius: 10, padding: 2 } },
-                        [['bookings', 'Most Bookings'], ['earnings', 'Highest Spend']].map(([id, label]) => React.createElement("button", { key: id, onClick: () => setCustomersRankMode(id), style: { padding: '5px 9px', borderRadius: 8, fontSize: 10.5, fontWeight: 700, background: customersRankMode === id ? '#fff' : 'transparent', color: customersRankMode === id ? PD.text : PD.sub } }, label)))),
-                rankedCustomers.length === 0
-                    ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, marginTop: 12 } }, "No customer data yet.")
-                    : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 14, marginTop: 14 } }, rankedCustomers.map((c, i) => {
-                        const val = customersRankMode === 'bookings' ? c.count : c.earnings;
-                        const pct = Math.round((val / maxCustomerVal) * 100);
-                        return React.createElement("button", { key: c.name, onClick: () => setSelectedCustomerDetail(c.name), style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10 } },
-                            React.createElement("span", { style: { width: 18, fontSize: 12, fontWeight: 700, color: PD.sub, flexShrink: 0 } }, i + 1),
+                    nonReturning.length === 0
+                        ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub } }, "No customers to show.")
+                        : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 16 } }, nonReturning.map((c, i) => React.createElement("div", { key: c.name, style: { display: 'flex', alignItems: 'center', gap: 10 } },
                             React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', flexShrink: 0, background: c.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
                             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 5 } },
-                                    React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: PD.text } }, c.name),
-                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: PD.text } }, `${c.count} booking${c.count === 1 ? '' : 's'} · ${money(c.earnings)}`)),
-                                React.createElement("div", { style: { width: '100%', height: 6, borderRadius: 3, background: '#F0F0F0' } },
-                                    React.createElement("div", { style: { width: `${pct}%`, height: '100%', borderRadius: 3, background: THEME.coral } }))));
-                    })));
-            return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 12, background: '#fff', display: 'flex', flexDirection: 'column' } },
-                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${PD.border}` } },
-                    React.createElement("button", { onClick: close }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "Customer Insights")),
-                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `16px 18px calc(env(safe-area-inset-bottom) + 24px)` } },
-                    summaryRow, listSection));
+                                React.createElement("p", { style: { fontSize: 13, fontWeight: 600, color: PD.text, margin: 0 } }, c.name),
+                                React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: '2px 0 0' } }, `Last booked ${c.lastDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`)))))));
         })(),
-        providerDashboardOpen && earningsInsightsOpen && earningsBreakdownDetailOpen && (() => {
+        providerDashboardOpen && earningsInsightsOpen && insightsMoreOpen && (() => {
             const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const close = () => setInsightsMoreOpen(false);
             const filteredBookings = businessBookings.filter((b) => getBookingDate(b) >= earningsPeriodCutoff(earningsPeriod));
             const stats = computeEarningsStats(filteredBookings);
-            const close = () => setEarningsBreakdownDetailOpen(false);
-            const revenueTiles = stats.promotionDiscountTotal > 0 && React.createElement("div", { style: { display: 'flex', gap: 10 } },
-                [['Gross Sales', money(stats.grossServiceValue)], ['Discounts Given', '-' + money(stats.promotionDiscountTotal)], ['Net Earnings', money(stats.totalEarnings)]].map(([label, val], i) => React.createElement("div", { key: label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '12px 8px', textAlign: 'center' } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: i === 1 ? THEME.coral : PD.text, margin: 0 } }, val),
-                    React.createElement("p", { style: { fontSize: 10, color: PD.sub, margin: '3px 0 0' } }, label))));
-            const breakdownCard = React.createElement("div", { style: { marginTop: stats.promotionDiscountTotal > 0 ? 16 : 0, border: `1px solid ${PD.border}`, borderRadius: 18, padding: 16 } },
-                React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Earnings Breakdown"),
-                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 9, marginTop: 12 } },
-                    [['Services', stats.grossServiceValue, false], ...(stats.promotionDiscountTotal > 0 ? [['Promotions', stats.promotionDiscountTotal, true]] : []), ['Tips', 0, false], ['Fees', 0, true], ['Refunds', 0, true]].map(([label, val, neg]) => React.createElement("div", { key: label, style: { display: 'flex', justifyContent: 'space-between' } },
-                        React.createElement("span", { style: { fontSize: 13, color: PD.sub } }, label),
-                        React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: neg && val > 0 ? '#D0304A' : PD.text } }, (neg && val > 0 ? '-' : '') + money(val))))),
-                React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTop: `1px solid ${PD.border}` } },
-                    React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: PD.text } }, "Net Earnings"),
-                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontSize: 20, fontWeight: 700, color: PD.text } }, money(stats.totalEarnings))),
-                React.createElement("button", { onClick: () => { setProviderDashboardTab('bookings'); setEarningsInsightsOpen(false); close(); }, style: { marginTop: 12, width: '100%', textAlign: 'center', fontSize: 12.5, fontWeight: 700, color: THEME.coral, padding: '9px 0', borderRadius: 12, background: '#FAFAFA' } }, "View Transactions  ›"));
+            const comparison = computeEarningsComparison(businessBookings, earningsPeriod);
+            const promoStats = computePromotionStats(filteredBookings);
+            const nonReturning = computeNonReturningCustomers(businessBookings, filteredBookings);
+            const PERIOD_VS_LABEL = { '7D': 'vs. previous 7 days', '30D': 'vs. previous 30 days', '3M': 'vs. previous 3 months', '1Y': 'vs. previous year' };
+            const rows = [];
+            if (comparison.pct != null)
+                rows.push(['📈', `Earnings are ${comparison.pct >= 0 ? 'up' : 'down'} ${Math.abs(comparison.pct)}% ${PERIOD_VS_LABEL[earningsPeriod]}.`]);
+            if (stats.topServiceByEarnings)
+                rows.push(['🔥', `${stats.topServiceByEarnings.name} is your top earner at ${money(stats.topServiceByEarnings.earnings)}.`]);
+            if (stats.mostPopularTime)
+                rows.push(['🕙', `${stats.mostPopularTime.labelFull} is your busiest time, with ${stats.mostPopularTime.count} booking${stats.mostPopularTime.count === 1 ? '' : 's'}.`]);
+            if (promoStats.count > 0)
+                rows.push(['🏷️', `${promoStats.count} booking${promoStats.count === 1 ? '' : 's'} used a promotion, giving back ${money(promoStats.discount)}.`]);
+            if (nonReturning.length > 0)
+                rows.push(['👋', `${nonReturning.length} customer${nonReturning.length === 1 ? '' : 's'} haven't booked again recently.`]);
             return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 12, background: '#fff', display: 'flex', flexDirection: 'column' } },
                 React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${PD.border}` } },
                     React.createElement("button", { onClick: close }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "Earnings Breakdown")),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "Insights")),
                 React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `16px 18px calc(env(safe-area-inset-bottom) + 24px)` } },
-                    revenueTiles, breakdownCard));
+                    rows.length === 0
+                        ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub } }, "Not enough data yet.")
+                        : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 12 } }, rows.map(([emoji, text], i) => React.createElement("div", { key: i, style: { display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, border: `1px solid ${PD.border}` } },
+                            React.createElement("span", { style: { fontSize: 16 } }, emoji),
+                            React.createElement("p", { style: { flex: 1, fontSize: 12.5, color: PD.text, margin: 0, lineHeight: 1.35 } }, text))))));
         })(),
         providerDashboardOpen && earningsInsightsOpen && allServicesOpen && (() => {
             const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
@@ -4278,75 +4509,6 @@ function App() {
                                 React.createElement("div", { style: { width: '100%', height: 6, borderRadius: 3, background: '#F0F0F0' } },
                                     React.createElement("div", { style: { width: `${pct}%`, height: '100%', borderRadius: 3, background: THEME.coral } }))));
                     }))));
-        })(),
-        providerDashboardOpen && earningsInsightsOpen && allTimesOpen && (() => {
-            const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
-            const filteredBookings = businessBookings.filter((b) => getBookingDate(b) >= earningsPeriodCutoff(earningsPeriod));
-            const stats = computeEarningsStats(filteredBookings);
-            const ranked = [...stats.byTimeSlot].sort((a, b) => timesRankMode === 'bookings' ? b.count - a.count : b.earnings - a.earnings);
-            const maxVal = Math.max(...ranked.map((s) => timesRankMode === 'bookings' ? s.count : s.earnings), 1);
-            return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 12, background: '#fff', display: 'flex', flexDirection: 'column' } },
-                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${PD.border}` } },
-                    React.createElement("button", { onClick: () => setAllTimesOpen(false) }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "All Times")),
-                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `16px 18px calc(env(safe-area-inset-bottom) + 24px)` } },
-                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 16 } }, ranked.map((s, i) => {
-                        const val = timesRankMode === 'bookings' ? s.count : s.earnings;
-                        const pct = Math.round((val / maxVal) * 100);
-                        return React.createElement("div", { key: s.hour24, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 10 } },
-                            React.createElement("span", { style: { width: 18, fontSize: 12, fontWeight: 700, color: PD.sub, flexShrink: 0 } }, i + 1),
-                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 5 } },
-                                    React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: PD.text } }, s.labelFull),
-                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: PD.text } }, `${s.count} booking${s.count === 1 ? '' : 's'} · ${money(s.earnings)}`)),
-                                React.createElement("div", { style: { width: '100%', height: 6, borderRadius: 3, background: '#F0F0F0' } },
-                                    React.createElement("div", { style: { width: `${pct}%`, height: '100%', borderRadius: 3, background: THEME.coral } }))));
-                    }))));
-        })(),
-        providerDashboardOpen && earningsInsightsOpen && selectedCustomerDetail && (() => {
-            const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
-            const filteredBookings = businessBookings.filter((b) => getBookingDate(b) >= earningsPeriodCutoff(earningsPeriod));
-            const stats = computeEarningsStats(filteredBookings);
-            const c = stats.customers.find((x) => x.name === selectedCustomerDetail);
-            if (!c) return null;
-            const custBookings = filteredBookings.filter((b) => b.customerName === selectedCustomerDetail && b.status !== 'cancelled');
-            const favoriteService = (() => {
-                const counts = {};
-                custBookings.forEach((b) => { counts[b.service] = (counts[b.service] || 0) + 1; });
-                let best = null, bestCount = 0;
-                Object.entries(counts).forEach(([name, n]) => { if (n > bestCount) { best = name; bestCount = n; } });
-                return best;
-            })();
-            return React.createElement("div", { onClick: () => setSelectedCustomerDetail(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
-                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 } },
-                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', flexShrink: 0, background: c.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
-                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, margin: 0 } }, c.name)),
-                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '16px 24px' } },
-                        [['Total Bookings', String(c.count)], ['Total Spent', money(c.earnings)], ['Avg. Booking', money(c.count > 0 ? c.earnings / c.count : 0)], ['Favorite Service', favoriteService || '—']].map(([k, v]) => React.createElement("div", { key: k },
-                            React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: 0 } }, k),
-                            React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: PD.text, margin: '3px 0 0', fontFamily: 'Space Grotesk, sans-serif' } }, v)))),
-                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 22 } },
-                        React.createElement("button", { onClick: () => flashToast('Messaging ' + c.name), style: { flex: 1, height: 48, borderRadius: 24, border: `1.5px solid ${PD.border}`, color: PD.text, fontWeight: 700, fontSize: 14 } }, "Message"),
-                        React.createElement("button", { onClick: () => setSelectedCustomerDetail(null), style: { flex: 1, height: 48, borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14 } }, "Close"))));
-        })(),
-        providerDashboardOpen && earningsInsightsOpen && selectedServiceDetail && (() => {
-            const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
-            const filteredBookings = businessBookings.filter((b) => getBookingDate(b) >= earningsPeriodCutoff(earningsPeriod));
-            const stats = computeEarningsStats(filteredBookings);
-            const s = stats.services.find((x) => x.name === selectedServiceDetail);
-            if (!s) return null;
-            const dayCounts = EARNINGS_WEEKDAYS.map((label, i) => ({ label, count: stats.byDayOfWeek[i].services[s.name] || 0 }));
-            const topDay = dayCounts.reduce((best, d) => (!best || d.count > best.count) ? d : best, null);
-            const pctOfTotal = stats.count > 0 ? Math.round((s.count / stats.count) * 100) : 0;
-            return React.createElement("div", { onClick: () => setSelectedServiceDetail(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 11 } },
-                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, s.name),
-                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '16px 24px' } },
-                        [['Total Bookings', String(s.count)], ['Total Earnings', money(s.earnings)], ['Avg. Price', money(s.count > 0 ? s.earnings / s.count : 0)], ['Most Popular Day', topDay && topDay.count > 0 ? topDay.label : '—'], ['% of Total Bookings', `${pctOfTotal}%`]].map(([k, v]) => React.createElement("div", { key: k },
-                            React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: 0 } }, k),
-                            React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: PD.text, margin: '3px 0 0', fontFamily: 'Space Grotesk, sans-serif' } }, v)))),
-                    React.createElement("button", { onClick: () => setSelectedServiceDetail(null), style: { width: '100%', height: 48, borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14, marginTop: 22 } }, "Close")));
         })(),
         providerDashboardOpen && serviceFormDraft && (() => {
             const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
