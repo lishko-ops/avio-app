@@ -3273,7 +3273,8 @@ function App() {
                 React.createElement("button", { onClick: () => flashToast('All comments — coming soon'), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 16, padding: '10px 0', fontSize: 13, fontWeight: 700, color: THEME.coral } },
                     `View all ${reviewCount} comments`, React.createElement(Icon, { name: "chevronright", size: 14, color: THEME.coral })));
             const activeSection = bizProfileTab === 'services' ? servicesSection : bizProfileTab === 'reviews' ? commentsSection : thrillzSection;
-            return React.createElement("div", { key: "bizprofile", onTouchStart: handleBizPanelTouchStart, onTouchMove: handleBizPanelTouchMove, onTouchEnd: handleBizPanelTouchEnd, style: { position: 'absolute', inset: 0, zIndex: 11, background: '#fff', overflowY: 'auto', paddingBottom: 40, transform: `translateX(${(1 - P.progress) * 100}%)`, transition: P.dragging ? 'none' : 'transform 0.28s cubic-bezier(0.22,1,0.36,1)' } },
+            const isOwnProfile = item.id === MY_PROVIDER_ID;
+            return React.createElement("div", { key: "bizprofile", onTouchStart: handleBizPanelTouchStart, onTouchMove: handleBizPanelTouchMove, onTouchEnd: handleBizPanelTouchEnd, style: { position: 'absolute', inset: 0, zIndex: isOwnProfile ? 2 : 11, background: '#fff', overflowY: 'auto', paddingBottom: isOwnProfile ? 'calc(env(safe-area-inset-bottom) + 90px)' : 40, transform: `translateX(${(1 - P.progress) * 100}%)`, transition: P.dragging ? 'none' : 'transform 0.28s cubic-bezier(0.22,1,0.36,1)' } },
                 header, avatarRow, statsRow, bioRow, actionRow, profileDealBadge, tabsRow, activeSection);
         })(),
         postViewer && (() => {
