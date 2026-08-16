@@ -76,6 +76,15 @@
   .avio-results-in { animation: avioResultsIn 0.26s cubic-bezier(0.22,1,0.36,1) backwards; }
   @keyframes avioChipPop { 0% { transform: scale(1); } 45% { transform: scale(0.92); } 100% { transform: scale(1); } }
   .avio-chip-pop { animation: avioChipPop 0.22s ease; }
+  @keyframes avioSettingsFwd { from { transform: translateX(100%); } to { transform: translateX(0); } }
+  @keyframes avioSettingsBack { from { transform: translateX(-28%); opacity: 0.6; } to { transform: translateX(0); opacity: 1; } }
+  .avio-settings-fwd { animation: avioSettingsFwd 0.30s cubic-bezier(0.32, 0.72, 0, 1); }
+  .avio-settings-back { animation: avioSettingsBack 0.24s cubic-bezier(0.32, 0.72, 0, 1); }
+  @keyframes avioSpin { to { transform: rotate(360deg); } }
+  .avio-spin { animation: avioSpin 0.7s linear infinite; }
+  .avio-settings-row:active { background: #FAFAFA; }
+  .avio-settings-tap { transition: opacity 0.12s ease, transform 0.12s ease; }
+  .avio-settings-tap:active { opacity: 0.7; transform: scale(0.98); }
 </style>
 </head>
 <body>
@@ -90,7 +99,8 @@
 <script src="promotions.js"></script>
 <script>
 "use strict";
-const { useState, useMemo, useEffect, useRef } = React;
+const { useState, useMemo, useEffect, useRef, useContext } = React;
+const SettingsThemeContext = React.createContext({ dark: false, ST: { bg: '#fff', text: '#161616', sub: '#8A8A8E', border: '#ECECEE', card: '#fff' }, accent: '#97C400', isRTL: false });
 const THEME = {
     ink: '#000000', inkLine: 'rgba(255,255,255,0.10)',
     surface: '#211D2A',
@@ -299,6 +309,24 @@ function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
         download: React.createElement(React.Fragment, null,
             React.createElement("path", { d: "M12 3v12M12 15l-4-4M12 15l4-4" }),
             React.createElement("path", { d: "M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" })),
+        helpcircle: React.createElement(React.Fragment, null,
+            React.createElement("circle", { cx: "12", cy: "12", r: "9" }),
+            React.createElement("path", { d: "M9.3 9.3a2.7 2.7 0 1 1 3.7 2.5c-.7.3-1 .8-1 1.5v.4" }),
+            React.createElement("circle", { cx: "12", cy: "16.6", r: "0.15", ...solid, strokeWidth: 2.6 })),
+        flag: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M6 21V4" }),
+            React.createElement("path", { d: "M6 4.5h11.5c.9 0 1.3 1 .7 1.7l-2.9 3.3 2.9 3.3c.6.7.2 1.7-.7 1.7H6" })),
+        info: React.createElement(React.Fragment, null,
+            React.createElement("circle", { cx: "12", cy: "12", r: "9" }),
+            React.createElement("path", { d: "M12 11v5.5" }),
+            React.createElement("circle", { cx: "12", cy: "7.7", r: "0.15", ...solid, strokeWidth: 2.6 })),
+        logout: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M15 4.5h2.5A2.5 2.5 0 0 1 20 7v10a2.5 2.5 0 0 1-2.5 2.5H15" }),
+            React.createElement("path", { d: "M4 12h11.5M12 8l4 4-4 4" })),
+        warningtriangle: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M12 3.3 21.8 20.5H2.2z" }),
+            React.createElement("path", { d: "M12 9.5v4.7" }),
+            React.createElement("circle", { cx: "12", cy: "17", r: "0.15", ...solid, strokeWidth: 2.8 })),
     };
     return React.createElement("svg", { ...common }, paths[name]);
 }
@@ -435,7 +463,60 @@ const VERIFIED_COMMENT_POOL = [
 function seedVerifiedComments(index) {
     return [VERIFIED_COMMENT_POOL[index % VERIFIED_COMMENT_POOL.length], VERIFIED_COMMENT_POOL[(index + 1) % VERIFIED_COMMENT_POOL.length]];
 }
-const PROFILE_MENU_ITEMS = ['Settings', 'Account', 'Privacy', 'Payment Methods', 'My Wallet', 'Help Center', 'Report a Problem', 'Invite Friends', 'Refer & Earn', 'Appearance', 'Language', 'Terms', 'Privacy Policy', 'Logout'];
+const DEFAULT_SETTINGS_PREFS = {
+    theme: 'system', accent: 'coral', appIcon: 'white', language: 'English',
+    twoFAEnabled: false, twoFAMethod: 'Authenticator App',
+    linkedAccounts: { google: true, apple: true, facebook: false, instagram: true },
+    paymentMethods: [
+        { id: 'pm1', brand: 'Visa', last4: '4242', exp: '04/26' },
+        { id: 'pm2', brand: 'Mastercard', last4: '8888', exp: '09/25' },
+        { id: 'pm3', brand: 'Apple Pay', last4: null, exp: null },
+    ],
+    defaultPaymentId: 'pm1',
+};
+const SETTINGS_LANGUAGES = [
+    { id: 'English', label: 'English' }, { id: 'Español', label: 'Español (Spanish)' },
+    { id: 'Français', label: 'Français (French)' }, { id: 'עברית', label: 'עברית (Hebrew)', rtl: true },
+    { id: 'العربية', label: 'العربية (Arabic)', rtl: true }, { id: 'Русский', label: 'Русский (Russian)' },
+    { id: '中文', label: '中文 (Chinese)' },
+];
+const SETTINGS_ACCENTS = [
+    { id: 'coral', color: '#97C400' }, { id: 'blue', color: '#2E9BFF' }, { id: 'purple', color: '#8B5CF6' },
+    { id: 'pink', color: '#F5134F' }, { id: 'orange', color: '#F5A623' },
+];
+const SETTINGS_LINKED_PROVIDERS = [
+    { id: 'google', label: 'Google', color: '#4285F4', letter: 'G' },
+    { id: 'apple', label: 'Apple', color: '#161616', letter: '' },
+    { id: 'facebook', label: 'Facebook', color: '#1877F2', letter: 'f' },
+    { id: 'instagram', label: 'Instagram', color: '#C13584', letter: '' },
+];
+const SETTINGS_HELP_TOPICS = [
+    { id: 'how', label: 'How BookVado Works', icon: 'compass', articles: [
+        { id: 'discover', title: 'Discovering businesses', body: "Swipe through Thrillz — short videos from local businesses — to discover services near you. Tap any video to see pricing, reviews, and available times." },
+        { id: 'booking-flow', title: 'How booking works', body: "Pick a service, choose a time that works for you, and confirm with a payment method on file. You'll get a confirmation instantly and a reminder before your appointment." },
+        { id: 'cancelling', title: 'Cancelling or rescheduling', body: "Open Bookings, select the appointment, and choose Modify or Cancel. Most businesses allow free changes up to 24 hours before your appointment." },
+    ] },
+    { id: 'payments', label: 'Payments & Refunds', icon: 'card', articles: [
+        { id: 'how-payments-work', title: 'How payments work', body: "When you book a service on BookVado, payment is securely processed through our platform. The provider gets paid after the service is completed, and your card is only charged once the booking is confirmed." },
+        { id: 'refund-policy', title: 'Refund policy', body: "Refunds are available if you cancel within the provider's cancellation window, or if a provider cancels on you. Refunds are issued to your original payment method within 5-10 business days." },
+        { id: 'failed-payment', title: 'Failed payment', body: "If a payment fails, check that your card hasn't expired and has sufficient funds. You can update your payment method anytime in Settings → Payment Methods." },
+        { id: 'get-refund', title: 'How to get a refund', body: "Go to Bookings, select the appointment, and tap Request Refund. Our team reviews most requests within 24 hours." },
+        { id: 'payment-methods', title: 'Payment methods', body: "BookVado accepts major credit and debit cards, Apple Pay, and PayPal. Manage your saved methods anytime in Settings → Payment Methods." },
+    ] },
+    { id: 'account', label: 'Account & Profile', icon: 'user', articles: [
+        { id: 'edit-profile', title: 'Editing your profile', body: "Go to Settings → Account → Edit Profile to update your name, username, bio, and photo at any time." },
+        { id: 'change-login', title: 'Changing your email or phone', body: "You can update your login email or phone number in Settings → Account. We'll send a verification code to confirm the change before it takes effect." },
+    ] },
+    { id: 'safety', label: 'Safety & Privacy', icon: 'shield', articles: [
+        { id: 'account-security', title: 'Keeping your account secure', body: "Enable Two-Factor Authentication in Settings → Account for an extra layer of protection. Never share your verification codes with anyone." },
+        { id: 'data-privacy', title: 'How we handle your data', body: "We only use your information to power bookings and recommendations. Read the full Privacy Policy in Settings → About BookVado." },
+    ] },
+    { id: 'using', label: 'Using BookVado', icon: 'sparkles', articles: [
+        { id: 'business-mode', title: 'Switching to Business Mode', body: "Tap your profile, then Switch Mode, to manage your business listing, bookings, and earnings from the same account." },
+        { id: 'thrillz', title: 'Posting Thrillz', body: "Businesses can post short videos, called Thrillz, to showcase their work and turn views into bookings." },
+    ] },
+];
+const SETTINGS_REPORT_ISSUES = ['Booking Issue', 'Payment Issue', 'Technical Issue', 'Inappropriate Content', 'Other'];
 const PROFILE_REVIEWS = [
     { name: 'Jordan M.', rating: 5, text: 'Booked instantly, worth every penny! Communication was great the whole way through.', time: '2d', avatarColor: '#3F6FBF', likes: 12 },
     { name: 'Casey R.', rating: 4, text: 'Great experience overall, would book again.', time: '1w', avatarColor: '#7A2E52', likes: 8 },
@@ -1422,6 +1503,87 @@ function bizStepDots(activeStep, allDone) {
                 circle);
         }));
 }
+function SettingsHeader({ title, onBack, right, showBack = true }) {
+    const { ST } = useContext(SettingsThemeContext);
+    return React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'calc(env(safe-area-inset-top) + 14px) 14px 12px', flexShrink: 0, borderBottom: `1px solid ${ST.border}`, position: 'relative', background: ST.bg } },
+        showBack
+            ? React.createElement("button", { className: "avio-settings-tap", onClick: onBack, "aria-label": "Back", style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                React.createElement(Icon, { name: "arrowleft", size: 20, color: ST.text }))
+            : React.createElement("div", { style: { width: 34 } }),
+        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: ST.text, margin: 0, position: 'absolute', left: '50%', transform: 'translateX(-50%)' } }, title),
+        right || React.createElement("div", { style: { width: 34 } }));
+}
+function SettingsRow({ icon, label, value, onClick, danger, chevron = true, sub, disabled }) {
+    const { ST } = useContext(SettingsThemeContext);
+    return React.createElement("button", { className: "avio-settings-row", onClick: disabled ? undefined : onClick, disabled, "aria-label": label, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', textAlign: 'left', background: 'transparent', opacity: disabled ? 0.45 : 1 } },
+        icon && React.createElement("div", { style: { width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: icon, size: 18, color: danger ? ST.red : ST.text })),
+        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+            React.createElement("p", { style: { fontSize: 14.5, fontWeight: 500, color: danger ? ST.red : ST.text, margin: 0 } }, label),
+            sub && React.createElement("p", { style: { fontSize: 12, color: ST.sub, margin: '2px 0 0' } }, sub)),
+        value && React.createElement("span", { style: { fontSize: 13, color: ST.sub, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, value),
+        chevron && React.createElement(Icon, { name: "chevronright", size: 16, color: ST.sub }));
+}
+function SettingsDivider({ inset = 18 }) { const { ST } = useContext(SettingsThemeContext); return React.createElement("div", { style: { height: 1, background: ST.border, marginLeft: inset } }); }
+function SettingsGroup({ children }) { const { ST } = useContext(SettingsThemeContext); return React.createElement("div", { style: { border: `1px solid ${ST.border}`, borderRadius: 14, margin: '0 18px', overflow: 'hidden', background: ST.card } }, children); }
+function SettingsSectionLabel({ text }) { const { ST } = useContext(SettingsThemeContext); return React.createElement("p", { style: { fontSize: 11.5, fontWeight: 700, letterSpacing: 0.4, color: ST.sub, textTransform: 'uppercase', margin: '22px 18px 8px' } }, text); }
+function SettingsField({ label, value, onChange, placeholder, multiline, secure, showToggle, onToggleShow, type = 'text', keyboardHint, error }) {
+    const { ST } = useContext(SettingsThemeContext);
+    const commonStyle = { width: '100%', border: `1px solid ${error ? ST.red : ST.border}`, borderRadius: 12, padding: multiline ? '11px 12px' : '13px 12px', fontSize: 14, color: ST.text, outline: 'none', fontFamily: 'inherit', background: ST.inputBg };
+    return React.createElement("div", { style: { marginBottom: 16 } },
+        label && React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: ST.sub, marginBottom: 6 } }, label),
+        React.createElement("div", { style: { position: 'relative' } },
+            multiline
+                ? React.createElement("textarea", { value: value, onChange: (e) => onChange(e.target.value), placeholder, rows: 4, style: { ...commonStyle, resize: 'none' } })
+                : React.createElement("input", { value: value, onChange: (e) => onChange(e.target.value), placeholder, type: secure ? (showToggle ? 'text' : 'password') : (type || 'text'), inputMode: keyboardHint, style: { ...commonStyle, paddingRight: secure ? 40 : 12 } }),
+            secure && React.createElement("button", { type: 'button', onClick: onToggleShow, style: { position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)' } },
+                React.createElement(Icon, { name: showToggle ? "eyeoff" : "eye", size: 16, color: ST.sub }))),
+        error && React.createElement("p", { style: { fontSize: 11.5, color: ST.red, margin: '5px 2px 0' } }, error));
+}
+function SettingsPrimaryButton({ label, onClick, loading, disabled, danger }) {
+    const { ST, accent } = useContext(SettingsThemeContext);
+    return React.createElement("button", { className: "avio-settings-tap", onClick: (disabled || loading) ? undefined : onClick, style: { width: '100%', height: 50, borderRadius: 14, background: danger ? ST.red : (disabled ? (ST.dark ? '#2A2A2C' : '#E5E5EA') : accent), color: (disabled) ? ST.sub : '#fff', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+        loading ? React.createElement("span", { className: "avio-spin", style: { width: 18, height: 18, borderRadius: '50%', border: '2.5px solid rgba(255,255,255,0.45)', borderTopColor: '#fff', display: 'inline-block' } }) : label);
+}
+function SettingsSecondaryButton({ label, onClick, danger }) {
+    const { ST } = useContext(SettingsThemeContext);
+    return React.createElement("button", { className: "avio-settings-tap", onClick, style: { width: '100%', height: 50, borderRadius: 14, background: ST.dark ? '#1C1C1E' : '#F5F5F5', color: danger ? ST.red : ST.text, fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, label);
+}
+function SettingsCodeInputs({ values, onChange, autoFocus }) {
+    const { ST, accent } = useContext(SettingsThemeContext);
+    const refs = useRef([]);
+    useEffect(() => { if (autoFocus && refs.current[0]) refs.current[0].focus(); }, []);
+    return React.createElement("div", { style: { display: 'flex', gap: 9, justifyContent: 'center' } },
+        values.map((v, i) => React.createElement("input", {
+            key: i, ref: (el) => refs.current[i] = el, value: v, inputMode: 'numeric', maxLength: 1,
+            onChange: (e) => {
+                const digit = e.target.value.replace(/[^0-9]/g, '').slice(-1);
+                const next = [...values]; next[i] = digit; onChange(next);
+                if (digit && refs.current[i + 1]) refs.current[i + 1].focus();
+            },
+            onKeyDown: (e) => { if (e.key === 'Backspace' && !values[i] && refs.current[i - 1]) refs.current[i - 1].focus(); },
+            style: { width: 42, height: 52, borderRadius: 12, border: `1.5px solid ${v ? accent : ST.border}`, textAlign: 'center', fontSize: 20, fontWeight: 700, color: ST.text, outline: 'none', fontFamily: 'inherit', background: ST.inputBg }
+        })));
+}
+function SettingsSuccessScreen({ title, text, buttonLabel, onDone }) {
+    const { ST, accent } = useContext(SettingsThemeContext);
+    return React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', textAlign: 'center' } },
+        React.createElement("div", { className: "avio-check-pop", style: { width: 76, height: 76, borderRadius: '50%', background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 22 } },
+            React.createElement(Icon, { name: "check", size: 32, color: "#fff" })),
+        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: ST.text, margin: 0 } }, title),
+        text && React.createElement("p", { style: { fontSize: 13.5, color: ST.sub, marginTop: 8, lineHeight: 1.5 } }, text),
+        onDone && React.createElement("div", { style: { width: '100%', maxWidth: 280, marginTop: 30 } },
+            React.createElement(SettingsPrimaryButton, { label: buttonLabel || 'Done', onClick: onDone })));
+}
+function SettingsSelectRow({ label, sub, selected, onClick }) {
+    const { ST, accent } = useContext(SettingsThemeContext);
+    return React.createElement("button", { className: "avio-settings-row", onClick, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', textAlign: 'left', background: 'transparent' } },
+        React.createElement("div", null,
+            React.createElement("p", { style: { fontSize: 14.5, fontWeight: 500, color: ST.text, margin: 0 } }, label),
+            sub && React.createElement("p", { style: { fontSize: 12, color: ST.sub, margin: '2px 0 0' } }, sub)),
+        selected
+            ? React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 13, color: "#fff" }))
+            : React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${ST.border}`, flexShrink: 0 } }));
+}
 function App() {
     var _a;
     const [session, setSession] = useState(() => { try { return localStorage.getItem('avio_session_v2'); } catch (e) { return null; } });
@@ -1488,7 +1650,6 @@ function App() {
         })();
         return () => { cancelled = true; };
     }, []);
-    const [profileMenuOpen, setProfileMenuOpen] = useState(false);
     const [bookingsSubTab, setBookingsSubTab] = useState('upcoming');
     const [bookingTarget, setBookingTarget] = useState(null);
     const [bookings, setBookings] = useState([
@@ -2217,9 +2378,61 @@ function App() {
     const [bookingSelectedDay, setBookingSelectedDay] = useState(() => new Date().getDate());
     const [selTime, setSelTime] = useState(null);
     const [customerInfo, setCustomerInfo] = useState({ fullName: '', phone: '', email: '', notes: '' });
-    const [customerProfile, setCustomerProfile] = useState(() => loadLS('avio_customer_profile', { fullName: '', username: '', bio: '', location: '', website: '', email: '' }));
+    const [customerProfile, setCustomerProfile] = useState(() => loadLS('avio_customer_profile', { fullName: 'Levi Dery', username: 'levidery', bio: '', location: '', website: '', email: 'levi@example.com', phone: '(917) 987-6543', avatarPhoto: null }));
     useEffect(() => { saveLS('avio_customer_profile', customerProfile); }, [customerProfile]);
     const [customerProfileOpen, setCustomerProfileOpen] = useState(false);
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [settingsStack, setSettingsStack] = useState([{ view: 'main' }]);
+    const [settingsDir, setSettingsDir] = useState('fwd');
+    const [settingsPrefs, setSettingsPrefs] = useState(() => loadLS('avio_settings_prefs', DEFAULT_SETTINGS_PREFS));
+    useEffect(() => { saveLS('avio_settings_prefs', settingsPrefs); }, [settingsPrefs]);
+    const [settingsForm, setSettingsForm] = useState({});
+    const [settingsBusy, setSettingsBusy] = useState(false);
+    const settingsPhotoInputRef = useRef(null);
+    const [settingsClock, setSettingsClock] = useState(() => Date.now());
+    useEffect(() => {
+        if (!settingsOpen) return;
+        const id = setInterval(() => setSettingsClock(Date.now()), 1000);
+        return () => clearInterval(id);
+    }, [settingsOpen]);
+    const settingsView = settingsStack[settingsStack.length - 1];
+    function openSettings() { setSettingsStack([{ view: 'main' }]); setSettingsForm({}); setSettingsDir('fwd'); setSettingsOpen(true); }
+    function closeSettings() { setSettingsOpen(false); }
+    function pushSettings(view, params) { setSettingsDir('fwd'); setSettingsStack((s) => [...s, { view, params: params || {} }]); }
+    function replaceSettings(view, params) { setSettingsDir('fwd'); setSettingsStack((s) => [...s.slice(0, -1), { view, params: params || {} }]); }
+    function popSettings() {
+        if (settingsStack.length > 1) { setSettingsDir('back'); setSettingsStack((s) => s.slice(0, -1)); }
+        else setSettingsOpen(false);
+    }
+    function popToSettings(view) {
+        setSettingsDir('back');
+        setSettingsStack((s) => { const idx = s.findIndex((x) => x.view === view); return idx >= 0 ? s.slice(0, idx + 1) : [{ view: 'main' }]; });
+    }
+    function setSForm(patch) { setSettingsForm((f) => ({ ...f, ...patch })); }
+    function setPrefs(patch) { setSettingsPrefs((p) => ({ ...p, ...patch })); }
+    function runSettingsAction(busyMs, fn) {
+        if (settingsBusy) return;
+        setSettingsBusy(true);
+        setTimeout(() => { setSettingsBusy(false); fn(); }, busyMs);
+    }
+    function handleSettingsPhotoFile(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => { setCustomerProfile((p) => ({ ...p, avatarPhoto: reader.result })); setSForm({ photoSheetOpen: false }); };
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    }
+    const settingsCameraInputRef = useRef(null);
+    const settingsAttachInputRef = useRef(null);
+    function handleSettingsAttachFile(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => setSForm({ attachment: reader.result, attachmentName: file.name });
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    }
     const feedCoveredByOverlay = !!customerProfileOpen || !!businessProfileTarget || !!postViewer || !!bookingTarget || !!providerDashboardOpen || !!uploadOpen;
     useEffect(() => {
         if (feedCoveredByOverlay)
@@ -3525,6 +3738,609 @@ function App() {
                 React.createElement("p", { style: { fontSize: 13, color: '#8A8A8E', marginTop: 8 } }, "You can now log in with your new password."),
                 React.createElement("button", { className: "avio-press", onClick: () => goAuth('login'), style: { ...authPrimaryBtn, marginTop: 28, maxWidth: 260 } }, "Log In")))));
     }
+    function addPaymentMethodEntry(entry) {
+        setSettingsPrefs((p) => ({ ...p, paymentMethods: [...p.paymentMethods, entry], defaultPaymentId: p.defaultPaymentId || entry.id }));
+    }
+    function removePaymentMethodEntry(id) {
+        setSettingsPrefs((p) => {
+            const methods = p.paymentMethods.filter((m) => m.id !== id);
+            return { ...p, paymentMethods: methods, defaultPaymentId: p.defaultPaymentId === id ? (methods[0] ? methods[0].id : null) : p.defaultPaymentId };
+        });
+    }
+    function paymentBadge(brand) {
+        const map = { Visa: { bg: '#1A1F71', text: 'VISA' }, Mastercard: { bg: '#EB001B', text: 'MC' }, 'Apple Pay': { bg: '#000', text: 'Pay' }, PayPal: { bg: '#003087', text: 'PP' }, Card: { bg: '#161616', text: '••••' } };
+        const m = map[brand] || { bg: '#161616', text: (brand || '?').slice(0, 2).toUpperCase() };
+        return React.createElement("div", { style: { width: 38, height: 26, borderRadius: 6, background: m.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement("span", { style: { fontSize: 9, fontWeight: 800, color: '#fff', letterSpacing: 0.3 } }, m.text));
+    }
+    function renderSettings() {
+        if (!settingsOpen) return null;
+        const top = settingsView;
+        const view = top.view;
+        const params = top.params || {};
+        const resolvedTheme = settingsPrefs.theme === 'system' ? ((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light') : settingsPrefs.theme;
+        const dark = resolvedTheme === 'dark';
+        const accentColor = (SETTINGS_ACCENTS.find((a) => a.id === settingsPrefs.accent) || SETTINGS_ACCENTS[0]).color;
+        const ST = { dark, bg: dark ? '#000' : '#fff', text: dark ? '#F5F5F7' : '#161616', sub: dark ? '#8E8E93' : '#8A8A8E', border: dark ? '#28282A' : '#ECECEE', card: dark ? '#161618' : '#fff', inputBg: dark ? '#161618' : '#fff', red: '#D0304A' };
+        const langMeta = SETTINGS_LANGUAGES.find((l) => l.id === settingsPrefs.language);
+        const isRTL = !!(langMeta && langMeta.rtl);
+        const scroll = (...children) => React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', paddingBottom: 'calc(env(safe-area-inset-bottom) + 30px)' } }, ...children);
+        const pad = (el) => React.createElement("div", { style: { padding: '0 18px' } }, el);
+        const gap = (h = 22) => React.createElement("div", { style: { height: h } });
+        const heading = (text) => React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: ST.text, margin: '18px 18px 6px' } }, text);
+        const sub = (text) => React.createElement("p", { style: { fontSize: 13, color: ST.sub, margin: '0 18px 18px', lineHeight: 1.5 } }, text);
+        const cardsBox = (children) => React.createElement("div", { style: { margin: '18px 18px 0' } }, children);
+        const now = settingsClock;
+        let title = 'Settings';
+        let body = null;
+        let showBack = true;
+
+        if (view === 'main') {
+            title = 'Settings';
+            body = scroll(
+                gap(6),
+                React.createElement(SettingsGroup, null,
+                    React.createElement(SettingsRow, { icon: 'user', label: 'Account', onClick: () => pushSettings('account') }),
+                    React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { icon: 'card', label: 'Payment Methods', onClick: () => pushSettings('paymentMethods') }),
+                    React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { icon: 'helpcircle', label: 'Help Center', onClick: () => { setSForm({ helpSearch: '' }); pushSettings('helpCenter'); } }),
+                    React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { icon: 'flag', label: 'Report a Problem', onClick: () => { setSForm({ reportIssue: null, reportMessage: '', attachment: null }); pushSettings('reportProblem'); } }),
+                    React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { icon: 'sliders', label: 'Display & Theme', onClick: () => pushSettings('displayTheme') }),
+                    React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { icon: 'globe', label: 'Language', onClick: () => pushSettings('language') }),
+                    React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { icon: 'clipboard', label: 'Terms of Service', onClick: () => pushSettings('termsOfService') }),
+                    React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { icon: 'info', label: 'About BookVado', onClick: () => pushSettings('aboutBookVado') })),
+                React.createElement("div", { style: { marginTop: 22 } },
+                    React.createElement(SettingsGroup, null,
+                        React.createElement(SettingsRow, { icon: 'logout', label: 'Log Out', danger: true, chevron: false, onClick: () => pushSettings('logoutConfirm') }))),
+                React.createElement("p", { style: { textAlign: 'center', fontSize: 11.5, color: ST.sub, marginTop: 26 } }, accountType === 'business' ? 'Business Mode' : 'Customer Mode'));
+        }
+        else if (view === 'account') {
+            title = 'Account';
+            body = scroll(gap(6),
+                React.createElement(SettingsGroup, null,
+                    React.createElement(SettingsRow, { icon: 'pencil', label: 'Edit Profile', onClick: () => { setSForm({ draftFullName: customerProfile.fullName, draftUsername: customerProfile.username, draftBio: customerProfile.bio, photoSheetOpen: false }); pushSettings('editProfile'); } }),
+                    React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { icon: 'messageoutline', label: 'Change Email', onClick: () => { setSForm({ newEmail: '' }); pushSettings('changeEmail'); } }),
+                    React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { icon: 'phone', label: 'Change Phone Number', onClick: () => { setSForm({ newPhone: '' }); pushSettings('changePhone'); } }),
+                    React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { icon: 'lock', label: 'Change Password', onClick: () => { setSForm({ curPass: '', newPass: '', confirmPass: '', showCur: false, showNew: false, showConfirm: false, passError: '' }); pushSettings('changePassword'); } }),
+                    React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { icon: 'shield', label: 'Two-Factor Authentication', value: settingsPrefs.twoFAEnabled ? 'On' : 'Off', onClick: () => pushSettings('twoFactor') }),
+                    React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { icon: 'rings', label: 'Linked Accounts', onClick: () => pushSettings('linkedAccounts') })),
+                React.createElement("div", { style: { marginTop: 22 } },
+                    React.createElement(SettingsGroup, null,
+                        React.createElement(SettingsRow, { icon: 'trash', label: 'Delete Account', danger: true, onClick: () => { setSForm({ deleteConfirmText: '' }); pushSettings('deleteAccount'); } }))));
+        }
+        else if (view === 'editProfile') {
+            title = 'Edit Profile';
+            const initial = (customerProfile.fullName || 'U').trim().charAt(0).toUpperCase();
+            const fullName = settingsForm.draftFullName ?? customerProfile.fullName;
+            const username = settingsForm.draftUsername ?? customerProfile.username;
+            const bio = settingsForm.draftBio ?? customerProfile.bio;
+            body = scroll(
+                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '22px 18px' } },
+                    customerProfile.avatarPhoto
+                        ? React.createElement("div", { style: { width: 88, height: 88, borderRadius: '50%', backgroundImage: `url(${customerProfile.avatarPhoto})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
+                        : React.createElement("div", { style: { width: 88, height: 88, borderRadius: '50%', background: accentColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: '#fff' } }, initial),
+                    React.createElement("button", { className: "avio-settings-tap", onClick: () => setSForm({ photoSheetOpen: true }), style: { marginTop: 12, fontSize: 13, fontWeight: 700, color: accentColor } }, "Change Photo")),
+                pad(React.createElement(React.Fragment, null,
+                    React.createElement(SettingsField, { label: 'Full Name', value: fullName, onChange: (v) => setSForm({ draftFullName: v }), placeholder: 'Your full name' }),
+                    React.createElement(SettingsField, { label: 'Username', value: username, onChange: (v) => setSForm({ draftUsername: v }), placeholder: 'username' }),
+                    React.createElement(SettingsField, { label: 'Bio', value: bio, onChange: (v) => setSForm({ draftBio: v }), placeholder: 'Tell people about yourself', multiline: true }),
+                    gap(6),
+                    React.createElement(SettingsPrimaryButton, {
+                        label: 'Save Changes', loading: settingsBusy, onClick: () => runSettingsAction(650, () => {
+                            setCustomerProfile((p) => ({ ...p, fullName, username, bio }));
+                            flashToast('Profile updated');
+                            popSettings();
+                        })
+                    }))));
+        }
+        else if (view === 'changeEmail') {
+            title = 'Change Email';
+            body = scroll(pad(React.createElement(React.Fragment, null,
+                React.createElement(SettingsField, { label: 'Current Email', value: customerProfile.email, onChange: () => { } }),
+                React.createElement(SettingsField, { label: 'New Email', value: settingsForm.newEmail || '', onChange: (v) => setSForm({ newEmail: v }), placeholder: 'newemail@example.com', keyboardHint: 'email' }),
+                gap(6),
+                React.createElement(SettingsPrimaryButton, {
+                    label: 'Confirm Email', disabled: !(settingsForm.newEmail || '').trim(), loading: settingsBusy, onClick: () => runSettingsAction(600, () => {
+                        setSForm({ emailCode: ['', '', '', '', '', ''], emailResendAt: Date.now() + 45000 });
+                        pushSettings('verifyEmail');
+                    })
+                }))));
+        }
+        else if (view === 'verifyEmail') {
+            title = 'Enter Code';
+            const code = settingsForm.emailCode || ['', '', '', '', '', ''];
+            const complete = code.every((d) => d);
+            const secsLeft = Math.max(0, Math.ceil(((settingsForm.emailResendAt || 0) - now) / 1000));
+            body = scroll(
+                React.createElement("div", { style: { padding: '26px 24px 0', textAlign: 'center' } },
+                    React.createElement("p", { style: { fontSize: 13.5, color: ST.sub, lineHeight: 1.5 } }, "We sent a 6-digit code to"),
+                    React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: ST.text, marginBottom: 24 } }, settingsForm.newEmail)),
+                React.createElement(SettingsCodeInputs, { values: code, onChange: (v) => setSForm({ emailCode: v }), autoFocus: true }),
+                React.createElement("div", { style: { textAlign: 'center', marginTop: 18 } },
+                    React.createElement("button", { disabled: secsLeft > 0, onClick: () => setSForm({ emailResendAt: Date.now() + 45000 }), style: { fontSize: 12.5, fontWeight: 600, color: secsLeft > 0 ? ST.sub : accentColor } }, secsLeft > 0 ? `Resend Code (0:${String(secsLeft).padStart(2, '0')})` : 'Resend Code')),
+                pad(React.createElement("div", { style: { marginTop: 28 } },
+                    React.createElement(SettingsPrimaryButton, {
+                        label: 'Verify', disabled: !complete, loading: settingsBusy, onClick: () => runSettingsAction(600, () => {
+                            setCustomerProfile((p) => ({ ...p, email: settingsForm.newEmail }));
+                            replaceSettings('emailUpdated');
+                        })
+                    }))));
+        }
+        else if (view === 'emailUpdated') {
+            title = 'Change Email';
+            body = React.createElement(SettingsSuccessScreen, { title: 'Email Updated', text: 'Your login email has been changed successfully.', onDone: () => popToSettings('account') });
+        }
+        else if (view === 'changePhone') {
+            title = 'Change Phone Number';
+            body = scroll(pad(React.createElement(React.Fragment, null,
+                React.createElement(SettingsField, { label: 'Current Phone', value: customerProfile.phone, onChange: () => { } }),
+                React.createElement(SettingsField, { label: 'New Phone Number', value: settingsForm.newPhone || '', onChange: (v) => setSForm({ newPhone: v }), placeholder: '(917) 555-0123', keyboardHint: 'tel' }),
+                gap(6),
+                React.createElement(SettingsPrimaryButton, {
+                    label: 'Send Code', disabled: !(settingsForm.newPhone || '').trim(), loading: settingsBusy, onClick: () => runSettingsAction(600, () => {
+                        setSForm({ phoneCode: ['', '', '', '', '', ''], phoneResendAt: Date.now() + 45000 });
+                        pushSettings('verifyPhone');
+                    })
+                }))));
+        }
+        else if (view === 'verifyPhone') {
+            title = 'Enter Code';
+            const code = settingsForm.phoneCode || ['', '', '', '', '', ''];
+            const complete = code.every((d) => d);
+            const secsLeft = Math.max(0, Math.ceil(((settingsForm.phoneResendAt || 0) - now) / 1000));
+            body = scroll(
+                React.createElement("div", { style: { padding: '26px 24px 0', textAlign: 'center' } },
+                    React.createElement("p", { style: { fontSize: 13.5, color: ST.sub, lineHeight: 1.5 } }, "We sent a 6-digit code to"),
+                    React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: ST.text, marginBottom: 24 } }, settingsForm.newPhone)),
+                React.createElement(SettingsCodeInputs, { values: code, onChange: (v) => setSForm({ phoneCode: v }), autoFocus: true }),
+                React.createElement("div", { style: { textAlign: 'center', marginTop: 18 } },
+                    React.createElement("button", { disabled: secsLeft > 0, onClick: () => setSForm({ phoneResendAt: Date.now() + 45000 }), style: { fontSize: 12.5, fontWeight: 600, color: secsLeft > 0 ? ST.sub : accentColor } }, secsLeft > 0 ? `Resend Code (0:${String(secsLeft).padStart(2, '0')})` : 'Resend Code')),
+                pad(React.createElement("div", { style: { marginTop: 28 } },
+                    React.createElement(SettingsPrimaryButton, {
+                        label: 'Verify', disabled: !complete, loading: settingsBusy, onClick: () => runSettingsAction(600, () => {
+                            setCustomerProfile((p) => ({ ...p, phone: settingsForm.newPhone }));
+                            replaceSettings('phoneUpdated');
+                        })
+                    }))));
+        }
+        else if (view === 'phoneUpdated') {
+            title = 'Change Phone Number';
+            body = React.createElement(SettingsSuccessScreen, { title: 'Phone Number Updated', text: 'Your phone number has been changed successfully.', onDone: () => popToSettings('account') });
+        }
+        else if (view === 'changePassword') {
+            title = 'Change Password';
+            body = scroll(pad(React.createElement(React.Fragment, null,
+                React.createElement(SettingsField, { label: 'Current Password', value: settingsForm.curPass || '', onChange: (v) => setSForm({ curPass: v }), secure: true, showToggle: !!settingsForm.showCur, onToggleShow: () => setSForm({ showCur: !settingsForm.showCur }) }),
+                React.createElement(SettingsField, { label: 'New Password', value: settingsForm.newPass || '', onChange: (v) => setSForm({ newPass: v }), secure: true, showToggle: !!settingsForm.showNew, onToggleShow: () => setSForm({ showNew: !settingsForm.showNew }) }),
+                React.createElement(SettingsField, { label: 'Confirm New Password', value: settingsForm.confirmPass || '', onChange: (v) => setSForm({ confirmPass: v }), secure: true, showToggle: !!settingsForm.showConfirm, onToggleShow: () => setSForm({ showConfirm: !settingsForm.showConfirm }), error: settingsForm.passError }),
+                gap(6),
+                React.createElement(SettingsPrimaryButton, {
+                    label: 'Update Password', loading: settingsBusy, onClick: () => {
+                        if (!(settingsForm.curPass || '').trim()) return setSForm({ passError: 'Enter your current password' });
+                        if ((settingsForm.newPass || '').length < 8) return setSForm({ passError: 'New password must be at least 8 characters' });
+                        if (settingsForm.newPass !== settingsForm.confirmPass) return setSForm({ passError: "Passwords don't match" });
+                        setSForm({ passError: '' });
+                        runSettingsAction(700, () => pushSettings('passwordUpdated'));
+                    }
+                }))));
+        }
+        else if (view === 'passwordUpdated') {
+            title = 'Change Password';
+            body = React.createElement(SettingsSuccessScreen, { title: 'Password Updated', text: 'Your password has been changed successfully.', onDone: () => popToSettings('account') });
+        }
+        else if (view === 'twoFactor') {
+            title = 'Two-Factor Authentication';
+            body = scroll(gap(6),
+                React.createElement(SettingsGroup, null,
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px' } },
+                        React.createElement("span", { style: { fontSize: 14.5, fontWeight: 500, color: ST.text } }, "Status"),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                            React.createElement("span", { style: { fontSize: 13, color: settingsPrefs.twoFAEnabled ? accentColor : ST.sub, fontWeight: 700 } }, settingsPrefs.twoFAEnabled ? 'On' : 'Off'),
+                            React.createElement(ToggleSwitch, {
+                                on: settingsPrefs.twoFAEnabled, onChange: () => {
+                                    if (settingsPrefs.twoFAEnabled) pushSettings('twoFactorOff');
+                                    else runSettingsAction(500, () => { setPrefs({ twoFAEnabled: true }); flashToast('Two-Factor Authentication enabled'); });
+                                }
+                            })))),
+                sub("Add an extra layer of security to your account."),
+                React.createElement(SettingsGroup, null,
+                    React.createElement(SettingsRow, { label: 'Authentication Method', value: settingsPrefs.twoFAMethod, onClick: () => pushSettings('twoFactorMethod') })),
+                settingsPrefs.twoFAEnabled && React.createElement("div", { style: { marginTop: 22 } },
+                    React.createElement(SettingsGroup, null,
+                        React.createElement(SettingsRow, { label: 'Turn Off', danger: true, chevron: false, onClick: () => pushSettings('twoFactorOff') }))));
+        }
+        else if (view === 'twoFactorMethod') {
+            title = 'Authentication Method';
+            body = scroll(gap(6), React.createElement(SettingsGroup, null,
+                ['Authenticator App', 'SMS', 'Email'].map((m, i) => React.createElement(React.Fragment, { key: m },
+                    i > 0 && React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsSelectRow, { label: m, selected: settingsPrefs.twoFAMethod === m, onClick: () => { setPrefs({ twoFAMethod: m }); flashToast(`Authentication method set to ${m}`); } })))));
+        }
+        else if (view === 'twoFactorOff') {
+            title = 'Two-Factor Authentication';
+            body = React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 28px', textAlign: 'center' } },
+                React.createElement("div", { style: { width: 68, height: 68, borderRadius: '50%', background: 'rgba(208,48,74,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 } },
+                    React.createElement(Icon, { name: "warningtriangle", size: 28, color: "#D0304A" })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: ST.text, margin: 0 } }, "Turn Off Two-Factor Authentication?"),
+                React.createElement("p", { style: { fontSize: 13.5, color: ST.sub, marginTop: 10, lineHeight: 1.5 } }, "This will make your account less secure. You'll only need your password to sign in."),
+                React.createElement("div", { style: { width: '100%', maxWidth: 300, marginTop: 30, display: 'flex', flexDirection: 'column', gap: 10 } },
+                    React.createElement(SettingsPrimaryButton, {
+                        label: 'Turn Off', danger: true, loading: settingsBusy, onClick: () => runSettingsAction(500, () => {
+                            setPrefs({ twoFAEnabled: false }); flashToast('Two-Factor Authentication turned off'); popToSettings('account');
+                        })
+                    }),
+                    React.createElement(SettingsSecondaryButton, { label: 'Cancel', onClick: () => popSettings() })));
+        }
+        else if (view === 'linkedAccounts') {
+            title = 'Linked Accounts';
+            body = scroll(gap(6), React.createElement(SettingsGroup, null,
+                SETTINGS_LINKED_PROVIDERS.map((p, i) => React.createElement(React.Fragment, { key: p.id },
+                    i > 0 && React.createElement(SettingsDivider, null),
+                    React.createElement("button", { className: "avio-settings-row", onClick: () => pushSettings('linkedProvider', { id: p.id }), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', textAlign: 'left', background: 'transparent' } },
+                        React.createElement("div", { style: { width: 30, height: 30, borderRadius: '50%', background: p.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                            p.id === 'instagram' ? React.createElement(Icon, { name: "instagram", size: 14, color: "#fff" }) : p.id === 'apple' ? React.createElement(Icon, { name: "faceid", size: 13, color: "#fff" }) : React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: '#fff' } }, p.letter)),
+                        React.createElement("span", { style: { flex: 1, fontSize: 14.5, fontWeight: 500, color: ST.text } }, p.label),
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: settingsPrefs.linkedAccounts[p.id] ? accentColor : ST.sub } }, settingsPrefs.linkedAccounts[p.id] ? 'Connected' : 'Not Connected'),
+                        React.createElement(Icon, { name: "chevronright", size: 16, color: ST.sub }))))));
+        }
+        else if (view === 'linkedProvider') {
+            const p = SETTINGS_LINKED_PROVIDERS.find((x) => x.id === params.id) || SETTINGS_LINKED_PROVIDERS[0];
+            const connected = settingsPrefs.linkedAccounts[p.id];
+            title = p.label;
+            body = React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 28px 0', textAlign: 'center' } },
+                React.createElement("div", { style: { width: 68, height: 68, borderRadius: '50%', background: p.color, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18 } },
+                    p.id === 'instagram' ? React.createElement(Icon, { name: "instagram", size: 26, color: "#fff" }) : p.id === 'apple' ? React.createElement(Icon, { name: "faceid", size: 24, color: "#fff" }) : React.createElement("span", { style: { fontSize: 22, fontWeight: 800, color: '#fff' } }, p.letter)),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: ST.text, margin: 0 } }, p.label),
+                React.createElement("p", { style: { fontSize: 13, color: connected ? accentColor : ST.sub, fontWeight: 600, marginTop: 6 } }, connected ? 'Connected' : 'Not Connected'),
+                React.createElement("div", { style: { width: '100%', maxWidth: 300, marginTop: 30 } },
+                    connected
+                        ? (settingsForm.confirmDisconnect
+                            ? React.createElement(React.Fragment, null,
+                                React.createElement("p", { style: { fontSize: 12.5, color: ST.sub, marginBottom: 14, lineHeight: 1.5 } }, "Disconnecting may affect your ability to log in with this provider. Are you sure?"),
+                                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } },
+                                    React.createElement(SettingsPrimaryButton, {
+                                        label: 'Disconnect', danger: true, loading: settingsBusy, onClick: () => runSettingsAction(500, () => {
+                                            setPrefs({ linkedAccounts: { ...settingsPrefs.linkedAccounts, [p.id]: false } });
+                                            setSForm({ confirmDisconnect: false });
+                                            flashToast(`${p.label} disconnected`);
+                                            popSettings();
+                                        })
+                                    }),
+                                    React.createElement(SettingsSecondaryButton, { label: 'Cancel', onClick: () => setSForm({ confirmDisconnect: false }) })))
+                            : React.createElement(SettingsSecondaryButton, { label: 'Disconnect', danger: true, onClick: () => setSForm({ confirmDisconnect: true }) }))
+                        : React.createElement(SettingsPrimaryButton, {
+                            label: 'Connect', loading: settingsBusy, onClick: () => runSettingsAction(600, () => {
+                                setPrefs({ linkedAccounts: { ...settingsPrefs.linkedAccounts, [p.id]: true } });
+                                flashToast(`${p.label} connected`);
+                                popSettings();
+                            })
+                        })));
+        }
+        else if (view === 'deleteAccount') {
+            title = 'Delete Account';
+            body = React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 28px 0', textAlign: 'center' } },
+                React.createElement("div", { style: { width: 68, height: 68, borderRadius: '50%', background: 'rgba(208,48,74,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 } },
+                    React.createElement(Icon, { name: "warningtriangle", size: 28, color: "#D0304A" })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: ST.text, margin: 0 } }, "Delete Your Account?"),
+                React.createElement("p", { style: { fontSize: 13.5, color: ST.sub, marginTop: 10, lineHeight: 1.5 } }, "Deleting your account will permanently remove your profile, bookings, and payment information. This action cannot be undone."),
+                React.createElement("div", { style: { width: '100%', maxWidth: 300, marginTop: 30 } },
+                    React.createElement(SettingsPrimaryButton, { label: 'Delete Account', danger: true, onClick: () => { setSForm({ deleteConfirmText: '' }); pushSettings('deleteAccountConfirm'); } })));
+        }
+        else if (view === 'deleteAccountConfirm') {
+            title = 'Delete Account';
+            body = React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 28px 0', textAlign: 'center' } },
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: ST.text, margin: 0 } }, "Are you absolutely sure?"),
+                React.createElement("p", { style: { fontSize: 13, color: ST.sub, marginTop: 10, marginBottom: 20, lineHeight: 1.5 } }, "Type DELETE below to confirm. This action is permanent and cannot be undone."),
+                React.createElement("div", { style: { width: '100%', maxWidth: 300, textAlign: 'left' } },
+                    React.createElement(SettingsField, { value: settingsForm.deleteConfirmText || '', onChange: (v) => setSForm({ deleteConfirmText: v }), placeholder: 'Type DELETE' }),
+                    React.createElement(SettingsPrimaryButton, {
+                        label: 'Delete Account', danger: true, disabled: settingsForm.deleteConfirmText !== 'DELETE', loading: settingsBusy, onClick: () => runSettingsAction(900, () => {
+                            closeSettings();
+                            flashToast('Your account deletion request has been submitted');
+                            logout();
+                        })
+                    }),
+                    gap(10),
+                    React.createElement(SettingsSecondaryButton, { label: 'Cancel', onClick: () => popSettings() })));
+        }
+        else if (view === 'paymentMethods') {
+            title = 'Payment Methods';
+            body = scroll(gap(6), React.createElement(SettingsGroup, null,
+                settingsPrefs.paymentMethods.map((pm, i) => React.createElement(React.Fragment, { key: pm.id },
+                    i > 0 && React.createElement(SettingsDivider, null),
+                    React.createElement("button", { className: "avio-settings-row", onClick: () => pushSettings('cardDetails', { id: pm.id }), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', textAlign: 'left', background: 'transparent' } },
+                        paymentBadge(pm.brand),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: ST.text, margin: 0 } }, pm.last4 ? `${pm.brand} •••• ${pm.last4}` : pm.brand),
+                            pm.exp && React.createElement("p", { style: { fontSize: 11.5, color: ST.sub, margin: '2px 0 0' } }, `Expires ${pm.exp}`)),
+                        pm.id === settingsPrefs.defaultPaymentId && React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: accentColor, border: `1px solid ${accentColor}`, borderRadius: 20, padding: '2px 8px', marginRight: 6 } }, "Default"),
+                        React.createElement(Icon, { name: "chevronright", size: 16, color: ST.sub }))))),
+                React.createElement("div", { style: { marginTop: 18 } }, React.createElement(SettingsGroup, null,
+                    React.createElement(SettingsRow, { label: 'Default Payment Method', onClick: () => pushSettings('defaultPayment') }))),
+                React.createElement("button", { className: "avio-settings-tap", onClick: () => { setSForm({ cardNumber: '', cardName: '', cardExp: '', cardCvv: '' }); pushSettings('addPaymentMethod'); }, style: { display: 'flex', alignItems: 'center', gap: 8, margin: '20px 18px 0', padding: '4px 0' } },
+                    React.createElement(Icon, { name: "plus", size: 16, color: accentColor }),
+                    React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: accentColor } }, "Add Payment Method")));
+        }
+        else if (view === 'cardDetails') {
+            const pm = settingsPrefs.paymentMethods.find((x) => x.id === params.id);
+            title = pm ? pm.brand : 'Card';
+            const isDefault = pm && pm.id === settingsPrefs.defaultPaymentId;
+            body = pm ? scroll(
+                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '26px 18px' } },
+                    React.createElement("div", { style: { transform: 'scale(1.5)', marginBottom: 18 } }, paymentBadge(pm.brand)),
+                    React.createElement("p", { style: { fontSize: 15, fontWeight: 700, color: ST.text, margin: 0 } }, pm.last4 ? `•••• •••• •••• ${pm.last4}` : pm.brand),
+                    pm.exp && React.createElement("p", { style: { fontSize: 12.5, color: ST.sub, marginTop: 4 } }, `Expires ${pm.exp}`)),
+                React.createElement(SettingsGroup, null,
+                    !isDefault && React.createElement(SettingsRow, { label: 'Make Default', chevron: false, onClick: () => { setPrefs({ defaultPaymentId: pm.id }); flashToast('Default payment method updated'); } }),
+                    !isDefault && React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { label: 'Remove Payment Method', danger: true, chevron: false, onClick: () => setSForm({ confirmRemoveCard: true }) })),
+                settingsForm.confirmRemoveCard && pad(React.createElement("div", { style: { marginTop: 18 } },
+                    React.createElement("p", { style: { fontSize: 12.5, color: ST.sub, marginBottom: 12 } }, "Remove this payment method? This can't be undone."),
+                    React.createElement("div", { style: { display: 'flex', gap: 10 } },
+                        React.createElement("div", { style: { flex: 1 } }, React.createElement(SettingsSecondaryButton, { label: 'Cancel', onClick: () => setSForm({ confirmRemoveCard: false }) })),
+                        React.createElement("div", { style: { flex: 1 } }, React.createElement(SettingsPrimaryButton, {
+                            label: 'Remove', danger: true, onClick: () => {
+                                removePaymentMethodEntry(pm.id); flashToast('Payment method removed'); setSForm({ confirmRemoveCard: false }); popSettings();
+                            }
+                        })))))
+            ) : scroll(sub('This payment method is no longer available.'));
+        }
+        else if (view === 'addPaymentMethod') {
+            title = 'Add Payment Method';
+            body = scroll(gap(6), React.createElement(SettingsGroup, null,
+                React.createElement(SettingsRow, { icon: 'card', label: 'Credit or Debit Card', onClick: () => pushSettings('addCard') }),
+                React.createElement(SettingsDivider, null),
+                React.createElement(SettingsRow, {
+                    icon: 'wallet', label: 'Apple Pay', chevron: false, onClick: () => runSettingsAction(700, () => {
+                        addPaymentMethodEntry({ id: 'pm' + Date.now(), brand: 'Apple Pay', last4: null, exp: null });
+                        flashToast('Apple Pay added'); popToSettings('paymentMethods');
+                    })
+                }),
+                React.createElement(SettingsDivider, null),
+                React.createElement(SettingsRow, {
+                    icon: 'globe', label: 'PayPal', chevron: false, onClick: () => runSettingsAction(700, () => {
+                        addPaymentMethodEntry({ id: 'pm' + Date.now(), brand: 'PayPal', last4: null, exp: null });
+                        flashToast('PayPal added'); popToSettings('paymentMethods');
+                    })
+                })));
+        }
+        else if (view === 'addCard') {
+            title = 'Add Card';
+            const valid = (settingsForm.cardNumber || '').replace(/\D/g, '').length >= 12 && (settingsForm.cardName || '').trim() && /^\d{2}\/\d{2}$/.test(settingsForm.cardExp || '') && (settingsForm.cardCvv || '').length >= 3;
+            body = scroll(pad(React.createElement(React.Fragment, null,
+                React.createElement(SettingsField, { label: 'Card Number', value: settingsForm.cardNumber || '', onChange: (v) => setSForm({ cardNumber: v }), placeholder: '1234 5678 9012 3456', keyboardHint: 'numeric' }),
+                React.createElement(SettingsField, { label: 'Name on Card', value: settingsForm.cardName || '', onChange: (v) => setSForm({ cardName: v }), placeholder: 'Levi Dery' }),
+                React.createElement("div", { style: { display: 'flex', gap: 12 } },
+                    React.createElement("div", { style: { flex: 1 } }, React.createElement(SettingsField, { label: 'Expiration Date', value: settingsForm.cardExp || '', onChange: (v) => setSForm({ cardExp: v }), placeholder: 'MM/YY' })),
+                    React.createElement("div", { style: { flex: 1 } }, React.createElement(SettingsField, { label: 'CVV', value: settingsForm.cardCvv || '', onChange: (v) => setSForm({ cardCvv: v }), placeholder: '123', secure: false, keyboardHint: 'numeric' }))),
+                gap(6),
+                React.createElement(SettingsPrimaryButton, {
+                    label: 'Save Card', disabled: !valid, loading: settingsBusy, onClick: () => runSettingsAction(900, () => {
+                        const digits = (settingsForm.cardNumber || '').replace(/\D/g, '');
+                        const brand = digits.startsWith('4') ? 'Visa' : (digits.startsWith('5') ? 'Mastercard' : 'Card');
+                        addPaymentMethodEntry({ id: 'pm' + Date.now(), brand, last4: digits.slice(-4), exp: settingsForm.cardExp });
+                        flashToast('Payment method added');
+                        popToSettings('paymentMethods');
+                    })
+                }))));
+        }
+        else if (view === 'defaultPayment') {
+            title = 'Default Payment';
+            body = scroll(gap(6), React.createElement(SettingsGroup, null,
+                settingsPrefs.paymentMethods.map((pm, i) => React.createElement(React.Fragment, { key: pm.id },
+                    i > 0 && React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsSelectRow, { label: pm.last4 ? `${pm.brand} •••• ${pm.last4}` : pm.brand, sub: pm.exp ? `Expires ${pm.exp}` : null, selected: pm.id === settingsPrefs.defaultPaymentId, onClick: () => { setPrefs({ defaultPaymentId: pm.id }); flashToast('Default payment method updated'); } })))));
+        }
+        else if (view === 'helpCenter') {
+            const q = (settingsForm.helpSearch || '').toLowerCase().trim();
+            const topics = SETTINGS_HELP_TOPICS.filter((t) => !q || t.label.toLowerCase().includes(q));
+            title = 'Help Center';
+            body = scroll(
+                pad(React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: dark ? '#161618' : '#F5F5F5', borderRadius: 12, padding: '10px 12px', margin: '16px 0' } },
+                    React.createElement(Icon, { name: "search", size: 15, color: ST.sub }),
+                    React.createElement("input", { value: settingsForm.helpSearch || '', onChange: (e) => setSForm({ helpSearch: e.target.value }), placeholder: "Search for help", style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13.5, color: ST.text } }))),
+                React.createElement(SettingsSectionLabel, { text: 'Popular Topics' }),
+                React.createElement(SettingsGroup, null,
+                    topics.length === 0
+                        ? React.createElement("p", { style: { fontSize: 13, color: ST.sub, padding: '20px 18px', textAlign: 'center' } }, "No results found")
+                        : topics.map((t, i) => React.createElement(React.Fragment, { key: t.id },
+                            i > 0 && React.createElement(SettingsDivider, null),
+                            React.createElement(SettingsRow, { icon: t.icon, label: t.label, onClick: () => pushSettings('helpTopic', { id: t.id }) })))),
+                pad(React.createElement("div", { style: { marginTop: 24 } },
+                    React.createElement(SettingsPrimaryButton, { label: 'Contact Support', onClick: () => { setSForm({ supportTopic: '', supportMessage: '', attachment: null }); pushSettings('contactSupport'); } }))));
+        }
+        else if (view === 'helpTopic') {
+            const topic = SETTINGS_HELP_TOPICS.find((t) => t.id === params.id) || SETTINGS_HELP_TOPICS[0];
+            title = topic.label;
+            body = scroll(gap(6), React.createElement(SettingsGroup, null,
+                topic.articles.map((a, i) => React.createElement(React.Fragment, { key: a.id },
+                    i > 0 && React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { label: a.title, onClick: () => pushSettings('helpArticle', { topicId: topic.id, articleId: a.id }) })))));
+        }
+        else if (view === 'helpArticle') {
+            const topic = SETTINGS_HELP_TOPICS.find((t) => t.id === params.topicId) || SETTINGS_HELP_TOPICS[0];
+            const article = topic.articles.find((a) => a.id === params.articleId) || topic.articles[0];
+            const idx = topic.articles.findIndex((a) => a.id === article.id);
+            const next = topic.articles[idx + 1];
+            title = article.title;
+            body = scroll(
+                pad(React.createElement("p", { style: { fontSize: 14, color: ST.text, lineHeight: 1.7, margin: '18px 0' } }, article.body)),
+                next && React.createElement(React.Fragment, null,
+                    React.createElement(SettingsSectionLabel, { text: 'Related Article' }),
+                    React.createElement(SettingsGroup, null,
+                        React.createElement(SettingsRow, { label: next.title, onClick: () => pushSettings('helpArticle', { topicId: topic.id, articleId: next.id }) }))));
+        }
+        else if (view === 'contactSupport') {
+            title = 'Contact Support';
+            body = scroll(
+                heading('What can we help you with?'),
+                pad(React.createElement(React.Fragment, null,
+                    React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: ST.sub, marginBottom: 6 } }, "Select a topic"),
+                    React.createElement("select", {
+                        value: settingsForm.supportTopic || '', onChange: (e) => setSForm({ supportTopic: e.target.value }),
+                        style: { width: '100%', border: `1px solid ${ST.border}`, borderRadius: 12, padding: '13px 12px', fontSize: 14, color: ST.text, outline: 'none', fontFamily: 'inherit', background: ST.inputBg, marginBottom: 16 }
+                    },
+                        React.createElement("option", { value: "" }, "Choose a topic"),
+                        SETTINGS_HELP_TOPICS.map((t) => React.createElement("option", { key: t.id, value: t.label }, t.label)),
+                        React.createElement("option", { value: "Other" }, "Other")),
+                    React.createElement(SettingsField, { label: 'Describe your issue', value: settingsForm.supportMessage || '', onChange: (v) => setSForm({ supportMessage: v }), placeholder: 'Type your message...', multiline: true }),
+                    React.createElement("button", { className: "avio-settings-tap", onClick: () => settingsAttachInputRef.current && settingsAttachInputRef.current.click(), style: { width: '100%', border: `1.5px dashed ${ST.border}`, borderRadius: 12, padding: '14px 12px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 } },
+                        React.createElement(Icon, { name: "image", size: 17, color: ST.sub }),
+                        React.createElement("span", { style: { fontSize: 13, color: ST.sub } }, settingsForm.attachmentName || 'Add Screenshot (optional)')),
+                    React.createElement(SettingsPrimaryButton, {
+                        label: 'Send Message', disabled: !(settingsForm.supportMessage || '').trim(), loading: settingsBusy, onClick: () => runSettingsAction(800, () => pushSettings('contactSupportSent'))
+                    }))));
+        }
+        else if (view === 'contactSupportSent') {
+            title = 'Contact Support';
+            body = React.createElement(SettingsSuccessScreen, { title: 'Message Sent', text: "Thanks for reaching out. Our support team typically replies within 24 hours.", onDone: () => popToSettings('helpCenter') });
+        }
+        else if (view === 'reportProblem') {
+            title = 'Report a Problem';
+            body = scroll(
+                heading("What's going on?"),
+                sub("Please select the issue you're facing."),
+                React.createElement(SettingsGroup, null,
+                    SETTINGS_REPORT_ISSUES.map((issue, i) => React.createElement(React.Fragment, { key: issue },
+                        i > 0 && React.createElement(SettingsDivider, null),
+                        React.createElement(SettingsSelectRow, { label: issue, selected: settingsForm.reportIssue === issue, onClick: () => setSForm({ reportIssue: issue }) })))),
+                pad(React.createElement("div", { style: { marginTop: 22 } },
+                    React.createElement(SettingsPrimaryButton, { label: 'Next', disabled: !settingsForm.reportIssue, onClick: () => { setSForm({ reportMessage: '', attachment: null }); pushSettings('reportDetails', { issue: settingsForm.reportIssue }); } }))));
+        }
+        else if (view === 'reportDetails') {
+            title = 'Report Details';
+            body = scroll(pad(React.createElement(React.Fragment, null,
+                React.createElement(SettingsField, { label: 'Please provide more details', value: settingsForm.reportMessage || '', onChange: (v) => setSForm({ reportMessage: v }), placeholder: 'Type your message...', multiline: true }),
+                React.createElement("button", { className: "avio-settings-tap", onClick: () => settingsAttachInputRef.current && settingsAttachInputRef.current.click(), style: { width: '100%', border: `1.5px dashed ${ST.border}`, borderRadius: 12, padding: '14px 12px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 } },
+                    React.createElement(Icon, { name: "image", size: 17, color: ST.sub }),
+                    React.createElement("span", { style: { fontSize: 13, color: ST.sub } }, settingsForm.attachmentName || 'Add Screenshot (optional)')),
+                React.createElement(SettingsPrimaryButton, {
+                    label: 'Submit Report', disabled: !(settingsForm.reportMessage || '').trim(), loading: settingsBusy, onClick: () => runSettingsAction(800, () => pushSettings('reportSubmitted'))
+                }))));
+        }
+        else if (view === 'reportSubmitted') {
+            title = 'Report Submitted';
+            body = React.createElement(SettingsSuccessScreen, { title: 'Thank you!', text: "Your report has been submitted. We'll review it and get back to you if needed.", onDone: () => popToSettings('main') });
+        }
+        else if (view === 'displayTheme') {
+            title = 'Display & Theme';
+            body = scroll(
+                React.createElement(SettingsSectionLabel, { text: 'Theme' }),
+                React.createElement(SettingsGroup, null,
+                    [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']].map(([id, label], i) => React.createElement(React.Fragment, { key: id },
+                        i > 0 && React.createElement(SettingsDivider, null),
+                        React.createElement(SettingsSelectRow, { label, selected: settingsPrefs.theme === id, onClick: () => setPrefs({ theme: id }) })))),
+                React.createElement(SettingsSectionLabel, { text: 'Accent Color' }),
+                React.createElement("div", { style: { display: 'flex', gap: 14, padding: '2px 18px 4px' } },
+                    SETTINGS_ACCENTS.map((a) => React.createElement("button", { key: a.id, onClick: () => setPrefs({ accent: a.id }), style: { width: 30, height: 30, borderRadius: '50%', background: a.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: settingsPrefs.accent === a.id ? `0 0 0 2.5px ${ST.bg}, 0 0 0 4px ${a.color}` : 'none' } },
+                        settingsPrefs.accent === a.id && React.createElement(Icon, { name: "check", size: 13, color: "#fff" })))),
+                React.createElement(SettingsSectionLabel, { text: 'App Icon' }),
+                React.createElement("div", { style: { display: 'flex', gap: 14, padding: '2px 18px 4px' } },
+                    [['white', '#fff'], ['black', '#000']].map(([id, bg]) => React.createElement("button", { key: id, onClick: () => setPrefs({ appIcon: id }), style: { position: 'relative', width: 56, height: 56, borderRadius: 14, background: bg, border: `1px solid ${ST.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement("img", { src: "assets/brand/icon-1024.png", style: { width: 34, height: 34, objectFit: 'contain', borderRadius: 8 } }),
+                        settingsPrefs.appIcon === id && React.createElement("div", { style: { position: 'absolute', bottom: -4, right: -4, width: 18, height: 18, borderRadius: '50%', background: accentColor, border: `2px solid ${ST.bg}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "check", size: 10, color: "#fff" }))))),
+                gap(10));
+        }
+        else if (view === 'language') {
+            title = 'Language';
+            body = scroll(gap(6), React.createElement(SettingsGroup, null,
+                SETTINGS_LANGUAGES.map((l, i) => React.createElement(React.Fragment, { key: l.id },
+                    i > 0 && React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsSelectRow, { label: l.label, selected: settingsPrefs.language === l.id, onClick: () => { setPrefs({ language: l.id }); flashToast(`Language set to ${l.label}`); } })))));
+        }
+        else if (view === 'termsOfService') {
+            title = 'Terms of Service';
+            body = scroll(
+                React.createElement("div", { style: { padding: '20px 18px 0' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: ST.text, margin: 0 } }, "Terms of Service"),
+                    React.createElement("p", { style: { fontSize: 12, color: ST.sub, margin: '6px 0 18px' } }, "Last updated: May 1, 2024"),
+                    React.createElement("p", { style: { fontSize: 13.5, color: ST.text, lineHeight: 1.7, marginBottom: 14 } }, "Welcome to BookVado! These Terms of Service govern your access to and use of the BookVado app and services."),
+                    React.createElement("p", { style: { fontSize: 13.5, color: ST.text, lineHeight: 1.7, marginBottom: 14 } }, "By using our services, you agree to these terms. If you don't agree, please don't use BookVado."),
+                    React.createElement("p", { style: { fontSize: 13.5, color: ST.text, lineHeight: 1.7, marginBottom: 20 } }, "BookVado connects customers with local businesses for bookings and services. We are not responsible for the quality of services provided by businesses on our platform."),
+                    React.createElement(SettingsPrimaryButton, { label: 'Read Full Terms', onClick: () => pushSettings('fullTerms') })));
+        }
+        else if (view === 'fullTerms') {
+            title = 'Full Terms';
+            const sections = [
+                ['1. Acceptance of Terms', "By creating an account or using BookVado, you agree to be bound by these Terms of Service and our Privacy Policy."],
+                ['2. Bookings & Payments', "When you book a service, payment is processed securely through BookVado. Providers are paid after the service is completed."],
+                ['3. Cancellations', "Cancellation policies are set by individual providers and shown before you confirm a booking."],
+                ['4. Business Accounts', "Businesses on BookVado are independent providers and are solely responsible for the services they offer."],
+                ['5. Account Termination', "We may suspend or terminate accounts that violate these terms or engage in fraudulent activity."],
+            ];
+            body = scroll(pad(React.createElement(React.Fragment, null, sections.map(([h, t]) => React.createElement("div", { key: h, style: { marginTop: 18 } },
+                React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: ST.text, marginBottom: 6 } }, h),
+                React.createElement("p", { style: { fontSize: 13, color: ST.sub, lineHeight: 1.7 } }, t))))));
+        }
+        else if (view === 'aboutBookVado') {
+            title = 'About BookVado';
+            body = scroll(
+                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '26px 18px' } },
+                    React.createElement("img", { src: "assets/brand/icon-1024.png", style: { width: 64, height: 64, borderRadius: 16, objectFit: 'cover', marginBottom: 12 } }),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: ST.text, margin: 0 } }, "BookVado"),
+                    React.createElement("p", { style: { fontSize: 12.5, color: ST.sub, marginTop: 4 } }, "Version 1.0.0"),
+                    React.createElement("p", { style: { fontSize: 13, color: ST.text, textAlign: 'center', marginTop: 14, lineHeight: 1.6 } }, "The easiest way to discover, book, and enjoy amazing experiences — watch it, book it.")),
+                React.createElement(SettingsGroup, null,
+                    React.createElement(SettingsRow, { icon: 'star', label: 'Rate BookVado', onClick: () => flashToast('Thanks! Redirecting to the App Store…') }),
+                    React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { label: 'Privacy Policy', onClick: () => pushSettings('privacyPolicy') }),
+                    React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { label: 'Open Source Licenses', onClick: () => pushSettings('openSourceLicenses') })));
+        }
+        else if (view === 'privacyPolicy') {
+            title = 'Privacy Policy';
+            body = scroll(pad(React.createElement(React.Fragment, null,
+                React.createElement("p", { style: { fontSize: 12, color: ST.sub, margin: '18px 0 14px' } }, "Last updated: May 1, 2024"),
+                ["We collect information you provide directly, like your name, email, and booking details, to power your BookVado experience.",
+                    "We never sell your personal data. Payment information is processed securely and never stored in full on our servers.",
+                    "You can request a copy of your data or delete your account at any time from Settings → Account → Delete Account."].map((t, i) => React.createElement("p", { key: i, style: { fontSize: 13.5, color: ST.text, lineHeight: 1.7, marginBottom: 14 } }, t)))));
+        }
+        else if (view === 'openSourceLicenses') {
+            title = 'Open Source Licenses';
+            const libs = [['React', '18.2.0', 'MIT'], ['React DOM', '18.2.0', 'MIT'], ['Inter (Google Fonts)', '—', 'OFL 1.1'], ['Space Grotesk (Google Fonts)', '—', 'OFL 1.1']];
+            body = scroll(gap(6), React.createElement(SettingsGroup, null,
+                libs.map(([name, ver, lic], i) => React.createElement(React.Fragment, { key: name },
+                    i > 0 && React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { label: name, sub: lic, value: ver, chevron: false })))));
+        }
+        else if (view === 'logoutConfirm') {
+            title = 'Log Out';
+            body = React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 28px', textAlign: 'center' } },
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: ST.text, margin: 0 } }, "Are you sure you want to log out?"),
+                React.createElement("div", { style: { width: '100%', maxWidth: 300, marginTop: 26, display: 'flex', flexDirection: 'column', gap: 10 } },
+                    React.createElement(SettingsPrimaryButton, { label: 'Log Out', danger: true, onClick: () => { closeSettings(); logout(); } }),
+                    React.createElement(SettingsSecondaryButton, { label: 'Cancel', onClick: () => popSettings() })));
+        }
+
+        const photoSheet = settingsForm.photoSheetOpen && React.createElement("div", { onClick: () => setSForm({ photoSheetOpen: false }), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 2 } },
+            React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: ST.card, borderRadius: '20px 20px 0 0', padding: `10px 8px calc(env(safe-area-inset-bottom) + 18px)` } },
+                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: ST.border, margin: '0 auto 10px' } }),
+                [
+                    { label: 'Take Photo', onClick: () => settingsCameraInputRef.current && settingsCameraInputRef.current.click() },
+                    { label: 'Choose From Library', onClick: () => settingsPhotoInputRef.current && settingsPhotoInputRef.current.click() },
+                    { label: 'Remove Current Photo', danger: true, onClick: () => { setCustomerProfile((p) => ({ ...p, avatarPhoto: null })); setSForm({ photoSheetOpen: false }); } },
+                    { label: 'Cancel', onClick: () => setSForm({ photoSheetOpen: false }) },
+                ].map((o) => React.createElement("button", { key: o.label, onClick: o.onClick, style: { width: '100%', textAlign: 'center', padding: '13px 14px', fontSize: 14.5, color: o.danger ? '#D0304A' : ST.text, fontWeight: o.label === 'Cancel' ? 500 : 600, borderBottom: `1px solid ${ST.border}` } }, o.label))));
+
+        return React.createElement(SettingsThemeContext.Provider, { key: "settingsctx", value: { dark, ST, accent: accentColor, isRTL } },
+            React.createElement("div", { key: 'settings-' + view, dir: isRTL ? 'rtl' : 'ltr', className: settingsDir === 'fwd' ? 'avio-settings-fwd' : 'avio-settings-back', style: { position: 'absolute', inset: 0, zIndex: 15, background: ST.bg, display: 'flex', flexDirection: 'column' } },
+                React.createElement(SettingsHeader, { title, showBack, onBack: () => popSettings() }),
+                body,
+                React.createElement("input", { ref: settingsPhotoInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleSettingsPhotoFile }),
+                React.createElement("input", { ref: settingsCameraInputRef, type: "file", accept: "image/*", capture: "environment", style: { display: 'none' }, onChange: handleSettingsPhotoFile }),
+                React.createElement("input", { ref: settingsAttachInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleSettingsAttachFile }),
+                photoSheet));
+    }
     return (React.createElement("div", { style: { width: '100%', maxWidth: 480, margin: '0 auto', position: 'fixed', top: 0, bottom: 0, overflow: 'hidden', background: THEME.paper, boxShadow: '0 0 40px rgba(0,0,0,0.08)' } },
         React.createElement("input", { ref: fileInputRef, type: "file", accept: "video/*", style: { display: 'none' }, onChange: handleFileChosen }),
         tab === 'discover' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
@@ -4513,7 +5329,7 @@ function App() {
                     ? React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
                         React.createElement("button", { onClick: () => setCustomerProfileView('share'), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                             React.createElement(Icon, { name: "upload", size: 18, color: CP.text })),
-                        React.createElement("button", { onClick: () => setProfileMenuOpen(true), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement("button", { onClick: () => openSettings(), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                             React.createElement("span", { style: { fontSize: 18, color: CP.text, letterSpacing: 1 } }, "•••")))
                     : customerProfileView === 'editProfile'
                         ? React.createElement("button", { onClick: () => { setCustomerProfile({ ...customerProfileDraft }); setCustomerProfileView('main'); }, style: { fontSize: 14, fontWeight: 700, color: THEME.coral } }, "Save")
@@ -4557,7 +5373,7 @@ function App() {
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14 } },
                     React.createElement("button", { onClick: () => shareItem(item), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                         React.createElement(Icon, { name: "upload", size: 19, color: "#161616" })),
-                    React.createElement("button", { onClick: () => item.id === MY_PROVIDER_ID ? setProfileMenuOpen(true) : flashToast('More options — coming soon'), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement("button", { onClick: () => item.id === MY_PROVIDER_ID ? openSettings() : flashToast('More options — coming soon'), style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                         React.createElement("span", { style: { fontSize: 18, color: '#161616', letterSpacing: 1 } }, "•••"))));
             const avatarRow = React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: 14, padding: '14px 18px 0' } },
                 React.createElement("div", { style: { position: 'relative', flexShrink: 0 } },
@@ -5153,10 +5969,7 @@ function App() {
                             React.createElement("p", { style: { fontSize: 11, color: '#8A8A8E', marginTop: 2 } }, f.category, " · ", f.location)),
                         React.createElement("button", { onClick: () => repostDraft(f.id), style: { fontSize: 12, fontWeight: 700, color: THEME.coral, flexShrink: 0 } }, "Repost"),
                         React.createElement("button", { onClick: () => deleteDraft(f.id), style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "trash", size: 15, color: "#B5B5B8" }))))))),
-        profileMenuOpen && (React.createElement("div", { onClick: () => setProfileMenuOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 12 } },
-            React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `10px 8px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '75%', overflowY: 'auto' } },
-                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#ECECEE', margin: '0 auto 10px' } }),
-                PROFILE_MENU_ITEMS.map((item) => React.createElement("button", { key: item, onClick: () => { setProfileMenuOpen(false); if (item === 'Logout') logout(); else flashToast(`${item} — coming soon`); }, style: { width: '100%', textAlign: 'left', padding: '13px 14px', fontSize: 14, color: item === 'Logout' ? THEME.coral : '#161616', fontWeight: item === 'Logout' ? 600 : 500, borderBottom: '1px solid #ECECEE' } }, item))))),
+        settingsOpen && renderSettings(),
         bookingTarget && (() => {
             const BF = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
             const inputStyle2 = { width: '100%', border: `1px solid ${BF.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: BF.text, outline: 'none', background: '#fff', fontFamily: 'inherit' };
@@ -5499,7 +6312,7 @@ function App() {
                                         : React.createElement("div", { style: { width: 17 } }))
                         : providerDashboardTab === 'bookings'
                             ? React.createElement("button", { onClick: () => setProviderDashboardTab('calendar') }, React.createElement(Icon, { name: "calendar", size: 18, color: PD.text }))
-                            : React.createElement("button", { onClick: () => setProfileMenuOpen(true) }, React.createElement(Icon, { name: "sliders", size: 17, color: PD.text })));
+                            : React.createElement("button", { onClick: () => openSettings() }, React.createElement(Icon, { name: "sliders", size: 17, color: PD.text })));
             const tabsRow = React.createElement("div", { className: "avio-scroll", style: { flexShrink: 0, display: 'flex', gap: 20, padding: '14px 18px 0', borderBottom: `1px solid ${PD.border}`, overflowX: 'auto' } }, [{ id: 'overview', label: 'Overview' }, { id: 'bookings', label: 'Bookings' }, { id: 'services', label: 'Services' }, { id: 'hours', label: 'Schedule' }, { id: 'team', label: 'Team' }, { id: 'calendar', label: 'Calendar' }, { id: 'customerPosts', label: 'Customer Posts' }].map((t) => {
                 const active = providerDashboardTab === t.id;
                 return React.createElement("button", { key: t.id, onClick: () => { setProviderDashboardTab(t.id); if (t.id === 'hours') setScheduleView('menu'); }, style: { flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
