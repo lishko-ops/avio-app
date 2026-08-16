@@ -1874,6 +1874,31 @@ function App() {
         }
         return { available, availableToday, checked: true };
     }
+    function aiEarliestAvailability(item) {
+        const staffList = getStaffForTarget(item);
+        const services = getServicesForTarget(item);
+        const duration = (services[0] && services[0].durationMin) || 30;
+        const staffToCheck = staffList.length ? staffList : [null];
+        const now = new Date();
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+        const todayStart = aiStartOfDay(now);
+        for (let dayOffset = 0; dayOffset < 3; dayOffset++) {
+            const day = aiAddDays(todayStart, dayOffset);
+            let earliest = null;
+            for (const st of staffToCheck) {
+                let slots = generateAvailableSlots(item.id, day, duration, st);
+                if (dayOffset === 0)
+                    slots = slots.filter((s) => s.minutes >= nowMin);
+                if (slots.length > 0 && (!earliest || slots[0].minutes < earliest.minutes))
+                    earliest = slots[0];
+            }
+            if (earliest) {
+                const dayLabel = dayOffset === 0 ? 'Today' : dayOffset === 1 ? 'Tomorrow' : day.toLocaleDateString('en-US', { weekday: 'short' });
+                return { dayLabel, timeLabel: earliest.label, isToday: dayOffset === 0 };
+            }
+        }
+        return null;
+    }
     function runAiSearchFull(candidates, ctx) {
         const base = runAiSearch(candidates, ctx);
         if (!ctx.availabilityRequired)
@@ -3547,6 +3572,8 @@ function App() {
                     : aiSearchResults.map((item, i) => {
                         const badge = resultBadges[item.id];
                         const reviewCount = item.comments || 0;
+                        const isOpen = (item.openStatus || '').startsWith('Open Now') || (item.openStatus || '').startsWith('Available');
+                        const earliest = aiEarliestAvailability(item);
                         return React.createElement("button", { key: item.id, onClick: () => openBusinessProfile(item), className: "avio-results-in avio-press", style: { animationDelay: `${Math.min(i, 6) * 0.04}s`, display: 'flex', gap: 12, width: '100%', textAlign: 'left', padding: 12, borderRadius: 18, border: '1px solid #F0F0F0', background: '#fff', marginBottom: 10, boxShadow: '0 2px 10px rgba(0,0,0,0.04)' } },
                             item.image
                                 ? React.createElement("div", { style: { width: 76, height: 76, borderRadius: 14, flexShrink: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
@@ -3560,7 +3587,13 @@ function App() {
                                     React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: '#161616' } }, (item.rating || 4.6).toFixed(1)),
                                     reviewCount > 0 && React.createElement("span", { style: { fontSize: 11.5, color: '#8A8A8E' } }, `(${reviewCount})`),
                                     React.createElement("span", { style: { fontSize: 11.5, color: '#8A8A8E' } }, ` · ${item.location}`)),
-                                React.createElement("p", { style: { fontSize: 11.5, color: '#8A8A8E', marginTop: 2 } }, `${item.category} · $${item.price}`),
+                                React.createElement("p", { style: { fontSize: 11.5, color: '#8A8A8E', marginTop: 2 } }, `${item.category} · From $${item.price}`),
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 } },
+                                    React.createElement("span", { style: { width: 6, height: 6, borderRadius: '50%', background: isOpen ? THEME.coral : '#B5B5B8', flexShrink: 0 } }),
+                                    React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: isOpen ? THEME.coral : '#8A8A8E' } }, item.openStatus || (isOpen ? 'Open Now' : 'Closed'))),
+                                earliest && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 } },
+                                    React.createElement(Icon, { name: "clock", size: 11, color: THEME.coral }),
+                                    React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: '#161616' } }, `Next available: ${earliest.dayLabel} ${earliest.timeLabel}`)),
                                 badge && React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6, padding: '3px 8px', borderRadius: 10, background: badge.bg } },
                                     React.createElement("span", { style: { fontSize: 10 } }, badge.icon),
                                     React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: badge.color } }, badge.label))),
@@ -3660,16 +3693,23 @@ function App() {
             const recommendedItems = recommendedSorted.slice(0, 3);
             const recommendedSection = recommendedItems.length > 0 && React.createElement("div", { style: { marginTop: 26 } },
                 React.createElement("p", { style: { fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: '#161616', margin: '0 18px' } }, "Recommended For You"),
-                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 12, padding: '12px 18px 4px', overflowX: 'auto' } }, recommendedItems.map((item) => React.createElement("button", { key: item.id, className: "avio-press", onClick: () => openBusinessProfile(item), style: { flexShrink: 0, width: 158, textAlign: 'left', borderRadius: 18, overflow: 'hidden', border: '1px solid #F0F0F0', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
-                    React.createElement("div", { style: { position: 'relative', aspectRatio: '4 / 3', background: item.avatarColor || '#F5F5F5' } },
-                        item.image && React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } }),
-                        (item.openStatus || '').startsWith('Open Now') && React.createElement("span", { style: { position: 'absolute', top: 8, left: 8, fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 6, background: 'rgba(151,196,0,0.92)', color: '#fff' } }, "Available Today")),
-                    React.createElement("div", { style: { padding: '10px 11px 12px' } },
-                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: '#161616', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' } }, item.name),
-                        React.createElement("p", { style: { fontSize: 10.5, color: '#8A8A8E', marginTop: 2 } }, `${item.category} · ${item.distance}`),
-                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 3, marginTop: 4 } },
-                            React.createElement(Icon, { name: "star", size: 10, color: THEME.gold, fill: THEME.gold }),
-                            React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: '#161616' } }, (item.rating || 4.6).toFixed(1))))))));
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 12, padding: '12px 18px 4px', overflowX: 'auto' } }, recommendedItems.map((item) => {
+                    const earliest = aiEarliestAvailability(item);
+                    return React.createElement("button", { key: item.id, className: "avio-press", onClick: () => openBusinessProfile(item), style: { flexShrink: 0, width: 158, textAlign: 'left', borderRadius: 18, overflow: 'hidden', border: '1px solid #F0F0F0', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
+                        React.createElement("div", { style: { position: 'relative', aspectRatio: '4 / 3', background: item.avatarColor || '#F5F5F5' } },
+                            item.image && React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } }),
+                            earliest && earliest.isToday && React.createElement("span", { style: { position: 'absolute', top: 8, left: 8, fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 6, background: 'rgba(151,196,0,0.92)', color: '#fff' } }, "Available Today")),
+                        React.createElement("div", { style: { padding: '10px 11px 12px' } },
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: '#161616', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' } }, item.name),
+                            React.createElement("p", { style: { fontSize: 10.5, color: '#8A8A8E', marginTop: 2 } }, `${item.category} · ${item.distance}`),
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 3, marginTop: 4 } },
+                                React.createElement(Icon, { name: "star", size: 10, color: THEME.gold, fill: THEME.gold }),
+                                React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: '#161616' } }, (item.rating || 4.6).toFixed(1))),
+                            earliest && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 3, marginTop: 4 } },
+                                React.createElement(Icon, { name: "clock", size: 10, color: THEME.coral }),
+                                React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral } }, `${earliest.dayLabel} ${earliest.timeLabel}`))));
+                })));
+
             const trendingSection = React.createElement("div", { style: { marginTop: 26 } },
                 React.createElement("p", { style: { fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: '#161616', margin: '0 18px' } }, "Trending Searches"),
                 React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 10, padding: '12px 18px 30px', overflowX: 'auto' } }, TRENDING_CHIPS.map((t) => React.createElement("button", { key: t.label, className: "avio-pill avio-press", onClick: () => runHomeQuery(t.label), style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px 7px 7px', borderRadius: 20, background: '#fff', border: '1px solid #ECECEE' } },
