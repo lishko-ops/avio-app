@@ -545,6 +545,116 @@ function dateKey(d) {
 const MY_PROVIDER_ID = 'me-business';
 const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DEFAULT_WEEKLY_HOURS = { 0: null, 1: { start: '09:00', end: '17:00' }, 2: { start: '09:00', end: '17:00' }, 3: { start: '09:00', end: '17:00' }, 4: { start: '09:00', end: '17:00' }, 5: { start: '09:00', end: '17:00' }, 6: null };
+
+const RESTAURANT_ID = 'bella-vista-demo';
+const RESTAURANT_AREA_ICONS = { indoor: 'house', outdoor: 'globe', bar: 'store', patio: 'sparkles', rooftop: 'building', private: 'lock' };
+function makeDefaultRestaurantAreas() {
+    return [
+        { id: 'indoor', label: 'Indoor', active: true, description: 'Climate-controlled main dining room.' },
+        { id: 'outdoor', label: 'Outdoor', active: true, description: 'Open-air patio seating, weather permitting.' },
+        { id: 'bar', label: 'Bar', active: true, description: 'Bar-top seating for walk-ins and small groups.' },
+    ];
+}
+function makeDefaultRestaurantTables() {
+    return [
+        { id: 'T1', capacity: 2, minPartySize: 1, area: 'indoor', status: 'active' },
+        { id: 'T2', capacity: 2, minPartySize: 1, area: 'indoor', status: 'active' },
+        { id: 'T3', capacity: 4, minPartySize: 2, area: 'indoor', status: 'active' },
+        { id: 'T4', capacity: 4, minPartySize: 2, area: 'outdoor', status: 'active' },
+        { id: 'T5', capacity: 4, minPartySize: 2, area: 'outdoor', status: 'active' },
+        { id: 'T6', capacity: 6, minPartySize: 4, area: 'outdoor', status: 'active' },
+        { id: 'T7', capacity: 2, minPartySize: 1, area: 'bar', status: 'active' },
+        { id: 'T8', capacity: 8, minPartySize: 5, area: 'indoor', status: 'active' },
+    ];
+}
+function makeDefaultRestaurantCombinations() {
+    return [{ id: 'combo1', tableIds: ['T4', 'T5'], active: true }];
+}
+function makeDefaultRestaurantHours() {
+    return { 0: { start: '11:00', end: '21:00' }, 1: { start: '11:00', end: '22:00' }, 2: { start: '11:00', end: '22:00' }, 3: { start: '11:00', end: '22:00' }, 4: { start: '11:00', end: '22:00' }, 5: { start: '11:00', end: '23:59' }, 6: { start: '11:00', end: '23:59' } };
+}
+const DEFAULT_RESTAURANT_DURATION_RULES = [
+    { min: 1, max: 2, duration: 75 },
+    { min: 3, max: 4, duration: 90 },
+    { min: 5, max: 6, duration: 120 },
+    { min: 7, max: 20, duration: 150 },
+];
+function restaurantDurationForParty(rules, partySize) {
+    const rule = (rules || DEFAULT_RESTAURANT_DURATION_RULES).find((r) => partySize >= r.min && partySize <= r.max);
+    return rule ? rule.duration : (rules || DEFAULT_RESTAURANT_DURATION_RULES)[(rules || DEFAULT_RESTAURANT_DURATION_RULES).length - 1].duration;
+}
+function restaurantCapacityStats(restaurant) {
+    const tables = (restaurant.tables || []).filter((t) => t.status !== 'disabled');
+    const byArea = {};
+    let totalSeats = 0;
+    tables.forEach((t) => {
+        totalSeats += t.capacity;
+        byArea[t.area] = (byArea[t.area] || 0) + t.capacity;
+    });
+    return { totalTables: tables.length, totalSeats, byArea };
+}
+function restaurantCandidateTables(restaurant, area, partySize) {
+    const activeAreaIds = new Set((restaurant.areas || []).filter((a) => a.active).map((a) => a.id));
+    return (restaurant.tables || [])
+        .filter((t) => t.status === 'active' && activeAreaIds.has(t.area))
+        .filter((t) => area === 'no-preference' || t.area === area)
+        .filter((t) => t.capacity >= partySize && partySize >= (t.minPartySize || 1))
+        .sort((a, b) => a.capacity - b.capacity);
+}
+function restaurantActiveCombinations(restaurant, area, partySize) {
+    const activeAreaIds = new Set((restaurant.areas || []).filter((a) => a.active).map((a) => a.id));
+    return (restaurant.combinations || [])
+        .filter((c) => c.active)
+        .map((c) => {
+            const members = c.tableIds.map((id) => (restaurant.tables || []).find((t) => t.id === id)).filter(Boolean);
+            const capacity = members.reduce((sum, t) => sum + t.capacity, 0);
+            const memberAreas = new Set(members.map((t) => t.area));
+            return { ...c, capacity, members, singleArea: memberAreas.size === 1 ? [...memberAreas][0] : null };
+        })
+        .filter((c) => c.members.every((t) => t.status === 'active' && activeAreaIds.has(t.area)))
+        .filter((c) => area === 'no-preference' || c.singleArea === area)
+        .filter((c) => c.capacity >= partySize);
+}
+function restaurantTableFree(tableId, startMin, duration, buffer, reservations) {
+    const endWithBuffer = startMin + duration + buffer;
+    return !reservations.some((r) => r.tableIds.includes(tableId) && startMin < (r.time + r.duration + buffer) && (r.time) < endWithBuffer);
+}
+function computeRestaurantAvailability(restaurant, allReservations, opts) {
+    const { date, partySize, area, excludeReservationId } = opts;
+    const dow = new Date(date + 'T00:00:00').getDay();
+    const hours = (restaurant.hours || {})[dow];
+    if (!hours)
+        return [];
+    const duration = restaurantDurationForParty(restaurant.durationRules, partySize);
+    const buffer = restaurant.bufferMinutes != null ? restaurant.bufferMinutes : 15;
+    const interval = restaurant.intervalMinutes || 30;
+    const openMin = timeStrToMinutes(hours.start);
+    const closeMin = hours.end === '23:59' ? 24 * 60 : timeStrToMinutes(hours.end);
+    const candidateTables = restaurantCandidateTables(restaurant, area, partySize);
+    const candidateCombos = restaurantActiveCombinations(restaurant, area, partySize);
+    const activeReservations = allReservations.filter((r) => r.restaurantId === restaurant.id && r.date === date && r.status !== 'cancelled' && r.id !== excludeReservationId);
+    const results = [];
+    for (let t = openMin; t + duration <= closeMin; t += interval) {
+        let assigned = null;
+        for (const table of candidateTables) {
+            if (restaurantTableFree(table.id, t, duration, buffer, activeReservations)) {
+                assigned = { tableIds: [table.id], isCombo: false };
+                break;
+            }
+        }
+        if (!assigned) {
+            for (const combo of candidateCombos) {
+                if (combo.tableIds.every((id) => restaurantTableFree(id, t, duration, buffer, activeReservations))) {
+                    assigned = { tableIds: combo.tableIds, isCombo: true };
+                    break;
+                }
+            }
+        }
+        if (assigned)
+            results.push({ minutes: t, label: minutesToTimeLabel(t), duration, ...assigned });
+    }
+    return results;
+}
 const GENERIC_PROVIDER_HOURS = { start: '09:00', end: '19:00' };
 const DEFAULT_MY_SERVICES = [
     { id: 'ps1', name: 'Haircut', durationMinutes: 30, price: 25 },
@@ -589,6 +699,11 @@ const FEED = [
     { id: 'f7', category: 'Parties', name: 'Nova Sound DJs', location: 'Los Angeles, CA', rating: 4.8, price: 350, likes: '2.7K', comments: 95, saves: '4.1K', blurb: 'Wedding and club DJ sets with full sound and lighting rig.', verified: true, distance: '4.2 mi', openStatus: 'Available Today', hashtags: ['#dj', '#losangeles', '#nightlife'], friendsBooked: 31, avatarColor: '#6C4CFC', locationMode: 'I travel to customers' },
     { id: 'f8', category: 'Beauty', name: 'Bare Skin Makeup Co.', location: 'Phoenix, AZ', rating: 4.9, price: 130, likes: '1.5K', comments: 61, saves: '2.3K', blurb: 'Natural glam and airbrush makeup for any event.', verified: false, distance: '0.8 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#makeup', '#phoenix', '#airbrush'], friendsBooked: 11, avatarColor: '#3FA6BF', locationMode: 'I travel to customers',
         deal: { id: 'deal-f8', enabled: true, type: 'fixed', value: 25, label: '$25 OFF TODAY', activatedAt: 0, eligibleServiceIds: null } },
+    { id: RESTAURANT_ID, category: 'Restaurants', name: 'Bella Vista', location: 'Brooklyn, NY', rating: 4.8, price: 50, likes: '2.4K', comments: 128, saves: '1.9K', blurb: 'Modern Italian cuisine with handmade pasta, local ingredients and a cozy atmosphere.', verified: true, distance: '0.8 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#italian', '#brooklyn', '#datenight'], friendsBooked: 42, avatarColor: '#3B2A22', locationMode: 'At my business location',
+        businessType: 'restaurant', address: '123 Grand St, Brooklyn, NY 11249', phone: '(718) 555-0134', priceTier: '$$',
+        areas: makeDefaultRestaurantAreas(), tables: makeDefaultRestaurantTables(), combinations: makeDefaultRestaurantCombinations(),
+        hours: makeDefaultRestaurantHours(), durationRules: DEFAULT_RESTAURANT_DURATION_RULES, bufferMinutes: 15, intervalMinutes: 30, maxPartySize: 10, minAdvanceHours: 1, advanceDays: 60,
+        menu: [{ name: 'Handmade Tagliatelle', price: 24 }, { name: 'Margherita Pizza', price: 18 }, { name: 'Branzino al Forno', price: 32 }, { name: 'Burrata Caprese', price: 16 }, { name: 'Tiramisu', price: 12 }] },
 ];
 const CATEGORIES = [
     { id: 'shorts', label: 'All shorts', count: 31, icon: 'compass', color: '#2E9BFF' },
@@ -1599,6 +1714,20 @@ function App() {
     const [homeSearchOpen, setHomeSearchOpen] = useState(false);
     const [homeSearchQuery, setHomeSearchQuery] = useState('');
     const [homeQuickFilter, setHomeQuickFilter] = useState('all');
+    const [businessType, setBusinessType] = useState('service');
+    const [restaurantDashboardOpen, setRestaurantDashboardOpen] = useState(false);
+    const [restaurantDashTab, setRestaurantDashTab] = useState('overview');
+    const [restaurantReservations, setRestaurantReservations] = useState(() => loadLS('avio_restaurant_reservations', []));
+    const [tableFormDraft, setTableFormDraft] = useState(null);
+    const [comboPickerOpen, setComboPickerOpen] = useState(false);
+    const [comboPickerTables, setComboPickerTables] = useState([]);
+    const [restaurantProfileTab, setRestaurantProfileTab] = useState('overview');
+    const [rsvFlow, setRsvFlow] = useState(null);
+    const [manageReservationOpen, setManageReservationOpen] = useState(false);
+    const [rsvPickerPartySize, setRsvPickerPartySize] = useState(2);
+    const [rsvPickerDate, setRsvPickerDate] = useState(() => dateKey(new Date()));
+    const [rsvPickerArea, setRsvPickerArea] = useState('no-preference');
+    const [areaFormDraft, setAreaFormDraft] = useState(null);
     const [filterSheetOpen, setFilterSheetOpen] = useState(false);
     const [filterCat, setFilterCat] = useState('all');
     const [filterSearch, setFilterSearch] = useState('');
@@ -2639,6 +2768,242 @@ function App() {
         setBizProfileTab('videos');
         setProfileDrag({ itemId: item.id, progress: 1, dragging: false });
     }
+    function getMyRestaurant() {
+        return feed.find((f) => f.id === RESTAURANT_ID);
+    }
+    function updateMyRestaurant(patch) {
+        setFeed((prev) => prev.map((f) => f.id === RESTAURANT_ID ? { ...f, ...(typeof patch === 'function' ? patch(f) : patch) } : f));
+    }
+    function openRestaurantDashboard() {
+        setBusinessType('restaurant');
+        setRestaurantDashTab('overview');
+        setRestaurantDashboardOpen(true);
+    }
+    function closeRestaurantDashboard() {
+        setRestaurantDashboardOpen(false);
+    }
+    function saveRestaurantReservations(next) {
+        setRestaurantReservations(next);
+        saveLS('avio_restaurant_reservations', next);
+    }
+    function saveTableDraft() {
+        const d = tableFormDraft;
+        if (!d || !d.id.trim() || !d.capacity)
+            return;
+        updateMyRestaurant((r) => {
+            const exists = (r.tables || []).some((t) => t.id === d.id && t.isEditingOriginalId === undefined);
+            const tables = d.originalId
+                ? r.tables.map((t) => t.id === d.originalId ? { id: d.id.trim(), capacity: Number(d.capacity), minPartySize: Number(d.minPartySize) || 1, area: d.area, status: d.status } : t)
+                : [...r.tables, { id: d.id.trim(), capacity: Number(d.capacity), minPartySize: Number(d.minPartySize) || 1, area: d.area, status: d.status }];
+            return { tables };
+        });
+        setTableFormDraft(null);
+        flashToast(d.originalId ? 'Table updated' : 'Table added');
+    }
+    function deleteTable(tableId) {
+        updateMyRestaurant((r) => ({
+            tables: r.tables.filter((t) => t.id !== tableId),
+            combinations: (r.combinations || []).filter((c) => !c.tableIds.includes(tableId)),
+        }));
+        flashToast('Table removed');
+    }
+    function toggleCombinationActive(comboId) {
+        updateMyRestaurant((r) => ({ combinations: r.combinations.map((c) => c.id === comboId ? { ...c, active: !c.active } : c) }));
+    }
+    function deleteCombination(comboId) {
+        updateMyRestaurant((r) => ({ combinations: r.combinations.filter((c) => c.id !== comboId) }));
+    }
+    function toggleComboPickerTable(tableId) {
+        setComboPickerTables((prev) => prev.includes(tableId) ? prev.filter((id) => id !== tableId) : [...prev, tableId]);
+    }
+    function saveComboFromPicker() {
+        if (comboPickerTables.length < 2)
+            return;
+        updateMyRestaurant((r) => ({ combinations: [...(r.combinations || []), { id: 'combo' + Date.now(), tableIds: [...comboPickerTables], active: true }] }));
+        setComboPickerOpen(false);
+        setComboPickerTables([]);
+        flashToast('Combination added');
+    }
+    function toggleRestaurantAreaActive(areaId) {
+        updateMyRestaurant((r) => ({ areas: r.areas.map((a) => a.id === areaId ? { ...a, active: !a.active } : a) }));
+    }
+    function saveAreaDraft() {
+        const d = areaFormDraft;
+        if (!d || !d.label.trim())
+            return;
+        updateMyRestaurant((r) => ({
+            areas: d.originalId
+                ? r.areas.map((a) => a.id === d.originalId ? { ...a, label: d.label.trim(), description: d.description } : a)
+                : [...r.areas, { id: 'area' + Date.now(), label: d.label.trim(), description: d.description, active: true }],
+        }));
+        setAreaFormDraft(null);
+        flashToast(d.originalId ? 'Area updated' : 'Area added');
+    }
+    function deleteRestaurantArea(areaId) {
+        updateMyRestaurant((r) => ({
+            areas: r.areas.filter((a) => a.id !== areaId),
+            tables: r.tables.map((t) => t.area === areaId ? { ...t, status: 'disabled' } : t),
+        }));
+        flashToast('Area removed');
+    }
+    function updateRestaurantHours(dow, patch) {
+        updateMyRestaurant((r) => ({ hours: { ...r.hours, [dow]: patch === null ? null : { ...(r.hours[dow] || { start: '11:00', end: '21:00' }), ...patch } } }));
+    }
+    function updateRestaurantDurationRule(index, patch) {
+        updateMyRestaurant((r) => ({ durationRules: r.durationRules.map((rule, i) => i === index ? { ...rule, ...patch } : rule) }));
+    }
+    function addRestaurantDurationRule() {
+        updateMyRestaurant((r) => ({ durationRules: [...r.durationRules, { min: 1, max: 2, duration: 90 }] }));
+    }
+    function removeRestaurantDurationRule(index) {
+        updateMyRestaurant((r) => ({ durationRules: r.durationRules.filter((_, i) => i !== index) }));
+    }
+    function openReservationFlow() {
+        setRsvFlow({ stage: 'times', partySize: rsvPickerPartySize, date: rsvPickerDate, area: rsvPickerArea, time: null, duration: null, tableIds: null, isCombo: false,
+            name: customerProfile.fullName || '', phone: isPhoneLikeIdentifier(authDraft.identifier || '') ? authDraft.identifier : '', email: !isPhoneLikeIdentifier(authDraft.identifier || '') ? (authDraft.identifier || '') : '',
+            notes: '', editingId: null });
+    }
+    function closeReservationFlow() {
+        setRsvFlow(null);
+        setManageReservationOpen(false);
+    }
+    function selectReservationTime(slot) {
+        setRsvFlow((f) => ({ ...f, time: slot.minutes, duration: slot.duration, tableIds: slot.tableIds, isCombo: slot.isCombo, stage: 'review' }));
+    }
+    function confirmReservation() {
+        const f = rsvFlow;
+        const restaurant = getMyRestaurant();
+        if (!f || !restaurant || f.time == null)
+            return;
+        const fresh = computeRestaurantAvailability(restaurant, restaurantReservations, { date: f.date, partySize: f.partySize, area: f.area, excludeReservationId: f.editingId });
+        const stillValid = fresh.some((s) => s.minutes === f.time && JSON.stringify([...s.tableIds].sort()) === JSON.stringify([...f.tableIds].sort()));
+        if (!stillValid) {
+            flashToast('That time was just booked — pick another');
+            setRsvFlow((prev) => ({ ...prev, stage: 'times', time: null }));
+            return;
+        }
+        const assignedTable = restaurant.tables.find((t) => t.id === f.tableIds[0]);
+        const assignedArea = assignedTable && restaurant.areas.find((a) => a.id === assignedTable.area);
+        const areaLabel = f.area !== 'no-preference' ? (restaurant.areas.find((a) => a.id === f.area) || { label: 'No Preference' }).label : (assignedArea ? assignedArea.label : 'No Preference');
+        if (f.editingId) {
+            saveRestaurantReservations(restaurantReservations.map((r) => r.id === f.editingId ? { ...r, date: f.date, time: f.time, duration: f.duration, partySize: f.partySize, area: areaLabel, tableIds: f.tableIds, isCombo: f.isCombo, notes: f.notes } : r));
+            flashToast('Reservation updated');
+            setRsvFlow((prev) => ({ ...prev, stage: 'confirmed' }));
+            return;
+        }
+        const reservation = {
+            id: 'rsv' + Date.now(), restaurantId: RESTAURANT_ID, date: f.date, time: f.time, duration: f.duration, partySize: f.partySize,
+            area: areaLabel, tableIds: f.tableIds, isCombo: f.isCombo, name: f.name.trim(), phone: f.phone.trim(), email: f.email.trim(), notes: f.notes.trim(),
+            status: 'upcoming', confirmationCode: 'BV' + Math.random().toString(36).slice(2, 7).toUpperCase(), createdAt: Date.now(),
+        };
+        saveRestaurantReservations([...restaurantReservations, reservation]);
+        setRsvFlow((prev) => ({ ...prev, stage: 'confirmed', confirmed: reservation }));
+        flashToast('Reservation confirmed');
+    }
+    function cancelReservationById(id) {
+        saveRestaurantReservations(restaurantReservations.map((r) => r.id === id ? { ...r, status: 'cancelled' } : r));
+        flashToast('Reservation cancelled');
+    }
+    function updateReservationStatus(id, status) {
+        saveRestaurantReservations(restaurantReservations.map((r) => r.id === id ? { ...r, status } : r));
+    }
+    function startModifyReservation(reservation) {
+        setManageReservationOpen(false);
+        setRsvFlow({ stage: 'times', partySize: reservation.partySize, date: reservation.date, area: 'no-preference', time: null, duration: null, tableIds: null, isCombo: false,
+            name: reservation.name, phone: reservation.phone, email: reservation.email, notes: reservation.notes, editingId: reservation.id });
+    }
+    function renderRestaurantProfileScreen(item) {
+        const r = item;
+        const activeAreas = (r.areas || []).filter((a) => a.active);
+        const todayStr = dateKey(new Date());
+        const RP = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+        const headerBtns = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 18, right: 18, zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+            React.createElement("button", { onClick: closeBusinessProfile, style: { width: 34, height: 34, borderRadius: '50%', background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                React.createElement(Icon, { name: "arrowleft", size: 19, color: "#fff" })),
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                React.createElement("button", { onClick: () => shareItem(item), style: { width: 34, height: 34, borderRadius: '50%', background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "upload", size: 17, color: "#fff" })),
+                React.createElement("button", { onClick: () => toggleSavedShort(item.id), style: { width: 34, height: 34, borderRadius: '50%', background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "bookmark", size: 16, color: "#fff", fill: savedShorts.has(item.id) ? '#fff' : 'none' }))));
+        const hero = React.createElement("div", { style: { position: 'relative', height: 210, background: item.avatarColor || '#3B2A22', flexShrink: 0 } },
+            React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.08) 40%, rgba(0,0,0,0.6) 100%)' } }),
+            headerBtns,
+            React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 16 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 7 } },
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#fff' } }, item.name),
+                    item.verified && React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 10, color: THEME.ink }))),
+                React.createElement("p", { style: { fontSize: 13, color: 'rgba(255,255,255,0.85)', marginTop: 4 } }, r.category ? `Italian Restaurant · ${r.priceTier || '$$'}` : '')));
+        const ratingRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '14px 18px 0' } },
+            React.createElement(Icon, { name: "star", size: 14, color: THEME.gold, fill: THEME.gold }),
+            React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: RP.text } }, item.rating.toFixed(1)),
+            React.createElement("span", { style: { fontSize: 12.5, color: RP.sub } }, `(326 reviews) · ${item.openStatus}`));
+        const RESTAURANT_TABS = [{ id: 'overview', label: 'Overview' }, { id: 'menu', label: 'Menu' }, { id: 'reviews', label: 'Reviews' }, { id: 'info', label: 'Info' }];
+        const tabsRow = React.createElement("div", { style: { display: 'flex', gap: 22, padding: '18px 18px 0', borderBottom: `1px solid ${RP.border}` } }, RESTAURANT_TABS.map((t) => {
+            const active = restaurantProfileTab === t.id;
+            return React.createElement("button", { key: t.id, onClick: () => setRestaurantProfileTab(t.id), style: { paddingBottom: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 } },
+                React.createElement("span", { style: { fontSize: 13, fontWeight: active ? 700 : 500, color: active ? RP.text : RP.sub } }, t.label),
+                React.createElement("div", { style: { width: active ? 20 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
+        }));
+        const partySizeOptions = Array.from({ length: r.maxPartySize || 10 }, (_, i) => i + 1);
+        const reservationCard = React.createElement("div", { style: { margin: '18px 18px 0', padding: 16, borderRadius: 20, border: `1px solid ${RP.border}`, boxShadow: '0 4px 16px rgba(0,0,0,0.05)' } },
+            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15.5, color: RP.text, margin: 0 } }, "Make a Reservation"),
+            React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 12 } },
+                React.createElement("div", { style: { flex: 1 } },
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: RP.sub, textTransform: 'uppercase' } }, "Party Size"),
+                    React.createElement("select", { value: rsvPickerPartySize, onChange: (e) => setRsvPickerPartySize(Number(e.target.value)), style: { width: '100%', marginTop: 5, padding: '10px 10px', borderRadius: 12, border: `1px solid ${RP.border}`, fontSize: 13, fontWeight: 600, color: RP.text, background: '#FAFAFA' } },
+                        partySizeOptions.map((n) => React.createElement("option", { key: n, value: n }, n === (r.maxPartySize || 10) ? `${n}+ Guests` : `${n} Guest${n === 1 ? '' : 's'}`)))),
+                React.createElement("div", { style: { flex: 1 } },
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: RP.sub, textTransform: 'uppercase' } }, "Date"),
+                    React.createElement("input", { type: "date", value: rsvPickerDate, min: todayStr, onChange: (e) => setRsvPickerDate(e.target.value), style: { width: '100%', marginTop: 5, padding: '9px 8px', borderRadius: 12, border: `1px solid ${RP.border}`, fontSize: 12.5, fontWeight: 600, color: RP.text, background: '#FAFAFA' } }))),
+            React.createElement("div", { style: { marginTop: 12 } },
+                React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: RP.sub, textTransform: 'uppercase' } }, "Seating"),
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, marginTop: 6, overflowX: 'auto' } },
+                    [{ id: 'no-preference', label: 'No Preference' }, ...activeAreas].map((a) => {
+                        const active = rsvPickerArea === a.id;
+                        return React.createElement("button", { key: a.id, className: "avio-pill", onClick: () => setRsvPickerArea(a.id), style: { flexShrink: 0, padding: '7px 13px', borderRadius: 14, background: active ? 'rgba(151,196,0,0.12)' : '#F5F5F5', border: `1px solid ${active ? THEME.coral : '#F0F0F0'}` } },
+                            React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: active ? THEME.coral : '#484848' } }, a.label));
+                    }))),
+            React.createElement("button", { className: "avio-press", onClick: openReservationFlow, style: { width: '100%', marginTop: 16, padding: '14px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Find a Table"));
+        const aboutSection = React.createElement("div", { style: { padding: '20px 18px 0' } },
+            React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: RP.text, margin: 0 } }, "About"),
+            React.createElement("p", { style: { fontSize: 12.5, color: RP.sub, marginTop: 6, lineHeight: 1.5 } }, item.blurb),
+            React.createElement("p", { style: { fontSize: 12, color: RP.sub, marginTop: 10 } }, r.address));
+        const menuSection = React.createElement("div", { style: { padding: '18px 18px 0' } },
+            (r.menu || []).map((m, i, arr) => React.createElement("div", { key: m.name, style: { display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: i < arr.length - 1 ? `1px solid ${RP.border}` : 'none' } },
+                React.createElement("span", { style: { fontSize: 13.5, color: RP.text, fontWeight: 500 } }, m.name),
+                React.createElement("span", { style: { fontSize: 13.5, color: RP.text, fontWeight: 700 } }, `$${m.price}`))));
+        const SAMPLE_REVIEWS = [
+            { name: 'Jordan M.', rating: 5, text: 'Best pasta in Brooklyn, hands down. The tagliatelle was perfect and service was warm without being slow.' },
+            { name: 'Casey R.', rating: 5, text: 'Cozy date-night spot. We sat outdoors and the patio heaters made it comfortable even in fall.' },
+            { name: 'Alex P.', rating: 4, text: 'Great food, a bit loud on weekends. Would still come back for the branzino.' },
+        ];
+        const reviewsSection = React.createElement("div", { style: { padding: '18px 18px 0' } },
+            SAMPLE_REVIEWS.map((rv, i, arr) => React.createElement("div", { key: rv.name, style: { padding: '12px 0', borderBottom: i < arr.length - 1 ? `1px solid ${RP.border}` : 'none' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: RP.text } }, rv.name),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 3 } }, React.createElement(Icon, { name: "star", size: 11, color: THEME.gold, fill: THEME.gold }), React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: RP.text } }, rv.rating.toFixed(1)))),
+                React.createElement("p", { style: { fontSize: 12.5, color: RP.sub, marginTop: 5, lineHeight: 1.45 } }, rv.text))));
+        const infoSection = React.createElement("div", { style: { padding: '18px 18px 0' } },
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0' } }, React.createElement(Icon, { name: "mappin", size: 15, color: RP.sub }), React.createElement("span", { style: { fontSize: 13, color: RP.text } }, r.address)),
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0' } }, React.createElement(Icon, { name: "phone", size: 15, color: RP.sub }), React.createElement("span", { style: { fontSize: 13, color: RP.text } }, r.phone)),
+            React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 10 } },
+                React.createElement("button", { onClick: () => flashToast('Opening directions to ' + r.address), style: { flex: 1, padding: '11px 0', borderRadius: 14, border: `1px solid ${RP.border}`, fontSize: 12.5, fontWeight: 700, color: RP.text } }, "Directions"),
+                React.createElement("button", { onClick: () => flashToast('Calling ' + r.name), style: { flex: 1, padding: '11px 0', borderRadius: 14, border: `1px solid ${RP.border}`, fontSize: 12.5, fontWeight: 700, color: RP.text } }, "Call")),
+            React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: RP.sub, textTransform: 'uppercase', marginTop: 20 } }, "Hours"),
+            [0, 1, 2, 3, 4, 5, 6].map((dow) => {
+                const h = (r.hours || {})[dow];
+                return React.createElement("div", { key: dow, style: { display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${RP.border}` } },
+                    React.createElement("span", { style: { fontSize: 12.5, color: RP.text, fontWeight: dow === new Date().getDay() ? 700 : 500 } }, WEEKDAY_LABELS[dow]),
+                    React.createElement("span", { style: { fontSize: 12.5, color: h ? RP.text : RP.sub } }, h ? `${hhmmToLabel(h.start)} – ${h.end === '23:59' ? '12:00 AM' : hhmmToLabel(h.end)}` : 'Closed'));
+            }));
+        const tabBody = restaurantProfileTab === 'overview' ? React.createElement(React.Fragment, null, reservationCard, aboutSection)
+            : restaurantProfileTab === 'menu' ? menuSection
+                : restaurantProfileTab === 'reviews' ? reviewsSection
+                    : infoSection;
+        return React.createElement("div", { key: "restaurantProfile", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 11, display: 'flex', flexDirection: 'column' } },
+            React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto' } },
+                hero, ratingRow, tabsRow, tabBody, React.createElement("div", { style: { height: 40 } })));
+    }
     function openMyBusinessProfile() {
         setProviderDashboardOpen(false);
         openBusinessProfile({
@@ -3193,7 +3558,7 @@ function App() {
                         React.createElement("source", { src: item.video + '.mp4', type: "video/mp4" }))
                     : item.image
                     ? React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
-                    : React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#000' } });
+                    : React.createElement("div", { style: { position: 'absolute', inset: 0, background: item.avatarColor || '#000' } });
             const scrim = React.createElement("div", { style: { position: 'absolute', inset: 0, pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.38) 22%, rgba(0,0,0,0.4) 45%, rgba(0,0,0,0.68) 72%, rgba(0,0,0,0.94) 100%)' } });
             const modeSwitcher = hasBusinessProfile && React.createElement("button", { onClick: () => setModeSwitcherOpen(true), style: { display: 'flex', alignItems: 'center', gap: 5, border: `1px solid ${THEME.coral}`, borderRadius: 14, padding: '5px 10px', background: 'rgba(0,0,0,0.35)', flexShrink: 0 } },
                 React.createElement(Icon, { name: "store", size: 12, color: THEME.coral }),
@@ -4172,7 +4537,8 @@ function App() {
                                 React.createElement("p", { style: { fontSize: 11.5, color: '#8A8A8E', marginTop: 2 } }, m.sub)),
                             active && React.createElement("div", { style: { width: 20, height: 20, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 11, color: "#fff" })));
                     }))))),
-        businessProfileTarget && (() => {
+        businessProfileTarget && businessProfileTarget.businessType === 'restaurant' && renderRestaurantProfileScreen(businessProfileTarget),
+        businessProfileTarget && businessProfileTarget.businessType !== 'restaurant' && (() => {
             const item = businessProfileTarget;
             const P = profileDrag && profileDrag.itemId === item.id ? profileDrag : { progress: 1, dragging: false };
             const followed = followedIds.has(item.id);
@@ -4284,6 +4650,436 @@ function App() {
             const isOwnProfile = item.id === MY_PROVIDER_ID;
             return React.createElement("div", { key: "bizprofile", onTouchStart: handleBizPanelTouchStart, onTouchMove: handleBizPanelTouchMove, onTouchEnd: handleBizPanelTouchEnd, style: { position: 'absolute', inset: 0, zIndex: isOwnProfile ? 2 : 11, background: '#fff', overflowY: 'auto', paddingBottom: isOwnProfile ? 'calc(env(safe-area-inset-bottom) + 90px)' : 40, transform: `translateX(${(1 - P.progress) * 100}%)`, transition: P.dragging ? 'none' : 'transform 0.28s cubic-bezier(0.22,1,0.36,1)' } },
                 header, avatarRow, statsRow, bioRow, actionRow, profileDealBadge, tabsRow, activeSection);
+        })(),
+        rsvFlow && (() => {
+            const f = rsvFlow;
+            const restaurant = getMyRestaurant();
+            if (!restaurant)
+                return null;
+            const RF = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const dateObj = new Date(f.date + 'T00:00:00');
+            const dateLabel = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            const areaLabel = f.area === 'no-preference' ? 'No Preference' : (restaurant.areas.find((a) => a.id === f.area) || { label: f.area }).label;
+            const fieldRow = (label, value, onChange) => React.createElement("div", { key: label, style: { marginBottom: 12 } },
+                React.createElement("label", { style: { fontSize: 11, fontWeight: 700, color: RF.sub, textTransform: 'uppercase', display: 'block', marginBottom: 6 } }, label),
+                React.createElement("input", { value: value, onChange: (e) => onChange(e.target.value), style: { width: '100%', border: `1px solid ${RF.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 13, color: RF.text, outline: 'none' } }));
+            const header = (title) => React.createElement("div", { style: { flexShrink: 0, position: 'relative', padding: `calc(env(safe-area-inset-top) + 14px) 50px 14px`, textAlign: 'center', borderBottom: `1px solid ${RF.border}` } },
+                React.createElement("button", { onClick: () => f.stage === 'review' ? setRsvFlow((prev) => ({ ...prev, stage: 'times' })) : closeReservationFlow(), style: { position: 'absolute', left: 16, top: 'calc(env(safe-area-inset-top) + 12px)', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "arrowleft", size: 20, color: "#161616" })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: '#161616', margin: 0 } }, title),
+                React.createElement("button", { onClick: closeReservationFlow, style: { position: 'absolute', right: 16, top: 'calc(env(safe-area-inset-top) + 12px)', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "x", size: 20, color: "#161616" })));
+            if (f.stage === 'times') {
+                const slots = computeRestaurantAvailability(restaurant, restaurantReservations, { date: f.date, partySize: f.partySize, area: f.area, excludeReservationId: f.editingId });
+                const durationForParty = restaurantDurationForParty(restaurant.durationRules, f.partySize);
+                const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '18px 18px 20px' } },
+                    React.createElement("p", { style: { fontSize: 12.5, color: RF.sub } }, `${dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${f.partySize} People · ${areaLabel}`),
+                    slots.length === 0
+                        ? React.createElement("div", { style: { textAlign: 'center', padding: '60px 20px' } },
+                            React.createElement(Icon, { name: "clock", size: 24, color: '#B5B5B8' }),
+                            React.createElement("p", { style: { fontSize: 13, color: RF.sub, marginTop: 12 } }, "No tables available for this party size and date."),
+                            React.createElement("p", { style: { fontSize: 12, color: RF.sub, marginTop: 4 } }, "Try a different time, date, or seating area."))
+                        : React.createElement("div", { style: { marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 } }, slots.map((s) => React.createElement("button", { key: s.minutes, onClick: () => selectReservationTime(s), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: 16, border: `1px solid ${RF.border}`, background: '#fff' } },
+                            React.createElement("span", { style: { fontSize: 14.5, fontWeight: 700, color: RF.text } }, s.label),
+                            React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral, background: 'rgba(151,196,0,0.12)', borderRadius: 10, padding: '4px 10px' } }, "Available")))),
+                    slots.length > 0 && React.createElement("p", { style: { fontSize: 11.5, color: RF.sub, textAlign: 'center', marginTop: 18 } }, `Reservation duration: ${durationForParty} min`),
+                    React.createElement("p", { style: { fontSize: 11, color: RF.sub, textAlign: 'center', marginTop: 6 } }, "No payment required"));
+                return React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 12, display: 'flex', flexDirection: 'column' } }, header("Select a Time"), body);
+            }
+            if (f.stage === 'review') {
+                const ready = f.name.trim() && f.phone.trim() && f.email.trim();
+                const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '18px 18px 20px' } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, background: '#FAFAFA' } },
+                        React.createElement("div", { style: { width: 52, height: 52, borderRadius: 14, background: restaurant.avatarColor || '#3B2A22', flexShrink: 0 } }),
+                        React.createElement("div", null,
+                            React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: RF.text, margin: 0 } }, restaurant.name),
+                            React.createElement("p", { style: { fontSize: 11.5, color: RF.sub, marginTop: 2 } }, restaurant.address))),
+                    React.createElement("div", { style: { marginTop: 16, display: 'flex', flexDirection: 'column', gap: 2 } }, [
+                        ['calendar', dateLabel],
+                        ['clock', minutesToTimeLabel(f.time)],
+                        ['users', `${f.partySize} Guest${f.partySize === 1 ? '' : 's'}`],
+                        ['mappin', areaLabel === 'No Preference' ? 'No Seating Preference' : `${areaLabel} Seating`],
+                    ].map(([icon, label]) => React.createElement("div", { key: icon, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 4px' } },
+                        React.createElement(Icon, { name: icon, size: 16, color: RF.sub }),
+                        React.createElement("span", { style: { fontSize: 13.5, color: RF.text, fontWeight: 600 } }, label)))),
+                    React.createElement("p", { style: { fontSize: 12, color: RF.sub, padding: '4px 4px' } }, `Reservation duration: ${f.duration} minutes`),
+                    React.createElement("div", { style: { marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                        React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral, margin: 0 } }, "No payment required"),
+                        React.createElement("p", { style: { fontSize: 11, color: '#5c7a2b', marginTop: 2 } }, "You can modify or cancel later.")),
+                    React.createElement("div", { style: { marginTop: 18 } },
+                        fieldRow("Full Name", f.name, (v) => setRsvFlow((p) => ({ ...p, name: v }))),
+                        fieldRow("Phone Number", f.phone, (v) => setRsvFlow((p) => ({ ...p, phone: v }))),
+                        fieldRow("Email", f.email, (v) => setRsvFlow((p) => ({ ...p, email: v }))),
+                        React.createElement("label", { style: { fontSize: 11, fontWeight: 700, color: RF.sub, textTransform: 'uppercase', display: 'block', marginTop: 12, marginBottom: 6 } }, "Special Requests (Optional)"),
+                        React.createElement("textarea", { value: f.notes, onChange: (e) => setRsvFlow((p) => ({ ...p, notes: e.target.value })), rows: 3, placeholder: "e.g. Birthday dinner, high chair needed", style: { width: '100%', border: `1px solid ${RF.border}`, borderRadius: 12, padding: 12, fontSize: 13, color: RF.text, outline: 'none', resize: 'none', fontFamily: 'inherit' } })),
+                    React.createElement("button", { className: "avio-press", disabled: !ready, onClick: confirmReservation, style: { width: '100%', marginTop: 20, padding: '15px 0', borderRadius: 26, background: ready ? THEME.coral : '#EDEDED', color: ready ? '#fff' : '#B5B5B8', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Confirm Reservation"));
+                return React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 12, display: 'flex', flexDirection: 'column' } }, header("Review Reservation"), body);
+            }
+            const confirmed = f.confirmed || restaurantReservations.find((r) => r.id === f.editingId) || [...restaurantReservations].reverse().find((r) => r.status !== 'cancelled');
+            if (!confirmed)
+                return null;
+            const confDateObj = new Date(confirmed.date + 'T00:00:00');
+            const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 24px calc(env(safe-area-inset-bottom) + 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' } },
+                React.createElement("div", { style: { position: 'relative', width: 96, height: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'calc(env(safe-area-inset-top) + 32px)' } },
+                    [[-36, -30, 0], [34, -22, 0.15], [-30, 28, 0.3], [38, 26, 0.45], [0, -44, 0.6], [4, 44, 0.75]].map(([dx, dy, delay], i) => React.createElement("span", { key: i, className: "avio-check-pop", style: { position: 'absolute', left: `calc(50% + ${dx}px)`, top: `calc(50% + ${dy}px)`, width: i % 2 ? 5 : 3, height: i % 2 ? 5 : 3, borderRadius: '50%', background: THEME.coral, opacity: 0.55, animationDelay: `${delay}s`, animationFillMode: 'backwards' } })),
+                    React.createElement("div", { className: "avio-check-pop avio-ring-pulse", style: { width: 68, height: 68, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: "check", size: 28, color: "#fff" }))),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: RF.text, marginTop: 18 } }, "Reservation Confirmed!"),
+                React.createElement("p", { style: { fontSize: 13, color: RF.sub, marginTop: 6 } }, "We look forward to seeing you."),
+                React.createElement("div", { style: { width: '100%', background: '#FAFAFA', borderRadius: 18, padding: 16, marginTop: 22, textAlign: 'left' } },
+                    React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: RF.text, margin: 0 } }, restaurant.name),
+                    React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 } }, [
+                        ['calendar', `${confDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${minutesToTimeLabel(confirmed.time)}`],
+                        ['users', `${confirmed.partySize} Guests`],
+                        ['mappin', `${confirmed.area} Seating`],
+                        ['tag', `Confirmation #${confirmed.confirmationCode}`],
+                    ].map(([icon, label]) => React.createElement("div", { key: icon, style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                        React.createElement(Icon, { name: icon, size: 13, color: RF.sub }),
+                        React.createElement("span", { style: { fontSize: 12.5, color: RF.text, fontWeight: 600 } }, label))))),
+                React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', width: '100%', marginTop: 22 } },
+                    [['send', 'Directions', () => flashToast('Opening directions to ' + restaurant.address)], ['phone', 'Call', () => flashToast('Calling ' + restaurant.name)], ['calendar', 'Add to Calendar', () => flashToast('Added to calendar')], ['message', 'Message', () => flashToast('Messaging ' + restaurant.name)]].map(([icon, label, onClick]) => React.createElement("button", { key: label, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 } },
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: icon, size: 17, color: RF.text })),
+                        React.createElement("span", { style: { fontSize: 10, color: RF.sub } }, label)))),
+                React.createElement("button", { onClick: () => setManageReservationOpen(true), style: { width: '100%', height: 48, borderRadius: 24, border: `1px solid ${RF.border}`, color: RF.text, fontWeight: 700, fontSize: 13.5, marginTop: 24 } }, "Manage Reservation"),
+                React.createElement("button", { onClick: closeReservationFlow, style: { width: '100%', height: 54, borderRadius: 27, background: THEME.coral, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', marginTop: 10 } }, "Done"));
+            return React.createElement(React.Fragment, null,
+                React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 12, display: 'flex', flexDirection: 'column' } }, body),
+                manageReservationOpen && React.createElement("div", { onClick: () => setManageReservationOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
+                    React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', marginBottom: 14 } }, "Manage Reservation"),
+                        React.createElement("button", { onClick: () => startModifyReservation(confirmed), style: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '13px 4px', borderBottom: '1px solid #F5F5F5' } },
+                            React.createElement(Icon, { name: "pencil", size: 16, color: "#161616" }), React.createElement("span", { style: { fontSize: 14, color: '#161616', fontWeight: 600 } }, "Modify Reservation")),
+                        React.createElement("button", { onClick: () => { cancelReservationById(confirmed.id); setManageReservationOpen(false); closeReservationFlow(); }, style: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '13px 4px' } },
+                            React.createElement(Icon, { name: "trash", size: 16, color: "#D0304A" }), React.createElement("span", { style: { fontSize: 14, color: '#D0304A', fontWeight: 600 } }, "Cancel Reservation")))));
+        })(),
+        restaurantDashboardOpen && (() => {
+            const restaurant = getMyRestaurant();
+            if (!restaurant)
+                return null;
+            const RD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const stats = restaurantCapacityStats(restaurant);
+            const RESTAURANT_TABS = [
+                { id: 'overview', label: 'Overview' },
+                { id: 'basic', label: 'Basic Info' },
+                { id: 'tables', label: 'Tables & Capacity' },
+                { id: 'areas', label: 'Seating Areas' },
+                { id: 'hours', label: 'Operating Hours' },
+                { id: 'settings', label: 'Reservation Settings' },
+                { id: 'reservations', label: 'Reservations' },
+            ];
+            const tabHeader = React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 14px) 18px 0`, borderBottom: `1px solid ${RD.border}` } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("button", { onClick: closeRestaurantDashboard, style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: "#161616" })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: '#161616', margin: 0 } }, restaurant.name, " · Restaurant"),
+                    React.createElement("button", { onClick: () => { setRestaurantDashboardOpen(false); openBusinessProfile(restaurant); }, style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "eye", size: 19, color: "#161616" }))),
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 20, overflowX: 'auto', marginTop: 14 } }, RESTAURANT_TABS.map((t) => {
+                    const active = restaurantDashTab === t.id;
+                    return React.createElement("button", { key: t.id, onClick: () => setRestaurantDashTab(t.id), style: { flexShrink: 0, paddingBottom: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 } },
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: active ? 700 : 500, color: active ? RD.text : RD.sub, whiteSpace: 'nowrap' } }, t.label),
+                        React.createElement("div", { style: { width: active ? '100%' : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
+                })));
+            let dashBody = null;
+            if (restaurantDashTab === 'overview') {
+                const todayStr = dateKey(new Date());
+                const upcomingWindow = new Date();
+                upcomingWindow.setDate(upcomingWindow.getDate() + 7);
+                const notCancelled = restaurantReservations.filter((rr) => rr.status !== 'cancelled');
+                const todayReservations = notCancelled.filter((rr) => rr.date === todayStr);
+                const upcomingReservations = notCancelled.filter((rr) => rr.date > todayStr && new Date(rr.date + 'T00:00:00') <= upcomingWindow);
+                const noShowsToday = todayReservations.filter((rr) => rr.status === 'no-show').length;
+                const utilization = todayReservations.length === 0 ? 0 : Math.min(100, Math.round((todayReservations.reduce((sum, rr) => sum + rr.partySize, 0) / Math.max(1, stats.totalSeats)) * 100));
+                const OVERVIEW_CARDS = [
+                    { id: 'tables', icon: 'grid', label: 'Tables', detail: `${stats.totalTables} tables · ${stats.totalSeats} seats`, tab: 'tables' },
+                    { id: 'areas', icon: 'house', label: 'Areas', detail: `${(restaurant.areas || []).filter((a) => a.active).length} active areas`, tab: 'areas' },
+                    { id: 'hours', icon: 'clock', label: 'Hours', detail: 'Set operating and reservation hours', tab: 'hours' },
+                    { id: 'settings', icon: 'sliders', label: 'Reservation Settings', detail: `${restaurant.durationRules.length} duration rules · ${restaurant.bufferMinutes}min buffer`, tab: 'settings' },
+                ];
+                const cardsGrid = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 } }, OVERVIEW_CARDS.map((c) => React.createElement("div", { key: c.id, style: { border: `1px solid ${RD.border}`, borderRadius: 16, padding: 14 } },
+                    React.createElement(Icon, { name: c.icon, size: 16, color: THEME.coral }),
+                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: RD.text, margin: '10px 0 0' } }, c.label),
+                    React.createElement("p", { style: { fontSize: 10.5, color: RD.sub, marginTop: 4, lineHeight: 1.4 } }, c.detail),
+                    React.createElement("button", { onClick: () => setRestaurantDashTab(c.tab), style: { marginTop: 10, fontSize: 11.5, fontWeight: 700, color: THEME.coral } }, "Manage"))));
+                const summaryRow = React.createElement("div", { style: { marginTop: 24, border: `1px solid ${RD.border}`, borderRadius: 16, padding: 14 } },
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: RD.sub, textTransform: 'uppercase', margin: 0 } }, "Today's Summary"),
+                    React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12 } }, [
+                        { value: todayReservations.length, label: 'Reservations' },
+                        { value: upcomingReservations.length, label: 'Upcoming (7d)' },
+                        { value: `${utilization}%`, label: 'Utilization' },
+                        { value: noShowsToday, label: 'No Shows' },
+                    ].map((s) => React.createElement("div", { key: s.label, style: { textAlign: 'center' } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: RD.text, margin: 0 } }, s.value),
+                        React.createElement("p", { style: { fontSize: 10.5, color: RD.sub, marginTop: 2 } }, s.label)))));
+                const checklist = [
+                    { label: 'Basic Info', done: !!restaurant.name },
+                    { label: 'Tables & Capacity', done: (restaurant.tables || []).length > 0 },
+                    { label: 'Seating Areas', done: (restaurant.areas || []).length > 0 },
+                    { label: 'Operating Hours', done: Object.values(restaurant.hours || {}).some((h) => h) },
+                    { label: 'Reservation Settings', done: (restaurant.durationRules || []).length > 0 },
+                ];
+                const allDone = checklist.every((c) => c.done);
+                const checklistCard = React.createElement("div", { style: { marginTop: 22, border: `1px solid ${RD.border}`, borderRadius: 16, padding: 14 } },
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: THEME.coral, textTransform: 'uppercase', margin: 0 } }, "Setup Checklist"),
+                    React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 } }, checklist.map((c) => React.createElement("div", { key: c.label, style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                        React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', background: c.done ? THEME.coral : '#EDEDED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, c.done && React.createElement(Icon, { name: "check", size: 10, color: "#fff" })),
+                        React.createElement("span", { style: { fontSize: 12.5, color: RD.text, fontWeight: 500 } }, c.label)))),
+                    allDone && React.createElement("div", { style: { marginTop: 16, padding: 12, borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                        React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral, margin: 0 } }, "Your restaurant is ready to accept reservations! 🎉"),
+                        React.createElement("button", { onClick: () => { setRestaurantDashboardOpen(false); openBusinessProfile(restaurant); }, style: { marginTop: 10, width: '100%', padding: '11px 0', borderRadius: 20, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 12.5 } }, "View Your Profile")));
+                dashBody = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px calc(env(safe-area-inset-bottom) + 40px)' } }, cardsGrid, summaryRow, checklistCard);
+            }
+            else if (restaurantDashTab === 'basic') {
+                const fieldBlock = (label, value, onChange, placeholder) => React.createElement("div", { key: label, style: { marginTop: 14 } },
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: RD.sub, textTransform: 'uppercase' } }, label),
+                    React.createElement("input", { value: value, placeholder: placeholder || '', onChange: (e) => onChange(e.target.value), style: { width: '100%', marginTop: 6, padding: '11px 12px', borderRadius: 12, border: `1px solid ${RD.border}`, fontSize: 13, color: RD.text, outline: 'none' } }));
+                const typeToggle = React.createElement("div", { style: { marginTop: 18, padding: 4, borderRadius: 16, background: '#F5F5F5', display: 'flex', gap: 4 } },
+                    [{ id: 'service', label: 'Services' }, { id: 'restaurant', label: 'Restaurant' }].map((opt) => {
+                        const active = businessType === opt.id;
+                        return React.createElement("button", { key: opt.id, onClick: () => { setBusinessType(opt.id); if (opt.id === 'service') { closeRestaurantDashboard(); flashToast('Switched to Services mode'); } }, style: { flex: 1, padding: '10px 0', borderRadius: 12, background: active ? '#fff' : 'transparent', boxShadow: active ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', fontSize: 12.5, fontWeight: 700, color: active ? RD.text : RD.sub } }, opt.label);
+                    }));
+                dashBody = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px calc(env(safe-area-inset-bottom) + 40px)' } },
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: RD.sub, textTransform: 'uppercase', marginTop: 18 } }, "Business Type"),
+                    typeToggle,
+                    fieldBlock("Restaurant Name", restaurant.name, (v) => updateMyRestaurant({ name: v })),
+                    fieldBlock("Price Tier", restaurant.priceTier || '$$', (v) => updateMyRestaurant({ priceTier: v }), "$, $$, $$$"),
+                    fieldBlock("Address", restaurant.address || '', (v) => updateMyRestaurant({ address: v })),
+                    fieldBlock("Phone", restaurant.phone || '', (v) => updateMyRestaurant({ phone: v })),
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: RD.sub, textTransform: 'uppercase', display: 'block', marginTop: 14 } }, "Description"),
+                    React.createElement("textarea", { value: restaurant.blurb || '', onChange: (e) => updateMyRestaurant({ blurb: e.target.value }), rows: 3, style: { width: '100%', marginTop: 6, padding: 12, borderRadius: 12, border: `1px solid ${RD.border}`, fontSize: 13, color: RD.text, outline: 'none', resize: 'none', fontFamily: 'inherit' } }));
+            }
+            else if (restaurantDashTab === 'tables') {
+                const AREA_COLORS = ['#97C400', '#2E9BFF', '#F5A623', '#6C4CFC', '#F5134F'];
+                const areaColorMap = {};
+                (restaurant.areas || []).forEach((a, i) => { areaColorMap[a.id] = AREA_COLORS[i % AREA_COLORS.length]; });
+                const statCards = [
+                    { label: 'Total Tables', value: stats.totalTables },
+                    { label: 'Total Seats', value: stats.totalSeats },
+                    ...(restaurant.areas || []).map((a) => ({ label: `${a.label} Seats`, value: stats.byArea[a.id] || 0 })),
+                ];
+                const statsRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 10, overflowX: 'auto', marginTop: 16, paddingBottom: 4 } }, statCards.map((s) => React.createElement("div", { key: s.label, style: { flexShrink: 0, minWidth: 88, border: `1px solid ${RD.border}`, borderRadius: 14, padding: '12px 14px', textAlign: 'center' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: RD.text, margin: 0 } }, s.value),
+                    React.createElement("p", { style: { fontSize: 10, color: RD.sub, marginTop: 3, whiteSpace: 'nowrap' } }, s.label))));
+                const headerRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 22 } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: RD.text, margin: 0 } }, "Tables"),
+                    React.createElement("button", { onClick: () => setTableFormDraft({ id: '', capacity: '2', minPartySize: '1', area: (restaurant.areas[0] || {}).id || 'indoor', status: 'active', originalId: null }), style: { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 16, background: THEME.coral } },
+                        React.createElement(Icon, { name: "plus", size: 13, color: "#fff" }), React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#fff" } }, "Add Table")));
+                const tableRows = React.createElement("div", { style: { marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 } }, (restaurant.tables || []).length === 0
+                    ? React.createElement("p", { style: { fontSize: 12.5, color: RD.sub, textAlign: 'center', padding: '20px 0' } }, "No tables yet — add your first table.")
+                    : (restaurant.tables || []).map((t) => {
+                        const areaObj = (restaurant.areas || []).find((a) => a.id === t.area);
+                        return React.createElement("div", { key: t.id, style: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', border: `1px solid ${RD.border}`, borderRadius: 14 } },
+                            React.createElement("div", { style: { width: 36, height: 36, borderRadius: 10, background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: RD.text } }, t.id)),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: RD.text, margin: 0 } }, `${t.capacity} seats · Min ${t.minPartySize}`),
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 } },
+                                    React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: areaColorMap[t.area] || RD.sub, background: '#F5F5F5', borderRadius: 8, padding: '2px 8px' } }, areaObj ? areaObj.label : t.area),
+                                    React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: t.status === 'active' ? THEME.coral : '#B5B5B8', background: t.status === 'active' ? 'rgba(151,196,0,0.12)' : '#F5F5F5', borderRadius: 8, padding: '2px 8px' } }, t.status === 'active' ? 'Active' : t.status === 'disabled' ? 'Disabled' : 'Unavailable'))),
+                            React.createElement("button", { onClick: () => setTableFormDraft({ id: t.id, capacity: String(t.capacity), minPartySize: String(t.minPartySize), area: t.area, status: t.status, originalId: t.id }), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "pencil", size: 14, color: RD.sub })),
+                            React.createElement("button", { onClick: () => deleteTable(t.id), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "trash", size: 14, color: "#D0304A" })));
+                    }));
+                const comboSection = React.createElement("div", { style: { marginTop: 26 } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: RD.text, margin: 0 } }, "Table Combinations"),
+                        React.createElement("button", { onClick: () => { setComboPickerTables([]); setComboPickerOpen(true); }, style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, "+ Add Combination")),
+                    (restaurant.combinations || []).length === 0
+                        ? React.createElement("p", { style: { fontSize: 12, color: RD.sub, marginTop: 8 } }, "Combine tables for larger parties.")
+                        : React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 } }, (restaurant.combinations || []).map((c) => React.createElement("div", { key: c.id, style: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: `1px solid ${RD.border}`, borderRadius: 12 } },
+                            React.createElement("span", { style: { flex: 1, fontSize: 12.5, fontWeight: 700, color: RD.text } }, `${c.tableIds.join(' + ')} = ${c.tableIds.reduce((sum, id) => sum + ((restaurant.tables.find((t) => t.id === id) || {}).capacity || 0), 0)} seats`),
+                            React.createElement("button", { onClick: () => toggleCombinationActive(c.id), style: { width: 36, height: 20, borderRadius: 10, background: c.active ? THEME.coral : '#EDEDED', position: 'relative', flexShrink: 0 } }, React.createElement("div", { style: { position: 'absolute', top: 2, left: c.active ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' } })),
+                            React.createElement("button", { onClick: () => deleteCombination(c.id), style: { width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 13, color: RD.sub }))))));
+                const circumference = 2 * Math.PI * 45;
+                let cumulative = 0;
+                const donutSegments = (restaurant.areas || []).map((a) => {
+                    const seats = stats.byArea[a.id] || 0;
+                    const pct = stats.totalSeats > 0 ? seats / stats.totalSeats : 0;
+                    const dash = pct * circumference;
+                    const seg = React.createElement("circle", { key: a.id, cx: 50, cy: 50, r: 45, fill: "none", stroke: areaColorMap[a.id], strokeWidth: 12, strokeDasharray: `${dash} ${circumference - dash}`, strokeDashoffset: -cumulative, transform: "rotate(-90 50 50)" });
+                    cumulative += dash;
+                    return seg;
+                });
+                const donutSection = stats.totalSeats > 0 && React.createElement("div", { style: { marginTop: 26, border: `1px solid ${RD.border}`, borderRadius: 16, padding: 16 } },
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: RD.sub, textTransform: 'uppercase', margin: 0 } }, "Capacity Overview"),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 18, marginTop: 12 } },
+                        React.createElement("svg", { width: 100, height: 100, viewBox: "0 0 100 100" }, donutSegments,
+                            React.createElement("text", { x: 50, y: 47, textAnchor: "middle", fontSize: 16, fontWeight: 700, fill: RD.text }, stats.totalSeats),
+                            React.createElement("text", { x: 50, y: 61, textAnchor: "middle", fontSize: 8, fill: RD.sub }, "seats")),
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, (restaurant.areas || []).map((a) => {
+                            const seats = stats.byArea[a.id] || 0;
+                            const pct = stats.totalSeats > 0 ? Math.round(seats / stats.totalSeats * 100) : 0;
+                            return React.createElement("div", { key: a.id, style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                                React.createElement("span", { style: { width: 8, height: 8, borderRadius: '50%', background: areaColorMap[a.id], flexShrink: 0 } }),
+                                React.createElement("span", { style: { fontSize: 11.5, color: RD.text, fontWeight: 600 } }, `${a.label} · ${seats} (${pct}%)`));
+                        }))));
+                dashBody = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px calc(env(safe-area-inset-bottom) + 40px)' } }, statsRow, headerRow, tableRows, comboSection, donutSection);
+            }
+            else if (restaurantDashTab === 'areas') {
+                const headerRowA = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: RD.text, margin: 0 } }, "Seating Areas"),
+                    React.createElement("button", { onClick: () => setAreaFormDraft({ label: '', description: '', originalId: null }), style: { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 16, background: THEME.coral } },
+                        React.createElement(Icon, { name: "plus", size: 13, color: "#fff" }), React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#fff" } }, "Add Area")));
+                const areaRows = React.createElement("div", { style: { marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 } }, (restaurant.areas || []).map((a) => {
+                    const tablesInArea = (restaurant.tables || []).filter((t) => t.area === a.id);
+                    const capacity = tablesInArea.reduce((sum, t) => sum + t.capacity, 0);
+                    return React.createElement("div", { key: a.id, style: { padding: 14, border: `1px solid ${RD.border}`, borderRadius: 16 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                            React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: RD.text } }, a.label),
+                            React.createElement("button", { onClick: () => toggleRestaurantAreaActive(a.id), style: { width: 40, height: 22, borderRadius: 11, background: a.active ? THEME.coral : '#EDEDED', position: 'relative', flexShrink: 0 } }, React.createElement("div", { style: { position: 'absolute', top: 2, left: a.active ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' } }))),
+                        React.createElement("p", { style: { fontSize: 11.5, color: RD.sub, marginTop: 4 } }, a.description || 'No description'),
+                        React.createElement("p", { style: { fontSize: 11.5, color: RD.sub, marginTop: 6 } }, `${tablesInArea.length} tables · ${capacity} seats`),
+                        !a.active && React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: '#D0304A', marginTop: 6 } }, "Closed — not shown to customers"),
+                        React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 10 } },
+                            React.createElement("button", { onClick: () => setAreaFormDraft({ label: a.label, description: a.description || '', originalId: a.id }), style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral } }, "Edit"),
+                            React.createElement("button", { onClick: () => deleteRestaurantArea(a.id), style: { fontSize: 11.5, fontWeight: 700, color: '#D0304A' } }, "Delete")));
+                }));
+                dashBody = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px calc(env(safe-area-inset-bottom) + 40px)' } }, headerRowA, areaRows);
+            }
+            else if (restaurantDashTab === 'hours') {
+                const hourRows = React.createElement("div", { style: { marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 } }, [0, 1, 2, 3, 4, 5, 6].map((dow) => {
+                    const h = (restaurant.hours || {})[dow];
+                    return React.createElement("div", { key: dow, style: { padding: 14, border: `1px solid ${RD.border}`, borderRadius: 14 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                            React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: RD.text } }, WEEKDAY_LABELS[dow]),
+                            React.createElement("button", { onClick: () => updateRestaurantHours(dow, h ? null : { start: '11:00', end: '21:00' }), style: { width: 40, height: 22, borderRadius: 11, background: h ? THEME.coral : '#EDEDED', position: 'relative', flexShrink: 0 } }, React.createElement("div", { style: { position: 'absolute', top: 2, left: h ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' } }))),
+                        h
+                            ? React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 } },
+                                React.createElement("input", { type: "time", value: h.start, onChange: (e) => updateRestaurantHours(dow, { start: e.target.value }), style: { flex: 1, padding: '9px 8px', borderRadius: 10, border: `1px solid ${RD.border}`, fontSize: 12.5, color: RD.text } }),
+                                React.createElement("span", { style: { fontSize: 12, color: RD.sub } }, "to"),
+                                React.createElement("input", { type: "time", value: h.end === '23:59' ? '23:59' : h.end, onChange: (e) => updateRestaurantHours(dow, { end: e.target.value }), style: { flex: 1, padding: '9px 8px', borderRadius: 10, border: `1px solid ${RD.border}`, fontSize: 12.5, color: RD.text } }))
+                            : React.createElement("p", { style: { fontSize: 12, color: RD.sub, marginTop: 6 } }, "Closed"));
+                }));
+                dashBody = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px calc(env(safe-area-inset-bottom) + 40px)' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: RD.text, marginTop: 18 } }, "Operating Hours"),
+                    React.createElement("p", { style: { fontSize: 11.5, color: RD.sub, marginTop: 4 } }, "Reservations are only offered within these hours."),
+                    hourRows);
+            }
+            else if (restaurantDashTab === 'settings') {
+                const numField = (label, value, onChange, suffix) => React.createElement("div", { key: label, style: { marginTop: 14 } },
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: RD.sub, textTransform: 'uppercase' } }, label),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 } },
+                        React.createElement("input", { type: "number", value: value, onChange: (e) => onChange(Number(e.target.value)), style: { flex: 1, padding: '10px 12px', borderRadius: 12, border: `1px solid ${RD.border}`, fontSize: 13, color: RD.text, outline: 'none' } }),
+                        suffix && React.createElement("span", { style: { fontSize: 12, color: RD.sub } }, suffix)));
+                const ruleRows = React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 } }, restaurant.durationRules.map((rule, i) => React.createElement("div", { key: i, style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', border: `1px solid ${RD.border}`, borderRadius: 12 } },
+                    React.createElement("input", { type: "number", value: rule.min, onChange: (e) => updateRestaurantDurationRule(i, { min: Number(e.target.value) }), style: { width: 42, padding: '7px 6px', borderRadius: 8, border: `1px solid ${RD.border}`, fontSize: 12, textAlign: 'center' } }),
+                    React.createElement("span", { style: { fontSize: 11, color: RD.sub } }, "–"),
+                    React.createElement("input", { type: "number", value: rule.max, onChange: (e) => updateRestaurantDurationRule(i, { max: Number(e.target.value) }), style: { width: 42, padding: '7px 6px', borderRadius: 8, border: `1px solid ${RD.border}`, fontSize: 12, textAlign: 'center' } }),
+                    React.createElement("span", { style: { fontSize: 11, color: RD.sub } }, "guests →"),
+                    React.createElement("input", { type: "number", value: rule.duration, onChange: (e) => updateRestaurantDurationRule(i, { duration: Number(e.target.value) }), style: { width: 52, padding: '7px 6px', borderRadius: 8, border: `1px solid ${RD.border}`, fontSize: 12, textAlign: 'center' } }),
+                    React.createElement("span", { style: { fontSize: 11, color: RD.sub, flex: 1 } }, "min"),
+                    React.createElement("button", { onClick: () => removeRestaurantDurationRule(i), style: { width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 12, color: RD.sub })))));
+                dashBody = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px calc(env(safe-area-inset-bottom) + 40px)' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: RD.text, marginTop: 18 } }, "Reservation Duration"),
+                    React.createElement("p", { style: { fontSize: 11.5, color: RD.sub, marginTop: 4 } }, "Table hold time based on party size."),
+                    ruleRows,
+                    React.createElement("button", { onClick: addRestaurantDurationRule, style: { marginTop: 8, fontSize: 12, fontWeight: 700, color: THEME.coral } }, "+ Add duration rule"),
+                    numField("Buffer Time", restaurant.bufferMinutes, (v) => updateMyRestaurant({ bufferMinutes: v }), "min between reservations"),
+                    React.createElement("div", { style: { marginTop: 14 } },
+                        React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: RD.sub, textTransform: 'uppercase' } }, "Reservation Interval"),
+                        React.createElement("select", { value: restaurant.intervalMinutes, onChange: (e) => updateMyRestaurant({ intervalMinutes: Number(e.target.value) }), style: { width: '100%', marginTop: 6, padding: '10px 12px', borderRadius: 12, border: `1px solid ${RD.border}`, fontSize: 13, color: RD.text } },
+                            [15, 30, 45, 60].map((n) => React.createElement("option", { key: n, value: n }, `Every ${n} minutes`)))),
+                    numField("Maximum Party Size", restaurant.maxPartySize, (v) => updateMyRestaurant({ maxPartySize: v })),
+                    numField("Minimum Advance Notice", restaurant.minAdvanceHours, (v) => updateMyRestaurant({ minAdvanceHours: v }), "hours ahead"),
+                    numField("Advance Booking Window", restaurant.advanceDays, (v) => updateMyRestaurant({ advanceDays: v }), "days ahead"));
+            }
+            else if (restaurantDashTab === 'reservations') {
+                const RSV_STATUS_META = {
+                    upcoming: { label: 'Upcoming', bg: 'rgba(46,155,255,0.12)', color: '#2E9BFF' },
+                    arrived: { label: 'Arrived', bg: 'rgba(245,166,35,0.14)', color: THEME.gold },
+                    seated: { label: 'Seated', bg: 'rgba(151,196,0,0.12)', color: THEME.coral },
+                    completed: { label: 'Completed', bg: '#F0F0F0', color: RD.sub },
+                    'no-show': { label: 'No Show', bg: 'rgba(208,48,74,0.1)', color: '#D0304A' },
+                    cancelled: { label: 'Cancelled', bg: '#F0F0F0', color: RD.sub },
+                };
+                const RSV_NEXT_ACTIONS = {
+                    upcoming: [['arrived', 'Arrived'], ['no-show', 'No Show'], ['cancelled', 'Cancel']],
+                    arrived: [['seated', 'Seat'], ['cancelled', 'Cancel']],
+                    seated: [['completed', 'Completed']],
+                    completed: [], 'no-show': [], cancelled: [],
+                };
+                const todayStr = dateKey(new Date());
+                const todayList = restaurantReservations.filter((rr) => rr.date === todayStr).sort((a, b) => a.time - b.time);
+                const upcomingList = restaurantReservations.filter((rr) => rr.date > todayStr && rr.status !== 'cancelled').sort((a, b) => a.date === b.date ? a.time - b.time : (a.date < b.date ? -1 : 1));
+                const renderRsvRow = (rr) => {
+                    const meta = RSV_STATUS_META[rr.status] || RSV_STATUS_META.upcoming;
+                    const actions = RSV_NEXT_ACTIONS[rr.status] || [];
+                    return React.createElement("div", { key: rr.id, style: { padding: 14, border: `1px solid ${RD.border}`, borderRadius: 14, marginBottom: 10 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                            React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: RD.text } }, minutesToTimeLabel(rr.time)),
+                            React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: meta.color, background: meta.bg, borderRadius: 8, padding: '3px 9px' } }, meta.label)),
+                        React.createElement("p", { style: { fontSize: 12.5, color: RD.text, marginTop: 4, fontWeight: 600 } }, `${rr.name || 'Guest'} · ${rr.partySize} guests`),
+                        React.createElement("p", { style: { fontSize: 11.5, color: RD.sub, marginTop: 2 } }, `${rr.area} · ${rr.tableIds.join(' + ')}`),
+                        actions.length > 0 && React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' } }, actions.map(([status, label]) => React.createElement("button", { key: status, onClick: () => status === 'cancelled' ? cancelReservationById(rr.id) : updateReservationStatus(rr.id, status), style: { padding: '7px 12px', borderRadius: 12, border: `1px solid ${RD.border}`, fontSize: 11.5, fontWeight: 700, color: status === 'no-show' || status === 'cancelled' ? '#D0304A' : RD.text } }, label))));
+                };
+                dashBody = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px calc(env(safe-area-inset-bottom) + 40px)' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: RD.text, marginTop: 18 } }, "Today"),
+                    todayList.length === 0
+                        ? React.createElement("p", { style: { fontSize: 12.5, color: RD.sub, marginTop: 10 } }, "No reservations today yet.")
+                        : React.createElement("div", { style: { marginTop: 10 } }, todayList.map(renderRsvRow)),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: RD.text, marginTop: 22 } }, "Upcoming"),
+                    upcomingList.length === 0
+                        ? React.createElement("p", { style: { fontSize: 12.5, color: RD.sub, marginTop: 10 } }, "No upcoming reservations.")
+                        : React.createElement("div", { style: { marginTop: 10 } }, upcomingList.map(renderRsvRow)));
+            }
+            return React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 8, display: 'flex', flexDirection: 'column' } }, tabHeader, dashBody);
+        })(),
+        tableFormDraft && (() => {
+            const restaurant = getMyRestaurant();
+            if (!restaurant)
+                return null;
+            const d = tableFormDraft;
+            const TD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            return React.createElement("div", { onClick: () => setTableFormDraft(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '80vh', overflowY: 'auto' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', marginBottom: 14 } }, d.originalId ? "Edit Table" : "Add Table"),
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase' } }, "Table Name / Number"),
+                    React.createElement("input", { value: d.id, onChange: (e) => setTableFormDraft((prev) => ({ ...prev, id: e.target.value })), placeholder: "T1", style: { width: '100%', marginTop: 6, padding: '11px 12px', borderRadius: 12, border: `1px solid ${TD.border}`, fontSize: 13, color: TD.text, outline: 'none' } }),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 12 } },
+                        React.createElement("div", { style: { flex: 1 } },
+                            React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase' } }, "Capacity"),
+                            React.createElement("input", { type: "number", value: d.capacity, onChange: (e) => setTableFormDraft((prev) => ({ ...prev, capacity: e.target.value })), style: { width: '100%', marginTop: 6, padding: '11px 12px', borderRadius: 12, border: `1px solid ${TD.border}`, fontSize: 13, color: TD.text, outline: 'none' } })),
+                        React.createElement("div", { style: { flex: 1 } },
+                            React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase' } }, "Min Party Size"),
+                            React.createElement("input", { type: "number", value: d.minPartySize, onChange: (e) => setTableFormDraft((prev) => ({ ...prev, minPartySize: e.target.value })), style: { width: '100%', marginTop: 6, padding: '11px 12px', borderRadius: 12, border: `1px solid ${TD.border}`, fontSize: 13, color: TD.text, outline: 'none' } }))),
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase', display: 'block', marginTop: 12 } }, "Seating Area"),
+                    React.createElement("select", { value: d.area, onChange: (e) => setTableFormDraft((prev) => ({ ...prev, area: e.target.value })), style: { width: '100%', marginTop: 6, padding: '11px 12px', borderRadius: 12, border: `1px solid ${TD.border}`, fontSize: 13, color: TD.text } },
+                        (restaurant.areas || []).map((a) => React.createElement("option", { key: a.id, value: a.id }, a.label))),
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase', display: 'block', marginTop: 12 } }, "Status"),
+                    React.createElement("select", { value: d.status, onChange: (e) => setTableFormDraft((prev) => ({ ...prev, status: e.target.value })), style: { width: '100%', marginTop: 6, padding: '11px 12px', borderRadius: 12, border: `1px solid ${TD.border}`, fontSize: 13, color: TD.text } },
+                        [['active', 'Active'], ['unavailable', 'Temporarily Unavailable'], ['disabled', 'Disabled']].map(([v, l]) => React.createElement("option", { key: v, value: v }, l))),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 18 } },
+                        React.createElement("button", { onClick: () => setTableFormDraft(null), style: { flex: 1, padding: '13px 0', borderRadius: 22, border: `1px solid ${TD.border}`, fontWeight: 700, fontSize: 13.5, color: TD.text } }, "Cancel"),
+                        React.createElement("button", { onClick: saveTableDraft, style: { flex: 1, padding: '13px 0', borderRadius: 22, background: THEME.coral, fontWeight: 700, fontSize: 13.5, color: '#fff' } }, "Save"))));
+        })(),
+        areaFormDraft && (() => {
+            const d = areaFormDraft;
+            const TD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            return React.createElement("div", { onClick: () => setAreaFormDraft(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', marginBottom: 14 } }, d.originalId ? "Edit Area" : "Add Area"),
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase' } }, "Name"),
+                    React.createElement("input", { value: d.label, onChange: (e) => setAreaFormDraft((prev) => ({ ...prev, label: e.target.value })), placeholder: "Rooftop", style: { width: '100%', marginTop: 6, padding: '11px 12px', borderRadius: 12, border: `1px solid ${TD.border}`, fontSize: 13, color: TD.text, outline: 'none' } }),
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase', display: 'block', marginTop: 12 } }, "Description"),
+                    React.createElement("textarea", { value: d.description, onChange: (e) => setAreaFormDraft((prev) => ({ ...prev, description: e.target.value })), rows: 2, style: { width: '100%', marginTop: 6, padding: 12, borderRadius: 12, border: `1px solid ${TD.border}`, fontSize: 13, color: TD.text, outline: 'none', resize: 'none', fontFamily: 'inherit' } }),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 18 } },
+                        React.createElement("button", { onClick: () => setAreaFormDraft(null), style: { flex: 1, padding: '13px 0', borderRadius: 22, border: `1px solid ${TD.border}`, fontWeight: 700, fontSize: 13.5, color: TD.text } }, "Cancel"),
+                        React.createElement("button", { onClick: saveAreaDraft, style: { flex: 1, padding: '13px 0', borderRadius: 22, background: THEME.coral, fontWeight: 700, fontSize: 13.5, color: '#fff' } }, "Save"))));
+        })(),
+        comboPickerOpen && (() => {
+            const restaurant = getMyRestaurant();
+            if (!restaurant)
+                return null;
+            const TD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            return React.createElement("div", { onClick: () => setComboPickerOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: '#fff', borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '80vh', overflowY: 'auto' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', marginBottom: 6 } }, "Combine Tables"),
+                    React.createElement("p", { style: { fontSize: 12, color: TD.sub, marginBottom: 14 } }, "Select 2 or more tables to combine for larger parties."),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, restaurant.tables.map((t) => {
+                        const checked = comboPickerTables.includes(t.id);
+                        return React.createElement("button", { key: t.id, onClick: () => toggleComboPickerTable(t.id), style: { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 12, border: `1px solid ${checked ? THEME.coral : TD.border}`, background: checked ? 'rgba(151,196,0,0.08)' : '#fff' } },
+                            React.createElement("div", { style: { width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${checked ? THEME.coral : '#D1D1D6'}`, background: checked ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, checked && React.createElement(Icon, { name: "check", size: 12, color: "#fff" })),
+                            React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: TD.text } }, `${t.id} · ${t.capacity} seats`));
+                    })),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 18 } },
+                        React.createElement("button", { onClick: () => setComboPickerOpen(false), style: { flex: 1, padding: '13px 0', borderRadius: 22, border: `1px solid ${TD.border}`, fontWeight: 700, fontSize: 13.5, color: TD.text } }, "Cancel"),
+                        React.createElement("button", { disabled: comboPickerTables.length < 2, onClick: saveComboFromPicker, style: { flex: 1, padding: '13px 0', borderRadius: 22, background: comboPickerTables.length < 2 ? '#EDEDED' : THEME.coral, fontWeight: 700, fontSize: 13.5, color: comboPickerTables.length < 2 ? '#B5B5B8' : '#fff' } }, "Add Combination"))));
         })(),
         postViewer && (() => {
             const { item, posts, index } = postViewer;
@@ -4758,6 +5554,7 @@ function App() {
                     { id: 'schedule', label: 'Schedule', onClick: () => { setProviderDashboardTab('hours'); setScheduleView('menu'); } },
                     { id: 'addService', label: 'Add Service', onClick: () => { setProviderDashboardTab('services'); setServiceFormDraft({ id: null, name: '', durationMinutes: '', price: '' }); } },
                     { id: 'promote', label: 'Promote', onClick: () => setPromoDraftOpen(true) },
+                    { id: 'restaurant', label: businessType === 'restaurant' ? 'Restaurant' : 'Set Up Restaurant', onClick: openRestaurantDashboard },
                 ];
                 const quickActionsBar = React.createElement("div", { style: { marginTop: 26 } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
