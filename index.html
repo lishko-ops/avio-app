@@ -1343,8 +1343,6 @@ function App() {
     }, [authView, resendSeconds]);
     const [tab, setTab] = useState('discover');
     const [activeCat, setActiveCat] = useState(null);
-    const [shortsSearchOpen, setShortsSearchOpen] = useState(false);
-    const [shortsQuery, setShortsQuery] = useState('');
     const [shortsFeedTab, setShortsFeedTab] = useState('forYou');
     const [feed, setFeed] = useState(FEED);
     const shortsHydratedRef = useRef(false);
@@ -1597,6 +1595,10 @@ function App() {
     const [aiLocationStatus, setAiLocationStatus] = useState('unset');
     const [aiLocationPickerOpen, setAiLocationPickerOpen] = useState(false);
     const [aiManualCity, setAiManualCity] = useState('');
+    const [aiVoiceListening, setAiVoiceListening] = useState(false);
+    const [homeSearchOpen, setHomeSearchOpen] = useState(false);
+    const [homeSearchQuery, setHomeSearchQuery] = useState('');
+    const [homeQuickFilter, setHomeQuickFilter] = useState('all');
     const [filterSheetOpen, setFilterSheetOpen] = useState(false);
     const [filterCat, setFilterCat] = useState('all');
     const [filterSearch, setFilterSearch] = useState('');
@@ -1771,6 +1773,10 @@ function App() {
             return next;
         });
     }
+    function clearAiRecentSearches() {
+        setAiRecentSearches([]);
+        saveLS('avio_ai_recent_searches', []);
+    }
     function closeAiSearch() {
         setExploreSearchOpen(false);
         setExploreSearchQuery('');
@@ -1785,6 +1791,45 @@ function App() {
         setAiQueryDraft('');
         setAiIsSearching(false);
         setAiLocationPickerOpen(false);
+    }
+    function openHomeSearch() {
+        setHomeSearchQuery('');
+        setHomeQuickFilter('all');
+        setHomeSearchOpen(true);
+    }
+    function closeHomeSearch() {
+        setHomeSearchOpen(false);
+        setHomeSearchQuery('');
+    }
+    function closeAllSearch() {
+        closeAiSearch();
+        setHomeSearchOpen(false);
+    }
+    function openAiSearchFromHome(query) {
+        setAiSearchStage('home');
+        setExploreSearchOpen(true);
+        if (query && query.trim())
+            submitAiSearch(query);
+    }
+    function startVoiceSearch() {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) {
+            flashToast("Voice search isn't supported on this device");
+            return;
+        }
+        const recognition = new SR();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        recognition.onstart = () => setAiVoiceListening(true);
+        recognition.onend = () => setAiVoiceListening(false);
+        recognition.onerror = () => { setAiVoiceListening(false); flashToast("Couldn't hear that — try typing instead"); };
+        recognition.onresult = (e) => {
+            const text = e.results[0][0].transcript;
+            setExploreSearchQuery(text);
+            submitAiSearch(text);
+        };
+        recognition.start();
     }
     function aiCandidateAvailability(item, ctx) {
         if (!ctx.availabilityRequired)
@@ -1979,15 +2024,12 @@ function App() {
     const aiSearchHasDeals = useMemo(() => aiSearchCandidates.some((i) => i.deal && i.deal.enabled), [aiSearchCandidates]);
     const filteredFeed = useMemo(() => {
         let result = shortsFeedTab === 'following' ? feed.filter((item) => followedIds.has(item.id)) : feed;
-        const q = shortsQuery.trim().toLowerCase();
-        if (q)
-            result = result.filter((item) => item.name.toLowerCase().includes(q) || item.category.toLowerCase().includes(q) || item.location.toLowerCase().includes(q));
         const LOCATION_TOGGLE_MODES = { inStudio: 'At my business location', atHome: 'I travel to customers', mobile: 'I travel to customers' };
         const activeLocationModes = new Set(Object.keys(LOCATION_TOGGLE_MODES).filter((id) => filterToggles.has(id)).map((id) => LOCATION_TOGGLE_MODES[id]));
         if (activeLocationModes.size > 0)
             result = result.filter((item) => !item.locationMode || item.locationMode === 'All' || activeLocationModes.has(item.locationMode));
         return result;
-    }, [shortsQuery, shortsFeedTab, followedIds, feed, filterToggles]);
+    }, [shortsFeedTab, followedIds, feed, filterToggles]);
     useEffect(() => {
         if (tab !== 'discover')
             return;
@@ -3106,10 +3148,10 @@ function App() {
                             React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
                             React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: '#fff', transition: 'width 0.2s' } }));
                     })),
-                React.createElement("button", { onClick: () => setShortsSearchOpen(true), style: { display: 'flex', paddingBottom: 4 } },
+                React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', paddingBottom: 4 } },
                     React.createElement(Icon, { name: "search", size: 20, color: "#fff" }))),
             React.createElement(Icon, { name: shortsFeedTab === 'following' ? "user" : "search", size: 22, color: THEME.mutedDark }),
-            React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : `No shorts match "${shortsQuery}"`),
+            React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : "No shorts to show right now"),
             shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('forYou'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Browse Thrillz"))) : filteredFeed.map((item) => {
             const liked = likedIds.has(item.id);
             const followed = followedIds.has(item.id);
@@ -3214,12 +3256,8 @@ function App() {
                 arrowOverlay, burstOverlay);
         }))),
         tab === 'discover' && !customerProfileOpen && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 18px)', right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 } },
-            shortsSearchOpen ? (React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, padding: '6px 10px', width: 190 } },
-            React.createElement(Icon, { name: "search", size: 14, color: THEME.mutedDark }),
-            React.createElement("input", { autoFocus: true, value: shortsQuery, onChange: (e) => setShortsQuery(e.target.value), placeholder: "Search shorts", style: { flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: THEME.textDark, fontSize: 13 } }),
-            React.createElement("button", { onClick: () => { setShortsSearchOpen(false); setShortsQuery(''); }, style: { color: THEME.mutedDark, display: 'flex' } },
-                React.createElement(Icon, { name: "x", size: 14, color: THEME.mutedDark })))) : (React.createElement("button", { onClick: () => setShortsSearchOpen(true), style: { display: 'flex' } },
-                React.createElement(Icon, { name: "search", size: 20, color: "#fff" }))))),
+            React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex' } },
+                React.createElement(Icon, { name: "search", size: 20, color: "#fff" })))),
         tab === 'browse' && (React.createElement("div", { style: { position: 'absolute', inset: 0, overflowY: 'auto', background: '#fff', padding: `calc(env(safe-area-inset-top) + 16px) 0 calc(env(safe-area-inset-bottom) + 90px)` } }, (() => {
             const categories = CATEGORIES.filter((c) => c.id !== 'shorts');
             const quickFilters = [
@@ -3315,7 +3353,7 @@ function App() {
             const grid = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '16px 18px 0' } }, cards);
             return React.createElement(React.Fragment, null, header, searchBar, quickFilterRow, dealsSection, categoryRow, categoryDots, tabsRow, grid);
         })())),
-        tab === 'browse' && exploreSearchOpen && (React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 5, display: 'flex', flexDirection: 'column' } }, (() => {
+        (tab === 'browse' || tab === 'discover') && exploreSearchOpen && (React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 6, display: 'flex', flexDirection: 'column' } }, (() => {
             const stage = aiSearchStage;
             const ctx = aiSearchContext;
             const canSubmit = exploreSearchQuery.trim().length > 0 && !aiIsSearching;
@@ -3323,7 +3361,9 @@ function App() {
                 React.createElement("button", { onClick: closeAiSearch, style: { position: 'absolute', left: 16, top: 'calc(env(safe-area-inset-top) + 12px)', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                     React.createElement(Icon, { name: "arrowleft", size: 20, color: "#161616" })),
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: '#161616', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 } }, "AI Search", React.createElement("span", null, "✨")),
-                stage === 'home' && React.createElement("p", { style: { fontSize: 12, color: '#8A8A8E', marginTop: 4 } }, "Find anything. We'll find the best for you."));
+                stage === 'home' && React.createElement("p", { style: { fontSize: 12, color: '#8A8A8E', marginTop: 4 } }, "Find anything. We'll find the best for you."),
+                React.createElement("button", { onClick: closeAllSearch, style: { position: 'absolute', right: 16, top: 'calc(env(safe-area-inset-top) + 12px)', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "x", size: 20, color: "#161616" })));
             const dateLabel = { null: 'Any time', today: 'Today', tomorrow: 'Tomorrow', weekend: 'This weekend' }[aiSearchFilters.date];
             const priceLabel = aiSearchFilters.maxPrice ? `Under $${aiSearchFilters.maxPrice}` : 'Any price';
             const locationLabel = aiSearchFilters.location ? (aiSearchFilters.location === 'current' ? 'Near me' : aiCapitalize(aiSearchFilters.location)) : 'Add location';
@@ -3334,7 +3374,9 @@ function App() {
             const searchBox = React.createElement("div", { style: { margin: '18px 18px 0', padding: 16, borderRadius: 24, background: '#fff', border: `1.5px solid ${exploreSearchQuery ? THEME.coral : '#ECECEE'}`, boxShadow: '0 6px 24px rgba(0,0,0,0.05)' } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
                     React.createElement("input", { autoFocus: stage === 'home', value: exploreSearchQuery, onChange: (e) => setExploreSearchQuery(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter')
-                            submitAiSearch(); }, placeholder: "What are you looking for?", style: { flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: '#161616', fontSize: 15.5, fontWeight: 500 } }),
+                            submitAiSearch(); }, placeholder: "Describe what you need…", style: { flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: '#161616', fontSize: 15.5, fontWeight: 500 } }),
+                    React.createElement("button", { className: "avio-press", onClick: startVoiceSearch, style: { width: 34, height: 34, borderRadius: '50%', background: aiVoiceListening ? THEME.coral : '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, animation: aiVoiceListening ? 'avioRingPulse 1.1s ease infinite' : 'none' } },
+                        React.createElement("span", { style: { fontSize: 15, filter: aiVoiceListening ? 'grayscale(0) brightness(10)' : 'none' } }, "🎙")),
                     React.createElement("button", { className: "avio-press", disabled: !canSubmit, onClick: () => submitAiSearch(), style: { width: 40, height: 40, borderRadius: '50%', background: canSubmit ? THEME.coral : '#EDEDED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: aiIsSearching ? 0.7 : 1 } },
                         aiIsSearching
                             ? React.createElement("div", { className: "avio-skeleton", style: { width: 16, height: 16, borderRadius: '50%', background: 'rgba(255,255,255,0.6)' } })
@@ -3531,6 +3573,111 @@ function App() {
                 React.createElement("button", { disabled: !aiRefineDraft.trim(), onClick: () => submitAiRefine(), style: { width: 38, height: 38, borderRadius: '50%', background: aiRefineDraft.trim() ? THEME.coral : '#F0F0F0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                     React.createElement("span", { style: { color: aiRefineDraft.trim() ? '#fff' : '#B5B5B8', fontSize: 15, fontWeight: 700 } }, "↑")));
             return React.createElement(React.Fragment, null, header, resultsHeader, resultsList, followUpBar);
+        })())),
+        tab === 'discover' && homeSearchOpen && (React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 5, display: 'flex', flexDirection: 'column' } }, (() => {
+            const QUICK_CHIPS = [
+                { id: 'all', label: 'All', icon: 'grid' },
+                { id: 'nearby', label: 'Nearby', icon: 'mappin' },
+                { id: 'topRated', label: 'Top Rated', icon: 'star' },
+                { id: 'openNow', label: 'Open Now', icon: 'clock' },
+                { id: 'price', label: 'Price', icon: 'tag' },
+            ];
+            const POPULAR_CATEGORIES = [
+                { id: 'hairbeauty', label: 'Hair & Beauty', icon: 'scissors', query: 'hair and beauty' },
+                { id: 'fitness', label: 'Fitness', icon: 'heart', query: 'fitness training' },
+                { id: 'auto', label: 'Auto', icon: 'car', query: 'auto detailing' },
+                { id: 'wellness', label: 'Wellness', icon: 'sparkles', query: 'wellness' },
+                { id: 'events', label: 'Events', icon: 'calendar', query: 'event planning' },
+                { id: 'homeservices', label: 'Home Services', icon: 'house', query: 'home services' },
+                { id: 'food', label: 'Food', icon: 'utensils', query: 'food' },
+                { id: 'photography', label: 'Photography', icon: 'camera', query: 'photography' },
+                { id: 'more', label: 'More', icon: 'grid', query: null },
+            ];
+            const TRENDING_CHIPS = [
+                { label: 'Nail Salon', color: '#F5134F' },
+                { label: 'Barbershop', color: '#2E9BFF' },
+                { label: 'Massage', color: THEME.violet },
+                { label: 'Makeup Artist', color: THEME.gold },
+                { label: 'Yoga', color: '#3FBF8A' },
+                { label: 'Photography', color: THEME.purple },
+            ];
+            const runHomeQuery = (text) => { openAiSearchFromHome(text); };
+            const titleBar = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 16px) 18px 0` } },
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#161616', margin: 0 } }, "Search"),
+                React.createElement("button", { onClick: closeHomeSearch, style: { display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "x", size: 22, color: "#161616" })));
+            const searchFieldRow = React.createElement("div", { style: { flexShrink: 0, padding: '14px 18px 0' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: '#F5F5F5', border: '1px solid #F0F0F0', borderRadius: 16, height: 48, padding: '0 14px' } },
+                    React.createElement(Icon, { name: "search", size: 17, color: '#8A8A8E' }),
+                    React.createElement("input", { autoFocus: true, value: homeSearchQuery, onChange: (e) => setHomeSearchQuery(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter' && homeSearchQuery.trim())
+                            runHomeQuery(homeSearchQuery); }, placeholder: "Search services, businesses or people", style: { flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', fontSize: 14, color: '#161616' } }),
+                    React.createElement("button", { className: "avio-press", onClick: () => openAiSearchFromHome(null), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement(Icon, { name: "sparkles", size: 18, color: THEME.coral }))));
+            const suggestions = homeSearchQuery.trim().length > 0
+                ? aiSearchCandidates.filter((i) => i.name.toLowerCase().includes(homeSearchQuery.trim().toLowerCase()) || i.category.toLowerCase().includes(homeSearchQuery.trim().toLowerCase())).slice(0, 5)
+                : [];
+            const suggestionsList = suggestions.length > 0 && React.createElement("div", { style: { margin: '8px 18px 0', borderRadius: 16, border: '1px solid #F0F0F0', overflow: 'hidden' } },
+                suggestions.map((s) => React.createElement("button", { key: s.id, onClick: () => runHomeQuery(s.name), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: '1px solid #F5F5F5', textAlign: 'left' } },
+                    React.createElement(Icon, { name: "search", size: 13, color: '#B5B5B8' }),
+                    React.createElement("span", { style: { flex: 1, fontSize: 13, fontWeight: 600, color: '#161616' } }, s.name),
+                    React.createElement("span", { style: { fontSize: 11.5, color: '#8A8A8E' } }, s.category))));
+            const quickChipsRow = React.createElement("div", { className: "avio-scroll", style: { flexShrink: 0, display: 'flex', gap: 8, padding: '14px 18px 0', overflowX: 'auto' } }, QUICK_CHIPS.map((c) => {
+                const active = homeQuickFilter === c.id;
+                return React.createElement("button", { key: c.id, className: "avio-pill", onClick: () => setHomeQuickFilter(c.id), style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 14, background: active ? 'rgba(151,196,0,0.12)' : '#F5F5F5', border: `1px solid ${active ? THEME.coral : '#F0F0F0'}` } },
+                    React.createElement(Icon, { name: c.icon, size: 12, color: active ? THEME.coral : '#8A8A8E' }),
+                    React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: active ? THEME.coral : '#484848' } }, c.label));
+            }));
+            const recentSection = aiRecentSearches.length > 0 && React.createElement("div", { style: { marginTop: 24, padding: '0 18px' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("span", { style: { fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: '#161616' } }, "Recent Searches"),
+                    React.createElement("button", { onClick: clearAiRecentSearches }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, "Clear All"))),
+                React.createElement("div", { style: { marginTop: 6 } }, aiRecentSearches.slice(0, 5).map((r) => React.createElement("div", { key: r.id, style: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid #F5F5F5' } },
+                    React.createElement(Icon, { name: "clock", size: 15, color: '#B5B5B8' }),
+                    React.createElement("button", { onClick: () => runHomeQuery(r.text), style: { flex: 1, textAlign: 'left', minWidth: 0 } },
+                        React.createElement("span", { style: { fontSize: 13.5, color: '#161616', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' } }, r.text)),
+                    React.createElement("button", { onClick: () => removeAiRecentSearch(r.id), style: { flexShrink: 0, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: "x", size: 13, color: '#B5B5B8' }))))));
+            const categoriesSection = React.createElement("div", { style: { marginTop: 26, padding: '0 18px' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("span", { style: { fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: '#161616' } }, "Popular Categories"),
+                    React.createElement("button", { onClick: () => flashToast('All categories — coming soon') }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, "See All"))),
+                React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 12 } }, POPULAR_CATEGORIES.map((c) => React.createElement("button", { key: c.id, className: "avio-press", onClick: () => c.query ? runHomeQuery(c.query) : flashToast('More categories — coming soon'), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '14px 6px', borderRadius: 16, border: '1px solid #F0F0F0', background: '#fff' } },
+                    React.createElement("div", { style: { width: 38, height: 38, borderRadius: 12, background: 'rgba(151,196,0,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: c.icon, size: 18, color: THEME.coral })),
+                    React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: '#161616', textAlign: 'center' } }, c.label)))));
+            const recommendedBase = [...aiSearchCandidates];
+            let recommendedSorted;
+            if (homeQuickFilter === 'nearby')
+                recommendedSorted = recommendedBase.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
+            else if (homeQuickFilter === 'topRated')
+                recommendedSorted = recommendedBase.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+            else if (homeQuickFilter === 'openNow')
+                recommendedSorted = recommendedBase.filter((i) => (i.openStatus || '').startsWith('Open Now'));
+            else if (homeQuickFilter === 'price')
+                recommendedSorted = recommendedBase.sort((a, b) => (a.price || 0) - (b.price || 0));
+            else
+                recommendedSorted = recommendedBase.sort((a, b) => scoreAiSearchCandidate(b, {}) - scoreAiSearchCandidate(a, {}));
+            const recommendedItems = recommendedSorted.slice(0, 3);
+            const recommendedSection = recommendedItems.length > 0 && React.createElement("div", { style: { marginTop: 26 } },
+                React.createElement("p", { style: { fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: '#161616', margin: '0 18px' } }, "Recommended For You"),
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 12, padding: '12px 18px 4px', overflowX: 'auto' } }, recommendedItems.map((item) => React.createElement("button", { key: item.id, className: "avio-press", onClick: () => openBusinessProfile(item), style: { flexShrink: 0, width: 158, textAlign: 'left', borderRadius: 18, overflow: 'hidden', border: '1px solid #F0F0F0', background: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
+                    React.createElement("div", { style: { position: 'relative', aspectRatio: '4 / 3', background: item.avatarColor || '#F5F5F5' } },
+                        item.image && React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } }),
+                        (item.openStatus || '').startsWith('Open Now') && React.createElement("span", { style: { position: 'absolute', top: 8, left: 8, fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 6, background: 'rgba(151,196,0,0.92)', color: '#fff' } }, "Available Today")),
+                    React.createElement("div", { style: { padding: '10px 11px 12px' } },
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: '#161616', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' } }, item.name),
+                        React.createElement("p", { style: { fontSize: 10.5, color: '#8A8A8E', marginTop: 2 } }, `${item.category} · ${item.distance}`),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 3, marginTop: 4 } },
+                            React.createElement(Icon, { name: "star", size: 10, color: THEME.gold, fill: THEME.gold }),
+                            React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: '#161616' } }, (item.rating || 4.6).toFixed(1))))))));
+            const trendingSection = React.createElement("div", { style: { marginTop: 26 } },
+                React.createElement("p", { style: { fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: '#161616', margin: '0 18px' } }, "Trending Searches"),
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 10, padding: '12px 18px 30px', overflowX: 'auto' } }, TRENDING_CHIPS.map((t) => React.createElement("button", { key: t.label, className: "avio-pill avio-press", onClick: () => runHomeQuery(t.label), style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px 7px 7px', borderRadius: 20, background: '#fff', border: '1px solid #ECECEE' } },
+                    React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', background: t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: '#fff' } }, t.label.charAt(0))),
+                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616', whiteSpace: 'nowrap' } }, t.label)))));
+            return React.createElement(React.Fragment, null, titleBar, searchFieldRow, suggestionsList, quickChipsRow,
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto' } }, recentSection, categoriesSection, recommendedSection, trendingSection));
         })())),
         tab === 'connect' && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#fff' } }, (() => {
             const CN = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
