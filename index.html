@@ -1391,6 +1391,11 @@ function App() {
     const [calView, setCalView] = useState('month');
     const [dailyExpanded, setDailyExpanded] = useState(true);
     const [bookingDetail, setBookingDetail] = useState(null);
+    const [rescheduleTarget, setRescheduleTarget] = useState(null);
+    const [rescheduleStep, setRescheduleStep] = useState('pick');
+    const [rescheduleCalMonth, setRescheduleCalMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
+    const [rescheduleSelectedDay, setRescheduleSelectedDay] = useState(() => new Date().getDate());
+    const [rescheduleTime, setRescheduleTime] = useState(null);
     const calTouchRef = useRef(null);
     function handleCalTouchStart(e) { calTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
     function handleCalTouchEnd(e) {
@@ -2292,9 +2297,9 @@ function App() {
             return providerDateOverrides[key];
         return providerWeeklyHours[dateObj.getDay()] || null;
     }
-    function getBusyIntervalsForDate(providerId, dateObj, staff) {
+    function getBusyIntervalsForDate(providerId, dateObj, staff, excludeBookingId) {
         const intervals = bookings
-            .filter((b) => b.providerId === providerId && b.day === dateObj.getDate() && b.month === dateObj.getMonth() && b.year === dateObj.getFullYear() && (b.status === 'confirmed' || b.status === 'pending') && (staff ? b.staffId === staff.id : true))
+            .filter((b) => b.id !== excludeBookingId && b.providerId === providerId && b.day === dateObj.getDate() && b.month === dateObj.getMonth() && b.year === dateObj.getFullYear() && (b.status === 'confirmed' || b.status === 'pending') && (staff ? b.staffId === staff.id : true))
             .map((b) => { const start = timeLabelToMinutes(b.time); return { start, end: start + (b.durationMinutes || 30) }; });
         if (providerId === MY_PROVIDER_ID) {
             const dow = dateObj.getDay();
@@ -2313,13 +2318,13 @@ function App() {
         }
         return intervals.sort((a, b) => a.start - b.start);
     }
-    function generateAvailableSlots(providerId, dateObj, durationMinutes, staff) {
+    function generateAvailableSlots(providerId, dateObj, durationMinutes, staff, excludeBookingId) {
         const hours = (staff && staff.customHours) ? (staff.customHours[dateObj.getDay()] || null) : getProviderHoursForDate(providerId, dateObj);
         if (!hours || !durationMinutes)
             return [];
         const dayStart = timeStrToMinutes(hours.start);
         const dayEnd = timeStrToMinutes(hours.end);
-        const busy = getBusyIntervalsForDate(providerId, dateObj, staff);
+        const busy = getBusyIntervalsForDate(providerId, dateObj, staff, excludeBookingId);
         const merged = [];
         busy.forEach((iv) => {
             const last = merged[merged.length - 1];
@@ -2469,6 +2474,55 @@ function App() {
         setBookingStep('success');
     }
     function cancelBooking(id) { setBookings((prev) => prev.map((b) => b.id === id ? { ...b, status: 'cancelled' } : b)); setBookingDetail(null); flashToast('Booking canceled'); }
+    function findStaffForBooking(b) {
+        if (!b.staffId)
+            return null;
+        const providerItem = b.providerId === MY_PROVIDER_ID ? { id: MY_PROVIDER_ID } : (feed.find((f) => f.id === b.providerId) || { id: b.providerId });
+        return getStaffForTarget(providerItem).find((s) => s.id === b.staffId) || null;
+    }
+    function openReschedule(b) {
+        setBookingDetail(null);
+        setRescheduleTarget(b);
+        setRescheduleStep('pick');
+        const n = new Date();
+        setRescheduleCalMonth(new Date(n.getFullYear(), n.getMonth(), 1));
+        setRescheduleSelectedDay(n.getDate());
+        setRescheduleTime(null);
+    }
+    function closeReschedule() {
+        setRescheduleTarget(null);
+        setRescheduleStep('pick');
+        setRescheduleTime(null);
+    }
+    function confirmReschedule() {
+        if (!rescheduleTarget || rescheduleTime == null)
+            return;
+        const b = rescheduleTarget;
+        const newDateObj = new Date(rescheduleCalMonth.getFullYear(), rescheduleCalMonth.getMonth(), rescheduleSelectedDay);
+        const staff = findStaffForBooking(b);
+        // Re-check availability right before committing so we never trust the slot list the
+        // customer was looking at a moment ago — if it's gone, the original booking is left untouched.
+        const freshSlots = generateAvailableSlots(b.providerId, newDateObj, b.durationMinutes, staff, b.id);
+        const stillOpen = freshSlots.some((s) => s.minutes === rescheduleTime);
+        if (!stillOpen) {
+            flashToast('That time was just booked. Please choose another available time.');
+            setRescheduleTime(null);
+            return;
+        }
+        const newDateLabel = newDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const newTimeLabel = minutesToTimeLabel(rescheduleTime);
+        const historyEntry = { fromDate: b.date, fromTime: b.time, toDate: newDateLabel, toTime: newTimeLabel, rescheduledAt: Date.now(), initiatedBy: 'customer' };
+        const updated = {
+            ...b, date: newDateLabel, day: newDateObj.getDate(), month: newDateObj.getMonth(), year: newDateObj.getFullYear(), time: newTimeLabel,
+            rescheduleHistory: [...(b.rescheduleHistory || []), historyEntry],
+        };
+        // Single synchronous state write: the old slot is never "open" and the new slot never
+        // "taken" in any intermediate render — this booking's day/time change atomically together.
+        setBookings((prev) => prev.map((bk) => bk.id === b.id ? updated : bk));
+        setBookingDetail(updated);
+        closeReschedule();
+        flashToast('Booking rescheduled successfully');
+    }
     function addToAppleCalendar(b) {
         const dt = new Date(b.year, b.month, b.day);
         const stamp = dt.toISOString().slice(0, 10).replace(/-/g, '');
@@ -4325,6 +4379,110 @@ function App() {
                 footer = footerWrap(React.createElement("button", { disabled: !agreedToPolicy, onClick: finalizeBooking, style: ctaStyle(agreedToPolicy) }, "Confirm Booking"));
             return React.createElement("div", { className: "avio-upload-page", style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 10, display: 'flex', flexDirection: 'column' } }, header, body, footer);
         })(),
+        rescheduleTarget && (() => {
+            const RF = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
+            const b = rescheduleTarget;
+            const today = new Date();
+            const calYearR = rescheduleCalMonth.getFullYear();
+            const calMonthIdxR = rescheduleCalMonth.getMonth();
+            const calFirstWeekdayR = new Date(calYearR, calMonthIdxR, 1).getDay();
+            const calDaysInMonthR = new Date(calYearR, calMonthIdxR + 1, 0).getDate();
+            const calCellsR = [...Array(calFirstWeekdayR).fill(null), ...Array.from({ length: calDaysInMonthR }, (_, i) => i + 1)];
+            const isPastDayR = (day) => new Date(calYearR, calMonthIdxR, day) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const selectedDateObjR = new Date(calYearR, calMonthIdxR, rescheduleSelectedDay);
+            const staffForBooking = findStaffForBooking(b);
+            const availableSlotsR = generateAvailableSlots(b.providerId, selectedDateObjR, b.durationMinutes, staffForBooking, b.id);
+            const newDateLabelShort = selectedDateObjR.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const newTimeLabelR = rescheduleTime != null ? minutesToTimeLabel(rescheduleTime) : null;
+            const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${RF.border}` } },
+                React.createElement("button", { onClick: () => rescheduleStep === 'review' ? setRescheduleStep('pick') : closeReschedule() },
+                    React.createElement(Icon, { name: rescheduleStep === 'review' ? 'arrowleft' : 'x', size: rescheduleStep === 'review' ? 17 : 18, color: RF.text })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: RF.text, margin: 0 } }, rescheduleStep === 'review' ? 'Review & Confirm' : 'Reschedule Booking'),
+                React.createElement("div", { style: { width: 18 } }));
+            const summaryCard = React.createElement("div", { style: { margin: '14px 18px 0', padding: 14, borderRadius: 16, border: `1px solid ${RF.border}`, boxShadow: '0 2px 10px rgba(0,0,0,0.04)' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12 } },
+                    React.createElement("div", { style: { width: 44, height: 44, borderRadius: 12, background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, flexShrink: 0 } }, b.logoText || (b.business || b.name).slice(0, 2).toUpperCase()),
+                    React.createElement("div", { style: { minWidth: 0 } },
+                        React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: RF.text, margin: 0 } }, b.service || b.name),
+                        React.createElement("p", { style: { fontSize: 12, color: RF.sub, marginTop: 2 } }, b.business || b.name))),
+                React.createElement("div", { style: { marginTop: 10 } },
+                    React.createElement("span", { style: { fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 10, background: 'rgba(151,196,0,0.14)', color: THEME.coral, textTransform: 'capitalize' } }, b.status)),
+                rescheduleStep === 'pick' && React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: `1px solid ${RF.border}`, display: 'flex', alignItems: 'center', gap: 10 } },
+                    React.createElement(Icon, { name: "calendar", size: 15, color: RF.sub }),
+                    React.createElement("div", null,
+                        React.createElement("p", { style: { fontSize: 10.5, color: RF.sub, margin: 0 } }, "Current Appointment"),
+                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: THEME.violet, margin: '2px 0 0' } }, `${b.date} · ${b.time}`))));
+            const downArrow = React.createElement("div", { style: { display: 'flex', justifyContent: 'center', margin: '10px 0' } },
+                React.createElement("div", { style: { width: 26, height: 26, borderRadius: '50%', background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement("span", { style: { fontSize: 12, color: RF.sub } }, "↓")));
+            let body, footer;
+            if (rescheduleStep === 'pick') {
+                const weekdayRowR = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginTop: 8 } }, ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => React.createElement("div", { key: i, style: { textAlign: 'center', fontSize: 11, color: RF.sub } }, d)));
+                const monthGridR = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: 6, marginTop: 6 } }, calCellsR.map((day, i) => {
+                    if (day === null)
+                        return React.createElement("div", { key: 'e' + i });
+                    const past = isPastDayR(day);
+                    const isTodayR = calYearR === today.getFullYear() && calMonthIdxR === today.getMonth() && day === today.getDate();
+                    const selectedR = day === rescheduleSelectedDay;
+                    return React.createElement("button", { key: day, disabled: past, onClick: () => { setRescheduleSelectedDay(day); setRescheduleTime(null); }, style: { padding: '6px 0', opacity: past ? 0.3 : 1 } },
+                        React.createElement("span", { style: { width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontSize: 13, fontWeight: selectedR ? 700 : 500, background: selectedR ? THEME.coral : 'transparent', color: selectedR ? '#fff' : RF.text, border: !selectedR && isTodayR ? `1.5px solid ${THEME.coral}` : 'none' } }, day));
+                }));
+                const quickBtnsR = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 14 } },
+                    React.createElement("button", { onClick: () => { setRescheduleCalMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setRescheduleSelectedDay(today.getDate()); setRescheduleTime(null); }, style: { flex: 1, padding: '9px 0', borderRadius: 14, border: `1px solid ${RF.border}`, fontSize: 12.5, fontWeight: 600, color: RF.text } }, "Today"),
+                    React.createElement("button", { onClick: () => { const t = new Date(today); t.setDate(t.getDate() + 1); setRescheduleCalMonth(new Date(t.getFullYear(), t.getMonth(), 1)); setRescheduleSelectedDay(t.getDate()); setRescheduleTime(null); }, style: { flex: 1, padding: '9px 0', borderRadius: 14, border: `1px solid ${RF.border}`, fontSize: 12.5, fontWeight: 600, color: RF.text } }, "Tomorrow"));
+                const calNavR = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 } },
+                    React.createElement("button", { onClick: () => setRescheduleCalMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1)), style: { width: 28, height: 28, borderRadius: '50%', border: `1px solid ${RF.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 12, color: RF.text })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: RF.text, margin: 0 } }, rescheduleCalMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })),
+                    React.createElement("button", { onClick: () => setRescheduleCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1)), style: { width: 28, height: 28, borderRadius: '50%', border: `1px solid ${RF.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement("span", { style: { display: 'flex', transform: 'rotate(180deg)' } }, React.createElement(Icon, { name: "arrowleft", size: 12, color: RF.text }))));
+                const timeGridR = React.createElement("div", { style: { marginTop: 22 } },
+                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: RF.text, marginBottom: 10 } }, "Available Times"),
+                    availableSlotsR.length === 0
+                        ? React.createElement("p", { style: { fontSize: 12.5, color: RF.sub, padding: '14px 0' } }, "No open slots long enough for this service on this day — try another date.")
+                        : React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } }, availableSlotsR.map((slot) => {
+                            const active = rescheduleTime === slot.minutes;
+                            return React.createElement("button", { key: slot.minutes, onClick: () => setRescheduleTime(slot.minutes), style: { padding: '11px 0', borderRadius: 16, fontSize: 13, fontWeight: 600, border: `1.5px solid ${active ? THEME.coral : RF.border}`, background: active ? THEME.coral : '#fff', color: active ? '#fff' : RF.text } }, slot.label);
+                        })));
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px 20px' } },
+                    summaryCard, downArrow,
+                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: RF.text, margin: '4px 0 0' } }, "Select New Date"),
+                    quickBtnsR, calNavR, weekdayRowR, monthGridR, timeGridR,
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: 6, marginTop: 18 } },
+                        React.createElement(Icon, { name: "check", size: 12, color: THEME.coral }),
+                        React.createElement("span", { style: { fontSize: 10.5, color: RF.sub, lineHeight: 1.4 } }, "Your current booking will remain until you confirm the new time.")));
+                footer = React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${RF.border}` } },
+                    React.createElement("button", { disabled: rescheduleTime == null, onClick: () => setRescheduleStep('review'), style: { width: '100%', height: 52, borderRadius: 26, background: rescheduleTime != null ? THEME.violet : '#EDEDED', color: rescheduleTime != null ? '#fff' : '#B5B5B8', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "Review Change"));
+            }
+            else {
+                const compareCard = React.createElement("div", { style: { margin: '16px 18px 0', padding: 16, borderRadius: 16, border: `1px solid ${RF.border}` } },
+                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: RF.sub, margin: '0 0 12px' } }, "Review Your Change"),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                        React.createElement("div", null,
+                            React.createElement("p", { style: { fontSize: 10.5, color: RF.sub, margin: 0 } }, "Current"),
+                            React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: RF.text, margin: '3px 0 0' } }, `${b.date} · ${b.time}`)),
+                        React.createElement(Icon, { name: "calendar", size: 16, color: RF.sub })),
+                    downArrow,
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                        React.createElement("div", null,
+                            React.createElement("p", { style: { fontSize: 10.5, color: RF.sub, margin: 0 } }, "New"),
+                            React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: THEME.violet, margin: '3px 0 0' } }, `${newDateLabelShort} · ${newTimeLabelR}`)),
+                        React.createElement(Icon, { name: "calendar", size: 16, color: THEME.violet })));
+                const detailRows = React.createElement("div", { style: { margin: '14px 18px 0', padding: 14, borderRadius: 16, background: '#FAFAFA' } },
+                    [['Duration', b.duration], ['Location', b.address], ['Total', money(b.total) + (b.promotionApplied ? '' : '')]].map(([k, v], i, arr) => React.createElement("div", { key: k, style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: i > 0 ? '1px solid #ECECEE' : 'none' } },
+                        React.createElement("span", { style: { fontSize: 12, color: RF.sub } }, k),
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: RF.text } }, v))),
+                    React.createElement("p", { style: { fontSize: 10.5, color: RF.sub, marginTop: 4 } }, "Price remains the same"));
+                const infoBanner = React.createElement("div", { style: { margin: '14px 18px 0', display: 'flex', alignItems: 'flex-start', gap: 8, padding: '12px 14px', borderRadius: 14, background: 'rgba(108,76,252,0.08)' } },
+                    React.createElement(Icon, { name: "clock", size: 14, color: THEME.violet }),
+                    React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: THEME.violet, lineHeight: 1.4 } }, "Your original time will be released after you confirm."));
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 0 20px' } }, compareCard, detailRows, infoBanner);
+                footer = React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${RF.border}` } },
+                    React.createElement("button", { onClick: confirmReschedule, style: { width: '100%', height: 52, borderRadius: 26, background: THEME.violet, color: '#fff', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "Confirm Reschedule"),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 4, marginTop: 10, alignItems: 'center' } },
+                        React.createElement("span", { style: { fontSize: 10.5, color: RF.sub } }, "That time will be reserved for you."),
+                        React.createElement("span", { style: { fontSize: 10.5, color: RF.sub } }, "You'll receive an updated confirmation.")));
+            }
+            return React.createElement("div", { className: "avio-upload-page", style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 10, display: 'flex', flexDirection: 'column' } }, header, body, footer);
+        })(),
         providerDashboardOpen && (() => {
             const PD = { text: '#161616', sub: '#8A8A8E', border: '#F0F0F0' };
             const inputStyle3 = { width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none', background: '#fff', fontFamily: 'inherit' };
@@ -5557,7 +5715,7 @@ function App() {
                 { icon: 'send', label: 'Get Directions', onClick: () => flashToast('Opening directions to ' + b.address) },
             ];
             if (b.status === 'confirmed' || b.status === 'pending') {
-                actions.push({ icon: 'clock', label: 'Reschedule', onClick: () => flashToast('Reschedule — coming soon') });
+                actions.push({ icon: 'clock', label: 'Reschedule', onClick: () => openReschedule(b) });
                 actions.push({ icon: 'x', label: 'Cancel Booking', danger: true, onClick: () => cancelBooking(b.id) });
             }
             if (b.status === 'completed') {
