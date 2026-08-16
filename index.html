@@ -3645,7 +3645,7 @@ function App() {
                     backdrop, scrim, brand, actionStack, infoBlock, bookCta),
                 arrowOverlay, burstOverlay);
         }))),
-        tab === 'discover' && !customerProfileOpen && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 18px)', right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 } },
+        tab === 'discover' && !customerProfileOpen && !businessProfileTarget && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 18px)', right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 } },
             React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex' } },
                 React.createElement(Icon, { name: "search", size: 20, color: "#fff" })))),
         tab === 'browse' && (React.createElement("div", { style: { position: 'absolute', inset: 0, overflowY: 'auto', background: '#fff', padding: `calc(env(safe-area-inset-top) + 16px) 0 calc(env(safe-area-inset-bottom) + 90px)` } }, (() => {
