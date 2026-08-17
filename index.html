@@ -703,6 +703,83 @@ function makeDefaultRestaurantCombinations() {
 function makeDefaultRestaurantHours() {
     return { 0: { start: '11:00', end: '21:00' }, 1: { start: '11:00', end: '22:00' }, 2: { start: '11:00', end: '22:00' }, 3: { start: '11:00', end: '22:00' }, 4: { start: '11:00', end: '22:00' }, 5: { start: '11:00', end: '23:59' }, 6: { start: '11:00', end: '23:59' } };
 }
+// ACTIVITIES booking model: Activity -> Party Size -> Date -> Session -> Space capacity -> Booking.
+// A "session" is a recurring weekly time slot tied to a specific space. Remaining capacity is never
+// stored — it's always derived live from the shared `bookings` array (see computeActivitySessionAvailability),
+// so cancellations/reschedules/manual bookings/online bookings can never drift out of sync with each other.
+function makeDefaultActivityHours() {
+    return { 0: { start: '10:00', end: '18:00' }, 1: { start: '11:00', end: '20:00' }, 2: { start: '11:00', end: '20:00' }, 3: { start: '11:00', end: '20:00' }, 4: { start: '11:00', end: '20:00' }, 5: { start: '11:00', end: '22:00' }, 6: { start: '10:00', end: '22:00' } };
+}
+function makeDefaultActivitySpaces() {
+    return [
+        { id: 'space-main', name: 'Main Studio', capacity: 24, active: true },
+        { id: 'space-patio', name: 'Patio', capacity: 12, active: true },
+    ];
+}
+function makeDefaultActivities() {
+    const weekdaySessions = [
+        { time: '11:00', spaceId: 'space-main' }, { time: '13:30', spaceId: 'space-main' },
+        { time: '16:00', spaceId: 'space-main' }, { time: '18:30', spaceId: 'space-patio' },
+    ];
+    const fridaySessions = [...weekdaySessions, { time: '20:30', spaceId: 'space-patio' }];
+    return [
+        {
+            id: 'act-pottery', name: 'Pottery Painting Session',
+            description: 'Choose your piece, paint it, and we’ll glaze and fire it!',
+            durationMin: 120, minAge: 5, minPartySize: 1, maxPartySize: 12,
+            whatsIncluded: ['All pottery pieces', 'Paints & tools', 'Glazing & firing', 'Apron & workspace'],
+            pricingModel: 'perPerson', price: 30, bufferMin: 30,
+            spaceIds: ['space-main', 'space-patio'], addOns: [],
+            sessionsByDay: { 0: weekdaySessions, 1: weekdaySessions, 2: weekdaySessions, 3: weekdaySessions, 4: weekdaySessions, 5: fridaySessions, 6: fridaySessions },
+        },
+        {
+            id: 'act-handbuilding', name: 'Clay Hand Building',
+            description: 'Hands-on clay building techniques — no wheel required.',
+            durationMin: 150, minAge: 8, minPartySize: 1, maxPartySize: 8,
+            whatsIncluded: ['All clay & tools', 'Glazing & firing', 'Apron & workspace'],
+            pricingModel: 'perPerson', price: 45, bufferMin: 30,
+            spaceIds: ['space-main'], addOns: [],
+            sessionsByDay: { 0: [{ time: '12:00', spaceId: 'space-main' }], 1: [], 2: [{ time: '17:00', spaceId: 'space-main' }], 3: [], 4: [{ time: '17:00', spaceId: 'space-main' }], 5: [{ time: '17:00', spaceId: 'space-main' }], 6: [{ time: '12:00', spaceId: 'space-main' }] },
+        },
+    ];
+}
+function getActivityBookedCount(bookings, businessId, activityId, spaceId, dKey, timeMinutes, excludeBookingId) {
+    return bookings
+        .filter((b) => b.bookingType === 'activity' && b.providerId === businessId && b.activityId === activityId && b.spaceId === spaceId
+            && b.dateKey === dKey && b.timeMinutes === timeMinutes && (b.status === 'confirmed' || b.status === 'pending') && b.id !== excludeBookingId)
+        .reduce((sum, b) => sum + (b.partySize || 0), 0);
+}
+function computeActivitySessionAvailability(business, activity, dateObj, bookings, excludeBookingId) {
+    const dow = dateObj.getDay();
+    const hours = (business.activityHours || {})[dow];
+    if (!hours || !activity)
+        return [];
+    const dayStart = timeStrToMinutes(hours.start);
+    const dayEnd = timeStrToMinutes(hours.end);
+    const dKey = dateKey(dateObj);
+    const sessions = (activity.sessionsByDay || {})[dow] || [];
+    return sessions
+        .map((s) => {
+            const space = (business.activitySpaces || []).find((sp) => sp.id === s.spaceId);
+            if (!space || !space.active)
+                return null;
+            const minutes = timeStrToMinutes(s.time);
+            if (minutes < dayStart || minutes + activity.durationMin > dayEnd)
+                return null;
+            const booked = getActivityBookedCount(bookings, business.id, activity.id, s.spaceId, dKey, minutes, excludeBookingId);
+            const remaining = Math.max(0, space.capacity - booked);
+            return { minutes, label: minutesToTimeLabel(minutes), spaceId: s.spaceId, spaceName: space.name, capacity: space.capacity, booked, remaining };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.minutes - b.minutes);
+}
+function activityPriceForParty(activity, partySize) {
+    if (activity.pricingModel === 'free')
+        return 0;
+    if (activity.pricingModel === 'flatGroup')
+        return activity.price;
+    return activity.price * partySize;
+}
 const DEFAULT_RESTAURANT_DURATION_RULES = [
     { min: 1, max: 2, duration: 75 },
     { min: 3, max: 4, duration: 90 },
@@ -877,6 +954,8 @@ const FEED = [
     { id: 'f36', category: 'Parties', name: 'Frame & Focus Films', location: 'Brooklyn, NY', rating: 4.9, price: 550, likes: '1.4K', comments: 53, saves: '1.7K', blurb: 'Cinematic wedding and event videography.', verified: true, distance: '0.8 mi', openStatus: 'Booking Fast · 3 slots left', hashtags: ['#videographer', '#brooklyn', '#weddingfilm'], friendsBooked: 23, avatarColor: '#4C4C6C', locationMode: 'I travel to customers' },
     { id: 'f37', category: 'Parties', name: 'Golden Hour Media', location: 'Austin, TX', rating: 4.7, price: 400, likes: '820', comments: 28, saves: '940', blurb: 'Event and brand videography, same-week edits.', verified: true, distance: '2.0 mi', openStatus: 'Open Now', hashtags: ['#videographer', '#austin', '#eventvideo'], friendsBooked: 11, avatarColor: '#5C5480', locationMode: 'I travel to customers' },
     { id: 'f38', category: 'Parties', name: 'Lasting Moments Videography', location: 'San Francisco, CA', rating: 4.8, price: 600, likes: '1.0K', comments: 37, saves: '1.2K', blurb: 'Full-day event coverage with drone footage.', verified: true, distance: '1.7 mi', openStatus: 'Available Today', hashtags: ['#videographer', '#sanfrancisco', '#dronefootage'], friendsBooked: 18, avatarColor: '#3F3F6E', locationMode: 'I travel to customers' },
+    { id: 'f39', category: 'Educational', businessType: 'activities', name: 'Clay & Co.', businessSubtitle: 'Pottery Painting Studio', location: 'Brooklyn, NY', rating: 4.9, price: 30, likes: '2.4K', comments: 326, saves: '3.1K', blurb: 'Unwind, get creative, and make something beautiful.', verified: true, distance: '0.7 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#potterypainting', '#brooklyn', '#thingstodo'], friendsBooked: 29, avatarColor: '#8A5A3B', locationMode: 'At my business location',
+        address: '123 Art Lane, Brooklyn, NY 11217', activityHours: makeDefaultActivityHours(), activitySpaces: makeDefaultActivitySpaces(), activities: makeDefaultActivities() },
 ];
 const CATEGORIES = [
     { id: 'shorts', label: 'All shorts', count: 31, icon: 'compass', color: '#2E9BFF' },
@@ -2557,6 +2636,16 @@ function App() {
     const [customerFollowSearch, setCustomerFollowSearch] = useState('');
     const [paymentMethod, setPaymentMethod] = useState(null);
     const [confirmedBooking, setConfirmedBooking] = useState(null);
+    const [activityBookingTarget, setActivityBookingTarget] = useState(null);
+    const [activityBookingStep, setActivityBookingStep] = useState('activity');
+    const [selectedActivity, setSelectedActivity] = useState(null);
+    const [activityPartySize, setActivityPartySize] = useState(null);
+    const [activityCalMonth, setActivityCalMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
+    const [activitySelectedDay, setActivitySelectedDay] = useState(() => new Date().getDate());
+    const [selectedActivitySession, setSelectedActivitySession] = useState(null);
+    const [activityAreaFilter, setActivityAreaFilter] = useState('all');
+    const [activityCustomerInfo, setActivityCustomerInfo] = useState({ fullName: '', phone: '', notes: '' });
+    const [confirmedActivityBooking, setConfirmedActivityBooking] = useState(null);
     const calYear = calendarMonth.getFullYear();
     const calMonthIdx = calendarMonth.getMonth();
     const calFirstWeekday = new Date(calYear, calMonthIdx, 1).getDay();
@@ -2980,6 +3069,55 @@ function App() {
         setConfirmedBooking(null);
     }
     function closeBookingFlow() { setBookingTarget(null); }
+    function openActivityBooking(item, preselectedActivity) {
+        setPostViewer(null);
+        setBusinessProfileTarget(null);
+        setProfileDrag(null);
+        setActivityBookingTarget(item);
+        const activities = item.activities || [];
+        const chosen = preselectedActivity || (activities.length === 1 ? activities[0] : null);
+        setSelectedActivity(chosen);
+        setActivityBookingStep(chosen ? 'partySize' : 'activity');
+        setActivityPartySize(null);
+        setActivityCalMonth(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
+        setActivitySelectedDay(new Date().getDate());
+        setSelectedActivitySession(null);
+        setActivityAreaFilter('all');
+        setActivityCustomerInfo({ fullName: customerProfile.fullName || '', phone: customerProfile.phone || (isPhoneLikeIdentifier(authDraft.identifier || '') ? authDraft.identifier : ''), notes: '' });
+        setConfirmedActivityBooking(null);
+    }
+    function closeActivityBookingFlow() { setActivityBookingTarget(null); }
+    function finalizeActivityBooking() {
+        const business = activityBookingTarget;
+        if (!business || !selectedActivity || !activityPartySize || !selectedActivitySession)
+            return;
+        const d = new Date(activityCalMonth.getFullYear(), activityCalMonth.getMonth(), activitySelectedDay);
+        // Re-check capacity immediately before creating the booking — the session list the customer
+        // saw a moment ago may already be stale if another party grabbed the last spots in the meantime.
+        const freshSessions = computeActivitySessionAvailability(business, selectedActivity, d, bookings);
+        const fresh = freshSessions.find((s) => s.minutes === selectedActivitySession.minutes && s.spaceId === selectedActivitySession.spaceId);
+        if (!fresh || fresh.remaining < activityPartySize) {
+            flashToast('That session no longer has enough spots. Please choose another.');
+            setSelectedActivitySession(null);
+            setActivityBookingStep('session');
+            return;
+        }
+        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const total = activityPriceForParty(selectedActivity, activityPartySize);
+        const initials = business.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+        const confirmationNumber = 'BVK' + Math.random().toString(36).slice(2, 8).toUpperCase();
+        const booking = {
+            id: 'ab' + Date.now(), bookingType: 'activity', name: business.name, service: selectedActivity.name, business: business.name, category: business.category,
+            providerId: business.id, activityId: selectedActivity.id, spaceId: fresh.spaceId, spaceName: fresh.spaceName, partySize: activityPartySize,
+            durationMinutes: selectedActivity.durationMin,
+            date: label, dateKey: dateKey(d), day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), time: minutesToTimeLabel(fresh.minutes), timeMinutes: fresh.minutes, timeRange: formatTimeRange(fresh.minutes, selectedActivity.durationMin),
+            total, status: 'confirmed', address: business.address || business.location, duration: formatDuration(selectedActivity.durationMin), logoText: initials,
+            confirmationNumber, customerName: activityCustomerInfo.fullName.trim(), customerPhone: activityCustomerInfo.phone.trim(), notes: activityCustomerInfo.notes.trim(),
+        };
+        setBookings((prev) => [booking, ...prev]);
+        setConfirmedActivityBooking(booking);
+        setActivityBookingStep('success');
+    }
     function finalizeBooking() {
         if (!bookingTarget || !selectedService || selTime == null)
             return;
@@ -3056,6 +3194,34 @@ function App() {
             return;
         const b = rescheduleTarget;
         const newDateObj = new Date(rescheduleCalMonth.getFullYear(), rescheduleCalMonth.getMonth(), rescheduleSelectedDay);
+        if (b.bookingType === 'activity') {
+            const business = feed.find((f) => f.id === b.providerId);
+            const activity = business && (business.activities || []).find((a) => a.id === b.activityId);
+            // Re-check capacity right before committing, same as finalizeActivityBooking — never trust
+            // the session list the customer was looking at a moment ago.
+            const freshSessions = business && activity ? computeActivitySessionAvailability(business, activity, newDateObj, bookings, b.id) : [];
+            const fresh = freshSessions.find((s) => s.minutes === rescheduleTime);
+            if (!fresh || fresh.remaining < b.partySize) {
+                flashToast('That session no longer has enough spots for your party. Please choose another.');
+                setRescheduleTime(null);
+                return;
+            }
+            const newDateLabel = newDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const newTimeLabel = minutesToTimeLabel(rescheduleTime);
+            const historyEntry = { fromDate: b.date, fromTime: b.time, toDate: newDateLabel, toTime: newTimeLabel, rescheduledAt: Date.now(), initiatedBy: 'customer' };
+            const updated = {
+                ...b, date: newDateLabel, dateKey: dateKey(newDateObj), day: newDateObj.getDate(), month: newDateObj.getMonth(), year: newDateObj.getFullYear(),
+                time: newTimeLabel, timeMinutes: rescheduleTime, timeRange: formatTimeRange(rescheduleTime, b.durationMinutes), spaceId: fresh.spaceId, spaceName: fresh.spaceName,
+                rescheduleHistory: [...(b.rescheduleHistory || []), historyEntry],
+            };
+            // Single synchronous state write: since remaining capacity is always derived live from
+            // `bookings`, moving this booking's own date/time IS the release-old/reserve-new operation.
+            setBookings((prev) => prev.map((bk) => bk.id === b.id ? updated : bk));
+            setBookingDetail(updated);
+            closeReschedule();
+            flashToast('Booking rescheduled successfully');
+            return;
+        }
         const staff = findStaffForBooking(b);
         // Re-check availability right before committing so we never trust the slot list the
         // customer was looking at a moment ago — if it's gone, the original booking is left untouched.
@@ -4580,12 +4746,16 @@ function App() {
                 React.createElement("span", { style: { fontSize: 9.5, fontWeight: 500, color: 'rgba(255,255,255,0.75)' } }, "Booked"));
             const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 'calc(env(safe-area-inset-bottom) + 110px)', padding: '0 18px', zIndex: 2 } },
                 bookedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, taggedRow);
+            const isActivityTarget = primaryTagTarget.businessType === 'activities';
             const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(env(safe-area-inset-bottom) + 62px)', zIndex: 2, borderRadius: 18, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
-                React.createElement("button", { onClick: () => openBooking(primaryTagTarget), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 19.5px' } },
+                React.createElement("button", { onClick: () => isActivityTarget ? openActivityBooking(primaryTagTarget) : openBooking(primaryTagTarget), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 19.5px' } },
                     React.createElement(Icon, { name: "calendar", size: 14, color: "#fff" }),
-                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12, color: "#fff" } }, "Book Now"),
-                    React.createElement("span", { style: { width: 1, height: 13, background: 'rgba(255,255,255,0.3)' } }),
-                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12, color: THEME.coral } }, "$", primaryTagTarget.price || item.price)));
+                    isActivityTarget
+                        ? React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12, color: "#fff" } }, "Book Activity")
+                        : React.createElement(React.Fragment, null,
+                            React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12, color: "#fff" } }, "Book Now"),
+                            React.createElement("span", { style: { width: 1, height: 13, background: 'rgba(255,255,255,0.3)' } }),
+                            React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12, color: THEME.coral } }, "$", primaryTagTarget.price || item.price))));
             const isArrowHere = swipeArrow && swipeArrow.itemId === item.id;
             const arrowOverlay = isArrowHere && React.createElement("div", { style: { position: 'absolute', left: 0, top: '50%', zIndex: 5, pointerEvents: 'none', transform: `translate(${-30 + swipeArrow.progress * 60}px,-50%) scale(${0.7 + swipeArrow.progress * 0.5})`, opacity: swipeArrow.progress, transition: swipeArrow.dragging ? 'none' : 'transform 0.25s ease, opacity 0.25s ease' } },
                 React.createElement("div", { style: { width: 54, height: 54, borderRadius: '50%', background: 'rgba(151,196,0,0.22)', boxShadow: `0 0 ${18 + swipeArrow.progress * 20}px ${6 + swipeArrow.progress * 6}px rgba(151,196,0,0.45)`, backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
@@ -5572,20 +5742,32 @@ function App() {
                                 React.createElement("span", { style: { fontSize: 8.5, fontWeight: 600, color: "#fff" } }, formatCount(parseCount(post.likes || '0'))))))),
                 posts.length > 0 && !item.mine && React.createElement("button", { onClick: () => { closeBusinessProfile(); setTab('discover'); setShortsFeedTab('forYou'); }, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 14, padding: '10px 0', fontSize: 13, fontWeight: 700, color: THEME.coral } },
                     "View all thrillz", React.createElement(Icon, { name: "chevronright", size: 14, color: THEME.coral })));
-            const servicesSection = React.createElement("div", { style: { padding: '18px 18px 0' } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, margin: 0 } }, "Services"),
-                    services.length > 4 && React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, "View all")),
-                React.createElement("div", { style: { display: 'flex', flexDirection: 'column' } },
-                    services.slice(0, 4).map((s, i) => React.createElement("button", { key: i, onClick: () => openBooking(item, s), style: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: i < Math.min(services.length, 4) - 1 ? `1px solid ${T.border}` : 'none', textAlign: 'left', width: '100%' } },
-                        React.createElement("div", { style: { width: 48, height: 48, borderRadius: 10, background: T.textPrimary, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                            React.createElement(Icon, { name: "scissors", size: 18, color: "#fff" })),
-                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                            React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: T.textPrimary, margin: 0 } }, s.name),
-                            React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, marginTop: 2 } }, formatDuration(s.durationMin))),
-                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 } },
-                            React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: T.textPrimary } }, money(s.price)),
-                            React.createElement(Icon, { name: "chevronright", size: 15, color: '#B5B5B8' }))))));
+            const servicesSection = item.businessType === 'activities'
+                ? React.createElement("div", { style: { padding: '18px 18px 0' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, margin: '0 0 10px' } }, "Activities"),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } },
+                        (item.activities || []).map((a) => React.createElement("div", { key: a.id, style: { border: `1px solid ${T.border}`, borderRadius: 16, padding: 14 } },
+                            React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: T.textPrimary, margin: 0 } }, a.name),
+                            React.createElement("p", { style: { fontSize: 12, color: T.textSecondary, marginTop: 4, lineHeight: 1.5 } }, a.description),
+                            React.createElement("div", { style: { display: 'flex', gap: 14, marginTop: 8 } },
+                                React.createElement("span", { style: { fontSize: 11.5, color: T.textSecondary } }, `Duration: ${formatDuration(a.durationMin)}`),
+                                React.createElement("span", { style: { fontSize: 11.5, color: T.textSecondary } }, `Ages ${a.minAge}+`)),
+                            a.whatsIncluded && a.whatsIncluded.length > 0 && React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, marginTop: 6 } }, `Includes: ${a.whatsIncluded.join(', ')}`),
+                            React.createElement("button", { onClick: () => openActivityBooking(item, a), style: { width: '100%', marginTop: 12, padding: '11px 0', borderRadius: 20, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 13 } }, "Book This Activity")))))
+                : React.createElement("div", { style: { padding: '18px 18px 0' } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, margin: 0 } }, "Services"),
+                        services.length > 4 && React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, "View all")),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column' } },
+                        services.slice(0, 4).map((s, i) => React.createElement("button", { key: i, onClick: () => openBooking(item, s), style: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: i < Math.min(services.length, 4) - 1 ? `1px solid ${T.border}` : 'none', textAlign: 'left', width: '100%' } },
+                            React.createElement("div", { style: { width: 48, height: 48, borderRadius: 10, background: T.textPrimary, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                                React.createElement(Icon, { name: "scissors", size: 18, color: "#fff" })),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: T.textPrimary, margin: 0 } }, s.name),
+                                React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, marginTop: 2 } }, formatDuration(s.durationMin))),
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 } },
+                                React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: T.textPrimary } }, money(s.price)),
+                                React.createElement(Icon, { name: "chevronright", size: 15, color: '#B5B5B8' }))))));
             const commentsSection = React.createElement("div", { style: { padding: '18px 18px 24px' } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, margin: 0 } }, "All Comments"),
@@ -6348,6 +6530,146 @@ function App() {
                 footer = footerWrap(React.createElement("button", { onClick: finalizeBooking, style: ctaStyle(true) }, `Pay ${money(total)}`));
             return React.createElement("div", { className: "avio-upload-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 10, display: 'flex', flexDirection: 'column' } }, header, body, footer);
         })(),
+        activityBookingTarget && (() => {
+            const AF = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const business = activityBookingTarget;
+            const activities = business.activities || [];
+            const bizInitials = business.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+            const hasMultipleActivities = activities.length > 1;
+            const STEP_TITLES = { activity: 'Choose an Activity', partySize: 'Select Party Size', session: 'Choose a Session', review: 'Review Your Booking', success: '' };
+            const STEP_ORDER = hasMultipleActivities ? ['activity', 'partySize', 'session', 'review'] : ['partySize', 'session', 'review'];
+            function goBackActivity() {
+                const idx = STEP_ORDER.indexOf(activityBookingStep);
+                if (idx <= 0) { closeActivityBookingFlow(); return; }
+                setActivityBookingStep(STEP_ORDER[idx - 1]);
+            }
+            const header = activityBookingStep !== 'success' && React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${AF.border}` } },
+                React.createElement("button", { onClick: goBackActivity }, React.createElement(Icon, { name: "arrowleft", size: 17, color: AF.text })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: AF.text, margin: 0 } }, STEP_TITLES[activityBookingStep]),
+                React.createElement("button", { onClick: closeActivityBookingFlow }, React.createElement(Icon, { name: "x", size: 18, color: AF.text })));
+            let body;
+            if (activityBookingStep === 'activity') {
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 } },
+                        React.createElement("div", { style: { width: 48, height: 48, borderRadius: 14, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 15, flexShrink: 0 } }, bizInitials),
+                        React.createElement("div", null,
+                            React.createElement("p", { style: { fontSize: 15, fontWeight: 700, color: AF.text, margin: 0 } }, business.name),
+                            React.createElement("p", { style: { fontSize: 11.5, color: AF.sub, marginTop: 2 } }, business.businessSubtitle || business.location))),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, activities.map((a) => React.createElement("button", { key: a.id, onClick: () => { setSelectedActivity(a); setActivityBookingStep('partySize'); }, style: { textAlign: 'left', padding: 14, borderRadius: 16, border: `1.5px solid ${AF.border}`, background: T.surface } },
+                        React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: AF.text, margin: 0 } }, a.name),
+                        React.createElement("p", { style: { fontSize: 11.5, color: AF.sub, marginTop: 3 } }, `${formatDuration(a.durationMin)} · Ages ${a.minAge}+`),
+                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: THEME.coral, marginTop: 6 } }, a.pricingModel === 'free' ? 'Free' : a.pricingModel === 'flatGroup' ? `${money(a.price)} per group` : `${money(a.price)} per person`)))));
+            }
+            else if (activityBookingStep === 'partySize') {
+                const sizes = [1, 2, 3, 4, 5, 6];
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 } },
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "users", size: 19, color: AF.text })),
+                        React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: AF.text, margin: 0 } }, "How many people are joining?")),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+                        sizes.map((n) => {
+                            const active = activityPartySize === n;
+                            const overMax = selectedActivity && n > selectedActivity.maxPartySize;
+                            return React.createElement("button", { key: n, disabled: overMax, onClick: () => setActivityPartySize(n), style: { padding: '13px 16px', borderRadius: 14, textAlign: 'left', border: `1.5px solid ${active ? THEME.coral : AF.border}`, background: active ? THEME.coral : T.surface, opacity: overMax ? 0.4 : 1 } },
+                                React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: active ? '#fff' : AF.text } }, `${n} ${n === 1 ? 'Person' : 'People'}`));
+                        }),
+                        (() => {
+                            const active = activityPartySize != null && activityPartySize >= 7;
+                            return React.createElement("button", { onClick: () => setActivityPartySize(7), style: { padding: '13px 16px', borderRadius: 14, textAlign: 'left', border: `1.5px solid ${active ? THEME.coral : AF.border}`, background: active ? THEME.coral : T.surface } },
+                                React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: active ? '#fff' : AF.text } }, "7+ People"));
+                        })()));
+            }
+            else if (activityBookingStep === 'session') {
+                const today = new Date();
+                const strip = Array.from({ length: 14 }, (_, i) => { const d = new Date(today); d.setDate(d.getDate() + i); return d; });
+                const selectedDateObj = new Date(activityCalMonth.getFullYear(), activityCalMonth.getMonth(), activitySelectedDay);
+                const dateStrip = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 } },
+                    strip.map((d) => {
+                        const selected = d.getFullYear() === selectedDateObj.getFullYear() && d.getMonth() === selectedDateObj.getMonth() && d.getDate() === selectedDateObj.getDate();
+                        return React.createElement("button", { key: d.toISOString(), onClick: () => { setActivityCalMonth(new Date(d.getFullYear(), d.getMonth(), 1)); setActivitySelectedDay(d.getDate()); setSelectedActivitySession(null); }, style: { flexShrink: 0, width: 52, padding: '10px 0', borderRadius: 14, border: `1.5px solid ${selected ? THEME.coral : AF.border}`, background: selected ? THEME.coral : T.surface, textAlign: 'center' } },
+                            React.createElement("p", { style: { fontSize: 10, fontWeight: 600, color: selected ? '#fff' : AF.sub, margin: 0, textTransform: 'uppercase' } }, d.toLocaleDateString('en-US', { weekday: 'short' })),
+                            React.createElement("p", { style: { fontSize: 15, fontWeight: 700, color: selected ? '#fff' : AF.text, margin: '2px 0 0' } }, d.getDate()));
+                    }));
+                const spaceOptions = (selectedActivity.spaceIds || []).map((id) => (business.activitySpaces || []).find((s) => s.id === id)).filter(Boolean);
+                const areaChips = spaceOptions.length > 1 && React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 14, overflowX: 'auto' } },
+                    [{ id: 'all', name: 'All Areas' }, ...spaceOptions].map((s) => {
+                        const active = activityAreaFilter === s.id;
+                        return React.createElement("button", { key: s.id, onClick: () => setActivityAreaFilter(s.id), style: { flexShrink: 0, padding: '7px 14px', borderRadius: 16, fontSize: 12.5, fontWeight: 600, border: `1px solid ${active ? THEME.coral : AF.border}`, background: active ? 'rgba(151,196,0,0.12)' : T.surface, color: active ? THEME.coral : AF.text } }, s.name);
+                    }));
+                const allSessions = computeActivitySessionAvailability(business, selectedActivity, selectedDateObj, bookings);
+                const fitSessions = allSessions.filter((s) => s.remaining >= activityPartySize && (activityAreaFilter === 'all' || s.spaceId === activityAreaFilter));
+                const sessionList = React.createElement("div", { style: { marginTop: 18 } },
+                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: AF.text, marginBottom: 10 } }, selectedDateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })),
+                    fitSessions.length === 0
+                        ? React.createElement("p", { style: { fontSize: 12.5, color: AF.sub, padding: '14px 0' } }, "No sessions have room for your party on this day — try another date.")
+                        : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, fitSessions.map((s) => {
+                            const active = selectedActivitySession && selectedActivitySession.minutes === s.minutes && selectedActivitySession.spaceId === s.spaceId;
+                            return React.createElement("button", { key: s.minutes + s.spaceId, onClick: () => setSelectedActivitySession(s), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', borderRadius: 16, border: `1.5px solid ${active ? THEME.coral : AF.border}`, background: active ? 'rgba(151,196,0,0.08)' : T.surface, textAlign: 'left' } },
+                                React.createElement("div", null,
+                                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: AF.text, margin: 0 } }, s.label),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: AF.sub, marginTop: 2 } }, s.spaceName)),
+                                React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: s.remaining <= 5 ? '#D0304A' : THEME.coral } }, s.remaining <= 5 ? `Only ${s.remaining} spots left` : `${s.remaining} spots left`));
+                        })));
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
+                    dateStrip, areaChips, sessionList);
+            }
+            else if (activityBookingStep === 'review') {
+                const total = activityPriceForParty(selectedActivity, activityPartySize);
+                const selectedDateObj = new Date(activityCalMonth.getFullYear(), activityCalMonth.getMonth(), activitySelectedDay);
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12 } },
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: 12, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, flexShrink: 0 } }, bizInitials),
+                        React.createElement("div", null,
+                            React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: AF.text, margin: 0 } }, business.name),
+                            React.createElement("p", { style: { fontSize: 11.5, color: AF.sub, marginTop: 2 } }, selectedActivity.name))),
+                    React.createElement("div", { style: { background: T.surfaceSecondary, borderRadius: 16, padding: '4px 14px', marginTop: 18 } },
+                        [['Date', selectedDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })],
+                            ['Time', selectedActivitySession ? selectedActivitySession.label : '—'],
+                            ['People', String(activityPartySize)],
+                            ['Space', selectedActivitySession ? selectedActivitySession.spaceName : '—'],
+                            ['Duration', formatDuration(selectedActivity.durationMin)]].map(([k, v]) => React.createElement("div", { key: k, style: { display: 'flex', justifyContent: 'space-between', padding: '7px 0' } },
+                                React.createElement("span", { style: { fontSize: 12.5, color: AF.sub } }, k),
+                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: AF.text } }, v)))),
+                    selectedActivity.whatsIncluded && selectedActivity.whatsIncluded.length > 0 && React.createElement(React.Fragment, null,
+                        React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: AF.text, margin: '18px 0 8px' } }, "What's Included"),
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 6 } }, selectedActivity.whatsIncluded.map((item) => React.createElement("div", { key: item, style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                            React.createElement(Icon, { name: "check", size: 13, color: THEME.coral }),
+                            React.createElement("span", { style: { fontSize: 12.5, color: AF.text } }, item))))),
+                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, paddingTop: 14, borderTop: `1px solid ${AF.border}` } },
+                        React.createElement("span", { style: { fontSize: 12.5, color: AF.sub } }, selectedActivity.pricingModel === 'perPerson' ? `${money(selectedActivity.price)} × ${activityPartySize}` : 'Total'),
+                        React.createElement("span", { style: { fontSize: 20, fontWeight: 700, color: THEME.coral, fontFamily: 'Space Grotesk, sans-serif' } }, money(total))));
+            }
+            else {
+                const b = confirmedActivityBooking;
+                body = b && React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 24px calc(env(safe-area-inset-bottom) + 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' } },
+                    React.createElement("button", { onClick: closeActivityBookingFlow, style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', right: 0, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 18, color: AF.sub })),
+                    React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', border: '2.5px solid #22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'calc(env(safe-area-inset-top) + 44px)' } }, React.createElement(Icon, { name: "check", size: 28, color: "#22C55E" })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: AF.text, marginTop: 20 } }, "You're All Set!"),
+                    React.createElement("p", { style: { fontSize: 13, color: AF.sub, marginTop: 6 } }, "Your booking is confirmed."),
+                    React.createElement("div", { style: { width: '100%', background: T.surfaceSecondary, borderRadius: 18, padding: 16, marginTop: 24, textAlign: 'left' } },
+                        React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: AF.text, margin: 0 } }, b.business),
+                        React.createElement("div", { style: { marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', gap: 4 } },
+                            React.createElement("span", { style: { fontSize: 12.5, color: AF.text } }, b.service),
+                            React.createElement("span", { style: { fontSize: 12.5, color: AF.text } }, b.date),
+                            React.createElement("span", { style: { fontSize: 12.5, color: AF.text } }, b.timeRange || b.time),
+                            React.createElement("span", { style: { fontSize: 12.5, color: AF.text } }, `${b.partySize} People · ${b.spaceName}`),
+                            React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: THEME.coral, marginTop: 2 } }, money(b.total)))),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, width: '100%', marginTop: 24 } },
+                        React.createElement("button", { onClick: () => addToAppleCalendar(b), style: { width: '100%', height: 50, borderRadius: 25, border: `1.5px solid ${T.textPrimary}`, background: 'transparent', color: T.textPrimary, fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } }, React.createElement(Icon, { name: "calendar", size: 15, color: T.textPrimary }), "Add to Calendar"),
+                        React.createElement("button", { onClick: () => { closeActivityBookingFlow(); setTab('bookings'); setBookingsSubTab('upcoming'); }, style: { width: '100%', height: 50, borderRadius: 25, background: T.textPrimary, color: T.background, fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "View Booking")),
+                    b.confirmationNumber && React.createElement("p", { style: { fontSize: 11, color: AF.sub, marginTop: 18 } }, `Confirmation #${b.confirmationNumber}`));
+            }
+            let footer = null;
+            const ctaStyle = (ready) => ({ width: '100%', height: 52, borderRadius: 26, background: ready ? THEME.coral : '#EDEDED', color: ready ? '#fff' : '#B5B5B8', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' });
+            const footerWrap = (node) => React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${AF.border}` } }, node);
+            if (activityBookingStep === 'partySize')
+                footer = footerWrap(React.createElement("button", { disabled: activityPartySize == null, onClick: () => setActivityBookingStep('session'), style: ctaStyle(activityPartySize != null) }, "Continue"));
+            else if (activityBookingStep === 'session')
+                footer = footerWrap(React.createElement("button", { disabled: !selectedActivitySession, onClick: () => setActivityBookingStep('review'), style: ctaStyle(!!selectedActivitySession) }, "Continue"));
+            else if (activityBookingStep === 'review')
+                footer = footerWrap(React.createElement("button", { onClick: finalizeActivityBooking, style: ctaStyle(true) }, "Confirm Booking"));
+            return React.createElement("div", { className: "avio-upload-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 10, display: 'flex', flexDirection: 'column' } }, header, body, footer);
+        })(),
         rescheduleTarget && (() => {
             const RF = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
             const b = rescheduleTarget;
@@ -6359,8 +6681,14 @@ function App() {
             const calCellsR = [...Array(calFirstWeekdayR).fill(null), ...Array.from({ length: calDaysInMonthR }, (_, i) => i + 1)];
             const isPastDayR = (day) => new Date(calYearR, calMonthIdxR, day) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
             const selectedDateObjR = new Date(calYearR, calMonthIdxR, rescheduleSelectedDay);
-            const staffForBooking = findStaffForBooking(b);
-            const availableSlotsR = generateAvailableSlots(b.providerId, selectedDateObjR, b.durationMinutes, staffForBooking, b.id);
+            const staffForBooking = b.bookingType === 'activity' ? null : findStaffForBooking(b);
+            const rescheduleBusiness = b.bookingType === 'activity' ? feed.find((f) => f.id === b.providerId) : null;
+            const rescheduleActivity = rescheduleBusiness && (rescheduleBusiness.activities || []).find((a) => a.id === b.activityId);
+            const availableSlotsR = b.bookingType === 'activity'
+                ? (rescheduleBusiness && rescheduleActivity ? computeActivitySessionAvailability(rescheduleBusiness, rescheduleActivity, selectedDateObjR, bookings, b.id) : [])
+                    .filter((s) => s.remaining >= b.partySize)
+                    .map((s) => ({ minutes: s.minutes, label: `${s.label} · ${s.spaceName} · ${s.remaining} left` }))
+                : generateAvailableSlots(b.providerId, selectedDateObjR, b.durationMinutes, staffForBooking, b.id);
             const newDateLabelShort = selectedDateObjR.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
             const newTimeLabelR = rescheduleTime != null ? minutesToTimeLabel(rescheduleTime) : null;
             const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${RF.border}` } },
