@@ -412,18 +412,18 @@ const BOOKING_STATUS_STYLE = {
     cancelled: { bg: '#fff', color: '#D0304A', border: '1px solid #D0304A' },
 };
 const BUSINESS_INCOMING_BOOKINGS = [
-    { id: 'ib1', customerName: 'Michael R.', initials: 'MR', service: "Men's Fade", price: 45, time: '10:00 AM', status: 'confirmed', avatarColor: '#3F3F5C', dateGroup: 'today' },
-    { id: 'ib2', customerName: 'Sarah M.', initials: 'SM', service: 'Balayage', price: 180, time: '11:30 AM', status: 'confirmed', avatarColor: '#7A2E52', dateGroup: 'today' },
-    { id: 'ib3', customerName: 'Jessica T.', initials: 'JT', service: 'Hair Color', price: 120, time: '1:00 PM', status: 'pending', avatarColor: '#5A2E7A', dateGroup: 'today' },
-    { id: 'ib4', customerName: 'David L.', initials: 'DL', service: 'Beard Trim', price: 30, time: '3:30 PM', status: 'confirmed', avatarColor: '#2B4C5C', dateGroup: 'today' },
-    { id: 'ib5', customerName: 'Jessica W.', initials: 'JW', service: 'Highlights', price: 150, time: '12:00 PM', status: 'confirmed', avatarColor: '#6C4CFC', dateGroup: 'tomorrow' },
-    { id: 'ib6', customerName: 'Anthony M.', initials: 'AM', service: 'Haircut', price: 35, time: '2:00 PM', status: 'confirmed', avatarColor: '#161616', dateGroup: 'tomorrow' },
-    { id: 'ib7', customerName: 'Brian C.', initials: 'BC', service: "Men's Fade", price: 45, time: '4:00 PM', status: 'completed', avatarColor: '#8B5CF6', dateGroup: 'past', dateLabel: 'Aug 10' },
-    { id: 'ib8', customerName: 'Kevin T.', initials: 'KT', service: 'Beard Trim', price: 30, time: '1:30 PM', status: 'completed', avatarColor: '#3F6FBF', dateGroup: 'past', dateLabel: 'Aug 9' },
-    { id: 'ib9', customerName: 'Luis M.', initials: 'LM', service: 'Haircut', price: 35, time: '12:00 PM', status: 'completed', avatarColor: '#3FBF8A', dateGroup: 'past', dateLabel: 'Aug 8' },
-    { id: 'ib10', customerName: 'James S.', initials: 'JS', service: 'Balayage', price: 180, time: '3:00 PM', status: 'completed', avatarColor: '#F5A623', dateGroup: 'past', dateLabel: 'Aug 7' },
-    { id: 'ib11', customerName: 'Amanda W.', initials: 'AW', service: 'Highlights', price: 150, time: '11:00 AM', status: 'completed', avatarColor: '#7A2E52', dateGroup: 'past', dateLabel: 'Aug 6' },
-    { id: 'ib12', customerName: 'Taylor R.', initials: 'TR', service: 'Hair Color', price: 120, time: '2:30 PM', status: 'cancelled', avatarColor: '#D0304A', dateGroup: 'past', dateLabel: 'Aug 5' },
+    { id: 'ib1', customerName: 'Michael R.', initials: 'MR', service: "Men's Fade", price: 45, time: '10:00 AM', status: 'confirmed', avatarColor: '#000000', dateGroup: 'today' },
+    { id: 'ib2', customerName: 'Sarah M.', initials: 'SM', service: 'Balayage', price: 180, time: '11:30 AM', status: 'confirmed', avatarColor: '#97C400', dateGroup: 'today' },
+    { id: 'ib3', customerName: 'Jessica T.', initials: 'JT', service: 'Hair Color', price: 120, time: '1:00 PM', status: 'pending', avatarColor: '#FFFFFF', dateGroup: 'today' },
+    { id: 'ib4', customerName: 'David L.', initials: 'DL', service: 'Beard Trim', price: 30, time: '3:30 PM', status: 'confirmed', avatarColor: '#000000', dateGroup: 'today' },
+    { id: 'ib5', customerName: 'Jessica W.', initials: 'JW', service: 'Highlights', price: 150, time: '12:00 PM', status: 'confirmed', avatarColor: '#97C400', dateGroup: 'tomorrow' },
+    { id: 'ib6', customerName: 'Anthony M.', initials: 'AM', service: 'Haircut', price: 35, time: '2:00 PM', status: 'confirmed', avatarColor: '#FFFFFF', dateGroup: 'tomorrow' },
+    { id: 'ib7', customerName: 'Brian C.', initials: 'BC', service: "Men's Fade", price: 45, time: '4:00 PM', status: 'completed', avatarColor: '#000000', dateGroup: 'past', dateLabel: 'Aug 10' },
+    { id: 'ib8', customerName: 'Kevin T.', initials: 'KT', service: 'Beard Trim', price: 30, time: '1:30 PM', status: 'completed', avatarColor: '#97C400', dateGroup: 'past', dateLabel: 'Aug 9' },
+    { id: 'ib9', customerName: 'Luis M.', initials: 'LM', service: 'Haircut', price: 35, time: '12:00 PM', status: 'completed', avatarColor: '#FFFFFF', dateGroup: 'past', dateLabel: 'Aug 8' },
+    { id: 'ib10', customerName: 'James S.', initials: 'JS', service: 'Balayage', price: 180, time: '3:00 PM', status: 'completed', avatarColor: '#000000', dateGroup: 'past', dateLabel: 'Aug 7' },
+    { id: 'ib11', customerName: 'Amanda W.', initials: 'AW', service: 'Highlights', price: 150, time: '11:00 AM', status: 'completed', avatarColor: '#97C400', dateGroup: 'past', dateLabel: 'Aug 6' },
+    { id: 'ib12', customerName: 'Taylor R.', initials: 'TR', service: 'Hair Color', price: 120, time: '2:30 PM', status: 'cancelled', avatarColor: '#FFFFFF', dateGroup: 'past', dateLabel: 'Aug 5' },
 ];
 const UPLOAD_CATEGORIES = ['Beauty', 'Barber', 'Home Services', 'Parties', 'Restaurants', 'Educational'];
 const UPLOAD_EDIT_PANELS = ['Trim & Cover', 'Details', 'Settings', 'Preview'];
@@ -564,9 +564,9 @@ const SETTINGS_HELP_TOPICS = [
 ];
 const SETTINGS_REPORT_ISSUES = ['Booking Issue', 'Payment Issue', 'Technical Issue', 'Inappropriate Content', 'Other'];
 const PROFILE_REVIEWS = [
-    { name: 'Jordan M.', rating: 5, text: 'Booked instantly, worth every penny! Communication was great the whole way through.', time: '2d', avatarColor: '#3F6FBF', likes: 12 },
-    { name: 'Casey R.', rating: 4, text: 'Great experience overall, would book again.', time: '1w', avatarColor: '#7A2E52', likes: 8 },
-    { name: 'Riley P.', rating: 5, text: 'Super professional, on time, and the results were amazing.', time: '2w', avatarColor: '#5A2E7A', likes: 5 },
+    { name: 'Jordan M.', rating: 5, text: 'Booked instantly, worth every penny! Communication was great the whole way through.', time: '2d', avatarColor: '#000000', likes: 12 },
+    { name: 'Casey R.', rating: 4, text: 'Great experience overall, would book again.', time: '1w', avatarColor: '#97C400', likes: 8 },
+    { name: 'Riley P.', rating: 5, text: 'Super professional, on time, and the results were amazing.', time: '2w', avatarColor: '#FFFFFF', likes: 5 },
 ];
 function loadLS(key, fallback) {
     try {
@@ -625,11 +625,31 @@ function seededIndex(id, salt, mod) {
         h = (h * 31 + s.charCodeAt(i)) >>> 0;
     return mod > 0 ? h % mod : 0;
 }
+function resolveCategoryPhotoPool(item, catId) {
+    const hay = `${item.name} ${(item.hashtags || []).join(' ')}`.toLowerCase();
+    if (/barber|barbershop|\bfade\b/.test(hay))
+        return ['assets/explore/barbershop.jpg'];
+    if (/makeup|\bmua\b/.test(hay))
+        return ['assets/explore/makeup-promo.jpg'];
+    if (/\bbrow\b|lash/.test(hay))
+        return ['assets/explore/brow-arc.jpg'];
+    if (/\bdj\b|deejay/.test(hay))
+        return ['assets/explore/dj-battle.jpg'];
+    if (/photographer|photography|videographer|cinematograph|camera/.test(hay))
+        return [];
+    if (/nail/.test(hay))
+        return [];
+    if (/boat|yacht|jet ski|jetski|pontoon|charter|watersport/.test(hay))
+        return [];
+    if (/car rental|auto rental|rent a car/.test(hay))
+        return [];
+    return CATEGORY_PHOTOS[catId] || [];
+}
 function getProviderPosts(item) {
     if (!item)
         return [];
     const catId = CATEGORY_LABEL_TO_ID[item.category] || 'home';
-    const photoPool = (CATEGORY_PHOTOS[catId] && CATEGORY_PHOTOS[catId].length ? CATEGORY_PHOTOS[catId] : [item.image]).filter(Boolean);
+    const photoPool = item.image ? [item.image] : resolveCategoryPhotoPool(item, catId).filter(Boolean);
     const vid = CATEGORY_VIDEOS[catId] || null;
     return Array.from({ length: 6 }, (_, i) => {
         const photoIdx = seededIndex(item.id, 'photo' + i, photoPool.length || 1);
@@ -893,7 +913,7 @@ function ToggleSwitch({ on, onChange }) {
         React.createElement("span", { style: { position: 'absolute', top: 2, left: on ? 20 : 2, width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.28)', transition: 'left 0.22s cubic-bezier(0.34,1.56,0.64,1)' } }));
 }
 const FEED = [
-    { id: 'f0', category: 'Beauty', name: 'Fade House', location: 'Miami, FL', rating: 4.9, price: 35, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Clean fade. Sharp lines. Precision cuts. Premium experience.', verified: true, distance: '0.5 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#miami', '#fade'], friendsBooked: 120, avatarColor: '#161616', locationMode: 'At my business location',
+    { id: 'f0', category: 'Beauty', name: 'Fade House', location: 'Miami, FL', rating: 4.9, price: 35, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Clean fade. Sharp lines. Precision cuts. Premium experience.', verified: true, distance: '0.5 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#miami', '#fade'], friendsBooked: 120, avatarColor: '#000000', locationMode: 'At my business location',
         staff: [{ id: 'f0-staff-jessie', name: 'Jessie', customHours: null }, { id: 'f0-staff-jackie', name: 'Jackie', customHours: null }],
         services: [
             { id: 'f0-svc0', name: 'Basic Fade', durationMin: 30, price: 35 },
@@ -901,61 +921,64 @@ const FEED = [
             { id: 'f0-svc2', name: 'Fade + Beard', durationMin: 45, price: 50 },
             { id: 'f0-svc3', name: 'VIP Experience', durationMin: 60, price: 80, popular: true },
         ] },
-    { id: 'f1', category: 'Home Services', name: 'Sparkle Squad Cleaning', location: 'Denver, CO', rating: 4.8, price: 120, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Deep clean, move-in/move-out, eco-friendly products.', verified: true, distance: '1.2 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#cleaning', '#denver', '#freshhome'], friendsBooked: 8, avatarColor: '#3F6FBF', locationMode: 'I travel to customers',
+    { id: 'f1', category: 'Home Services', name: 'Sparkle Squad Cleaning', location: 'Denver, CO', rating: 4.8, price: 120, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Deep clean, move-in/move-out, eco-friendly products.', verified: true, distance: '1.2 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#cleaning', '#denver', '#freshhome'], friendsBooked: 8, avatarColor: '#97C400', locationMode: 'I travel to customers',
         deal: { id: 'deal-f1', enabled: true, type: 'percent', value: 15, label: '15% OFF TODAY', activatedAt: 0, eligibleServiceIds: null } },
-    { id: 'f2', category: 'Home Services', name: 'Fresh Start Cleaners', location: 'Miami, FL', rating: 4.9, price: 90, likes: '892', comments: 18, saves: '1.4K', blurb: 'Residential and post-construction cleaning.', verified: true, distance: '2.4 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#cleaning', '#miami', '#ecofriendly'], friendsBooked: 5, avatarColor: '#3FBF8A', locationMode: 'I travel to customers' },
-    { id: 'f3', category: 'Beauty', name: 'Glow by Mia', location: 'Austin, TX', rating: 4.7, price: 150, likes: '2.1K', comments: 76, saves: '3.6K', blurb: 'Balayage and color correction specialist.', verified: true, distance: '0.6 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#balayage', '#austin', '#haircolor'], friendsBooked: 14, avatarColor: '#8FBF3F', locationMode: 'At my business location' },
-    { id: 'f4', category: 'Beauty', name: 'Kiana Frost MUA', location: 'Brooklyn, NY', rating: 5.0, price: 220, likes: '3.4K', comments: 130, saves: '5.2K', blurb: 'Bridal and editorial makeup artistry.', verified: true, distance: '0.9 mi', openStatus: 'Booking Fast · 3 slots left', hashtags: ['#bridalmakeup', '#brooklyn', '#glam'], friendsBooked: 22, avatarColor: '#BF6B3F', locationMode: 'I travel to customers' },
-    { id: 'f5', category: 'Parties', name: 'Belle Noir Events', location: 'Chicago, IL', rating: 4.6, price: 400, likes: '640', comments: 24, saves: '980', blurb: 'Full-service party planning and styling.', verified: false, distance: '3.1 mi', openStatus: 'Open Now · Closes 9PM', hashtags: ['#eventplanning', '#chicago', '#luxury'], friendsBooked: 6, avatarColor: '#F5134F', locationMode: 'I travel to customers' },
-    { id: 'f6', category: 'Restaurants', name: "Camille's Table", location: 'New Orleans, LA', rating: 4.9, price: 85, likes: '1.8K', comments: 58, saves: '2.9K', blurb: "Chef's tasting menu, seasonal ingredients.", verified: true, distance: '1.5 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#neworleans', '#tastingmenu', '#chef'], friendsBooked: 19, avatarColor: '#F5A623', locationMode: 'At my business location',
+    { id: 'f2', category: 'Home Services', name: 'Fresh Start Cleaners', location: 'Miami, FL', rating: 4.9, price: 90, likes: '892', comments: 18, saves: '1.4K', blurb: 'Residential and post-construction cleaning.', verified: true, distance: '2.4 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#cleaning', '#miami', '#ecofriendly'], friendsBooked: 5, avatarColor: '#FFFFFF', locationMode: 'I travel to customers' },
+    { id: 'f3', category: 'Beauty', name: 'Glow by Mia', location: 'Austin, TX', rating: 4.7, price: 150, likes: '2.1K', comments: 76, saves: '3.6K', blurb: 'Balayage and color correction specialist.', verified: true, distance: '0.6 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#balayage', '#austin', '#haircolor'], friendsBooked: 14, avatarColor: '#000000', locationMode: 'At my business location' },
+    { id: 'f4', category: 'Beauty', name: 'Kiana Frost MUA', location: 'Brooklyn, NY', rating: 5.0, price: 220, likes: '3.4K', comments: 130, saves: '5.2K', blurb: 'Bridal and editorial makeup artistry.', verified: true, distance: '0.9 mi', openStatus: 'Booking Fast · 3 slots left', hashtags: ['#bridalmakeup', '#brooklyn', '#glam'], friendsBooked: 22, avatarColor: '#97C400', locationMode: 'I travel to customers' },
+    { id: 'f5', category: 'Parties', name: 'Belle Noir Events', location: 'Chicago, IL', rating: 4.6, price: 400, likes: '640', comments: 24, saves: '980', blurb: 'Full-service party planning and styling.', verified: false, distance: '3.1 mi', openStatus: 'Open Now · Closes 9PM', hashtags: ['#eventplanning', '#chicago', '#luxury'], friendsBooked: 6, avatarColor: '#FFFFFF', locationMode: 'I travel to customers' },
+    { id: 'f6', category: 'Restaurants', name: "Camille's Table", location: 'New Orleans, LA', rating: 4.9, price: 85, likes: '1.8K', comments: 58, saves: '2.9K', blurb: "Chef's tasting menu, seasonal ingredients.", verified: true, distance: '1.5 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#neworleans', '#tastingmenu', '#chef'], friendsBooked: 19, avatarColor: '#000000', locationMode: 'At my business location',
         deal: { id: 'deal-f6', enabled: true, type: 'percent', value: 20, label: '20% OFF TODAY', activatedAt: 0, eligibleServiceIds: null } },
-    { id: 'f7', category: 'Parties', name: 'Nova Sound DJs', location: 'Los Angeles, CA', rating: 4.8, price: 350, likes: '2.7K', comments: 95, saves: '4.1K', blurb: 'Wedding and club DJ sets with full sound and lighting rig.', verified: true, distance: '4.2 mi', openStatus: 'Available Today', hashtags: ['#dj', '#losangeles', '#nightlife'], friendsBooked: 31, avatarColor: '#6C4CFC', locationMode: 'I travel to customers' },
-    { id: 'f8', category: 'Beauty', name: 'Bare Skin Makeup Co.', location: 'Phoenix, AZ', rating: 4.9, price: 130, likes: '1.5K', comments: 61, saves: '2.3K', blurb: 'Natural glam and airbrush makeup for any event.', verified: false, distance: '0.8 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#makeup', '#phoenix', '#airbrush'], friendsBooked: 11, avatarColor: '#3FA6BF', locationMode: 'I travel to customers',
+    { id: 'f7', category: 'Parties', name: 'Nova Sound DJs', location: 'Los Angeles, CA', rating: 4.8, price: 350, likes: '2.7K', comments: 95, saves: '4.1K', blurb: 'Wedding and club DJ sets with full sound and lighting rig.', verified: true, distance: '4.2 mi', openStatus: 'Available Today', hashtags: ['#dj', '#losangeles', '#nightlife'], friendsBooked: 31, avatarColor: '#97C400', locationMode: 'I travel to customers' },
+    { id: 'f8', category: 'Beauty', name: 'Bare Skin Makeup Co.', location: 'Phoenix, AZ', rating: 4.9, price: 130, likes: '1.5K', comments: 61, saves: '2.3K', blurb: 'Natural glam and airbrush makeup for any event.', verified: false, distance: '0.8 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#makeup', '#phoenix', '#airbrush'], friendsBooked: 11, avatarColor: '#FFFFFF', locationMode: 'I travel to customers',
         deal: { id: 'deal-f8', enabled: true, type: 'fixed', value: 25, label: '$25 OFF TODAY', activatedAt: 0, eligibleServiceIds: null } },
-    { id: RESTAURANT_ID, category: 'Restaurants', name: 'Bella Vista', location: 'Brooklyn, NY', rating: 4.8, price: 50, likes: '2.4K', comments: 128, saves: '1.9K', blurb: 'Modern Italian cuisine with handmade pasta, local ingredients and a cozy atmosphere.', verified: true, distance: '0.8 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#italian', '#brooklyn', '#datenight'], friendsBooked: 42, avatarColor: '#3B2A22', locationMode: 'At my business location',
+    { id: RESTAURANT_ID, category: 'Restaurants', name: 'Bella Vista', location: 'Brooklyn, NY', rating: 4.8, price: 50, likes: '2.4K', comments: 128, saves: '1.9K', blurb: 'Modern Italian cuisine with handmade pasta, local ingredients and a cozy atmosphere.', verified: true, distance: '0.8 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#italian', '#brooklyn', '#datenight'], friendsBooked: 42, avatarColor: '#000000', locationMode: 'At my business location',
         businessType: 'restaurant', address: '123 Grand St, Brooklyn, NY 11249', phone: '(718) 555-0134', priceTier: '$$',
         areas: makeDefaultRestaurantAreas(), tables: makeDefaultRestaurantTables(), combinations: makeDefaultRestaurantCombinations(),
         hours: makeDefaultRestaurantHours(), durationRules: DEFAULT_RESTAURANT_DURATION_RULES, bufferMinutes: 15, intervalMinutes: 30, maxPartySize: 10, minAdvanceHours: 1, advanceDays: 60,
         menu: [{ name: 'Handmade Tagliatelle', price: 24 }, { name: 'Margherita Pizza', price: 18 }, { name: 'Branzino al Forno', price: 32 }, { name: 'Burrata Caprese', price: 16 }, { name: 'Tiramisu', price: 12 }] },
     // Barbers
-    { id: 'f9', category: 'Beauty', name: 'Steel & Blade Barbershop', location: 'Miami, FL', rating: 4.8, price: 30, likes: '980', comments: 34, saves: '1.1K', blurb: 'Classic cuts, sharp fades, hot towel shaves.', verified: true, distance: '1.1 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#miami', '#fade'], friendsBooked: 18, avatarColor: '#2B2B2B', locationMode: 'At my business location' },
-    { id: 'f10', category: 'Beauty', name: 'Clipper Kings', location: 'Austin, TX', rating: 4.7, price: 28, likes: '760', comments: 29, saves: '890', blurb: 'Neighborhood barbershop, walk-ins welcome.', verified: true, distance: '2.0 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#barber', '#austin', '#freshcut'], friendsBooked: 9, avatarColor: '#3B3B3B', locationMode: 'At my business location' },
-    { id: 'f11', category: 'Beauty', name: "The Gentlemen's Cut", location: 'Brooklyn, NY', rating: 4.9, price: 40, likes: '1.4K', comments: 51, saves: '1.6K', blurb: 'Old-school barbering with modern precision.', verified: true, distance: '0.7 mi', openStatus: 'Booking Fast · 5 slots left', hashtags: ['#barbershop', '#brooklyn', '#classiccut'], friendsBooked: 27, avatarColor: '#1F1F1F', locationMode: 'At my business location' },
-    { id: 'f12', category: 'Beauty', name: 'Royal Fade Barbershop', location: 'Chicago, IL', rating: 4.6, price: 32, likes: '650', comments: 22, saves: '740', blurb: 'Precision fades and beard sculpting.', verified: false, distance: '3.4 mi', openStatus: 'Open Now', hashtags: ['#barber', '#chicago', '#beardcare'], friendsBooked: 6, avatarColor: '#333333', locationMode: 'At my business location' },
-    { id: 'f13', category: 'Beauty', name: 'Sharp Edge Barbers', location: 'Denver, CO', rating: 4.8, price: 27, likes: '820', comments: 31, saves: '950', blurb: 'Clean lines, straight razor finishes.', verified: true, distance: '1.8 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#barbershop', '#denver', '#straightrazor'], friendsBooked: 14, avatarColor: '#262626', locationMode: 'At my business location' },
-    { id: 'f14', category: 'Beauty', name: 'Blackout Barbershop', location: 'Los Angeles, CA', rating: 4.9, price: 45, likes: '2.0K', comments: 88, saves: '2.4K', blurb: 'Celebrity barbers, by appointment only.', verified: true, distance: '5.1 mi', openStatus: 'Booking Fast · 2 slots left', hashtags: ['#barber', '#losangeles', '#luxurycut'], friendsBooked: 35, avatarColor: '#181818', locationMode: 'At my business location' },
-    { id: 'f15', category: 'Beauty', name: 'Fresh Fade Co.', location: 'Atlanta, GA', rating: 4.7, price: 29, likes: '710', comments: 26, saves: '810', blurb: 'Fast, clean fades for the whole family.', verified: true, distance: '2.6 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#atlanta', '#fade'], friendsBooked: 11, avatarColor: '#2E2E2E', locationMode: 'At my business location' },
+    { id: 'f9', category: 'Beauty', name: 'Steel & Blade Barbershop', location: 'Miami, FL', rating: 4.8, price: 30, likes: '980', comments: 34, saves: '1.1K', blurb: 'Classic cuts, sharp fades, hot towel shaves.', verified: true, distance: '1.1 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#miami', '#fade'], friendsBooked: 18, avatarColor: '#97C400', locationMode: 'At my business location' },
+    { id: 'f10', category: 'Beauty', name: 'Clipper Kings', location: 'Austin, TX', rating: 4.7, price: 28, likes: '760', comments: 29, saves: '890', blurb: 'Neighborhood barbershop, walk-ins welcome.', verified: true, distance: '2.0 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#barber', '#austin', '#freshcut'], friendsBooked: 9, avatarColor: '#FFFFFF', locationMode: 'At my business location' },
+    { id: 'f11', category: 'Beauty', name: "The Gentlemen's Cut", location: 'Brooklyn, NY', rating: 4.9, price: 40, likes: '1.4K', comments: 51, saves: '1.6K', blurb: 'Old-school barbering with modern precision.', verified: true, distance: '0.7 mi', openStatus: 'Booking Fast · 5 slots left', hashtags: ['#barbershop', '#brooklyn', '#classiccut'], friendsBooked: 27, avatarColor: '#000000', locationMode: 'At my business location' },
+    { id: 'f12', category: 'Beauty', name: 'Royal Fade Barbershop', location: 'Chicago, IL', rating: 4.6, price: 32, likes: '650', comments: 22, saves: '740', blurb: 'Precision fades and beard sculpting.', verified: false, distance: '3.4 mi', openStatus: 'Open Now', hashtags: ['#barber', '#chicago', '#beardcare'], friendsBooked: 6, avatarColor: '#97C400', locationMode: 'At my business location' },
+    { id: 'f13', category: 'Beauty', name: 'Sharp Edge Barbers', location: 'Denver, CO', rating: 4.8, price: 27, likes: '820', comments: 31, saves: '950', blurb: 'Clean lines, straight razor finishes.', verified: true, distance: '1.8 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#barbershop', '#denver', '#straightrazor'], friendsBooked: 14, avatarColor: '#FFFFFF', locationMode: 'At my business location' },
+    { id: 'f14', category: 'Beauty', name: 'Blackout Barbershop', location: 'Los Angeles, CA', rating: 4.9, price: 45, likes: '2.0K', comments: 88, saves: '2.4K', blurb: 'Celebrity barbers, by appointment only.', verified: true, distance: '5.1 mi', openStatus: 'Booking Fast · 2 slots left', hashtags: ['#barber', '#losangeles', '#luxurycut'], friendsBooked: 35, avatarColor: '#000000', locationMode: 'At my business location' },
+    { id: 'f15', category: 'Beauty', name: 'Fresh Fade Co.', location: 'Atlanta, GA', rating: 4.7, price: 29, likes: '710', comments: 26, saves: '810', blurb: 'Fast, clean fades for the whole family.', verified: true, distance: '2.6 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#atlanta', '#fade'], friendsBooked: 11, avatarColor: '#97C400', locationMode: 'At my business location' },
     // Boat rentals
-    { id: 'f16', category: 'Rentals', name: 'Blue Horizon Boat Rentals', location: 'Miami, FL', rating: 4.8, price: 220, likes: '1.6K', comments: 47, saves: '2.0K', blurb: 'Half-day and full-day boat rentals on Biscayne Bay.', verified: true, distance: '0.4 mi', openStatus: 'Open Now', hashtags: ['#boatrental', '#miami', '#biscaynebay'], friendsBooked: 21, avatarColor: '#1F5C7A', locationMode: 'At my business location' },
-    { id: 'f17', category: 'Rentals', name: 'Sunset Charters', location: 'San Diego, CA', rating: 4.7, price: 280, likes: '1.1K', comments: 38, saves: '1.3K', blurb: 'Sunset cruises and private charters.', verified: true, distance: '1.6 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#boatcharter', '#sandiego', '#sunsetcruise'], friendsBooked: 16, avatarColor: '#2A6F8F', locationMode: 'At my business location' },
-    { id: 'f18', category: 'Rentals', name: 'Marina Bay Yacht Rentals', location: 'Fort Lauderdale, FL', rating: 4.9, price: 450, likes: '2.3K', comments: 92, saves: '2.9K', blurb: 'Luxury yacht rentals with captain included.', verified: true, distance: '0.9 mi', openStatus: 'Booking Fast · 3 slots left', hashtags: ['#yachtrental', '#fortlauderdale', '#luxury'], friendsBooked: 40, avatarColor: '#134B63', locationMode: 'At my business location' },
-    { id: 'f19', category: 'Rentals', name: 'Lakeside Boat Co.', location: 'Lake Tahoe, CA', rating: 4.6, price: 190, likes: '640', comments: 19, saves: '720', blurb: 'Pontoon and speedboat rentals on the lake.', verified: false, distance: '2.2 mi', openStatus: 'Open Now', hashtags: ['#boatrental', '#laketahoe', '#pontoon'], friendsBooked: 8, avatarColor: '#2F7A93', locationMode: 'At my business location' },
-    { id: 'f20', category: 'Rentals', name: 'Coastal Cruise Rentals', location: 'Newport Beach, CA', rating: 4.7, price: 250, likes: '900', comments: 33, saves: '1.0K', blurb: 'Day sails and coastal boat rentals.', verified: true, distance: '3.0 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#boatrental', '#newportbeach', '#sailing'], friendsBooked: 13, avatarColor: '#20627E', locationMode: 'At my business location' },
-    { id: 'f21', category: 'Rentals', name: 'Anchor Point Charters', location: 'Seattle, WA', rating: 4.8, price: 300, likes: '1.2K', comments: 44, saves: '1.4K', blurb: 'Fishing charters and private boat rentals.', verified: true, distance: '1.3 mi', openStatus: 'Open Now', hashtags: ['#boatcharter', '#seattle', '#fishing'], friendsBooked: 19, avatarColor: '#1A4E6B', locationMode: 'At my business location' },
-    { id: 'f22', category: 'Rentals', name: 'Harbor Watersports', location: 'Charleston, SC', rating: 4.6, price: 175, likes: '540', comments: 17, saves: '600', blurb: 'Jet skis, pontoons, and watersport rentals.', verified: false, distance: '2.7 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#boatrental', '#charleston', '#jetski'], friendsBooked: 7, avatarColor: '#357F98', locationMode: 'At my business location' },
-    { id: 'f23', category: 'Rentals', name: 'Deep Blue Yachts', location: 'Key West, FL', rating: 4.9, price: 500, likes: '1.9K', comments: 71, saves: '2.2K', blurb: 'Premium yacht charters around the Keys.', verified: true, distance: '0.6 mi', openStatus: 'Booking Fast · 4 slots left', hashtags: ['#yachtcharter', '#keywest', '#luxury'], friendsBooked: 33, avatarColor: '#0F3E52', locationMode: 'At my business location' },
+    { id: 'f16', category: 'Rentals', name: 'Blue Horizon Boat Rentals', location: 'Miami, FL', rating: 4.8, price: 220, likes: '1.6K', comments: 47, saves: '2.0K', blurb: 'Half-day and full-day boat rentals on Biscayne Bay.', verified: true, distance: '0.4 mi', openStatus: 'Open Now', hashtags: ['#boatrental', '#miami', '#biscaynebay'], friendsBooked: 21, avatarColor: '#FFFFFF', locationMode: 'At my business location' },
+    { id: 'f17', category: 'Rentals', name: 'Sunset Charters', location: 'San Diego, CA', rating: 4.7, price: 280, likes: '1.1K', comments: 38, saves: '1.3K', blurb: 'Sunset cruises and private charters.', verified: true, distance: '1.6 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#boatcharter', '#sandiego', '#sunsetcruise'], friendsBooked: 16, avatarColor: '#000000', locationMode: 'At my business location' },
+    { id: 'f18', category: 'Rentals', name: 'Marina Bay Yacht Rentals', location: 'Fort Lauderdale, FL', rating: 4.9, price: 450, likes: '2.3K', comments: 92, saves: '2.9K', blurb: 'Luxury yacht rentals with captain included.', verified: true, distance: '0.9 mi', openStatus: 'Booking Fast · 3 slots left', hashtags: ['#yachtrental', '#fortlauderdale', '#luxury'], friendsBooked: 40, avatarColor: '#97C400', locationMode: 'At my business location' },
+    { id: 'f19', category: 'Rentals', name: 'Lakeside Boat Co.', location: 'Lake Tahoe, CA', rating: 4.6, price: 190, likes: '640', comments: 19, saves: '720', blurb: 'Pontoon and speedboat rentals on the lake.', verified: false, distance: '2.2 mi', openStatus: 'Open Now', hashtags: ['#boatrental', '#laketahoe', '#pontoon'], friendsBooked: 8, avatarColor: '#FFFFFF', locationMode: 'At my business location' },
+    { id: 'f20', category: 'Rentals', name: 'Coastal Cruise Rentals', location: 'Newport Beach, CA', rating: 4.7, price: 250, likes: '900', comments: 33, saves: '1.0K', blurb: 'Day sails and coastal boat rentals.', verified: true, distance: '3.0 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#boatrental', '#newportbeach', '#sailing'], friendsBooked: 13, avatarColor: '#000000', locationMode: 'At my business location' },
+    { id: 'f21', category: 'Rentals', name: 'Anchor Point Charters', location: 'Seattle, WA', rating: 4.8, price: 300, likes: '1.2K', comments: 44, saves: '1.4K', blurb: 'Fishing charters and private boat rentals.', verified: true, distance: '1.3 mi', openStatus: 'Open Now', hashtags: ['#boatcharter', '#seattle', '#fishing'], friendsBooked: 19, avatarColor: '#97C400', locationMode: 'At my business location' },
+    { id: 'f22', category: 'Rentals', name: 'Harbor Watersports', location: 'Charleston, SC', rating: 4.6, price: 175, likes: '540', comments: 17, saves: '600', blurb: 'Jet skis, pontoons, and watersport rentals.', verified: false, distance: '2.7 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#boatrental', '#charleston', '#jetski'], friendsBooked: 7, avatarColor: '#FFFFFF', locationMode: 'At my business location' },
+    { id: 'f23', category: 'Rentals', name: 'Deep Blue Yachts', location: 'Key West, FL', rating: 4.9, price: 500, likes: '1.9K', comments: 71, saves: '2.2K', blurb: 'Premium yacht charters around the Keys.', verified: true, distance: '0.6 mi', openStatus: 'Booking Fast · 4 slots left', hashtags: ['#yachtcharter', '#keywest', '#luxury'], friendsBooked: 33, avatarColor: '#000000', locationMode: 'At my business location' },
     // Hair salons
-    { id: 'f24', category: 'Beauty', name: 'Luxe Hair Studio', location: 'Los Angeles, CA', rating: 4.9, price: 110, likes: '1.7K', comments: 63, saves: '2.1K', blurb: 'Color, cuts, and keratin treatments.', verified: true, distance: '1.4 mi', openStatus: 'Open Now', hashtags: ['#hairsalon', '#losangeles', '#haircolor'], friendsBooked: 24, avatarColor: '#7A4A6B', locationMode: 'At my business location' },
-    { id: 'f25', category: 'Beauty', name: 'The Style Loft', location: 'New York, NY', rating: 4.8, price: 130, likes: '1.5K', comments: 55, saves: '1.8K', blurb: 'Modern cuts and balayage specialists.', verified: true, distance: '0.5 mi', openStatus: 'Booking Fast · 6 slots left', hashtags: ['#hairsalon', '#newyork', '#balayage'], friendsBooked: 20, avatarColor: '#8A5A75', locationMode: 'At my business location' },
-    { id: 'f26', category: 'Beauty', name: 'Radiance Hair Salon', location: 'Houston, TX', rating: 4.6, price: 85, likes: '620', comments: 21, saves: '710', blurb: 'Full-service salon for cuts, color, and styling.', verified: false, distance: '3.2 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#hairsalon', '#houston', '#hairstyle'], friendsBooked: 10, avatarColor: '#6B3F5C', locationMode: 'At my business location' },
+    { id: 'f24', category: 'Beauty', name: 'Luxe Hair Studio', location: 'Los Angeles, CA', rating: 4.9, price: 110, likes: '1.7K', comments: 63, saves: '2.1K', blurb: 'Color, cuts, and keratin treatments.', verified: true, distance: '1.4 mi', openStatus: 'Open Now', hashtags: ['#hairsalon', '#losangeles', '#haircolor'], friendsBooked: 24, avatarColor: '#97C400', locationMode: 'At my business location' },
+    { id: 'f25', category: 'Beauty', name: 'The Style Loft', location: 'New York, NY', rating: 4.8, price: 130, likes: '1.5K', comments: 55, saves: '1.8K', blurb: 'Modern cuts and balayage specialists.', verified: true, distance: '0.5 mi', openStatus: 'Booking Fast · 6 slots left', hashtags: ['#hairsalon', '#newyork', '#balayage'], friendsBooked: 20, avatarColor: '#FFFFFF', locationMode: 'At my business location' },
+    { id: 'f26', category: 'Beauty', name: 'Radiance Hair Salon', location: 'Houston, TX', rating: 4.6, price: 85, likes: '620', comments: 21, saves: '710', blurb: 'Full-service salon for cuts, color, and styling.', verified: false, distance: '3.2 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#hairsalon', '#houston', '#hairstyle'], friendsBooked: 10, avatarColor: '#000000', locationMode: 'At my business location' },
     // Personal trainers
-    { id: 'f27', category: 'Educational', name: 'Iron Will Fitness Coaching', location: 'Phoenix, AZ', rating: 4.8, price: 65, likes: '890', comments: 27, saves: '960', blurb: '1-on-1 strength and conditioning coaching.', verified: true, distance: '1.9 mi', openStatus: 'Open Now', hashtags: ['#personaltrainer', '#phoenix', '#strength'], friendsBooked: 15, avatarColor: '#B5461F', locationMode: 'I travel to customers' },
-    { id: 'f28', category: 'Educational', name: 'Peak Performance Training', location: 'Denver, CO', rating: 4.9, price: 75, likes: '1.0K', comments: 34, saves: '1.2K', blurb: 'Personalized workouts, in-gym or at home.', verified: true, distance: '2.3 mi', openStatus: 'Available Today', hashtags: ['#personaltrainer', '#denver', '#fitness'], friendsBooked: 22, avatarColor: '#C2571F', locationMode: 'I travel to customers' },
+    { id: 'f27', category: 'Educational', name: 'Iron Will Fitness Coaching', location: 'Phoenix, AZ', rating: 4.8, price: 65, likes: '890', comments: 27, saves: '960', blurb: '1-on-1 strength and conditioning coaching.', verified: true, distance: '1.9 mi', openStatus: 'Open Now', hashtags: ['#personaltrainer', '#phoenix', '#strength'], friendsBooked: 15, avatarColor: '#97C400', locationMode: 'I travel to customers' },
+    { id: 'f28', category: 'Educational', name: 'Peak Performance Training', location: 'Denver, CO', rating: 4.9, price: 75, likes: '1.0K', comments: 34, saves: '1.2K', blurb: 'Personalized workouts, in-gym or at home.', verified: true, distance: '2.3 mi', openStatus: 'Available Today', hashtags: ['#personaltrainer', '#denver', '#fitness'], friendsBooked: 22, avatarColor: '#FFFFFF', locationMode: 'I travel to customers' },
     // Home cleaning
-    { id: 'f29', category: 'Home Services', name: 'Spotless Home Cleaning Co.', location: 'Dallas, TX', rating: 4.7, price: 95, likes: '780', comments: 24, saves: '860', blurb: 'Recurring and one-time home cleaning.', verified: true, distance: '2.8 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#homecleaning', '#dallas', '#deepclean'], friendsBooked: 12, avatarColor: '#4A8F6B', locationMode: 'I travel to customers' },
-    { id: 'f30', category: 'Home Services', name: 'Bright Nest Cleaning', location: 'Seattle, WA', rating: 4.8, price: 100, likes: '910', comments: 30, saves: '1.0K', blurb: 'Eco-friendly cleaning for homes and apartments.', verified: true, distance: '1.5 mi', openStatus: 'Open Now', hashtags: ['#homecleaning', '#seattle', '#ecofriendly'], friendsBooked: 17, avatarColor: '#3F9E6F', locationMode: 'I travel to customers' },
-    { id: 'f31', category: 'Home Services', name: 'Tidy Turn Cleaners', location: 'Orlando, FL', rating: 4.6, price: 80, likes: '520', comments: 16, saves: '580', blurb: 'Move-in/move-out and standard cleaning.', verified: false, distance: '3.6 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#homecleaning', '#orlando', '#movein'], friendsBooked: 6, avatarColor: '#57A578', locationMode: 'I travel to customers' },
-    { id: 'f32', category: 'Home Services', name: 'Crystal Clean Home Services', location: 'Portland, OR', rating: 4.9, price: 110, likes: '1.1K', comments: 39, saves: '1.3K', blurb: 'Detailed cleaning with trusted, vetted staff.', verified: true, distance: '2.1 mi', openStatus: 'Open Now', hashtags: ['#homecleaning', '#portland', '#trusted'], friendsBooked: 19, avatarColor: '#2F8A5C', locationMode: 'I travel to customers' },
+    { id: 'f29', category: 'Home Services', name: 'Spotless Home Cleaning Co.', location: 'Dallas, TX', rating: 4.7, price: 95, likes: '780', comments: 24, saves: '860', blurb: 'Recurring and one-time home cleaning.', verified: true, distance: '2.8 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#homecleaning', '#dallas', '#deepclean'], friendsBooked: 12, avatarColor: '#000000', locationMode: 'I travel to customers' },
+    { id: 'f30', category: 'Home Services', name: 'Bright Nest Cleaning', location: 'Seattle, WA', rating: 4.8, price: 100, likes: '910', comments: 30, saves: '1.0K', blurb: 'Eco-friendly cleaning for homes and apartments.', verified: true, distance: '1.5 mi', openStatus: 'Open Now', hashtags: ['#homecleaning', '#seattle', '#ecofriendly'], friendsBooked: 17, avatarColor: '#97C400', locationMode: 'I travel to customers' },
+    { id: 'f31', category: 'Home Services', name: 'Tidy Turn Cleaners', location: 'Orlando, FL', rating: 4.6, price: 80, likes: '520', comments: 16, saves: '580', blurb: 'Move-in/move-out and standard cleaning.', verified: false, distance: '3.6 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#homecleaning', '#orlando', '#movein'], friendsBooked: 6, avatarColor: '#FFFFFF', locationMode: 'I travel to customers' },
+    { id: 'f32', category: 'Home Services', name: 'Crystal Clean Home Services', location: 'Portland, OR', rating: 4.9, price: 110, likes: '1.1K', comments: 39, saves: '1.3K', blurb: 'Detailed cleaning with trusted, vetted staff.', verified: true, distance: '2.1 mi', openStatus: 'Open Now', hashtags: ['#homecleaning', '#portland', '#trusted'], friendsBooked: 19, avatarColor: '#000000', locationMode: 'I travel to customers' },
     // Car rentals
-    { id: 'f33', category: 'Rentals', name: 'Premier Auto Rentals', location: 'Las Vegas, NV', rating: 4.6, price: 65, likes: '740', comments: 25, saves: '820', blurb: 'Daily and weekly car rentals, all makes.', verified: true, distance: '1.2 mi', openStatus: 'Open Now', hashtags: ['#carrental', '#lasvegas', '#roadtrip'], friendsBooked: 14, avatarColor: '#5A5A5A', locationMode: 'At my business location' },
-    { id: 'f34', category: 'Rentals', name: 'Elite Wheels Car Rental', location: 'Los Angeles, CA', rating: 4.8, price: 120, likes: '1.3K', comments: 46, saves: '1.5K', blurb: 'Luxury and sports car rentals.', verified: true, distance: '2.5 mi', openStatus: 'Booking Fast · 5 slots left', hashtags: ['#carrental', '#losangeles', '#luxurycars'], friendsBooked: 27, avatarColor: '#454545', locationMode: 'At my business location' },
-    { id: 'f35', category: 'Rentals', name: 'Metro Car Exchange', location: 'Chicago, IL', rating: 4.5, price: 55, likes: '480', comments: 14, saves: '540', blurb: 'Affordable, reliable rentals in the city.', verified: false, distance: '3.3 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#carrental', '#chicago', '#affordable'], friendsBooked: 5, avatarColor: '#4F4F4F', locationMode: 'At my business location' },
+    { id: 'f33', category: 'Rentals', name: 'Premier Auto Rentals', location: 'Las Vegas, NV', rating: 4.6, price: 65, likes: '740', comments: 25, saves: '820', blurb: 'Daily and weekly car rentals, all makes.', verified: true, distance: '1.2 mi', openStatus: 'Open Now', hashtags: ['#carrental', '#lasvegas', '#roadtrip'], friendsBooked: 14, avatarColor: '#97C400', locationMode: 'At my business location' },
+    { id: 'f34', category: 'Rentals', name: 'Elite Wheels Car Rental', location: 'Los Angeles, CA', rating: 4.8, price: 120, likes: '1.3K', comments: 46, saves: '1.5K', blurb: 'Luxury and sports car rentals.', verified: true, distance: '2.5 mi', openStatus: 'Booking Fast · 5 slots left', hashtags: ['#carrental', '#losangeles', '#luxurycars'], friendsBooked: 27, avatarColor: '#FFFFFF', locationMode: 'At my business location' },
+    { id: 'f35', category: 'Rentals', name: 'Metro Car Exchange', location: 'Chicago, IL', rating: 4.5, price: 55, likes: '480', comments: 14, saves: '540', blurb: 'Affordable, reliable rentals in the city.', verified: false, distance: '3.3 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#carrental', '#chicago', '#affordable'], friendsBooked: 5, avatarColor: '#000000', locationMode: 'At my business location' },
     // Event videographers
-    { id: 'f36', category: 'Parties', name: 'Frame & Focus Films', location: 'Brooklyn, NY', rating: 4.9, price: 550, likes: '1.4K', comments: 53, saves: '1.7K', blurb: 'Cinematic wedding and event videography.', verified: true, distance: '0.8 mi', openStatus: 'Booking Fast · 3 slots left', hashtags: ['#videographer', '#brooklyn', '#weddingfilm'], friendsBooked: 23, avatarColor: '#4C4C6C', locationMode: 'I travel to customers' },
-    { id: 'f37', category: 'Parties', name: 'Golden Hour Media', location: 'Austin, TX', rating: 4.7, price: 400, likes: '820', comments: 28, saves: '940', blurb: 'Event and brand videography, same-week edits.', verified: true, distance: '2.0 mi', openStatus: 'Open Now', hashtags: ['#videographer', '#austin', '#eventvideo'], friendsBooked: 11, avatarColor: '#5C5480', locationMode: 'I travel to customers' },
-    { id: 'f38', category: 'Parties', name: 'Lasting Moments Videography', location: 'San Francisco, CA', rating: 4.8, price: 600, likes: '1.0K', comments: 37, saves: '1.2K', blurb: 'Full-day event coverage with drone footage.', verified: true, distance: '1.7 mi', openStatus: 'Available Today', hashtags: ['#videographer', '#sanfrancisco', '#dronefootage'], friendsBooked: 18, avatarColor: '#3F3F6E', locationMode: 'I travel to customers' },
-    { id: 'f39', category: 'Educational', businessType: 'activities', name: 'Clay & Co.', businessSubtitle: 'Pottery Painting Studio', location: 'Brooklyn, NY', rating: 4.9, price: 30, likes: '2.4K', comments: 326, saves: '3.1K', blurb: 'Unwind, get creative, and make something beautiful.', verified: true, distance: '0.7 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#potterypainting', '#brooklyn', '#thingstodo'], friendsBooked: 29, avatarColor: '#8A5A3B', locationMode: 'At my business location',
+    { id: 'f36', category: 'Parties', name: 'Frame & Focus Films', location: 'Brooklyn, NY', rating: 4.9, price: 550, likes: '1.4K', comments: 53, saves: '1.7K', blurb: 'Cinematic wedding and event videography.', verified: true, distance: '0.8 mi', openStatus: 'Booking Fast · 3 slots left', hashtags: ['#videographer', '#brooklyn', '#weddingfilm'], friendsBooked: 23, avatarColor: '#97C400', locationMode: 'I travel to customers' },
+    { id: 'f37', category: 'Parties', name: 'Golden Hour Media', location: 'Austin, TX', rating: 4.7, price: 400, likes: '820', comments: 28, saves: '940', blurb: 'Event and brand videography, same-week edits.', verified: true, distance: '2.0 mi', openStatus: 'Open Now', hashtags: ['#videographer', '#austin', '#eventvideo'], friendsBooked: 11, avatarColor: '#FFFFFF', locationMode: 'I travel to customers' },
+    { id: 'f38', category: 'Parties', name: 'Lasting Moments Videography', location: 'San Francisco, CA', rating: 4.8, price: 600, likes: '1.0K', comments: 37, saves: '1.2K', blurb: 'Full-day event coverage with drone footage.', verified: true, distance: '1.7 mi', openStatus: 'Available Today', hashtags: ['#videographer', '#sanfrancisco', '#dronefootage'], friendsBooked: 18, avatarColor: '#000000', locationMode: 'I travel to customers' },
+    { id: 'f39', category: 'Educational', businessType: 'activities', name: 'Clay & Co.', businessSubtitle: 'Pottery Painting Studio', location: 'Brooklyn, NY', rating: 4.9, price: 30, likes: '2.4K', comments: 326, saves: '3.1K', blurb: 'Unwind, get creative, and make something beautiful.', verified: true, distance: '0.7 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#potterypainting', '#brooklyn', '#thingstodo'], friendsBooked: 29, avatarColor: '#97C400', locationMode: 'At my business location',
         address: '123 Art Lane, Brooklyn, NY 11217', activityHours: makeDefaultActivityHours(), activitySpaces: makeDefaultActivitySpaces(), activities: makeDefaultActivities() },
+    { id: 'f40', category: 'Beauty', name: 'Luxe Nail Bar', location: 'Miami, FL', rating: 4.9, price: 45, likes: '1.8K', comments: 61, saves: '2.0K', blurb: 'Gel manicures, acrylics and nail art in a relaxing studio.', verified: true, distance: '0.6 mi', openStatus: 'Open Now', hashtags: ['#nailsalon', '#manicure', '#miami'], friendsBooked: 34, avatarColor: '#000000', locationMode: 'At my business location' },
+    { id: 'f41', category: 'Beauty', name: 'Polished Nail Studio', location: 'Brooklyn, NY', rating: 4.8, price: 40, likes: '1.2K', comments: 44, saves: '1.5K', blurb: 'Clean, modern nail salon specializing in gel-x and nail art.', verified: true, distance: '0.9 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#nailsalon', '#pedicure', '#brooklyn'], friendsBooked: 21, avatarColor: '#97C400', locationMode: 'At my business location' },
+    { id: 'f42', category: 'Beauty', name: 'Bloom Nails & Spa', location: 'Austin, TX', rating: 4.7, price: 38, likes: '760', comments: 27, saves: '890', blurb: 'Manicures, pedicures and nail extensions with a spa touch.', verified: false, distance: '1.4 mi', openStatus: 'Open Now', hashtags: ['#nailsalon', '#nailart', '#austin'], friendsBooked: 9, avatarColor: '#FFFFFF', locationMode: 'At my business location' },
 ];
 const CATEGORIES = [
     { id: 'shorts', label: 'All shorts', count: 31, icon: 'compass', color: '#2E9BFF' },
@@ -1352,6 +1375,85 @@ const AI_SEARCH_TRENDING = [
     { id: 'massage-today', label: 'Massage today', count: '6.2K searches', query: 'massage available today', image: 'assets/explore/barbershop.jpg' },
     { id: 'brunch', label: 'Best brunch spots', count: '5.1K searches', query: 'best brunch spots', image: 'assets/explore/makeup-promo.jpg' },
 ];
+const QUICK_SEARCH_GROUPS = [
+    { key: 'barber', label: 'Barber', terms: ['barber', 'barbers', 'barbershop', 'barbershops', 'fade', 'fades', 'lineup', 'shape up', 'haircut', 'hair cut'] },
+    { key: 'hair', label: 'Hair Salon', terms: ['hair salon', 'hairstylist', 'hair stylist', 'stylist', 'blowout', 'balayage', 'braid', 'braids', 'loctician', 'locs'] },
+    { key: 'nails', label: 'Nail Salon', terms: ['nail salon', 'nails', 'nail tech', 'manicure', 'pedicure', 'mani', 'pedi'] },
+    { key: 'makeup', label: 'Makeup Artist', terms: ['makeup artist', 'makeup', 'mua'] },
+    { key: 'massage', label: 'Massage', terms: ['massage', 'masseuse', 'masseur', 'spa'] },
+    { key: 'photo', label: 'Photographer', terms: ['photographer', 'photography', 'photo studio', 'camera man', 'cameraman', 'videographer', 'video', 'cinematographer'] },
+    { key: 'dj', label: 'DJ', terms: ['dj', 'deejay', 'disc jockey'] },
+    { key: 'trainer', label: 'Personal Trainer', terms: ['personal trainer', 'trainer', 'fitness coach', 'gym coach'] },
+    { key: 'tattoo', label: 'Tattoo Artist', terms: ['tattoo', 'tattoo artist', 'tattoo studio'] },
+    { key: 'boat', label: 'Boat Rental', terms: ['boat rental', 'boat', 'boats', 'yacht', 'yacht charter'] },
+    { key: 'jetski', label: 'Jet Ski', terms: ['jet ski', 'jetski', 'jet skis', 'wave runner'] },
+    { key: 'car', label: 'Car Rental', terms: ['car rental', 'car detailing', 'detailing', 'auto detailing', 'car wash'] },
+    { key: 'cleaning', label: 'Home Cleaning', terms: ['home cleaning', 'cleaning', 'cleaner', 'maid', 'housekeeping'] },
+    { key: 'restaurant', label: 'Restaurant', terms: ['restaurant', 'sushi', 'brunch', 'dinner', 'date night'] },
+    { key: 'event', label: 'Event Planner', terms: ['event planner', 'event', 'party', 'wedding planner'] },
+    { key: 'golf', label: 'Golf', terms: ['topgolf', 'golf', 'mini golf'] },
+    { key: 'activity', label: 'Activities', terms: ['pottery', 'paint and sip', 'escape room', 'activity', 'activities', 'experience'] },
+];
+function quickSearchLevenshtein(a, b) {
+    const dp = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+    for (let j = 0; j <= b.length; j++)
+        dp[0][j] = j;
+    for (let i = 1; i <= a.length; i++)
+        for (let j = 1; j <= b.length; j++)
+            dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+    return dp[a.length][b.length];
+}
+function quickSearchFuzzyClose(a, b) {
+    if (a === b)
+        return true;
+    if (a.length < 4 || b.length < 4)
+        return false;
+    const maxDist = a.length <= 5 || b.length <= 5 ? 1 : 2;
+    return quickSearchLevenshtein(a, b) <= maxDist;
+}
+function quickSearchTermMatches(term, words, q) {
+    if (q.includes(term))
+        return true;
+    if (term.length >= 4 && term.includes(q))
+        return true;
+    const termWords = term.split(' ');
+    if (termWords.length === 1)
+        return words.some((qw) => quickSearchFuzzyClose(qw, termWords[0]));
+    return termWords.every((tw) => words.some((qw) => quickSearchFuzzyClose(qw, tw)));
+}
+function parseQuickSearchQuery(rawQuery) {
+    const q = rawQuery.trim().toLowerCase();
+    const words = q.split(/\s+/).filter(Boolean);
+    const groupKeys = new Set();
+    let matchedGroup = null;
+    if (q) {
+        QUICK_SEARCH_GROUPS.forEach((g) => {
+            const hit = g.terms.some((term) => quickSearchTermMatches(term, words, q));
+            if (hit) {
+                groupKeys.add(g.key);
+                if (!matchedGroup)
+                    matchedGroup = g;
+            }
+        });
+    }
+    return { q, words, groupKeys, matchedGroup };
+}
+function quickSearchItemHaystack(item) {
+    return `${item.name} ${item.category} ${item.businessSubtitle || ''} ${item.blurb || ''} ${(item.hashtags || []).join(' ')}`.toLowerCase();
+}
+function quickSearchItemMatches(item, parsed) {
+    const hay = quickSearchItemHaystack(item);
+    if (parsed.groupKeys.size > 0) {
+        for (const key of parsed.groupKeys) {
+            const g = QUICK_SEARCH_GROUPS.find((x) => x.key === key);
+            if (g.terms.some((t) => hay.includes(t)))
+                return true;
+        }
+        return false;
+    }
+    return parsed.words.some((w) => w.length >= 3 && hay.includes(w));
+}
+function avatarFg(bg) { return bg === '#FFFFFF' ? '#000000' : '#fff'; }
 function money(n) { return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' }); }
 const EARNINGS_WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const EARNINGS_WEEKDAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -2028,7 +2130,13 @@ function App() {
     const [aiSearchRelaxedNote, setAiSearchRelaxedNote] = useState(null);
     const [aiSearchRelaxedField, setAiSearchRelaxedField] = useState(null);
     const [aiRefineDraft, setAiRefineDraft] = useState('');
-    const [aiRecentSearches, setAiRecentSearches] = useState(() => loadLS('avio_ai_recent_searches', []));
+    const [aiRecentSearches, setAiRecentSearches] = useState(() => loadLS('avio_ai_recent_searches', [
+        { id: 'seed-barber', text: 'Barber', ts: Date.now() - 50000 },
+        { id: 'seed-nails', text: 'Nail Salon', ts: Date.now() - 40000 },
+        { id: 'seed-photo', text: 'Photographer', ts: Date.now() - 30000 },
+        { id: 'seed-trainer', text: 'Personal Trainer', ts: Date.now() - 20000 },
+        { id: 'seed-restaurant', text: 'Restaurant', ts: Date.now() - 10000 },
+    ]));
     const [aiQueryEditing, setAiQueryEditing] = useState(false);
     const [aiQueryDraft, setAiQueryDraft] = useState('');
     const [aiIsSearching, setAiIsSearching] = useState(false);
@@ -2038,7 +2146,18 @@ function App() {
     const [aiVoiceListening, setAiVoiceListening] = useState(false);
     const [homeSearchOpen, setHomeSearchOpen] = useState(false);
     const [homeSearchQuery, setHomeSearchQuery] = useState('');
-    const [homeQuickFilter, setHomeQuickFilter] = useState('all');
+    const [homeSearchDebounced, setHomeSearchDebounced] = useState('');
+    useEffect(() => {
+        const t = setTimeout(() => setHomeSearchDebounced(homeSearchQuery), 150);
+        return () => clearTimeout(t);
+    }, [homeSearchQuery]);
+    useEffect(() => {
+        const q = homeSearchDebounced.trim();
+        if (q.length < 2)
+            return;
+        const t = setTimeout(() => recordAiRecentSearch(q), 900);
+        return () => clearTimeout(t);
+    }, [homeSearchDebounced]);
     const [businessType, setBusinessType] = useState('service');
     const [restaurantDashboardOpen, setRestaurantDashboardOpen] = useState(false);
     const [restaurantDashTab, setRestaurantDashTab] = useState('overview');
@@ -2257,7 +2376,7 @@ function App() {
     }
     function openHomeSearch() {
         setHomeSearchQuery('');
-        setHomeQuickFilter('all');
+        setHomeSearchDebounced('');
         setHomeSearchOpen(true);
     }
     function closeHomeSearch() {
@@ -5055,7 +5174,7 @@ function App() {
                         return React.createElement("button", { key: item.id, onClick: () => openBusinessProfile(item), className: "avio-results-in avio-press", style: { animationDelay: `${Math.min(i, 6) * 0.04}s`, display: 'flex', gap: 12, width: '100%', textAlign: 'left', padding: 12, borderRadius: 18, border: `1px solid ${T.border}`, background: T.surface, marginBottom: 10, boxShadow: '0 2px 10px rgba(0,0,0,0.04)' } },
                             item.image
                                 ? React.createElement("div", { style: { width: 76, height: 76, borderRadius: 14, flexShrink: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
-                                : React.createElement("div", { style: { width: 76, height: 76, borderRadius: 14, flexShrink: 0, background: item.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: '#fff' } }, item.name.charAt(0)),
+                                : React.createElement("div", { style: { width: 76, height: 76, borderRadius: 14, flexShrink: 0, background: item.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: avatarFg(item.avatarColor) } }, item.name.charAt(0)),
                             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
                                     React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: T.textPrimary } }, item.name),
@@ -5085,117 +5204,82 @@ function App() {
                     React.createElement("span", { style: { color: aiRefineDraft.trim() ? '#fff' : '#B5B5B8', fontSize: 15, fontWeight: 700 } }, "↑")));
             return React.createElement(React.Fragment, null, header, resultsHeader, resultsList, followUpBar);
         })())),
-        tab === 'discover' && homeSearchOpen && (React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 5, display: 'flex', flexDirection: 'column' } }, (() => {
-            const QUICK_CHIPS = [
-                { id: 'all', label: 'All', icon: 'grid' },
-                { id: 'nearby', label: 'Nearby', icon: 'mappin' },
-                { id: 'topRated', label: 'Top Rated', icon: 'star' },
-                { id: 'openNow', label: 'Open Now', icon: 'clock' },
-                { id: 'price', label: 'Price', icon: 'tag' },
-            ];
-            const POPULAR_CATEGORIES = [
-                { id: 'hairbeauty', label: 'Hair & Beauty', icon: 'scissors', query: 'hair and beauty' },
-                { id: 'fitness', label: 'Fitness', icon: 'heart', query: 'fitness training' },
-                { id: 'auto', label: 'Auto', icon: 'car', query: 'auto detailing' },
-                { id: 'wellness', label: 'Wellness', icon: 'sparkles', query: 'wellness' },
-                { id: 'events', label: 'Events', icon: 'calendar', query: 'event planning' },
-                { id: 'homeservices', label: 'Home Services', icon: 'house', query: 'home services' },
-                { id: 'food', label: 'Food', icon: 'utensils', query: 'food' },
-                { id: 'photography', label: 'Photography', icon: 'camera', query: 'photography' },
-                { id: 'more', label: 'More', icon: 'grid', query: null },
-            ];
-            const TRENDING_CHIPS = [
-                { label: 'Nail Salon', color: '#F5134F' },
-                { label: 'Barbershop', color: '#2E9BFF' },
-                { label: 'Massage', color: THEME.violet },
-                { label: 'Makeup Artist', color: THEME.gold },
-                { label: 'Yoga', color: '#3FBF8A' },
-                { label: 'Photography', color: THEME.purple },
-            ];
-            const runHomeQuery = (text) => { openAiSearchFromHome(text); };
-            const titleBar = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 16px) 18px 0` } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: T.textPrimary, margin: 0 } }, "Search"),
-                React.createElement("button", { onClick: closeHomeSearch, style: { display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement(Icon, { name: "x", size: 22, color: "#161616" })));
+        tab === 'discover' && homeSearchOpen && (React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: '#FFFFFF', zIndex: 5, display: 'flex', flexDirection: 'column' } }, (() => {
+            const QS = { text: '#161616', sub: '#8A8A8E', border: '#E6E6EA', chip: '#FAFAFA' };
+            const TRENDING_CHIPS = ['Barber', 'Nail Salon', 'Photographer', 'Massage', 'Jet Ski', 'Makeup Artist', 'Personal Trainer', 'DJ'];
+            const query = homeSearchQuery;
+            const hasQuery = query.trim().length > 0;
+            const parsed = parseQuickSearchQuery(homeSearchDebounced);
+            const runHomeQuery = (text) => setHomeSearchQuery(text);
+            const titleBar = React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 16px) 18px 0` } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 800, fontSize: 24, color: QS.text, margin: 0 } }, "Search"),
+                    React.createElement("button", { onClick: closeHomeSearch, style: { display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: "x", size: 22, color: QS.text }))));
             const searchFieldRow = React.createElement("div", { style: { flexShrink: 0, padding: '14px 18px 0' } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: T.surfaceSecondary, border: `1px solid ${T.border}`, borderRadius: 16, height: 48, padding: '0 14px' } },
-                    React.createElement(Icon, { name: "search", size: 17, color: T.textSecondary }),
-                    React.createElement("input", { autoFocus: true, value: homeSearchQuery, onChange: (e) => setHomeSearchQuery(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter' && homeSearchQuery.trim())
-                            runHomeQuery(homeSearchQuery); }, placeholder: "Search services, businesses or people", style: { flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', fontSize: 14, color: T.textPrimary } }),
-                    React.createElement("button", { className: "avio-press", onClick: () => openAiSearchFromHome(null), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                        React.createElement(Icon, { name: "sparkles", size: 18, color: THEME.coral }))));
-            const suggestions = homeSearchQuery.trim().length > 0
-                ? aiSearchCandidates.filter((i) => i.name.toLowerCase().includes(homeSearchQuery.trim().toLowerCase()) || i.category.toLowerCase().includes(homeSearchQuery.trim().toLowerCase())).slice(0, 5)
-                : [];
-            const suggestionsList = suggestions.length > 0 && React.createElement("div", { style: { margin: '8px 18px 0', borderRadius: 16, border: `1px solid ${T.border}`, overflow: 'hidden' } },
-                suggestions.map((s) => React.createElement("button", { key: s.id, onClick: () => runHomeQuery(s.name), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: `1px solid ${T.border}`, textAlign: 'left' } },
-                    React.createElement(Icon, { name: "search", size: 13, color: '#B5B5B8' }),
-                    React.createElement("span", { style: { flex: 1, fontSize: 13, fontWeight: 600, color: T.textPrimary } }, s.name),
-                    React.createElement("span", { style: { fontSize: 11.5, color: T.textSecondary } }, s.category))));
-            const quickChipsRow = React.createElement("div", { className: "avio-scroll", style: { flexShrink: 0, display: 'flex', gap: 8, padding: '14px 18px 0', overflowX: 'auto' } }, QUICK_CHIPS.map((c) => {
-                const active = homeQuickFilter === c.id;
-                return React.createElement("button", { key: c.id, className: "avio-pill", onClick: () => setHomeQuickFilter(c.id), style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 14, background: active ? 'rgba(151,196,0,0.12)' : T.surfaceSecondary, border: `1px solid ${active ? THEME.coral : T.border}` } },
-                    React.createElement(Icon, { name: c.icon, size: 12, color: active ? THEME.coral : '#8A8A8E' }),
-                    React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: active ? THEME.coral : '#484848' } }, c.label));
-            }));
-            const recentSection = aiRecentSearches.length > 0 && React.createElement("div", { style: { marginTop: 24, padding: '0 18px' } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                    React.createElement("span", { style: { fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: T.textPrimary } }, "Recent Searches"),
-                    React.createElement("button", { onClick: clearAiRecentSearches }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, "Clear All"))),
-                React.createElement("div", { style: { marginTop: 6 } }, aiRecentSearches.slice(0, 5).map((r) => React.createElement("div", { key: r.id, style: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: `1px solid ${T.border}` } },
-                    React.createElement(Icon, { name: "clock", size: 15, color: '#B5B5B8' }),
-                    React.createElement("button", { onClick: () => runHomeQuery(r.text), style: { flex: 1, textAlign: 'left', minWidth: 0 } },
-                        React.createElement("span", { style: { fontSize: 13.5, color: T.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' } }, r.text)),
-                    React.createElement("button", { onClick: () => removeAiRecentSearch(r.id), style: { flexShrink: 0, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                        React.createElement(Icon, { name: "x", size: 13, color: '#B5B5B8' }))))));
-            const categoriesSection = React.createElement("div", { style: { marginTop: 26, padding: '0 18px' } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                    React.createElement("span", { style: { fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: T.textPrimary } }, "Popular Categories"),
-                    React.createElement("button", { onClick: () => flashToast('All categories — coming soon') }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, "See All"))),
-                React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 12 } }, POPULAR_CATEGORIES.map((c) => React.createElement("button", { key: c.id, className: "avio-press", onClick: () => c.query ? runHomeQuery(c.query) : flashToast('More categories — coming soon'), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '14px 6px', borderRadius: 16, border: `1px solid ${T.border}`, background: T.surface } },
-                    React.createElement("div", { style: { width: 38, height: 38, borderRadius: 12, background: 'rgba(151,196,0,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                        React.createElement(Icon, { name: c.icon, size: 18, color: THEME.coral })),
-                    React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: T.textPrimary, textAlign: 'center' } }, c.label)))));
-            const recommendedBase = [...aiSearchCandidates];
-            let recommendedSorted;
-            if (homeQuickFilter === 'nearby')
-                recommendedSorted = recommendedBase.sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
-            else if (homeQuickFilter === 'topRated')
-                recommendedSorted = recommendedBase.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-            else if (homeQuickFilter === 'openNow')
-                recommendedSorted = recommendedBase.filter((i) => (i.openStatus || '').startsWith('Open Now'));
-            else if (homeQuickFilter === 'price')
-                recommendedSorted = recommendedBase.sort((a, b) => (a.price || 0) - (b.price || 0));
-            else
-                recommendedSorted = recommendedBase.sort((a, b) => scoreAiSearchCandidate(b, {}) - scoreAiSearchCandidate(a, {}));
-            const recommendedItems = recommendedSorted.slice(0, 3);
-            const recommendedSection = recommendedItems.length > 0 && React.createElement("div", { style: { marginTop: 26 } },
-                React.createElement("p", { style: { fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: T.textPrimary, margin: '0 18px' } }, "Recommended For You"),
-                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 12, padding: '12px 18px 4px', overflowX: 'auto' } }, recommendedItems.map((item) => {
-                    const earliest = aiEarliestAvailability(item);
-                    return React.createElement("button", { key: item.id, className: "avio-press", onClick: () => openBusinessProfile(item), style: { flexShrink: 0, width: 158, textAlign: 'left', borderRadius: 18, overflow: 'hidden', border: `1px solid ${T.border}`, background: T.surface, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
-                        React.createElement("div", { style: { position: 'relative', aspectRatio: '4 / 3', background: item.avatarColor || T.surfaceSecondary } },
-                            item.image && React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } }),
-                            earliest && earliest.isToday && React.createElement("span", { style: { position: 'absolute', top: 8, left: 8, fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 6, background: 'rgba(151,196,0,0.92)', color: '#fff' } }, "Available Today")),
-                        React.createElement("div", { style: { padding: '10px 11px 12px' } },
-                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: T.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' } }, item.name),
-                            React.createElement("p", { style: { fontSize: 10.5, color: T.textSecondary, marginTop: 2 } }, `${item.category} · ${item.distance}`),
-                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 3, marginTop: 4 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: QS.chip, border: `1.5px solid ${QS.border}`, borderRadius: 18, height: 50, padding: '0 14px' } },
+                    React.createElement(Icon, { name: "search", size: 17, color: QS.sub }),
+                    React.createElement("input", { autoFocus: true, value: homeSearchQuery, onChange: (e) => setHomeSearchQuery(e.target.value), placeholder: "Search people, businesses or services", style: { flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', fontSize: 14.5, color: QS.text } }),
+                    hasQuery && React.createElement("button", { onClick: () => setHomeSearchQuery(''), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement(Icon, { name: "x", size: 15, color: QS.sub })),
+                    React.createElement(Icon, { name: "sparkles", size: 17, color: THEME.coral })));
+            let body;
+            if (!hasQuery) {
+                const recentSection = aiRecentSearches.length > 0 && React.createElement("div", { style: { marginTop: 24, padding: '0 18px' } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                        React.createElement("span", { style: { fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: QS.text } }, "Recent Searches"),
+                        React.createElement("button", { onClick: clearAiRecentSearches }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, "Clear All"))),
+                    React.createElement("div", { style: { marginTop: 6 } }, aiRecentSearches.slice(0, 5).map((r) => React.createElement("div", { key: r.id, style: { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 0', borderBottom: `1px solid ${QS.border}` } },
+                        React.createElement(Icon, { name: "clock", size: 15, color: '#B5B5B8' }),
+                        React.createElement("button", { onClick: () => runHomeQuery(r.text), style: { flex: 1, textAlign: 'left', minWidth: 0 } },
+                            React.createElement("span", { style: { fontSize: 13.5, color: QS.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' } }, r.text)),
+                        React.createElement("button", { onClick: () => removeAiRecentSearch(r.id), style: { flexShrink: 0, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement(Icon, { name: "x", size: 13, color: '#B5B5B8' }))))));
+                const trendingSection = React.createElement("div", { style: { marginTop: 26 } },
+                    React.createElement("p", { style: { fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: QS.text, margin: '0 18px' } }, "Trending Searches"),
+                    React.createElement("div", { className: "avio-scroll", style: { display: 'flex', flexWrap: 'wrap', gap: 8, padding: '12px 18px 30px' } }, TRENDING_CHIPS.map((label) => React.createElement("button", { key: label, className: "avio-pill avio-press", onClick: () => runHomeQuery(label), style: { flexShrink: 0, padding: '9px 16px', borderRadius: 20, background: QS.chip, border: `1px solid ${QS.border}` } },
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: QS.text, whiteSpace: 'nowrap' } }, label)))));
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto' } }, recentSection, trendingSection);
+            }
+            else {
+                const matches = aiSearchCandidates.filter((item) => quickSearchItemMatches(item, parsed));
+                const ranked = matches.sort((a, b) => scoreAiSearchCandidate(b, { keywords: parsed.words }) - scoreAiSearchCandidate(a, { keywords: parsed.words }));
+                const profiles = ranked.slice(0, 12);
+                const thrillzPool = [];
+                profiles.slice(0, 9).forEach((profile) => {
+                    getProviderPosts(profile).slice(0, 2).forEach((post, i) => thrillzPool.push({ profile, post, postIndex: i }));
+                });
+                thrillzPool.sort((a, b) => parseCount(b.post.likes) - parseCount(a.post.likes));
+                const groupLabel = parsed.matchedGroup ? parsed.matchedGroup.label : query.trim();
+                const correctedCaption = parsed.matchedGroup && parsed.matchedGroup.label.toLowerCase() !== parsed.q
+                    ? React.createElement("p", { style: { fontSize: 12, color: QS.sub, margin: '14px 18px 0' } }, "Showing results for ", React.createElement("span", { style: { fontWeight: 700, color: QS.text } }, `"${groupLabel}"`))
+                    : null;
+                const profilesSection = profiles.length > 0 && React.createElement("div", { style: { marginTop: 14 } },
+                    React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: QS.text, margin: '0 18px' } }, `${groupLabel} Near You`),
+                    React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 12, padding: '12px 18px 4px', overflowX: 'auto' } }, profiles.map((item) => React.createElement("button", { key: item.id, className: "avio-press", onClick: () => openBusinessProfile(item), style: { flexShrink: 0, width: 140, textAlign: 'left', borderRadius: 18, overflow: 'hidden', border: `1px solid ${QS.border}` } },
+                        React.createElement("div", { style: { position: 'relative', aspectRatio: '4 / 3', background: item.avatarColor || QS.chip, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: avatarFg(item.avatarColor) } }, item.name.charAt(0)),
+                            item.verified && React.createElement("div", { style: { position: 'absolute', top: 7, right: 7, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "check", size: 10, color: "#fff" }))),
+                        React.createElement("div", { style: { padding: '9px 10px 11px' } },
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: QS.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' } }, item.name),
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 3, marginTop: 3 } },
                                 React.createElement(Icon, { name: "star", size: 10, color: THEME.gold, fill: THEME.gold }),
-                                React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: T.textPrimary } }, (item.rating || 4.6).toFixed(1))),
-                            earliest && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 3, marginTop: 4 } },
-                                React.createElement(Icon, { name: "clock", size: 10, color: THEME.coral }),
-                                React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral } }, `${earliest.dayLabel} ${earliest.timeLabel}`))));
-                })));
-
-            const trendingSection = React.createElement("div", { style: { marginTop: 26 } },
-                React.createElement("p", { style: { fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: T.textPrimary, margin: '0 18px' } }, "Trending Searches"),
-                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 10, padding: '12px 18px 30px', overflowX: 'auto' } }, TRENDING_CHIPS.map((t) => React.createElement("button", { key: t.label, className: "avio-pill avio-press", onClick: () => runHomeQuery(t.label), style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px 7px 7px', borderRadius: 20, background: T.surface, border: `1px solid ${T.border}` } },
-                    React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', background: t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                        React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: '#fff' } }, t.label.charAt(0))),
-                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary, whiteSpace: 'nowrap' } }, t.label)))));
-            return React.createElement(React.Fragment, null, titleBar, searchFieldRow, suggestionsList, quickChipsRow,
-                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto' } }, recentSection, categoriesSection, recommendedSection, trendingSection));
+                                React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: QS.text } }, (item.rating || 4.6).toFixed(1)),
+                                React.createElement("span", { style: { fontSize: 10.5, color: QS.sub, marginLeft: 2 } }, item.distance)))))));
+                const thrillzSection = thrillzPool.length > 0 && React.createElement("div", { style: { marginTop: 22, paddingBottom: 24 } },
+                    React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', color: QS.text, margin: '0 18px 10px' } }, `${groupLabel} Thrillz`),
+                    React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1.5, padding: '0 0' } }, thrillzPool.map((t, i) => React.createElement("button", { key: t.profile.id + '-' + i, onClick: () => openPostViewer(t.profile, getProviderPosts(t.profile), t.postIndex), style: { position: 'relative', aspectRatio: '3 / 5', overflow: 'hidden', background: t.profile.avatarColor || '#000', boxShadow: `inset 0 0 0 1px ${QS.border}` } },
+                        React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "playcircle", size: 22, color: avatarFg(t.profile.avatarColor) })),
+                        React.createElement("div", { style: { position: 'absolute', left: 6, bottom: 6, display: 'flex', alignItems: 'center', gap: 3 } },
+                            React.createElement("span", { style: { fontSize: 9, color: avatarFg(t.profile.avatarColor) } }, "▶"),
+                            React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: avatarFg(t.profile.avatarColor) } }, formatCount(parseCount(t.post.likes || '0'))))))));
+                const emptyState = profiles.length === 0 && React.createElement("div", { style: { textAlign: 'center', padding: '60px 30px' } },
+                    React.createElement(Icon, { name: "search", size: 26, color: '#D1D1D6' }),
+                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: QS.text, marginTop: 14 } }, `No results for "${query.trim()}"`),
+                    React.createElement("p", { style: { fontSize: 12.5, color: QS.sub, marginTop: 4 } }, "Try a different search — like Barber, Massage, or Photographer."));
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto' } }, correctedCaption, profilesSection, thrillzSection, emptyState);
+            }
+            return React.createElement(React.Fragment, null, titleBar, searchFieldRow, body);
         })())),
         tab === 'connect' && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: T.background } }, (() => {
             const CN = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
@@ -5205,7 +5289,7 @@ function App() {
                     const c = bizActiveConversation;
                     const chatHeader = React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 12px) 18px 14px`, borderBottom: `1px solid ${CN.border}`, display: 'flex', alignItems: 'center', gap: 12 } },
                         React.createElement("button", { onClick: () => setActiveConversationId(null), style: { flexShrink: 0 } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: CN.text })),
-                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: c.avatarColor || '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, c.initials),
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: c.avatarColor || '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(c.avatarColor), fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, c.initials),
                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                             React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: CN.text, margin: 0 } }, c.name),
                             React.createElement("p", { style: { fontSize: 12, color: CN.sub, margin: '1px 0 0' } }, "Customer")),
@@ -5226,7 +5310,7 @@ function App() {
                         c.messages.map((m) => {
                             const mine = m.from === 'me';
                             return React.createElement("div", { key: m.id, style: { display: 'flex', alignItems: 'flex-end', gap: 8, justifyContent: mine ? 'flex-end' : 'flex-start' } },
-                                !mine && React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', background: c.avatarColor || '#161616', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 8.5, fontWeight: 700 } }, c.initials),
+                                !mine && React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', background: c.avatarColor || '#161616', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(c.avatarColor), fontSize: 8.5, fontWeight: 700 } }, c.initials),
                                 React.createElement("div", { style: { maxWidth: '74%' } },
                                     React.createElement("div", { style: { background: mine ? THEME.coral : T.border, color: mine ? '#fff' : CN.text, borderRadius: 18, padding: '10px 14px', fontSize: 13.5, lineHeight: 1.35 } }, m.text),
                                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, justifyContent: mine ? 'flex-end' : 'flex-start' } },
@@ -5283,7 +5367,7 @@ function App() {
                         const preview = lastMsg ? (lastMsg.type === 'booking' ? 'Sent a booking card' : `${lastMsg.from === 'me' ? 'You: ' : ''}${lastMsg.text}`) : '';
                         return React.createElement("button", { key: c.id, onClick: () => openConversation(c.id), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', borderBottom: `1px solid ${CN.border}`, textAlign: 'left' } },
                             React.createElement("div", { style: { position: 'relative', width: 52, height: 52, flexShrink: 0 } },
-                                React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', background: c.avatarColor || '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
+                                React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', background: c.avatarColor || '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(c.avatarColor), fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
                                 c.online && React.createElement("div", { style: { position: 'absolute', bottom: 1, right: 1, width: 14, height: 14, borderRadius: '50%', background: '#3FBF6A', border: '2.5px solid #fff' } })),
                             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
@@ -5524,7 +5608,7 @@ function App() {
                             followingFiltered.map((p) => React.createElement("div", { key: p.id, style: { display: 'flex', alignItems: 'center', gap: 10 } },
                                 p.image
                                     ? React.createElement("div", { style: { width: 42, height: 42, borderRadius: '50%', backgroundImage: `url(${p.image})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } })
-                                    : React.createElement("div", { style: { width: 42, height: 42, borderRadius: '50%', background: p.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, p.name.charAt(0)),
+                                    : React.createElement("div", { style: { width: 42, height: 42, borderRadius: '50%', background: p.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(p.avatarColor), fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, p.name.charAt(0)),
                                 React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                     React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: CP.text, margin: 0 } }, p.name),
                                     p.category && React.createElement("p", { style: { fontSize: 12, color: CP.sub, margin: '2px 0 0' } }, p.category)),
@@ -5680,7 +5764,7 @@ function App() {
                 React.createElement("div", { style: { position: 'relative', flexShrink: 0 } },
                     item.image
                         ? React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
-                        : React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: item.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: '#fff' } }, item.name.charAt(0)),
+                        : React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: item.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: avatarFg(item.avatarColor) } }, item.name.charAt(0)),
                     React.createElement("div", { style: { position: 'absolute', bottom: 1, right: 1, width: 16, height: 16, borderRadius: '50%', background: THEME.coral, border: '3px solid #fff' } })),
                 React.createElement("div", { style: { minWidth: 0, paddingTop: 4 } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
@@ -5763,7 +5847,7 @@ function App() {
                         React.createElement(Icon, { name: "chevrondown", size: 12, color: "#8A8A8E" }))),
                 React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 16 } },
                     PROFILE_REVIEWS.map((r, i) => React.createElement("div", { key: i, style: { display: 'flex', gap: 10 } },
-                        React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', background: r.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, r.name.charAt(0)),
+                        React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', background: r.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(r.avatarColor), fontSize: 13, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, r.name.charAt(0)),
                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                             React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
                                 React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: T.textPrimary } }, r.name),
@@ -6234,7 +6318,7 @@ function App() {
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 } },
                         item.image
                             ? React.createElement("div", { style: { width: 32, height: 32, borderRadius: '50%', backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } })
-                            : React.createElement("div", { style: { width: 32, height: 32, borderRadius: '50%', background: item.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 } }, item.name.charAt(0)),
+                            : React.createElement("div", { style: { width: 32, height: 32, borderRadius: '50%', background: item.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: avatarFg(item.avatarColor), flexShrink: 0 } }, item.name.charAt(0)),
                         React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: '#fff' } }, item.name),
                         React.createElement("span", { style: { fontSize: 12, color: 'rgba(255,255,255,0.7)' } }, post.likes, " likes")),
                     !item.mine && React.createElement("button", { onClick: () => openBooking(item), style: { width: '100%', borderRadius: 14, background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 16px' } },
@@ -6876,7 +6960,7 @@ function App() {
                         : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, upcomingPreview.map((b) => {
                             const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
                             return React.createElement("button", { key: b.id, onClick: () => setBusinessBookingDetail(b), style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, border: `1px solid ${PD.border}`, textAlign: 'left', width: '100%' } },
-                                React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.initials),
+                                React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(b.avatarColor), fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.initials),
                                 React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                     React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, b.customerName),
                                     React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, `${b.dateGroup === 'tomorrow' ? 'Tomorrow' : 'Today'}, ${b.time} · ${b.service}`)),
@@ -6906,7 +6990,7 @@ function App() {
                         React.createElement("div", { style: { width: 60, flexShrink: 0 } },
                             showDate && React.createElement("p", { style: { fontSize: 10.5, color: PD.sub, margin: 0 } }, b.dateLabel),
                             React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: PD.text, margin: 0 } }, b.time)),
-                        React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.initials),
+                        React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(b.avatarColor), fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.initials),
                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                             React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, b.customerName),
                             React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '1px 0 0' } }, b.service, " · ", money(b.price))),
@@ -7031,7 +7115,7 @@ function App() {
                                 const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
                                 return React.createElement("button", { key: b.id, onClick: () => setBusinessBookingDetail(b), style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, border: `1px solid ${PD.border}`, textAlign: 'left', width: '100%' } },
                                     React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: PD.text, width: 58, flexShrink: 0, margin: 0 } }, b.time),
-                                    React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 } }, b.initials),
+                                    React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: avatarFg(b.avatarColor), flexShrink: 0 } }, b.initials),
                                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                         React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, b.customerName),
                                         React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, b.service, " · ", money(b.price))),
@@ -7440,7 +7524,7 @@ function App() {
                         const pct = Math.round((val / maxCustomerValTab) * 100);
                         return React.createElement("button", { key: c.name, onClick: () => setSelectedCustomerDetail(c.name), style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 } },
                             React.createElement("span", { style: { width: 14, fontSize: 11, fontWeight: 700, color: PD.sub, flexShrink: 0 } }, i + 1),
-                            React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: c.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 9.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
+                            React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: c.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(c.avatarColor), fontSize: 9.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
                             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                 React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 3 } },
                                     React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: PD.text } }, c.name),
@@ -7589,7 +7673,7 @@ function App() {
             return React.createElement("div", { onClick: close, style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 14 } },
                 React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxHeight: '80vh', overflowY: 'auto', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 } },
-                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', flexShrink: 0, background: c.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', flexShrink: 0, background: c.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(c.avatarColor), fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, margin: 0 } }, c.name)),
                     React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: '16px 24px' } },
                         [['Bookings', String(c.count)], ['Total Spent', money(c.earnings)], ['Avg. Booking', money(c.count > 0 ? c.earnings / c.count : 0)], ['Favorite Service', favoriteService || '—'], ['Last Booking', lastBooking ? (lastBooking.dateLabel || (lastBooking.dateGroup === 'tomorrow' ? 'Tomorrow' : 'Today')) : '—'], ['Customer Since', since ? since.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—']].map(([k, v]) => React.createElement("div", { key: k },
@@ -7636,7 +7720,7 @@ function App() {
                     nonReturning.length === 0
                         ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub } }, "No customers to show.")
                         : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 16 } }, nonReturning.map((c, i) => React.createElement("div", { key: c.name, style: { display: 'flex', alignItems: 'center', gap: 10 } },
-                            React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', flexShrink: 0, background: c.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
+                            React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', flexShrink: 0, background: c.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(c.avatarColor), fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
                             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                 React.createElement("p", { style: { fontSize: 13, fontWeight: 600, color: PD.text, margin: 0 } }, c.name),
                                 React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: '2px 0 0' } }, `Last booked ${c.lastDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`)))))));
@@ -7712,7 +7796,7 @@ function App() {
                         const pct = Math.round((val / maxVal) * 100);
                         return React.createElement("button", { key: c.name, onClick: () => { setAllCustomersOpen(false); setSelectedCustomerDetail(c.name); }, style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10 } },
                             React.createElement("span", { style: { width: 18, fontSize: 12, fontWeight: 700, color: PD.sub, flexShrink: 0 } }, i + 1),
-                            React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', flexShrink: 0, background: c.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
+                            React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', flexShrink: 0, background: c.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(c.avatarColor), fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
                             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                 React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 5 } },
                                     React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: PD.text } }, c.name),
@@ -8075,7 +8159,7 @@ function App() {
             return React.createElement("div", { onClick: (e) => e.stopPropagation(), className: "avio-filter-sheet", style: { width: '100%', background: T.modalBackground, borderRadius: '24px 24px 0 0', padding: `14px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '85%', overflowY: 'auto' } },
                 React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: T.border, margin: '0 auto 14px' } }),
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12 } },
-                    React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, b.initials),
+                    React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(b.avatarColor), fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, b.initials),
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                         React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: T.textPrimary, margin: 0, fontFamily: 'Space Grotesk, sans-serif' } }, b.customerName),
                         React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 2 } }, b.service)),
@@ -8189,7 +8273,7 @@ function App() {
                                 return React.createElement("button", { key: v.id, onClick: () => toggleTaggedBusiness(v.id), style: { display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, border: `1.5px solid ${active ? THEME.coral : UP.border}`, background: active ? T.surfaceSecondary : T.surface } },
                                     v.image
                                         ? React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, backgroundImage: `url(${v.image})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } })
-                                        : React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, background: v.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 } }, v.name.charAt(0)),
+                                        : React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, background: v.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: avatarFg(v.avatarColor), flexShrink: 0 } }, v.name.charAt(0)),
                                     React.createElement("div", { style: { flex: 1, textAlign: 'left', minWidth: 0 } },
                                         React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: UP.text, margin: 0 } }, v.name),
                                         React.createElement("p", { style: { fontSize: 11.5, color: UP.sub, margin: '2px 0 0' } }, v.service, " · Visited ", v.bookingDateLabel)),
