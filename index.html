@@ -854,13 +854,22 @@ function restaurantActiveCombinations(restaurant, area, partySize) {
 }
 function restaurantTableFree(tableId, startMin, duration, buffer, reservations) {
     const endWithBuffer = startMin + duration + buffer;
-    return !reservations.some((r) => r.tableIds.includes(tableId) && startMin < (r.time + r.duration + buffer) && (r.time) < endWithBuffer);
+    return !reservations.some((r) => Array.isArray(r.tableIds) && r.tableIds.includes(tableId) && typeof r.time === 'number' && typeof r.duration === 'number' && startMin < (r.time + r.duration + buffer) && (r.time) < endWithBuffer);
 }
+// Never throws: malformed/legacy reservation records or a missing restaurant always resolve to
+// an empty result set rather than crashing the render (which would otherwise blank the screen).
 function computeRestaurantAvailability(restaurant, allReservations, opts) {
+    if (!restaurant || !opts)
+        return [];
     const { date, partySize, area, excludeReservationId } = opts;
-    const dow = new Date(date + 'T00:00:00').getDay();
+    if (!date || !partySize || partySize < 1)
+        return [];
+    const parsedDate = new Date(date + 'T00:00:00');
+    if (isNaN(parsedDate.getTime()))
+        return [];
+    const dow = parsedDate.getDay();
     const hours = (restaurant.hours || {})[dow];
-    if (!hours)
+    if (!hours || !hours.start || !hours.end)
         return [];
     const duration = restaurantDurationForParty(restaurant.durationRules, partySize);
     const buffer = restaurant.bufferMinutes != null ? restaurant.bufferMinutes : 15;
@@ -869,7 +878,7 @@ function computeRestaurantAvailability(restaurant, allReservations, opts) {
     const closeMin = hours.end === '23:59' ? 24 * 60 : timeStrToMinutes(hours.end);
     const candidateTables = restaurantCandidateTables(restaurant, area, partySize);
     const candidateCombos = restaurantActiveCombinations(restaurant, area, partySize);
-    const activeReservations = allReservations.filter((r) => r.restaurantId === restaurant.id && r.date === date && r.status !== 'cancelled' && r.id !== excludeReservationId);
+    const activeReservations = (Array.isArray(allReservations) ? allReservations : []).filter((r) => r && r.restaurantId === restaurant.id && r.date === date && r.status !== 'cancelled' && r.id !== excludeReservationId);
     const results = [];
     for (let t = openMin; t + duration <= closeMin; t += interval) {
         let assigned = null;
@@ -891,6 +900,27 @@ function computeRestaurantAvailability(restaurant, allReservations, opts) {
             results.push({ minutes: t, label: minutesToTimeLabel(t), duration, ...assigned });
     }
     return results;
+}
+// Returns { field, message } describing the first invalid reservation criterion, or null when the
+// current party size / date are valid to search availability with. Never throws.
+function validateReservationCriteria(restaurant, partySize, dateStr) {
+    if (!restaurant)
+        return { field: null, message: "This restaurant isn't available right now." };
+    if (!partySize || partySize < 1)
+        return { field: 'partySize', message: 'Select a party size to continue.' };
+    const maxPartySize = restaurant.maxPartySize || 10;
+    if (partySize > maxPartySize)
+        return { field: 'partySize', message: `Parties over ${maxPartySize} require calling the restaurant directly.` };
+    if (!dateStr)
+        return { field: 'date', message: 'Select a date to continue.' };
+    const picked = new Date(dateStr + 'T00:00:00');
+    if (isNaN(picked.getTime()))
+        return { field: 'date', message: 'Select a valid date to continue.' };
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+    if (picked < todayMidnight)
+        return { field: 'date', message: 'Select a date that is not in the past.' };
+    return null;
 }
 const GENERIC_PROVIDER_HOURS = { start: '09:00', end: '19:00' };
 const DEFAULT_MY_SERVICES = [
@@ -2348,6 +2378,7 @@ function App() {
     const [rsvPickerPartySize, setRsvPickerPartySize] = useState(2);
     const [rsvPickerDate, setRsvPickerDate] = useState(() => dateKey(new Date()));
     const [rsvPickerArea, setRsvPickerArea] = useState('no-preference');
+    const [rsvPickerError, setRsvPickerError] = useState(null);
     const [areaFormDraft, setAreaFormDraft] = useState(null);
     const [filterSheetOpen, setFilterSheetOpen] = useState(false);
     const [filterPopoverOpen, setFilterPopoverOpen] = useState(null);
@@ -3672,8 +3703,22 @@ function App() {
     function removeRestaurantDurationRule(index) {
         updateMyRestaurant((r) => ({ durationRules: r.durationRules.filter((_, i) => i !== index) }));
     }
-    function openReservationFlow() {
-        setRsvFlow({ stage: 'times', partySize: rsvPickerPartySize, date: rsvPickerDate, area: rsvPickerArea, time: null, duration: null, tableIds: null, isCombo: false,
+    // Resolves the restaurant a reservation-flow object refers to, always falling back to the demo
+    // restaurant rather than ever returning undefined mid-render.
+    function getReservationRestaurant(f) {
+        if (!f)
+            return null;
+        return feed.find((x) => x.id === f.restaurantId) || getMyRestaurant() || null;
+    }
+    function openReservationFlow(item) {
+        const restaurant = item || getMyRestaurant();
+        const error = validateReservationCriteria(restaurant, rsvPickerPartySize, rsvPickerDate);
+        if (error) {
+            setRsvPickerError(error);
+            return;
+        }
+        setRsvPickerError(null);
+        setRsvFlow({ stage: 'loading', restaurantId: restaurant.id, partySize: rsvPickerPartySize, date: rsvPickerDate, area: rsvPickerArea, time: null, duration: null, tableIds: null, isCombo: false, slots: null,
             name: customerProfile.fullName || '', phone: isPhoneLikeIdentifier(authDraft.identifier || '') ? authDraft.identifier : '', email: !isPhoneLikeIdentifier(authDraft.identifier || '') ? (authDraft.identifier || '') : '',
             notes: '', editingId: null });
     }
@@ -3681,24 +3726,34 @@ function App() {
         setRsvFlow(null);
         setManageReservationOpen(false);
     }
+    function retryReservationSearch() {
+        setRsvFlow((f) => f ? { ...f, stage: 'loading', slots: null } : f);
+    }
+    function editReservationCriteria() {
+        // Same destination as the back arrow: return to the restaurant page without losing
+        // the party size / date / seating the customer already chose (those live outside rsvFlow).
+        setRsvFlow(null);
+    }
     function selectReservationTime(slot) {
-        setRsvFlow((f) => ({ ...f, time: slot.minutes, duration: slot.duration, tableIds: slot.tableIds, isCombo: slot.isCombo, stage: 'review' }));
+        // Stays on the times screen so the customer sees the selected-time checkmark and the
+        // Continue button before moving on — matches tapping a time, then a separate Continue tap.
+        setRsvFlow((f) => ({ ...f, time: slot.minutes, duration: slot.duration, tableIds: slot.tableIds, isCombo: slot.isCombo }));
     }
     function confirmReservation() {
         const f = rsvFlow;
-        const restaurant = getMyRestaurant();
+        const restaurant = getReservationRestaurant(f);
         if (!f || !restaurant || f.time == null)
             return;
         const fresh = computeRestaurantAvailability(restaurant, restaurantReservations, { date: f.date, partySize: f.partySize, area: f.area, excludeReservationId: f.editingId });
-        const stillValid = fresh.some((s) => s.minutes === f.time && JSON.stringify([...s.tableIds].sort()) === JSON.stringify([...f.tableIds].sort()));
+        const stillValid = fresh.some((s) => s.minutes === f.time && Array.isArray(s.tableIds) && Array.isArray(f.tableIds) && JSON.stringify([...s.tableIds].sort()) === JSON.stringify([...f.tableIds].sort()));
         if (!stillValid) {
             flashToast('That time was just booked — pick another');
-            setRsvFlow((prev) => ({ ...prev, stage: 'times', time: null }));
+            setRsvFlow((prev) => ({ ...prev, stage: 'loading', time: null, slots: null }));
             return;
         }
-        const assignedTable = restaurant.tables.find((t) => t.id === f.tableIds[0]);
-        const assignedArea = assignedTable && restaurant.areas.find((a) => a.id === assignedTable.area);
-        const areaLabel = f.area !== 'no-preference' ? (restaurant.areas.find((a) => a.id === f.area) || { label: 'No Preference' }).label : (assignedArea ? assignedArea.label : 'No Preference');
+        const assignedTable = (restaurant.tables || []).find((t) => t.id === f.tableIds[0]);
+        const assignedArea = assignedTable && (restaurant.areas || []).find((a) => a.id === assignedTable.area);
+        const areaLabel = f.area !== 'no-preference' ? ((restaurant.areas || []).find((a) => a.id === f.area) || { label: 'No Preference' }).label : (assignedArea ? assignedArea.label : 'No Preference');
         if (f.editingId) {
             saveRestaurantReservations(restaurantReservations.map((r) => r.id === f.editingId ? { ...r, date: f.date, time: f.time, duration: f.duration, partySize: f.partySize, area: areaLabel, tableIds: f.tableIds, isCombo: f.isCombo, notes: f.notes } : r));
             flashToast('Reservation updated');
@@ -3706,7 +3761,7 @@ function App() {
             return;
         }
         const reservation = {
-            id: 'rsv' + Date.now(), restaurantId: RESTAURANT_ID, date: f.date, time: f.time, duration: f.duration, partySize: f.partySize,
+            id: 'rsv' + Date.now(), restaurantId: restaurant.id, date: f.date, time: f.time, duration: f.duration, partySize: f.partySize,
             area: areaLabel, tableIds: f.tableIds, isCombo: f.isCombo, name: f.name.trim(), phone: f.phone.trim(), email: f.email.trim(), notes: f.notes.trim(),
             status: 'upcoming', confirmationCode: 'BV' + Math.random().toString(36).slice(2, 7).toUpperCase(), createdAt: Date.now(),
         };
@@ -3723,9 +3778,32 @@ function App() {
     }
     function startModifyReservation(reservation) {
         setManageReservationOpen(false);
-        setRsvFlow({ stage: 'times', partySize: reservation.partySize, date: reservation.date, area: 'no-preference', time: null, duration: null, tableIds: null, isCombo: false,
+        setRsvFlow({ stage: 'loading', restaurantId: reservation.restaurantId || RESTAURANT_ID, partySize: reservation.partySize, date: reservation.date, area: 'no-preference', time: null, duration: null, tableIds: null, isCombo: false, slots: null,
             name: reservation.name, phone: reservation.phone, email: reservation.email, notes: reservation.notes, editingId: reservation.id });
     }
+    // Drives the 'loading' stage: computes availability off the render path (inside a try/catch)
+    // so a bad reservation record or lookup failure lands on the error state, never a blank screen.
+    useEffect(() => {
+        if (!rsvFlow || rsvFlow.stage !== 'loading')
+            return;
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            if (cancelled)
+                return;
+            try {
+                const restaurant = getReservationRestaurant(rsvFlow);
+                if (!restaurant)
+                    throw new Error('Restaurant not found for reservation flow');
+                const slots = computeRestaurantAvailability(restaurant, restaurantReservations, { date: rsvFlow.date, partySize: rsvFlow.partySize, area: rsvFlow.area, excludeReservationId: rsvFlow.editingId });
+                setRsvFlow((prev) => (prev && prev.stage === 'loading') ? { ...prev, stage: 'times', slots: Array.isArray(slots) ? slots : [] } : prev);
+            }
+            catch (err) {
+                console.error('Reservation availability error:', err);
+                setRsvFlow((prev) => (prev && prev.stage === 'loading') ? { ...prev, stage: 'error', slots: [] } : prev);
+            }
+        }, 550);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [rsvFlow && rsvFlow.stage, rsvFlow && rsvFlow.date, rsvFlow && rsvFlow.partySize, rsvFlow && rsvFlow.area, rsvFlow && rsvFlow.restaurantId, restaurantReservations]);
     function renderRestaurantProfileScreen(item) {
         const r = item;
         const activeAreas = (r.areas || []).filter((a) => a.active);
@@ -3759,25 +3837,28 @@ function App() {
                 React.createElement("div", { style: { width: active ? 20 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
         }));
         const partySizeOptions = Array.from({ length: r.maxPartySize || 10 }, (_, i) => i + 1);
+        const partySizeInvalid = rsvPickerError && rsvPickerError.field === 'partySize';
+        const dateInvalid = rsvPickerError && rsvPickerError.field === 'date';
         const reservationCard = React.createElement("div", { style: { margin: '18px 18px 0', padding: 16, borderRadius: 20, border: `1px solid ${RP.border}`, boxShadow: '0 4px 16px rgba(0,0,0,0.05)' } },
             React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15.5, color: RP.text, margin: 0 } }, "Make a Reservation"),
             React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 12 } },
                 React.createElement("div", { style: { flex: 1 } },
-                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: RP.sub, textTransform: 'uppercase' } }, "Party Size"),
-                    React.createElement("select", { value: rsvPickerPartySize, onChange: (e) => setRsvPickerPartySize(Number(e.target.value)), style: { width: '100%', marginTop: 5, padding: '10px 10px', borderRadius: 12, border: `1px solid ${RP.border}`, fontSize: 13, fontWeight: 600, color: RP.text, background: '#FAFAFA' } },
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: partySizeInvalid ? '#D0304A' : RP.sub, textTransform: 'uppercase' } }, "Party Size"),
+                    React.createElement("select", { value: rsvPickerPartySize, onChange: (e) => { setRsvPickerPartySize(Number(e.target.value)); setRsvPickerError(null); }, style: { width: '100%', marginTop: 5, padding: '10px 10px', borderRadius: 12, border: `1px solid ${partySizeInvalid ? '#D0304A' : RP.border}`, fontSize: 13, fontWeight: 600, color: RP.text, background: '#FAFAFA' } },
                         partySizeOptions.map((n) => React.createElement("option", { key: n, value: n }, n === (r.maxPartySize || 10) ? `${n}+ Guests` : `${n} Guest${n === 1 ? '' : 's'}`)))),
                 React.createElement("div", { style: { flex: 1 } },
-                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: RP.sub, textTransform: 'uppercase' } }, "Date"),
-                    React.createElement("input", { type: "date", value: rsvPickerDate, min: todayStr, onChange: (e) => setRsvPickerDate(e.target.value), style: { width: '100%', marginTop: 5, padding: '9px 8px', borderRadius: 12, border: `1px solid ${RP.border}`, fontSize: 12.5, fontWeight: 600, color: RP.text, background: '#FAFAFA' } }))),
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: dateInvalid ? '#D0304A' : RP.sub, textTransform: 'uppercase' } }, "Date"),
+                    React.createElement("input", { type: "date", value: rsvPickerDate, min: todayStr, onChange: (e) => { setRsvPickerDate(e.target.value); setRsvPickerError(null); }, style: { width: '100%', marginTop: 5, padding: '9px 8px', borderRadius: 12, border: `1px solid ${dateInvalid ? '#D0304A' : RP.border}`, fontSize: 12.5, fontWeight: 600, color: RP.text, background: '#FAFAFA' } }))),
             React.createElement("div", { style: { marginTop: 12 } },
                 React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: RP.sub, textTransform: 'uppercase' } }, "Seating"),
                 React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, marginTop: 6, overflowX: 'auto' } },
                     [{ id: 'no-preference', label: 'No Preference' }, ...activeAreas].map((a) => {
                         const active = rsvPickerArea === a.id;
-                        return React.createElement("button", { key: a.id, className: "avio-pill", onClick: () => setRsvPickerArea(a.id), style: { flexShrink: 0, padding: '7px 13px', borderRadius: 14, background: active ? 'rgba(151,196,0,0.12)' : '#F5F5F5', border: `1px solid ${active ? THEME.coral : '#F0F0F0'}` } },
+                        return React.createElement("button", { key: a.id, className: "avio-pill", onClick: () => { setRsvPickerArea(a.id); setRsvPickerError(null); }, style: { flexShrink: 0, padding: '7px 13px', borderRadius: 14, background: active ? 'rgba(151,196,0,0.12)' : '#F5F5F5', border: `1px solid ${active ? THEME.coral : '#F0F0F0'}` } },
                             React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: active ? THEME.coral : '#484848' } }, a.label));
                     }))),
-            React.createElement("button", { className: "avio-press", onClick: openReservationFlow, style: { width: '100%', marginTop: 16, padding: '14px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Find a Table"));
+            rsvPickerError && React.createElement("p", { style: { fontSize: 11.5, color: '#D0304A', marginTop: 10, fontWeight: 600 } }, rsvPickerError.message),
+            React.createElement("button", { className: "avio-press", onClick: () => openReservationFlow(item), style: { width: '100%', marginTop: 16, padding: '14px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Find a Table"));
         const aboutSection = React.createElement("div", { style: { padding: '20px 18px 0' } },
             React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: RP.text, margin: 0 } }, "About"),
             React.createElement("p", { style: { fontSize: 12.5, color: RP.sub, marginTop: 6, lineHeight: 1.5 } }, item.blurb),
@@ -6047,104 +6128,192 @@ function App() {
         })(),
         rsvFlow && (() => {
             const f = rsvFlow;
-            const restaurant = getMyRestaurant();
-            if (!restaurant)
-                return null;
             const RF = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
-            const dateObj = new Date(f.date + 'T00:00:00');
-            const dateLabel = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-            const areaLabel = f.area === 'no-preference' ? 'No Preference' : (restaurant.areas.find((a) => a.id === f.area) || { label: f.area }).label;
-            const fieldRow = (label, value, onChange) => React.createElement("div", { key: label, style: { marginBottom: 12 } },
-                React.createElement("label", { style: { fontSize: 11, fontWeight: 700, color: RF.sub, textTransform: 'uppercase', display: 'block', marginBottom: 6 } }, label),
-                React.createElement("input", { value: value, onChange: (e) => onChange(e.target.value), style: { width: '100%', border: `1px solid ${RF.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 13, color: RF.text, outline: 'none' } }));
-            const header = (title) => React.createElement("div", { style: { flexShrink: 0, position: 'relative', padding: `calc(env(safe-area-inset-top) + 14px) 50px 14px`, textAlign: 'center', borderBottom: `1px solid ${RF.border}` } },
-                React.createElement("button", { onClick: () => f.stage === 'review' ? setRsvFlow((prev) => ({ ...prev, stage: 'times' })) : closeReservationFlow(), style: { position: 'absolute', left: 16, top: 'calc(env(safe-area-inset-top) + 12px)', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement(Icon, { name: "arrowleft", size: 20, color: "#161616" })),
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: T.textPrimary, margin: 0 } }, title),
-                React.createElement("button", { onClick: closeReservationFlow, style: { position: 'absolute', right: 16, top: 'calc(env(safe-area-inset-top) + 12px)', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement(Icon, { name: "x", size: 20, color: "#161616" })));
-            if (f.stage === 'times') {
-                const slots = computeRestaurantAvailability(restaurant, restaurantReservations, { date: f.date, partySize: f.partySize, area: f.area, excludeReservationId: f.editingId });
-                const durationForParty = restaurantDurationForParty(restaurant.durationRules, f.partySize);
-                const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '18px 18px 20px' } },
-                    React.createElement("p", { style: { fontSize: 12.5, color: RF.sub } }, `${dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${f.partySize} People · ${areaLabel}`),
-                    slots.length === 0
-                        ? React.createElement("div", { style: { textAlign: 'center', padding: '60px 20px' } },
-                            React.createElement(Icon, { name: "clock", size: 24, color: '#B5B5B8' }),
-                            React.createElement("p", { style: { fontSize: 13, color: RF.sub, marginTop: 12 } }, "No tables available for this party size and date."),
-                            React.createElement("p", { style: { fontSize: 12, color: RF.sub, marginTop: 4 } }, "Try a different time, date, or seating area."))
-                        : React.createElement("div", { style: { marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 } }, slots.map((s) => React.createElement("button", { key: s.minutes, onClick: () => selectReservationTime(s), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: 16, border: `1px solid ${RF.border}`, background: T.surface } },
-                            React.createElement("span", { style: { fontSize: 14.5, fontWeight: 700, color: RF.text } }, s.label),
-                            React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral, background: 'rgba(151,196,0,0.12)', borderRadius: 10, padding: '4px 10px' } }, "Available")))),
-                    slots.length > 0 && React.createElement("p", { style: { fontSize: 11.5, color: RF.sub, textAlign: 'center', marginTop: 18 } }, `Reservation duration: ${durationForParty} min`),
-                    React.createElement("p", { style: { fontSize: 11, color: RF.sub, textAlign: 'center', marginTop: 6 } }, "No payment required"));
-                return React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 12, display: 'flex', flexDirection: 'column' } }, header("Select a Time"), body);
+            // The whole reservation flow renders inside a try/catch: any unexpected failure here
+            // (bad stored reservation data, a lookup miss, a date-parsing edge case) falls through
+            // to the error state below instead of throwing and leaving a blank screen.
+            try {
+                const restaurant = getReservationRestaurant(f);
+                if (!restaurant) {
+                    closeReservationFlow();
+                    return null;
+                }
+                const dateObj = new Date(f.date + 'T00:00:00');
+                const dateValid = !isNaN(dateObj.getTime());
+                const dateLabel = dateValid ? dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'Selected date';
+                const dateLabelShort = dateValid ? dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+                const areaLabel = f.area === 'no-preference' ? 'No Preference' : ((restaurant.areas || []).find((a) => a.id === f.area) || { label: f.area }).label;
+                const criteriaLine = `${f.partySize} Guest${f.partySize === 1 ? '' : 's'} · ${dateLabelShort} · ${areaLabel}`;
+                const fieldRow = (label, value, onChange) => React.createElement("div", { key: label, style: { marginBottom: 12 } },
+                    React.createElement("label", { style: { fontSize: 11, fontWeight: 700, color: RF.sub, textTransform: 'uppercase', display: 'block', marginBottom: 6 } }, label),
+                    React.createElement("input", { value: value, onChange: (e) => onChange(e.target.value), style: { width: '100%', border: `1px solid ${RF.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 13, color: RF.text, outline: 'none' } }));
+                // Shared header for the loading / times / error stages — matches the reference:
+                // back arrow, restaurant name, Edit pill, criteria summary underneath.
+                const topHeader = () => React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${RF.border}` } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                        React.createElement("button", { onClick: closeReservationFlow, style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement(Icon, { name: "arrowleft", size: 20, color: "#161616" })),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, margin: 0, flex: 1, textAlign: 'center' } }, restaurant.name),
+                        React.createElement("button", { onClick: editReservationCriteria, style: { padding: '6px 12px', borderRadius: 14, border: `1px solid ${RF.border}` } },
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: RF.text } }, "Edit"))),
+                    React.createElement("p", { style: { fontSize: 12.5, color: RF.sub, textAlign: 'center', marginTop: 6 } }, criteriaLine));
+                const page = (body) => React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 12, display: 'flex', flexDirection: 'column' } }, topHeader(), body);
+
+                // ---------- Loading ----------
+                if (f.stage === 'loading') {
+                    const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '18px 24px' } },
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 44 } },
+                            React.createElement("div", { className: "avio-spin", style: { width: 40, height: 40, borderRadius: '50%', border: `3px solid ${RF.border}`, borderTopColor: THEME.coral } }),
+                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: RF.text, marginTop: 20 } }, "Finding the best tables…"),
+                            React.createElement("p", { style: { fontSize: 12.5, color: RF.sub, marginTop: 6, textAlign: 'center', maxWidth: 260 } }, "Checking real-time availability for your party size and seating preference.")),
+                        React.createElement("div", { style: { marginTop: 40, display: 'flex', flexDirection: 'column', gap: 10 } },
+                            [0, 1, 2].map((i) => React.createElement("div", { key: i, className: "avio-skeleton", style: { height: 50 } }))));
+                    return page(body);
+                }
+
+                // ---------- Error ----------
+                if (f.stage === 'error') {
+                    const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '60px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' } },
+                        React.createElement("div", { style: { width: 56, height: 56, borderRadius: '50%', background: 'rgba(208,48,74,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement(Icon, { name: "warningtriangle", size: 24, color: "#D0304A" })),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: RF.text, marginTop: 18 } }, "We couldn't load availability"),
+                        React.createElement("p", { style: { fontSize: 13, color: RF.sub, marginTop: 8, lineHeight: 1.45 } }, "Something went wrong while checking tables. Please try again."),
+                        React.createElement("button", { className: "avio-press", onClick: retryReservationSearch, style: { width: '100%', marginTop: 26, padding: '14px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Try Again"));
+                    return page(body);
+                }
+
+                // ---------- Available times / No availability ----------
+                if (f.stage === 'times') {
+                    const slots = Array.isArray(f.slots) ? f.slots : [];
+                    const durationForParty = restaurantDurationForParty(restaurant.durationRules, f.partySize);
+                    let otherDaySlots = [];
+                    let nextDayKey = null;
+                    if (slots.length === 0 && dateValid) {
+                        const nextDay = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate() + 1);
+                        nextDayKey = dateKey(nextDay);
+                        otherDaySlots = computeRestaurantAvailability(restaurant, restaurantReservations, { date: nextDayKey, partySize: f.partySize, area: f.area }).slice(0, 3);
+                    }
+                    const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '18px 18px 20px' } },
+                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: RF.text } }, "Available Times"),
+                        slots.length === 0
+                            ? React.createElement("div", { style: { textAlign: 'center', padding: '32px 8px 8px' } },
+                                React.createElement(Icon, { name: "users", size: 26, color: '#B5B5B8' }),
+                                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: RF.text, marginTop: 14 } }, "No tables available"),
+                                React.createElement("p", { style: { fontSize: 12.5, color: RF.sub, marginTop: 6, lineHeight: 1.45 } }, `We couldn't find a table for ${f.partySize} guest${f.partySize === 1 ? '' : 's'} at this time.`),
+                                React.createElement("div", { style: { marginTop: 20, display: 'flex', flexDirection: 'column', gap: 8 } },
+                                    ['Change Date', 'Change Party Size', 'Change Seating'].map((label) => React.createElement("button", { key: label, onClick: editReservationCriteria, style: { padding: '12px 0', borderRadius: 18, border: `1px solid ${RF.border}` } },
+                                        React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: RF.text } }, label)))),
+                                otherDaySlots.length > 0 && React.createElement("div", { style: { marginTop: 26, textAlign: 'left' } },
+                                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: RF.sub, textTransform: 'uppercase', letterSpacing: 0.3 } }, "Other available times"),
+                                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: RF.text, marginTop: 8 } }, "Tomorrow"),
+                                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 } }, otherDaySlots.map((s) => React.createElement("button", { key: s.minutes, onClick: () => setRsvFlow((prev) => ({ ...prev, date: nextDayKey, time: null, stage: 'loading', slots: null })), style: { padding: '8px 14px', borderRadius: 14, border: `1px solid ${RF.border}` } },
+                                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: RF.text } }, s.label))))))
+                            : React.createElement("div", { style: { marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 } }, slots.map((s) => {
+                                const selected = f.time === s.minutes;
+                                return React.createElement("button", { key: s.minutes, onClick: () => selectReservationTime(s), style: { padding: '13px 0', borderRadius: 16, border: `1.5px solid ${selected ? THEME.coral : RF.border}`, background: selected ? THEME.coral : T.surface } },
+                                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: selected ? '#fff' : RF.text } }, selected ? `${s.label} ✓` : s.label));
+                            })),
+                        slots.length > 0 && React.createElement("p", { style: { fontSize: 11.5, color: RF.sub, textAlign: 'center', marginTop: 18 } }, `Reservation duration: ${durationForParty} min`),
+                        slots.length > 0 && React.createElement("p", { style: { fontSize: 11, color: RF.sub, textAlign: 'center', marginTop: 6 } }, "No payment required"),
+                        f.time != null && React.createElement("button", { className: "avio-press", onClick: () => setRsvFlow((prev) => ({ ...prev, stage: 'review' })), style: { width: '100%', marginTop: 20, padding: '15px 0', borderRadius: 26, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Continue"));
+                    return page(body);
+                }
+
+                // ---------- Review / confirm ----------
+                if (f.stage === 'review') {
+                    const ready = f.name.trim() && f.phone.trim() && f.email.trim();
+                    const header = React.createElement("div", { style: { flexShrink: 0, position: 'relative', padding: `calc(env(safe-area-inset-top) + 14px) 50px 14px`, textAlign: 'center', borderBottom: `1px solid ${RF.border}` } },
+                        React.createElement("button", { onClick: () => setRsvFlow((prev) => ({ ...prev, stage: 'times' })), style: { position: 'absolute', left: 16, top: 'calc(env(safe-area-inset-top) + 12px)', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement(Icon, { name: "arrowleft", size: 20, color: "#161616" })),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: T.textPrimary, margin: 0 } }, "Reservation Summary"),
+                        React.createElement("button", { onClick: closeReservationFlow, style: { position: 'absolute', right: 16, top: 'calc(env(safe-area-inset-top) + 12px)', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement(Icon, { name: "x", size: 20, color: "#161616" })));
+                    const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '18px 18px 20px' } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, background: T.surfaceSecondary } },
+                            React.createElement("div", { style: { width: 52, height: 52, borderRadius: 14, background: restaurant.avatarColor || '#3B2A22', flexShrink: 0 } }),
+                            React.createElement("div", null,
+                                React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: RF.text, margin: 0 } }, restaurant.name),
+                                React.createElement("p", { style: { fontSize: 11.5, color: RF.sub, marginTop: 2 } }, restaurant.address))),
+                        React.createElement("div", { style: { marginTop: 16, display: 'flex', flexDirection: 'column', gap: 2 } }, [
+                            ['calendar', dateLabel],
+                            ['clock', minutesToTimeLabel(f.time)],
+                            ['users', `${f.partySize} Guest${f.partySize === 1 ? '' : 's'}`],
+                            ['mappin', areaLabel === 'No Preference' ? 'No Seating Preference' : `${areaLabel} Seating`],
+                        ].map(([icon, label]) => React.createElement("div", { key: icon, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 4px' } },
+                            React.createElement(Icon, { name: icon, size: 16, color: RF.sub }),
+                            React.createElement("span", { style: { fontSize: 13.5, color: RF.text, fontWeight: 600 } }, label)))),
+                        React.createElement("p", { style: { fontSize: 12, color: RF.sub, padding: '4px 4px' } }, `Reservation duration: ${f.duration} minutes`),
+                        React.createElement("div", { style: { marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                            React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral, margin: 0 } }, "No payment required"),
+                            React.createElement("p", { style: { fontSize: 11, color: '#5c7a2b', marginTop: 2 } }, "You can modify or cancel later.")),
+                        React.createElement("div", { style: { marginTop: 18 } },
+                            fieldRow("Full Name", f.name, (v) => setRsvFlow((p) => ({ ...p, name: v }))),
+                            fieldRow("Phone Number", f.phone, (v) => setRsvFlow((p) => ({ ...p, phone: v }))),
+                            fieldRow("Email", f.email, (v) => setRsvFlow((p) => ({ ...p, email: v }))),
+                            React.createElement("label", { style: { fontSize: 11, fontWeight: 700, color: RF.sub, textTransform: 'uppercase', display: 'block', marginTop: 12, marginBottom: 6 } }, "Special Requests (Optional)"),
+                            React.createElement("textarea", { value: f.notes, onChange: (e) => setRsvFlow((p) => ({ ...p, notes: e.target.value })), rows: 3, placeholder: "e.g. Birthday dinner, high chair needed", style: { width: '100%', border: `1px solid ${RF.border}`, borderRadius: 12, padding: 12, fontSize: 13, color: RF.text, outline: 'none', resize: 'none', fontFamily: 'inherit' } })),
+                        React.createElement("button", { className: "avio-press", disabled: !ready, onClick: confirmReservation, style: { width: '100%', marginTop: 20, padding: '15px 0', borderRadius: 26, background: ready ? THEME.coral : '#EDEDED', color: ready ? '#fff' : '#B5B5B8', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Confirm Reservation"));
+                    return React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 12, display: 'flex', flexDirection: 'column' } }, header, body);
+                }
+
+                // ---------- Confirmed ----------
+                const confirmed = f.confirmed || restaurantReservations.find((r) => r.id === f.editingId) || [...restaurantReservations].reverse().find((r) => r.status !== 'cancelled');
+                if (!confirmed) {
+                    // Should never happen once a reservation has actually been created, but never
+                    // leave the customer staring at nothing.
+                    const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '60px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' } },
+                        React.createElement(Icon, { name: "warningtriangle", size: 24, color: "#D0304A" }),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: RF.text, marginTop: 16 } }, "We couldn't load your reservation"),
+                        React.createElement("p", { style: { fontSize: 13, color: RF.sub, marginTop: 8 } }, "Please close this and try booking again."),
+                        React.createElement("button", { onClick: closeReservationFlow, style: { width: '100%', marginTop: 24, padding: '14px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Close"));
+                    return page(body);
+                }
+                const confDateObj = new Date(confirmed.date + 'T00:00:00');
+                const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 24px calc(env(safe-area-inset-bottom) + 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' } },
+                    React.createElement("div", { style: { position: 'relative', width: 96, height: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'calc(env(safe-area-inset-top) + 32px)' } },
+                        [[-36, -30, 0], [34, -22, 0.15], [-30, 28, 0.3], [38, 26, 0.45], [0, -44, 0.6], [4, 44, 0.75]].map(([dx, dy, delay], i) => React.createElement("span", { key: i, className: "avio-check-pop", style: { position: 'absolute', left: `calc(50% + ${dx}px)`, top: `calc(50% + ${dy}px)`, width: i % 2 ? 5 : 3, height: i % 2 ? 5 : 3, borderRadius: '50%', background: THEME.coral, opacity: 0.55, animationDelay: `${delay}s`, animationFillMode: 'backwards' } })),
+                        React.createElement("div", { className: "avio-check-pop avio-ring-pulse", style: { width: 68, height: 68, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement(Icon, { name: "check", size: 28, color: "#fff" }))),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: RF.text, marginTop: 18 } }, "Reservation Confirmed!"),
+                    React.createElement("p", { style: { fontSize: 13, color: RF.sub, marginTop: 6 } }, "We look forward to seeing you."),
+                    React.createElement("div", { style: { width: '100%', background: T.surfaceSecondary, borderRadius: 18, padding: 16, marginTop: 22, textAlign: 'left' } },
+                        React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: RF.text, margin: 0 } }, restaurant.name),
+                        React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 } }, [
+                            ['calendar', `${confDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${minutesToTimeLabel(confirmed.time)}`],
+                            ['users', `${confirmed.partySize} Guests`],
+                            ['mappin', `${confirmed.area} Seating`],
+                            ['tag', `Confirmation #${confirmed.confirmationCode}`],
+                        ].map(([icon, label]) => React.createElement("div", { key: icon, style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                            React.createElement(Icon, { name: icon, size: 13, color: RF.sub }),
+                            React.createElement("span", { style: { fontSize: 12.5, color: RF.text, fontWeight: 600 } }, label))))),
+                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', width: '100%', marginTop: 22 } },
+                        [['send', 'Directions', () => flashToast('Opening directions to ' + restaurant.address)], ['phone', 'Call', () => flashToast('Calling ' + restaurant.name)], ['calendar', 'Add to Calendar', () => flashToast('Added to calendar')], ['message', 'Message', () => flashToast('Messaging ' + restaurant.name)]].map(([icon, label, onClick]) => React.createElement("button", { key: label, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 } },
+                            React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: icon, size: 17, color: RF.text })),
+                            React.createElement("span", { style: { fontSize: 10, color: RF.sub } }, label)))),
+                    React.createElement("button", { onClick: () => setManageReservationOpen(true), style: { width: '100%', height: 48, borderRadius: 24, border: `1px solid ${RF.border}`, color: RF.text, fontWeight: 700, fontSize: 13.5, marginTop: 24 } }, "Manage Reservation"),
+                    React.createElement("button", { onClick: closeReservationFlow, style: { width: '100%', height: 54, borderRadius: 27, background: THEME.coral, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', marginTop: 10 } }, "Done"));
+                return React.createElement(React.Fragment, null,
+                    React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 12, display: 'flex', flexDirection: 'column' } }, body),
+                    manageReservationOpen && React.createElement("div", { onClick: () => setManageReservationOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
+                        React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, marginBottom: 14 } }, "Manage Reservation"),
+                            React.createElement("button", { onClick: () => startModifyReservation(confirmed), style: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '13px 4px', borderBottom: `1px solid ${T.border}` } },
+                                React.createElement(Icon, { name: "pencil", size: 16, color: "#161616" }), React.createElement("span", { style: { fontSize: 14, color: T.textPrimary, fontWeight: 600 } }, "Modify Reservation")),
+                            React.createElement("button", { onClick: () => { cancelReservationById(confirmed.id); setManageReservationOpen(false); closeReservationFlow(); }, style: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '13px 4px' } },
+                                React.createElement(Icon, { name: "trash", size: 16, color: "#D0304A" }), React.createElement("span", { style: { fontSize: 14, color: '#D0304A', fontWeight: 600 } }, "Cancel Reservation")))));
             }
-            if (f.stage === 'review') {
-                const ready = f.name.trim() && f.phone.trim() && f.email.trim();
-                const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '18px 18px 20px' } },
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, background: T.surfaceSecondary } },
-                        React.createElement("div", { style: { width: 52, height: 52, borderRadius: 14, background: restaurant.avatarColor || '#3B2A22', flexShrink: 0 } }),
-                        React.createElement("div", null,
-                            React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: RF.text, margin: 0 } }, restaurant.name),
-                            React.createElement("p", { style: { fontSize: 11.5, color: RF.sub, marginTop: 2 } }, restaurant.address))),
-                    React.createElement("div", { style: { marginTop: 16, display: 'flex', flexDirection: 'column', gap: 2 } }, [
-                        ['calendar', dateLabel],
-                        ['clock', minutesToTimeLabel(f.time)],
-                        ['users', `${f.partySize} Guest${f.partySize === 1 ? '' : 's'}`],
-                        ['mappin', areaLabel === 'No Preference' ? 'No Seating Preference' : `${areaLabel} Seating`],
-                    ].map(([icon, label]) => React.createElement("div", { key: icon, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 4px' } },
-                        React.createElement(Icon, { name: icon, size: 16, color: RF.sub }),
-                        React.createElement("span", { style: { fontSize: 13.5, color: RF.text, fontWeight: 600 } }, label)))),
-                    React.createElement("p", { style: { fontSize: 12, color: RF.sub, padding: '4px 4px' } }, `Reservation duration: ${f.duration} minutes`),
-                    React.createElement("div", { style: { marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
-                        React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral, margin: 0 } }, "No payment required"),
-                        React.createElement("p", { style: { fontSize: 11, color: '#5c7a2b', marginTop: 2 } }, "You can modify or cancel later.")),
-                    React.createElement("div", { style: { marginTop: 18 } },
-                        fieldRow("Full Name", f.name, (v) => setRsvFlow((p) => ({ ...p, name: v }))),
-                        fieldRow("Phone Number", f.phone, (v) => setRsvFlow((p) => ({ ...p, phone: v }))),
-                        fieldRow("Email", f.email, (v) => setRsvFlow((p) => ({ ...p, email: v }))),
-                        React.createElement("label", { style: { fontSize: 11, fontWeight: 700, color: RF.sub, textTransform: 'uppercase', display: 'block', marginTop: 12, marginBottom: 6 } }, "Special Requests (Optional)"),
-                        React.createElement("textarea", { value: f.notes, onChange: (e) => setRsvFlow((p) => ({ ...p, notes: e.target.value })), rows: 3, placeholder: "e.g. Birthday dinner, high chair needed", style: { width: '100%', border: `1px solid ${RF.border}`, borderRadius: 12, padding: 12, fontSize: 13, color: RF.text, outline: 'none', resize: 'none', fontFamily: 'inherit' } })),
-                    React.createElement("button", { className: "avio-press", disabled: !ready, onClick: confirmReservation, style: { width: '100%', marginTop: 20, padding: '15px 0', borderRadius: 26, background: ready ? THEME.coral : '#EDEDED', color: ready ? '#fff' : '#B5B5B8', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Confirm Reservation"));
-                return React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 12, display: 'flex', flexDirection: 'column' } }, header("Review Reservation"), body);
+            catch (err) {
+                console.error('Reservation flow render error:', err);
+                return React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 12, display: 'flex', flexDirection: 'column' } },
+                    React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, display: 'flex', justifyContent: 'flex-end' } },
+                        React.createElement("button", { onClick: closeReservationFlow }, React.createElement(Icon, { name: "x", size: 20, color: RF.text }))),
+                    React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 28px', textAlign: 'center' } },
+                        React.createElement("div", { style: { width: 56, height: 56, borderRadius: '50%', background: 'rgba(208,48,74,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement(Icon, { name: "warningtriangle", size: 24, color: "#D0304A" })),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: RF.text, marginTop: 18 } }, "We couldn't load availability"),
+                        React.createElement("p", { style: { fontSize: 13, color: RF.sub, marginTop: 8, lineHeight: 1.45 } }, "Something went wrong while checking tables. Please try again."),
+                        React.createElement("button", { className: "avio-press", onClick: retryReservationSearch, style: { width: '100%', maxWidth: 280, marginTop: 26, padding: '14px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Try Again")));
             }
-            const confirmed = f.confirmed || restaurantReservations.find((r) => r.id === f.editingId) || [...restaurantReservations].reverse().find((r) => r.status !== 'cancelled');
-            if (!confirmed)
-                return null;
-            const confDateObj = new Date(confirmed.date + 'T00:00:00');
-            const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 24px calc(env(safe-area-inset-bottom) + 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' } },
-                React.createElement("div", { style: { position: 'relative', width: 96, height: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'calc(env(safe-area-inset-top) + 32px)' } },
-                    [[-36, -30, 0], [34, -22, 0.15], [-30, 28, 0.3], [38, 26, 0.45], [0, -44, 0.6], [4, 44, 0.75]].map(([dx, dy, delay], i) => React.createElement("span", { key: i, className: "avio-check-pop", style: { position: 'absolute', left: `calc(50% + ${dx}px)`, top: `calc(50% + ${dy}px)`, width: i % 2 ? 5 : 3, height: i % 2 ? 5 : 3, borderRadius: '50%', background: THEME.coral, opacity: 0.55, animationDelay: `${delay}s`, animationFillMode: 'backwards' } })),
-                    React.createElement("div", { className: "avio-check-pop avio-ring-pulse", style: { width: 68, height: 68, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                        React.createElement(Icon, { name: "check", size: 28, color: "#fff" }))),
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: RF.text, marginTop: 18 } }, "Reservation Confirmed!"),
-                React.createElement("p", { style: { fontSize: 13, color: RF.sub, marginTop: 6 } }, "We look forward to seeing you."),
-                React.createElement("div", { style: { width: '100%', background: T.surfaceSecondary, borderRadius: 18, padding: 16, marginTop: 22, textAlign: 'left' } },
-                    React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: RF.text, margin: 0 } }, restaurant.name),
-                    React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 } }, [
-                        ['calendar', `${confDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${minutesToTimeLabel(confirmed.time)}`],
-                        ['users', `${confirmed.partySize} Guests`],
-                        ['mappin', `${confirmed.area} Seating`],
-                        ['tag', `Confirmation #${confirmed.confirmationCode}`],
-                    ].map(([icon, label]) => React.createElement("div", { key: icon, style: { display: 'flex', alignItems: 'center', gap: 10 } },
-                        React.createElement(Icon, { name: icon, size: 13, color: RF.sub }),
-                        React.createElement("span", { style: { fontSize: 12.5, color: RF.text, fontWeight: 600 } }, label))))),
-                React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', width: '100%', marginTop: 22 } },
-                    [['send', 'Directions', () => flashToast('Opening directions to ' + restaurant.address)], ['phone', 'Call', () => flashToast('Calling ' + restaurant.name)], ['calendar', 'Add to Calendar', () => flashToast('Added to calendar')], ['message', 'Message', () => flashToast('Messaging ' + restaurant.name)]].map(([icon, label, onClick]) => React.createElement("button", { key: label, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 } },
-                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: icon, size: 17, color: RF.text })),
-                        React.createElement("span", { style: { fontSize: 10, color: RF.sub } }, label)))),
-                React.createElement("button", { onClick: () => setManageReservationOpen(true), style: { width: '100%', height: 48, borderRadius: 24, border: `1px solid ${RF.border}`, color: RF.text, fontWeight: 700, fontSize: 13.5, marginTop: 24 } }, "Manage Reservation"),
-                React.createElement("button", { onClick: closeReservationFlow, style: { width: '100%', height: 54, borderRadius: 27, background: THEME.coral, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', marginTop: 10 } }, "Done"));
-            return React.createElement(React.Fragment, null,
-                React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 12, display: 'flex', flexDirection: 'column' } }, body),
-                manageReservationOpen && React.createElement("div", { onClick: () => setManageReservationOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
-                    React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
-                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, marginBottom: 14 } }, "Manage Reservation"),
-                        React.createElement("button", { onClick: () => startModifyReservation(confirmed), style: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '13px 4px', borderBottom: `1px solid ${T.border}` } },
-                            React.createElement(Icon, { name: "pencil", size: 16, color: "#161616" }), React.createElement("span", { style: { fontSize: 14, color: T.textPrimary, fontWeight: 600 } }, "Modify Reservation")),
-                        React.createElement("button", { onClick: () => { cancelReservationById(confirmed.id); setManageReservationOpen(false); closeReservationFlow(); }, style: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '13px 4px' } },
-                            React.createElement(Icon, { name: "trash", size: 16, color: "#D0304A" }), React.createElement("span", { style: { fontSize: 14, color: '#D0304A', fontWeight: 600 } }, "Cancel Reservation")))));
         })(),
         restaurantDashboardOpen && (() => {
             const restaurant = getMyRestaurant();
