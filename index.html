@@ -427,7 +427,6 @@ const BUSINESS_INCOMING_BOOKINGS = [
     { id: 'ib11', customerName: 'Amanda W.', initials: 'AW', service: 'Highlights', price: 150, time: '11:00 AM', status: 'completed', avatarColor: '#97C400', dateGroup: 'past', dateLabel: 'Aug 6' },
     { id: 'ib12', customerName: 'Taylor R.', initials: 'TR', service: 'Hair Color', price: 120, time: '2:30 PM', status: 'cancelled', avatarColor: '#FFFFFF', dateGroup: 'past', dateLabel: 'Aug 5' },
 ];
-const THRILLZ_DURATIONS = [15, 30, 60, 90];
 const THRILLZ_TOPICS = ['Barber', 'Fade', 'Haircut', 'Beard', 'Hair Color', 'Nail Salon', 'Manicure', 'Lashes', 'Makeup', 'Photographer', 'Wedding', 'Jet Ski', 'Fitness', 'Personal Trainer', 'Massage', 'Cleaning', 'Restaurant', 'Events', 'Tattoo', 'Skincare'];
 const THRILLZ_SOUND_LIBRARY = [
     { id: 'snd1', name: 'Golden Hour', artist: 'Bay Loops', duration: '0:32' },
@@ -2082,7 +2081,6 @@ function App() {
     const recordedChunksRef = useRef([]);
     const cameraRafRef = useRef(null);
     const recordTickRef = useRef(null);
-    const recordMaxTimeoutRef = useRef(null);
     const countdownTimeoutRef = useRef(null);
     const cameraGrainPatternRef = useRef(null);
     // Mirrors the camera-adjustment state into a ref so the running rAF draw loop always reads
@@ -2092,7 +2090,6 @@ function App() {
     const [uploadStep, setUploadStep] = useState('options');
     const [uploadVideoUrl, setUploadVideoUrl] = useState(null);
     // --- Create a Thrillz flow (Step 1-8 reference flow) ---
-    const [uploadDuration, setUploadDuration] = useState(30);
     const [uploadCaption, setUploadCaption] = useState('');
     const [uploadTopics, setUploadTopics] = useState([]);
     const [uploadLocationText, setUploadLocationText] = useState('');
@@ -2154,7 +2151,6 @@ function App() {
         uploadFileRef.current = null;
         if (uploadPostTimerRef.current) { clearInterval(uploadPostTimerRef.current); uploadPostTimerRef.current = null; }
         setUploadVideoUrl(null);
-        setUploadDuration(30);
         setUploadCaption('');
         setUploadTopics([]);
         setUploadLocationText('');
@@ -2403,13 +2399,8 @@ function App() {
         setCameraElapsedMs(0);
         const startedAt = Date.now();
         recordTickRef.current = setInterval(() => setCameraElapsedMs(Date.now() - startedAt), 100);
-        recordMaxTimeoutRef.current = setTimeout(() => stopCameraRecording(), uploadDuration * 1000);
     }
     function stopCameraRecording() {
-        if (recordMaxTimeoutRef.current) {
-            clearTimeout(recordMaxTimeoutRef.current);
-            recordMaxTimeoutRef.current = null;
-        }
         if (recordTickRef.current) {
             clearInterval(recordTickRef.current);
             recordTickRef.current = null;
@@ -8885,8 +8876,7 @@ function App() {
                     ].map((opt) => React.createElement("button", { key: opt.title, onClick: opt.onClick, style: { width: '100%', border: `1.5px solid ${UP.border}`, borderRadius: 24, padding: '30px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: UP.surface } },
                         React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', background: 'rgba(151,196,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: opt.icon, size: 22, color: green })),
                         React.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: UP.text, fontFamily: 'Space Grotesk, sans-serif' } }, opt.title),
-                        React.createElement("span", { style: { fontSize: 12.5, color: UP.sub, textAlign: 'center' } }, opt.sub)))),
-                React.createElement("p", { style: { flexShrink: 0, textAlign: 'center', fontSize: 12, fontWeight: 600, color: UP.sub, padding: '0 0 calc(env(safe-area-inset-bottom) + 18px)' } }, "Max 90 seconds"));
+                        React.createElement("span", { style: { fontSize: 12.5, color: UP.sub, textAlign: 'center' } }, opt.sub)))));
 
             // ---------- STEP 2 — Record / capture ----------
             const recordTools = [
@@ -8935,9 +8925,6 @@ function App() {
                     cameraPermissionOverlay,
                     cameraCountdown > 0 && React.createElement("div", { onClick: cancelCameraCountdown, style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.35)', zIndex: 3 } },
                         React.createElement("span", { key: cameraCountdown, className: "avio-check-pop", style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 96, color: "#fff" } }, cameraCountdown))),
-                React.createElement("div", { style: { flexShrink: 0, display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 18 } },
-                    THRILLZ_DURATIONS.map((d) => React.createElement("button", { key: d, disabled: cameraRecording, onClick: () => setUploadDuration(d), style: { padding: '6px 14px', borderRadius: 16, background: uploadDuration === d ? green : 'rgba(255,255,255,0.12)', opacity: cameraRecording ? 0.4 : 1 } },
-                        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#fff" } }, d + "s")))),
                 React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 34px calc(env(safe-area-inset-bottom) + 22px)` } },
                     React.createElement("button", { onClick: () => setUploadSheet('effects'), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
                         React.createElement("div", { style: { width: 44, height: 44, borderRadius: 22, background: cameraEffectId !== 'none' ? 'rgba(151,196,0,0.25)' : 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "sparkles", size: 18, color: cameraEffectId !== 'none' ? green : "#fff" })),
