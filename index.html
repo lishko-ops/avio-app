@@ -1581,50 +1581,25 @@ function formatCount(n) {
         return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
     return String(n);
 }
-const FILTER_CATEGORIES_PRIMARY = [
-    { id: 'all', label: 'All' },
-    { id: 'beauty', label: 'Beauty' },
-    { id: 'barber', label: 'Barber' },
-    { id: 'cleaning', label: 'Cleaning' },
-    { id: 'realestate', label: 'Real Estate' },
-    { id: 'auto', label: 'Auto' },
-    { id: 'events', label: 'Events' },
+const FILTER_MASTER_CATEGORIES = [
+    { id: 'beauty', label: 'Beauty & Grooming', subs: ['Barbers', 'Hair', 'Nails', 'Makeup', 'Spa'] },
+    { id: 'fitness', label: 'Fitness & Training', subs: ['Personal Trainers', 'Pilates', 'Yoga', 'Boxing', 'Fitness Classes'] },
+    { id: 'events', label: 'Events', subs: ['Venues', 'Photographers', 'Videographers', 'DJs', 'Party Rentals'] },
+    {
+        id: 'activities', label: 'Activities & Fun',
+        subs: ['Go-Karts', 'Laser Tag', 'Topgolf / Golf', 'Bowling', 'Escape Rooms', 'Batting Cages', 'Mini Golf', 'Paintball', 'Axe Throwing', 'VR'],
+        moreSubs: ['Rock Climbing', 'Trampoline Parks', 'Arcades', 'Ziplining', 'Stand-Up Paddleboarding', 'Hiking', 'Bike Rentals', 'Segway Tours', 'Ice Skating', 'Indoor Skydiving', 'Horseback Riding', 'Amusement Parks', 'Water Parks', 'Cooking Classes', 'Pottery / Art Classes'],
+    },
+    { id: 'boats', label: 'Boats & Water', subs: ['Boat Rentals', 'Yacht Charters', 'Jet Skis', 'Fishing Charters'] },
+    { id: 'food', label: 'Food & Dining', subs: ['Restaurants', 'Private Chefs', 'Catering'] },
+    { id: 'auto', label: 'Auto', subs: ['Car Detailing', 'Window Tinting', 'Car Wraps', 'Car Wash'] },
+    { id: 'home', label: 'Home & Property', subs: ['Cleaning', 'Landscaping', 'Handyman', 'Painting'] },
 ];
-const FILTER_CATEGORIES_MORE = [
-    { id: 'home', label: 'Home Services' },
-    { id: 'photography', label: 'Photography' },
-    { id: 'dj', label: 'DJ' },
-    { id: 'fitness', label: 'Fitness' },
-    { id: 'pets', label: 'Pets' },
-    { id: 'medical', label: 'Medical' },
-    { id: 'tutoring', label: 'Tutoring' },
-    { id: 'moving', label: 'Moving' },
-    { id: 'repair', label: 'Repair' },
-    { id: 'food', label: 'Food' },
-];
-const FILTER_SERVICES = {
-    beauty: ['Nails', 'Hair', 'Makeup', 'Lashes', 'Brows', 'Skincare', 'Spa', 'Tanning', 'Facial', 'Massage', 'Waxing', 'Teeth Whitening'],
-    barber: ['Haircut', 'Beard Trim', 'Shave', 'Fade', 'Kids Cut', 'Hair Design'],
-    cleaning: ['Home Cleaning', 'Deep Clean', 'Move Out', 'Office Cleaning', 'Carpet Cleaning', 'Window Cleaning'],
-    home: ['Handyman', 'Plumbing', 'Electrical', 'Landscaping', 'Painting', 'Pest Control'],
-    photography: ['Portrait', 'Wedding', 'Event', 'Product', 'Headshots', 'Family'],
-    dj: ['Wedding DJ', 'Club DJ', 'Private Party', 'Corporate Event', 'MC Services', 'Lighting'],
-    realestate: ['Home Staging', 'Photography', 'Open House', 'Inspection', 'Appraisal', 'Cleaning'],
-    fitness: ['Personal Training', 'Yoga', 'Pilates', 'Nutrition Coaching', 'Group Class', 'Recovery'],
-    auto: ['Detailing', 'Oil Change', 'Tire Service', 'Inspection', 'Car Wash', 'Repair'],
-    pets: ['Grooming', 'Walking', 'Sitting', 'Training', 'Vet Visit', 'Boarding'],
-    medical: ['Checkup', 'Dental', 'Vision', 'Therapy', 'Vaccination', 'Lab Work'],
-    tutoring: ['Math', 'Science', 'Language', 'Test Prep', 'Music Lessons', 'Coding'],
-    moving: ['Local Move', 'Long Distance', 'Packing', 'Storage', 'Furniture Assembly', 'Junk Removal'],
-    events: ['Wedding Planning', 'Birthday', 'Corporate', 'Catering', 'Decor', 'Entertainment'],
-    repair: ['Appliance', 'Electronics', 'Furniture', 'Plumbing', 'Handyman', 'Locksmith'],
-    food: ['Personal Chef', 'Catering', 'Meal Prep', 'Baking', 'Bartending', 'Food Delivery'],
-};
-const FILTER_PRICE_LEVELS = ['$', '$$', '$$$', '$$$$'];
-const FILTER_DISTANCE_OPTIONS = ['5 miles', '10 miles', '25 miles', '50 miles', '100+ miles'];
-const FILTER_RATING_OPTIONS = ['Any', '4+', '4.5+', '4.8+'];
-const FILTER_AVAILABILITY_OPTIONS = ['Any time', 'Today', 'This week', 'This weekend'];
-const FILTER_SORT_OPTIONS = ['Most popular', 'Trending', 'Closest', 'Highest rated', 'Most booked', 'Newest', 'Recommended', 'Price low to high', 'Price high to low'];
+const FILTER_LOCATION_OPTIONS = ['My location', 'Current city', 'Choose on map'];
+const FILTER_PRICE_LEVELS = ['Any price', '$', '$$', '$$$', '$$$$', 'Custom range'];
+const FILTER_DISTANCE_OPTIONS = ['Any distance', '5 miles', '10 miles', '25 miles', '50 miles', 'Custom range'];
+const FILTER_RATING_OPTIONS = ['Any rating', '4.8+', '4.5+', '4.0+'];
+const FILTER_AVAILABILITY_OPTIONS = ['Any time', 'Today', 'This week', 'This weekend', 'Custom dates'];
 const FILTER_TOGGLES = [
     { id: 'verified', label: 'Verified only' }, { id: 'instant', label: 'Instant booking' }, { id: 'inStudio', label: 'In studio' },
     { id: 'atHome', label: 'At your home' }, { id: 'openNow', label: 'Open now' }, { id: 'mobile', label: 'Mobile service' },
@@ -2079,11 +2054,13 @@ function App() {
     const [rsvPickerArea, setRsvPickerArea] = useState('no-preference');
     const [areaFormDraft, setAreaFormDraft] = useState(null);
     const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-    const [filterCat, setFilterCat] = useState('all');
-    const [filterSearch, setFilterSearch] = useState('');
-    const [filterServices, setFilterServices] = useState(() => new Set());
-    const [filterExpanded, setFilterExpanded] = useState(null);
-    const [filterLocation, setFilterLocation] = useState('Current location');
+    const [filterPopoverOpen, setFilterPopoverOpen] = useState(null);
+    const [selectedFilterCategories, setSelectedFilterCategories] = useState(() => new Set());
+    const [selectedFilterSubcats, setSelectedFilterSubcats] = useState(() => new Set());
+    const [expandedFilterCategory, setExpandedFilterCategory] = useState(null);
+    const [activitiesMoreExpanded, setActivitiesMoreExpanded] = useState(false);
+    const [savePreferences, setSavePreferences] = useState(false);
+    const [filterLocation, setFilterLocation] = useState('My location');
     const [swipeArrow, setSwipeArrow] = useState(null);
     const [profileDrag, setProfileDrag] = useState(null);
     const [businessProfileTarget, setBusinessProfileTarget] = useState(null);
@@ -2177,20 +2154,28 @@ function App() {
     useEffect(() => { saveLS('avio_provider_services', providerServices); }, [providerServices]);
     useEffect(() => { saveLS('avio_provider_weekly_hours', providerWeeklyHours); }, [providerWeeklyHours]);
     useEffect(() => { saveLS('avio_provider_date_overrides', providerDateOverrides); }, [providerDateOverrides]);
-    const [filterDistance, setFilterDistance] = useState('25 miles');
-    const [filterPrice, setFilterPrice] = useState(1);
-    const [filterRating, setFilterRating] = useState('4.5+');
+    const [filterDistance, setFilterDistance] = useState('Any distance');
+    const [filterPrice, setFilterPrice] = useState('Any price');
+    const [filterRating, setFilterRating] = useState('Any rating');
     const [filterAvailability, setFilterAvailability] = useState('Any time');
-    const [filterSort, setFilterSort] = useState('Most popular');
     const [filterToggles, setFilterToggles] = useState(() => new Set());
-    const [filterShowMoreCats, setFilterShowMoreCats] = useState(false);
-    function toggleFilterService(catId, label) {
+    function toggleFilterCategoryAll(catId) {
+        setSelectedFilterCategories((prev) => {
+            const next = new Set(prev);
+            next.has(catId) ? next.delete(catId) : next.add(catId);
+            return next;
+        });
+    }
+    function toggleFilterSubcat(catId, label) {
         const key = catId + ':' + label;
-        setFilterServices((prev) => {
+        setSelectedFilterSubcats((prev) => {
             const next = new Set(prev);
             next.has(key) ? next.delete(key) : next.add(key);
             return next;
         });
+    }
+    function toggleFilterExpandedCategory(catId) {
+        setExpandedFilterCategory((prev) => (prev === catId ? null : catId));
     }
     function toggleFilterSwitch(id) {
         setFilterToggles((prev) => {
@@ -2200,20 +2185,22 @@ function App() {
         });
     }
     function resetFilters() {
-        setFilterCat('all');
-        setFilterSearch('');
-        setFilterServices(new Set());
-        setFilterExpanded(null);
-        setFilterShowMoreCats(false);
-        setFilterLocation('Current location');
-        setFilterDistance('25 miles');
-        setFilterPrice(1);
-        setFilterRating('4.5+');
+        setSelectedFilterCategories(new Set());
+        setSelectedFilterSubcats(new Set());
+        setExpandedFilterCategory(null);
+        setActivitiesMoreExpanded(false);
+        setFilterPopoverOpen(null);
+        setFilterLocation('My location');
+        setFilterDistance('Any distance');
+        setFilterPrice('Any price');
+        setFilterRating('Any rating');
         setFilterAvailability('Any time');
-        setFilterSort('Most popular');
         setFilterToggles(new Set());
     }
-    const filterResultCount = Math.max(3, 247 - filterServices.size * 13 - filterToggles.size * 9 - (filterCat !== 'all' ? 38 : 0) - (filterSearch.trim() ? 55 : 0) - (filterRating !== 'Any' ? 12 : 0) - (filterAvailability !== 'Any time' ? 10 : 0));
+    const filterSelectionCount = selectedFilterCategories.size + selectedFilterSubcats.size
+        + (filterLocation !== 'My location' ? 1 : 0) + (filterDistance !== 'Any distance' ? 1 : 0)
+        + (filterPrice !== 'Any price' ? 1 : 0) + (filterRating !== 'Any rating' ? 1 : 0) + (filterAvailability !== 'Any time' ? 1 : 0);
+    const filterResultCount = Math.max(3, 247 - selectedFilterSubcats.size * 13 - selectedFilterCategories.size * 24 - filterToggles.size * 9 - (filterRating !== 'Any rating' ? 12 : 0) - (filterAvailability !== 'Any time' ? 10 : 0) - (filterDistance !== 'Any distance' ? 8 : 0));
     function toggleBookmark(id) {
         setExploreBookmarks((prev) => {
             const next = new Set(prev);
@@ -7923,86 +7910,116 @@ function App() {
                             React.createElement(Icon, { name: "send", size: 14, color: "#fff" }))));
         })())),
         filterSheetOpen && (React.createElement("div", { className: "avio-filter-backdrop", onClick: () => setFilterSheetOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 12, display: 'flex', alignItems: 'flex-end' } }, (() => {
-            const gridCatId = filterCat === 'all' ? 'beauty' : filterCat;
-            const gridServices = FILTER_SERVICES[gridCatId] || [];
-            const shownServices = filterSearch.trim() ? gridServices.filter((s) => s.toLowerCase().includes(filterSearch.trim().toLowerCase())) : gridServices;
-            const visibleCats = filterShowMoreCats ? [...FILTER_CATEGORIES_PRIMARY, ...FILTER_CATEGORIES_MORE] : FILTER_CATEGORIES_PRIMARY;
-            function refineRow(key, label, valueText, content) {
-                const expanded = filterExpanded === key;
-                return React.createElement("div", { key: key, style: { borderBottom: `1px solid ${T.border}` } },
-                    React.createElement("button", { onClick: () => setFilterExpanded(expanded ? null : key), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 18px' } },
-                        React.createElement("span", { style: { fontSize: 14.5, color: T.textPrimary } }, label),
-                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-                            React.createElement("span", { style: { fontSize: 13.5, color: T.textSecondary } }, valueText),
-                            React.createElement(Icon, { name: expanded ? "chevrondown" : "chevronright", size: 14, color: "#C7C7CC" }))),
-                    expanded && React.createElement("div", { className: "avio-filter-section", style: { padding: '0 18px 16px' } }, content));
-            }
-            const headerBlock = React.createElement("div", { style: { flexShrink: 0, padding: '10px 18px 0' } },
-                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#E5E5E5', margin: '0 auto 14px' } }),
+            const FC = { bg: '#FFFFFF', card: '#FFFFFF', chip: '#FAFAFA', text: '#161616', sub: '#8A8A8E', border: '#E6E6EA' };
+            const TOP_FILTER_ICONS = { location: 'mappin', distance: 'compass', price: 'wallet', rating: 'star', availability: 'calendar' };
+            const TOP_FILTER_LABELS = { location: 'Location', distance: 'Distance', price: 'Price', rating: 'Rating', availability: 'Availability' };
+            const TOP_FILTER_DEFAULTS = { location: 'My location', distance: 'Any distance', price: 'Any price', rating: 'Any rating', availability: 'Any time' };
+            const TOP_FILTER_VALUES = { location: filterLocation, distance: filterDistance, price: filterPrice, rating: filterRating, availability: filterAvailability };
+            const headerBlock = React.createElement("div", { style: { flexShrink: 0, padding: '14px 18px 0' } },
+                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: FC.border, margin: '0 auto 14px' } }),
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
                     React.createElement("button", { onClick: () => setFilterSheetOpen(false), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                        React.createElement(Icon, { name: "x", size: 18, color: T.textPrimary })),
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: T.textPrimary, margin: 0 } }, "Filters"),
-                    React.createElement("button", { onClick: resetFilters, style: { fontSize: 13.5, fontWeight: 600, color: T.textSecondary, flexShrink: 0 } }, "Reset")));
-            const chipRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 20, overflowX: 'auto', padding: '18px 18px 6px', alignItems: 'center' } },
-                visibleCats.map((c) => {
-                    const active = filterCat === c.id;
-                    return React.createElement("div", { key: c.id, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, gap: 6 } },
-                        React.createElement("button", { className: "avio-filter-chip", onClick: () => setFilterCat(c.id), style: { padding: active ? '9px 16px' : '9px 2px', borderRadius: 20, background: active ? THEME.coral : 'transparent', fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? '#fff' : '#8A8A8E', whiteSpace: 'nowrap' } }, c.label),
-                        React.createElement("span", { style: { width: active ? 16 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
-                }),
-                React.createElement("button", { className: "avio-filter-chip", onClick: () => setFilterShowMoreCats((v) => !v), style: { flexShrink: 0, fontSize: 13.5, fontWeight: 500, color: T.textSecondary, padding: '9px 2px', whiteSpace: 'nowrap' } }, filterShowMoreCats ? "Less" : "More"));
-            const searchBarBlock = React.createElement("div", { style: { position: 'sticky', top: 0, zIndex: 2, background: T.surface, padding: '4px 18px 12px' } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: T.surfaceSecondary, borderRadius: 16, height: 44, padding: '0 14px' } },
-                    React.createElement(Icon, { name: "search", size: 16, color: "#B5B5B8" }),
-                    React.createElement("input", { value: filterSearch, onChange: (e) => setFilterSearch(e.target.value), placeholder: "Search services or categories", style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13.5, color: T.textPrimary } }),
-                    filterSearch && React.createElement("button", { onClick: () => setFilterSearch('') }, React.createElement(Icon, { name: "x", size: 14, color: "#B5B5B8" }))));
-            const categoriesBlock = React.createElement("div", { className: "avio-filter-section" },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 18px 0' } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: T.textPrimary, margin: 0 } }, "Categories"),
-                    React.createElement("button", { onClick: () => flashToast('More categories coming soon'), style: { display: 'flex', alignItems: 'center', gap: 2, fontSize: 13, fontWeight: 600, color: T.textSecondary } }, "See all", React.createElement(Icon, { name: "chevronright", size: 13, color: "#8A8A8E" }))),
-                React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', marginTop: 10 } },
-                    shownServices.length === 0 ? React.createElement("p", { style: { gridColumn: 'span 4', textAlign: 'center', fontSize: 12.5, color: '#B5B5B8', padding: '18px 0' } }, "No services match your search") :
-                        shownServices.map((s, i) => {
-                            const col = i % 4, row = Math.floor(i / 4), totalRows = Math.ceil(shownServices.length / 4);
-                            const key = gridCatId + ':' + s;
-                            const selected = filterServices.has(key);
-                            return React.createElement("button", { key: s, className: "avio-filter-card", onClick: () => toggleFilterService(gridCatId, s), style: { padding: '18px 4px', textAlign: 'center', fontSize: 12.5, fontWeight: selected ? 700 : 500, color: selected ? THEME.coral : T.textPrimary, background: selected ? T.surfaceSecondary : 'transparent', borderRight: col === 3 || i === shownServices.length - 1 ? 'none' : `1px solid ${T.border}`, borderBottom: row === totalRows - 1 ? 'none' : `1px solid ${T.border}` } }, s);
-                        })));
-            const refineBlock = React.createElement("div", { style: { marginTop: 20 } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: T.textPrimary, margin: '0 0 4px', padding: '0 18px' } }, "Refine your search"),
-                React.createElement("div", { style: { marginTop: 6 } },
-                    refineRow('location', 'Location', filterLocation, React.createElement("div", { style: { display: 'flex', gap: 8 } },
-                        ['Current location', 'Choose on map'].map((opt) => React.createElement("button", { key: opt, onClick: () => { setFilterLocation(opt); setFilterExpanded(null); }, style: { flex: 1, padding: '10px 0', borderRadius: 12, fontSize: 12.5, fontWeight: 600, border: `1.5px solid ${filterLocation === opt ? THEME.coral : T.border}`, color: filterLocation === opt ? THEME.coral : '#8A8A8E', background: T.surface } }, opt)))),
-                    refineRow('distance', 'Distance', filterDistance, React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto' } },
-                        FILTER_DISTANCE_OPTIONS.map((opt) => React.createElement("button", { key: opt, onClick: () => { setFilterDistance(opt); setFilterExpanded(null); }, style: { flexShrink: 0, padding: '9px 14px', borderRadius: 16, fontSize: 12.5, fontWeight: 600, border: `1.5px solid ${filterDistance === opt ? THEME.coral : T.border}`, color: filterDistance === opt ? THEME.coral : '#8A8A8E', background: T.surface } }, opt)))),
-                    refineRow('price', 'Price', FILTER_PRICE_LEVELS[filterPrice], React.createElement("div", { style: { display: 'flex', gap: 8 } },
-                        FILTER_PRICE_LEVELS.map((lvl, i) => React.createElement("button", { key: lvl, onClick: () => setFilterPrice(i), style: { flex: 1, padding: '10px 0', borderRadius: 12, fontSize: 13, fontWeight: 700, border: `1.5px solid ${filterPrice === i ? THEME.coral : T.border}`, color: filterPrice === i ? '#fff' : '#8A8A8E', background: filterPrice === i ? THEME.coral : T.surface } }, lvl)))),
-                    refineRow('rating', 'Rating', filterRating === 'Any' ? 'Any' : filterRating, React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 6 } },
-                        FILTER_RATING_OPTIONS.slice().reverse().map((opt) => React.createElement("button", { key: opt, onClick: () => { setFilterRating(opt); setFilterExpanded(null); }, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: 12, border: `1.5px solid ${filterRating === opt ? THEME.coral : T.border}`, background: T.surface } },
-                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } }, React.createElement(Icon, { name: "star", size: 13, color: "#F5A623", fill: "#F5A623" }), React.createElement("span", { style: { fontSize: 13, color: T.textPrimary, fontWeight: 600 } }, opt === 'Any' ? 'Any rating' : opt)),
-                            filterRating === opt && React.createElement(Icon, { name: "check", size: 14, color: THEME.coral }))))),
-                    refineRow('availability', 'Availability', filterAvailability, React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto' } },
-                        FILTER_AVAILABILITY_OPTIONS.map((opt) => React.createElement("button", { key: opt, onClick: () => { setFilterAvailability(opt); setFilterExpanded(null); }, style: { flexShrink: 0, padding: '9px 14px', borderRadius: 16, fontSize: 12.5, fontWeight: 600, border: `1.5px solid ${filterAvailability === opt ? THEME.coral : T.border}`, color: filterAvailability === opt ? THEME.coral : '#8A8A8E', background: T.surface } }, opt)))),
-                    refineRow('sort', 'Sort by', filterSort, React.createElement("div", { style: { display: 'flex', flexDirection: 'column' } },
-                        FILTER_SORT_OPTIONS.map((opt, i) => React.createElement("button", { key: opt, onClick: () => { setFilterSort(opt); setFilterExpanded(null); }, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 2px', borderBottom: i < FILTER_SORT_OPTIONS.length - 1 ? `1px solid ${T.border}` : 'none' } },
-                            React.createElement("span", { style: { fontSize: 13.5, color: T.textPrimary, fontWeight: filterSort === opt ? 700 : 500 } }, opt),
-                            filterSort === opt && React.createElement(Icon, { name: "check", size: 14, color: THEME.coral })))))));
-            const moreFiltersBlock = React.createElement("div", { style: { padding: '20px 18px 4px' } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: T.textPrimary, margin: '0 0 12px' } }, "More filters"),
-                React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
-                    FILTER_TOGGLES.map((t) => {
-                        const on = filterToggles.has(t.id);
-                        return React.createElement("button", { key: t.id, className: "avio-filter-chip", onClick: () => toggleFilterSwitch(t.id), style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 14, border: `1.5px solid ${on ? THEME.coral : T.border}`, background: T.surface } },
-                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 500, color: T.textPrimary } }, t.label),
-                            React.createElement("div", { style: { width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${on ? THEME.coral : '#D1D1D6'}`, background: on ? THEME.coral : T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, on && React.createElement(Icon, { name: "check", size: 10, color: "#fff" })));
-                    })));
+                        React.createElement(Icon, { name: "x", size: 19, color: FC.text })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 800, fontSize: 19, color: FC.text, margin: 0, letterSpacing: '-0.01em' } }, "BookVado"),
+                    React.createElement("button", { onClick: resetFilters, style: { fontSize: 14, fontWeight: 600, color: THEME.coral, flexShrink: 0 } }, "Reset")),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 800, fontSize: 28, color: FC.text, margin: '18px 0 4px' } }, "Filters"),
+                React.createElement("p", { style: { fontSize: 13, color: FC.sub, margin: 0 } }, "Refine your search and find the perfect match."));
+            const topFiltersRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', padding: '18px 18px 4px' } },
+                ['location', 'distance', 'price', 'rating', 'availability'].map((key) => {
+                    const isDefault = TOP_FILTER_VALUES[key] === TOP_FILTER_DEFAULTS[key];
+                    const open = filterPopoverOpen === key;
+                    return React.createElement("button", { key: key, className: "avio-filter-chip", onClick: () => setFilterPopoverOpen(open ? null : key), style: { flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4, padding: '9px 12px', borderRadius: 14, border: `1.5px solid ${!isDefault || open ? THEME.coral : FC.border}`, background: FC.card, minWidth: 88 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4 } },
+                            React.createElement(Icon, { name: TOP_FILTER_ICONS[key], size: 11, color: FC.sub }),
+                            React.createElement("span", { style: { fontSize: 10.5, fontWeight: 600, color: FC.sub } }, TOP_FILTER_LABELS[key])),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 2 } },
+                            React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: !isDefault ? THEME.coral : FC.text, whiteSpace: 'nowrap' } }, TOP_FILTER_VALUES[key]),
+                            React.createElement(Icon, { name: "chevrondown", size: 10, color: !isDefault ? THEME.coral : FC.sub })));
+                }));
+            function popoverOptionRow(label, active, onClick, icon) {
+                return React.createElement("button", { key: label, onClick: onClick, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 4px', borderBottom: `1px solid ${FC.border}` } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                        icon || null,
+                        React.createElement("span", { style: { fontSize: 14, fontWeight: active ? 700 : 500, color: FC.text } }, label)),
+                    React.createElement("div", { style: { width: 20, height: 20, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : FC.border}`, background: active ? THEME.coral : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" })));
+            }
+            let popoverContent = null;
+            if (filterPopoverOpen === 'location') {
+                popoverContent = React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: FC.chip, borderRadius: 14, padding: '11px 12px', marginBottom: 8 } },
+                        React.createElement(Icon, { name: "search", size: 14, color: "#B5B5B8" }),
+                        React.createElement("input", { placeholder: "Search location", style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13.5, color: FC.text } })),
+                    FILTER_LOCATION_OPTIONS.map((opt) => popoverOptionRow(opt, filterLocation === opt, () => { setFilterLocation(opt); setFilterPopoverOpen(null); })));
+            }
+            else if (filterPopoverOpen === 'distance') {
+                popoverContent = FILTER_DISTANCE_OPTIONS.map((opt) => popoverOptionRow(opt, filterDistance === opt, () => { setFilterDistance(opt); setFilterPopoverOpen(null); }));
+            }
+            else if (filterPopoverOpen === 'price') {
+                popoverContent = FILTER_PRICE_LEVELS.map((opt) => popoverOptionRow(opt, filterPrice === opt, () => { setFilterPrice(opt); setFilterPopoverOpen(null); }));
+            }
+            else if (filterPopoverOpen === 'rating') {
+                popoverContent = FILTER_RATING_OPTIONS.map((opt) => popoverOptionRow(opt === 'Any rating' ? opt : `${opt} & up`, filterRating === opt, () => { setFilterRating(opt); setFilterPopoverOpen(null); }, opt !== 'Any rating' ? React.createElement(Icon, { name: "star", size: 13, color: "#F5A623", fill: "#F5A623" }) : null));
+            }
+            else if (filterPopoverOpen === 'availability') {
+                popoverContent = FILTER_AVAILABILITY_OPTIONS.map((opt) => popoverOptionRow(opt, filterAvailability === opt, () => { setFilterAvailability(opt); setFilterPopoverOpen(null); }));
+            }
+            const popoverBackdrop = filterPopoverOpen && React.createElement("div", { onClick: () => setFilterPopoverOpen(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)', zIndex: 4 } });
+            const popover = filterPopoverOpen && React.createElement("div", { className: "avio-card-in", onClick: (e) => e.stopPropagation(), style: { position: 'absolute', left: 18, right: 18, bottom: 96, zIndex: 5, background: FC.card, borderRadius: 20, border: `1px solid ${FC.border}`, boxShadow: '0 -8px 32px rgba(0,0,0,0.14)', padding: '4px 14px', maxHeight: '52%', overflowY: 'auto' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 0', borderBottom: `1px solid ${FC.border}`, position: 'sticky', top: 0, background: FC.card } },
+                    React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: FC.text } }, TOP_FILTER_LABELS[filterPopoverOpen]),
+                    React.createElement("button", { onClick: () => setFilterPopoverOpen(null), style: { fontSize: 13, fontWeight: 700, color: THEME.coral } }, "Done")),
+                popoverContent);
+            function categoryCheckbox(active) {
+                return React.createElement("div", { style: { width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${active ? THEME.coral : FC.border}`, background: active ? THEME.coral : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    active && React.createElement(Icon, { name: "check", size: 12, color: "#fff" }));
+            }
+            function subcatPill(catId, sub) {
+                const key = catId + ':' + sub;
+                const selected = selectedFilterSubcats.has(key);
+                return React.createElement("button", { key: sub, className: "avio-filter-chip", onClick: () => toggleFilterSubcat(catId, sub), style: { position: 'relative', padding: '8px 14px', borderRadius: 18, border: `1.5px solid ${selected ? THEME.coral : FC.border}`, background: selected ? 'rgba(151,196,0,0.08)' : FC.card, fontSize: 12.5, fontWeight: selected ? 700 : 500, color: selected ? THEME.coral : FC.text } },
+                    sub,
+                    selected && React.createElement("span", { style: { position: 'absolute', top: -6, right: -6, width: 15, height: 15, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${FC.card}` } },
+                        React.createElement(Icon, { name: "check", size: 8, color: "#fff" })));
+            }
+            const categoriesBlock = React.createElement("div", { style: { padding: '18px 18px 0' } },
+                FILTER_MASTER_CATEGORIES.map((cat) => {
+                    const expanded = expandedFilterCategory === cat.id;
+                    const wholeSelected = selectedFilterCategories.has(cat.id);
+                    const hasSubSelected = cat.subs.some((s) => selectedFilterSubcats.has(cat.id + ':' + s)) || (cat.moreSubs || []).some((s) => selectedFilterSubcats.has(cat.id + ':' + s));
+                    const active = wholeSelected || hasSubSelected;
+                    const isActivities = cat.id === 'activities';
+                    return React.createElement("div", { key: cat.id, style: { border: `1px solid ${active ? THEME.coral : FC.border}`, borderRadius: 18, marginBottom: 10, overflow: 'hidden' } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center' } },
+                            React.createElement("button", { onClick: () => toggleFilterCategoryAll(cat.id), style: { flex: 1, display: 'flex', alignItems: 'center', gap: 10, padding: '14px 4px 14px 14px', textAlign: 'left' } },
+                                categoryCheckbox(active),
+                                React.createElement("span", { style: { fontSize: 14.5, fontWeight: 700, color: FC.text } }, cat.label)),
+                            React.createElement("button", { onClick: () => toggleFilterExpandedCategory(cat.id), style: { padding: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                                React.createElement("span", { style: { display: 'flex', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' } },
+                                    React.createElement(Icon, { name: "chevrondown", size: 15, color: "#B5B5B8" })))),
+                        expanded && React.createElement("div", { className: "avio-filter-section", style: { padding: '0 14px 14px' } },
+                            React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
+                                cat.subs.map((s) => subcatPill(cat.id, s)),
+                                isActivities && !activitiesMoreExpanded && React.createElement("button", { key: "more", className: "avio-filter-chip", onClick: () => setActivitiesMoreExpanded(true), style: { padding: '8px 14px', borderRadius: 18, border: `1.5px dashed ${FC.border}`, fontSize: 12.5, fontWeight: 600, color: FC.sub, background: 'transparent' } }, "+ More"),
+                                isActivities && activitiesMoreExpanded && (cat.moreSubs || []).map((s) => subcatPill(cat.id, s)),
+                                isActivities && activitiesMoreExpanded && React.createElement("button", { key: "less", className: "avio-filter-chip", onClick: () => setActivitiesMoreExpanded(false), style: { padding: '8px 14px', borderRadius: 18, border: `1.5px dashed ${FC.border}`, fontSize: 12.5, fontWeight: 600, color: FC.sub, background: 'transparent' } }, "Show less"))));
+                }));
+            const tipBlock = React.createElement("div", { style: { display: 'flex', gap: 8, alignItems: 'flex-start', margin: '6px 18px 20px', padding: 12, borderRadius: 14, background: FC.chip } },
+                React.createElement(Icon, { name: "info", size: 14, color: FC.sub }),
+                React.createElement("p", { style: { fontSize: 11.5, color: FC.sub, margin: 0, lineHeight: 1.5 } },
+                    React.createElement("span", { style: { fontWeight: 700, color: FC.text } }, "Good to know: "), "Your selections stay saved when you return. You can change or clear them anytime."));
             const bodyScroll = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto' } },
-                chipRow, searchBarBlock, categoriesBlock, refineBlock, moreFiltersBlock, React.createElement("div", { style: { height: 16 } }));
-            const footerBlock = React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', background: T.surface, borderTop: `1px solid ${T.border}` } },
-                React.createElement("button", { onClick: () => setFilterSheetOpen(false), style: { width: '100%', height: 58, borderRadius: 29, background: THEME.coral, color: '#fff', fontSize: 15.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, `Show ${filterResultCount} Results`));
-            return React.createElement("div", { className: "avio-filter-sheet", onClick: (e) => e.stopPropagation(), style: { width: '100%', height: '90%', background: T.modalBackground, borderRadius: '24px 24px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 -12px 40px rgba(0,0,0,0.22)' } },
-                headerBlock, bodyScroll, footerBlock);
+                topFiltersRow, categoriesBlock, tipBlock);
+            const footerBlock = React.createElement("div", { style: { flexShrink: 0, padding: '10px 18px calc(env(safe-area-inset-bottom) + 14px)', background: FC.bg, borderTop: `1px solid ${FC.border}` } },
+                React.createElement("button", { onClick: () => setSavePreferences((v) => !v), style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 } },
+                    React.createElement(Icon, { name: "bookmark", size: 16, color: savePreferences ? THEME.coral : FC.sub, fill: savePreferences ? THEME.coral : 'none' }),
+                    React.createElement("div", { style: { textAlign: 'left' } },
+                        React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: FC.text, margin: 0 } }, "Save my preferences"),
+                        React.createElement("p", { style: { fontSize: 10.5, color: FC.sub, margin: '1px 0 0' } }, "We'll remember your filters"))),
+                React.createElement("button", { onClick: () => setFilterSheetOpen(false), style: { width: '100%', height: 56, borderRadius: 28, background: THEME.coral, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } },
+                    `Show ${filterResultCount} Results`, React.createElement(Icon, { name: "arrowright", size: 16, color: "#fff" })));
+            return React.createElement("div", { className: "avio-filter-sheet", onClick: (e) => e.stopPropagation(), style: { width: '100%', height: '90%', background: FC.bg, borderRadius: '24px 24px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 -12px 40px rgba(0,0,0,0.22)', position: 'relative' } },
+                headerBlock, bodyScroll, footerBlock, popoverBackdrop, popover);
         })())),
         bookingDetail && (React.createElement("div", { onClick: () => setBookingDetail(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } }, (() => {
             const b = bookingDetail;
