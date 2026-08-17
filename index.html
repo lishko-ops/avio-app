@@ -1892,6 +1892,19 @@ function SettingsSelectRow({ label, sub, selected, onClick }) {
             ? React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 13, color: "#fff" }))
             : React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${ST.border}`, flexShrink: 0 } }));
 }
+// There's no real geocoding in this prototype, so a customer's entered service address is mapped
+// to a distance deterministically from the text itself (same address always yields the same
+// estimate) rather than faked as always-in-range — this keeps the in-range/out-of-range service
+// area check genuinely exercised end to end.
+function estimateAddressDistanceMi(address) {
+    const s = (address || '').trim().toLowerCase();
+    if (!s)
+        return null;
+    let hash = 0;
+    for (let i = 0; i < s.length; i++)
+        hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
+    return hash % 35;
+}
 function App() {
     var _a;
     const [themeMode, setThemeModeRaw] = useState(() => {
@@ -2802,6 +2815,59 @@ function App() {
     const [earningsChartSelectedIdx, setEarningsChartSelectedIdx] = useState(null);
     const [earningsSelectedDay, setEarningsSelectedDay] = useState(null);
     const [dashboardChartSelectedDay, setDashboardChartSelectedDay] = useState(null);
+    // --- Business Location & Service Area ---
+    const [businessTravel, setBusinessTravel] = useState(() => loadLS('avio_business_travel', {
+        enabled: false, distanceMi: 15, isCustom: false, customDistanceMi: '', feeType: 'free', customFee: '',
+    }));
+    useEffect(() => { saveLS('avio_business_travel', businessTravel); }, [businessTravel]);
+    const [businessLocationSettings, setBusinessLocationSettings] = useState(() => loadLS('avio_business_location_settings', {
+        showAddress: true, showMapPin: true, showDirections: true,
+    }));
+    useEffect(() => { saveLS('avio_business_location_settings', businessLocationSettings); }, [businessLocationSettings]);
+    const [locationDetailsOpen, setLocationDetailsOpen] = useState(false);
+    const [locationModePickerOpen, setLocationModePickerOpen] = useState(false);
+    const [locationAddressEditing, setLocationAddressEditing] = useState(false);
+    const [serviceAreaSettingsOpen, setServiceAreaSettingsOpen] = useState(false);
+    const [serviceAreaDraft, setServiceAreaDraft] = useState(null);
+    function closeLocationDetails() { setLocationDetailsOpen(false); setLocationModePickerOpen(false); setLocationAddressEditing(false); }
+    function openServiceAreaSettings() { setServiceAreaDraft({ ...businessTravel }); setServiceAreaSettingsOpen(true); }
+    function closeServiceAreaSettings() { setServiceAreaSettingsOpen(false); setServiceAreaDraft(null); }
+    function saveServiceArea() {
+        if (!serviceAreaDraft)
+            return;
+        setBusinessTravel(serviceAreaDraft);
+        flashToast('Service area updated');
+        closeServiceAreaSettings();
+    }
+    function serviceAreaDistanceMi(travel) {
+        if (!travel || !travel.enabled)
+            return 0;
+        return travel.isCustom ? (Number(travel.customDistanceMi) || 0) : travel.distanceMi;
+    }
+    function serviceAreaFeeAmount(travel) {
+        if (!travel || !travel.enabled || travel.feeType !== 'custom')
+            return 0;
+        return Number(travel.customFee) || 0;
+    }
+    function formatServiceAreaSummary(travel) {
+        if (!travel || !travel.enabled)
+            return 'Travel to customers: Off';
+        const dist = serviceAreaDistanceMi(travel);
+        const fee = serviceAreaFeeAmount(travel);
+        return `Travel to customers: On · Up to ${dist} mi${fee > 0 ? ` · $${fee} fee` : ''}`;
+    }
+    // Any business can be looked up for its travel info this way — my own business reads the
+    // configurable settings above; other (seeded) businesses fall back to a sensible default
+    // derived from their existing locationMode so discovery/booking logic works generically.
+    function getBusinessTravelInfo(business) {
+        if (!business)
+            return { enabled: false };
+        if (business.id === MY_PROVIDER_ID)
+            return businessTravel;
+        if (business.locationMode === 'I travel to customers' || business.locationMode === 'All')
+            return { enabled: true, distanceMi: 15, isCustom: false, feeType: 'free', customFee: '' };
+        return { enabled: false };
+    }
     const [daysRankMode, setDaysRankMode] = useState('bookings');
     const [servicesRankMode, setServicesRankMode] = useState('bookings');
     const [selectedServiceDetail, setSelectedServiceDetail] = useState(null);
@@ -3219,6 +3285,8 @@ function App() {
         return () => observer.disconnect();
     }, [filteredFeed, tab, feedSoundOn]);
     const [bookingStep, setBookingStep] = useState('service');
+    const [customerServiceLocation, setCustomerServiceLocation] = useState('business');
+    const [customerServiceAddress, setCustomerServiceAddress] = useState('');
     const [selectedService, setSelectedService] = useState(null);
     const [selectedStaff, setSelectedStaff] = useState(null);
     const [bookingCalMonth, setBookingCalMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
@@ -3728,6 +3796,8 @@ function App() {
         setCustomerInfo({ fullName: '', phone: isPhoneLikeIdentifier(authDraft.identifier || '') ? authDraft.identifier : '', notes: '' });
         setPaymentMethod('saved');
         setConfirmedBooking(null);
+        setCustomerServiceLocation('business');
+        setCustomerServiceAddress('');
     }
     function closeBookingFlow() { setBookingTarget(null); }
     function openActivityBooking(item, preselectedActivity) {
@@ -3782,6 +3852,22 @@ function App() {
     function finalizeBooking() {
         if (!bookingTarget || !selectedService || selTime == null)
             return;
+        // Re-validate the service location/radius at the moment of payment — never trust the
+        // 'info' step's check alone, since it's possible to reach this point with stale state.
+        const travelInfo = getBusinessTravelInfo(bookingTarget);
+        const travelRadiusMi = serviceAreaDistanceMi(travelInfo);
+        const travelFeeAmt = serviceAreaFeeAmount(travelInfo);
+        const customerAddressTrimmed = customerServiceAddress.trim();
+        const serviceLocation = customerServiceLocation === 'customer' && travelInfo.enabled ? 'customer' : 'business';
+        if (serviceLocation === 'customer') {
+            const estimatedDistanceMi = customerAddressTrimmed ? estimateAddressDistanceMi(customerAddressTrimmed) : null;
+            if (!customerAddressTrimmed || estimatedDistanceMi == null || estimatedDistanceMi > travelRadiusMi) {
+                flashToast("This location is outside this business's service area.");
+                setBookingStep('info');
+                return;
+            }
+        }
+        const travelFee = serviceLocation === 'customer' ? travelFeeAmt : 0;
         const d = new Date(bookingCalMonth.getFullYear(), bookingCalMonth.getMonth(), bookingSelectedDay);
         // Re-check availability at the moment of payment, immediately before creating the booking —
         // the slot list the customer looked at a moment ago may already be stale if someone else
@@ -3805,7 +3891,7 @@ function App() {
         const originalPrice = selectedService.price;
         const finalPrice = promo ? promo.finalPrice : originalPrice;
         const tax = Math.round(finalPrice * 0.08 * 100) / 100;
-        const total = Math.round((finalPrice + tax) * 100) / 100;
+        const total = Math.round((finalPrice + tax + travelFee) * 100) / 100;
         const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const initials = bookingTarget.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
         const confirmationNumber = 'AV' + Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -3813,7 +3899,8 @@ function App() {
             id: 'b' + Date.now(), name: bookingTarget.name, service: selectedService.name, business: bookingTarget.name, category: bookingTarget.category,
             providerId: bookingTarget.id, durationMinutes: selectedService.durationMin,
             date: label, day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), time: minutesToTimeLabel(selTime), timeRange: formatTimeRange(selTime, selectedService.durationMin), total, status: 'confirmed',
-            address: bookingTarget.location || 'Address shared after booking', duration: formatDuration(selectedService.durationMin), logoText: initials,
+            address: serviceLocation === 'customer' ? customerAddressTrimmed : (bookingTarget.location || 'Address shared after booking'), duration: formatDuration(selectedService.durationMin), logoText: initials,
+            serviceLocation, customerAddress: serviceLocation === 'customer' ? customerAddressTrimmed : null, travelFee,
             confirmationNumber, paymentMethod, staffId: selectedStaff ? selectedStaff.id : null, staffName: selectedStaff ? selectedStaff.name : null,
             bookingCreatedAt, originalPrice, finalPrice,
             discountAmount: promo ? promo.discountAmount : 0,
@@ -6377,7 +6464,27 @@ function App() {
                         item.verified && React.createElement("div", { style: { width: 16, height: 16, borderRadius: '50%', background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                             React.createElement(Icon, { name: "check", size: 9, color: T.background }))),
                     React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, margin: '2px 0 0' } }, item.category, " · ", item.location),
-                    item.locationMode && React.createElement("span", { style: { display: 'inline-block', marginTop: 6, fontSize: 11, fontWeight: 600, color: THEME.coral, background: 'rgba(151,196,0,0.12)', borderRadius: 10, padding: '3px 9px' } }, item.locationMode),
+                    (() => {
+                        // For my own business, the badge is always authoritatively derived from the
+                        // configurable Service Area settings, never the static onboarding string —
+                        // this guarantees "comes to you" is never shown once travel is turned off.
+                        let badgeLabel;
+                        if (item.id === MY_PROVIDER_ID) {
+                            const travel = getBusinessTravelInfo(item);
+                            if (travel.enabled)
+                                badgeLabel = `Comes to you · up to ${serviceAreaDistanceMi(travel)} mi`;
+                            else if (item.locationMode === 'I travel to customers' || item.locationMode === 'All')
+                                badgeLabel = 'At my location';
+                            else
+                                badgeLabel = item.locationMode || null;
+                        } else {
+                            const travel = getBusinessTravelInfo(item);
+                            badgeLabel = travel.enabled
+                                ? `Comes to you · up to ${serviceAreaDistanceMi(travel)} mi`
+                                : (item.locationMode && item.locationMode !== 'I travel to customers' && item.locationMode !== 'All' ? item.locationMode : null);
+                        }
+                        return badgeLabel && React.createElement("span", { style: { display: 'inline-block', marginTop: 6, fontSize: 11, fontWeight: 600, color: THEME.coral, background: 'rgba(151,196,0,0.12)', borderRadius: 10, padding: '3px 9px' } }, badgeLabel);
+                    })(),
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 } },
                         React.createElement(Icon, { name: "star", size: 13, color: THEME.coral, fill: THEME.coral }),
                         React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: T.textPrimary } }, item.rating.toFixed(1)),
@@ -7098,7 +7205,16 @@ function App() {
             const promoPreview = selectedService ? resolvePromotionSnapshot(activeDeal, selectedService, Date.now()) : null;
             const priceBeforeTax = selectedService ? (promoPreview ? promoPreview.finalPrice : selectedService.price) : 0;
             const tax = selectedService ? Math.round(priceBeforeTax * 0.08 * 100) / 100 : 0;
-            const total = selectedService ? Math.round((priceBeforeTax + tax) * 100) / 100 : 0;
+            // Business travel: whether this business travels to customers, and if so, the fee/radius
+            // the customer's chosen service location must be validated against before checkout.
+            const travelInfo = getBusinessTravelInfo(bookingTarget);
+            const travelRadiusMi = serviceAreaDistanceMi(travelInfo);
+            const travelFeeAmt = serviceAreaFeeAmount(travelInfo);
+            const customerAddressTrimmed = customerServiceAddress.trim();
+            const estimatedDistanceMi = customerServiceLocation === 'customer' && customerAddressTrimmed ? estimateAddressDistanceMi(customerAddressTrimmed) : null;
+            const outOfServiceArea = customerServiceLocation === 'customer' && estimatedDistanceMi != null && estimatedDistanceMi > travelRadiusMi;
+            const travelFeeApplies = customerServiceLocation === 'customer' && !outOfServiceArea && travelFeeAmt > 0;
+            const total = selectedService ? Math.round((priceBeforeTax + tax + (travelFeeApplies ? travelFeeAmt : 0)) * 100) / 100 : 0;
             const initials2 = bookingTarget.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
             const paymentLabel = { apple: 'Apple Pay', card: 'Credit/Debit Card', google: 'Google Pay', saved: 'VISA •••• 4242', gift: 'Gift Card', promo: 'Promo Code' }[paymentMethod] || 'Choose a payment method';
             const staffOptions = getStaffForTarget(bookingTarget);
@@ -7196,8 +7312,26 @@ function App() {
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } }, timeGrid);
             }
             else if (bookingStep === 'info') {
+                const locationChoice = travelInfo.enabled && React.createElement(React.Fragment, null,
+                    sectionLabel("Service Location"),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 } },
+                        [
+                            { id: 'business', title: 'At their location', sub: bookingTarget.location || 'Business address' },
+                            { id: 'customer', title: 'They come to you', sub: `Up to ${travelRadiusMi} mi${travelFeeAmt > 0 ? ` · $${travelFeeAmt} travel fee` : ''}` },
+                        ].map((opt) => {
+                            const active = customerServiceLocation === opt.id;
+                            return React.createElement("button", { key: opt.id, onClick: () => setCustomerServiceLocation(opt.id), style: { display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: '12px 14px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${BF.border}`, background: active ? 'rgba(151,196,0,0.07)' : 'transparent' } },
+                                React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', border: active ? `5px solid ${THEME.coral}` : `1.5px solid ${BF.sub}`, flexShrink: 0 } }),
+                                React.createElement("div", { style: { flex: 1 } },
+                                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: BF.text, margin: 0 } }, opt.title),
+                                    React.createElement("p", { style: { fontSize: 11, color: BF.sub, margin: '2px 0 0' } }, opt.sub)));
+                        })),
+                    customerServiceLocation === 'customer' && fieldWrap2("Your Address", React.createElement(React.Fragment, null,
+                        React.createElement("input", { value: customerServiceAddress, onChange: (e) => setCustomerServiceAddress(e.target.value), placeholder: "Street address", style: inputStyle2 }),
+                        outOfServiceArea && React.createElement("p", { style: { fontSize: 11.5, color: '#E0483C', marginTop: 6, fontWeight: 600 } }, "This location is outside this business's service area."))));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
                     React.createElement("p", { style: { fontSize: 12, color: BF.sub, marginBottom: 18, marginTop: -4 } }, "We'll contact you about your booking."),
+                    locationChoice,
                     fieldWrap2("Full Name", React.createElement("input", { value: customerInfo.fullName, onChange: (e) => setCustomerInfo((f) => ({ ...f, fullName: e.target.value })), placeholder: "Your full name", style: inputStyle2 })),
                     fieldWrap2("Phone Number", React.createElement("input", { value: customerInfo.phone, onChange: (e) => setCustomerInfo((f) => ({ ...f, phone: e.target.value })), placeholder: "(555) 555-0100", style: inputStyle2 })),
                     fieldWrap2("Add a note (optional)", React.createElement(React.Fragment, null,
@@ -7238,6 +7372,8 @@ function App() {
                         summaryRow('Time', selTime != null ? minutesToTimeLabel(selTime) : '—'),
                         summaryRow('Duration', selectedService ? formatDuration(selectedService.durationMin) : '—'),
                         ...(staffOptions.length > 0 ? [summaryRow('Barber', selectedStaff ? selectedStaff.name : 'Any Available')] : []),
+                        ...(travelInfo.enabled ? [summaryRow('Location', customerServiceLocation === 'customer' ? 'They come to you' : 'At their location')] : []),
+                        ...(travelFeeApplies ? [summaryRow('Travel Fee', money(travelFeeAmt))] : []),
                         ...(promoPreview ? [summaryRow('Original Price', money(promoPreview.originalPrice))] : []),
                         ...(promoPreview ? [summaryRow(promoPreview.promotionLabel, '-' + money(promoPreview.discountAmount))] : []),
                         React.createElement("div", { style: { borderTop: `1px solid ${T.border}`, margin: '4px 0' } }),
@@ -7267,6 +7403,7 @@ function App() {
                             React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, b.date),
                             React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, b.timeRange || b.time),
                             React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, b.service),
+                            b.serviceLocation === 'customer' && React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, `They come to you · ${b.customerAddress || ''}`),
                             React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: THEME.coral, marginTop: 2 } }, money(b.total)))),
                     React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, width: '100%', marginTop: 24 } },
                         React.createElement("button", { onClick: () => addToAppleCalendar(b), style: { width: '100%', height: 50, borderRadius: 25, border: '1.5px solid #161616', background: T.surface, color: T.textPrimary, fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } }, React.createElement(Icon, { name: "calendar", size: 15, color: "#161616" }), "Add to Calendar"),
@@ -7287,7 +7424,8 @@ function App() {
             else if (bookingStep === 'time')
                 footer = footerWrap(React.createElement("button", { disabled: selTime == null, onClick: () => setBookingStep('info'), style: ctaStyle(selTime != null) }, "Continue"));
             else if (bookingStep === 'info') {
-                const ready = customerInfo.fullName.trim() && customerInfo.phone.trim();
+                const locationReady = customerServiceLocation === 'business' || (customerAddressTrimmed && !outOfServiceArea);
+                const ready = customerInfo.fullName.trim() && customerInfo.phone.trim() && locationReady;
                 footer = footerWrap(React.createElement("button", { disabled: !ready, onClick: () => setBookingStep('review'), style: ctaStyle(ready) }, "Continue"));
             }
             else if (bookingStep === 'review')
@@ -7628,6 +7766,20 @@ function App() {
                     [{ value: totalBookings, label: 'New Bookings' }, { value: money(totalRevenue), label: 'Earnings' }, { value: profileViews, label: 'Profile Views' }].map((s) => React.createElement("div", { key: s.label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 10px', textAlign: 'center' } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: PD.text, margin: 0 } }, s.value),
                         React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: '3px 0 0' } }, s.label))));
+                const locationServiceAreaRow = React.createElement("div", { style: { marginTop: 14, border: `1.5px solid ${THEME.coral}`, borderRadius: 18, overflow: 'hidden' } },
+                    React.createElement("button", { onClick: () => setLocationDetailsOpen(true), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
+                        React.createElement(Icon, { name: "mappin", size: 17, color: THEME.coral }),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Location"),
+                            React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, bizOnboarding.address.trim() || 'Add your business address')),
+                        React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub })),
+                    React.createElement("div", { style: { height: 1, background: PD.border, marginLeft: 43 } }),
+                    React.createElement("button", { onClick: openServiceAreaSettings, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
+                        React.createElement(Icon, { name: "compass", size: 17, color: THEME.coral }),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Service Area"),
+                            React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, formatServiceAreaSummary(businessTravel))),
+                        React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub })));
                 const QUICK_ACTIONS = [
                     { id: 'schedule', label: 'Schedule', onClick: () => { setProviderDashboardTab('hours'); setScheduleView('menu'); } },
                     { id: 'addService', label: 'Add Service', onClick: () => { setProviderDashboardTab('services'); setServiceFormDraft({ id: null, name: '', durationMinutes: '', price: '' }); } },
@@ -7662,7 +7814,7 @@ function App() {
                                     React.createElement("span", { style: { fontSize: 9.5, fontWeight: 700, padding: '3px 8px', borderRadius: 9, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize', display: 'inline-block', marginTop: 3 } }, b.status)));
                         })));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `0 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    earningsCard, statsRow, quickActionsBar, upcomingBookingsSection);
+                    earningsCard, statsRow, locationServiceAreaRow, quickActionsBar, upcomingBookingsSection);
             }
             else if (providerDashboardTab === 'bookings') {
                 const BIZ_BOOKING_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'pending', label: 'Pending' }, { id: 'past', label: 'Past' }, { id: 'cancelled', label: 'Canceled' }];
@@ -7984,6 +8136,98 @@ function App() {
                         React.createElement(Icon, { name: "chevronright", size: 16, color: '#C7C7CC' }))));
             }
             return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 2, background: T.background, display: 'flex', flexDirection: 'column' } }, header, providerDashboardTab !== 'overview' && tabsRow, body);
+        })(),
+        providerDashboardOpen && locationDetailsOpen && (() => {
+            const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            function toggleRow(label, sub, on, onChange) {
+                return React.createElement("div", { key: label, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 0', borderBottom: `1px solid ${PD.border}` } },
+                    React.createElement("div", { style: { flex: 1, paddingRight: 12 } },
+                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: PD.text, margin: 0 } }, label),
+                        sub && React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, sub)),
+                    React.createElement(ToggleSwitch, { on: on, onChange: onChange }));
+            }
+            const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: `calc(env(safe-area-inset-top) + 8px) 18px 8px`, borderBottom: `1px solid ${PD.border}` } },
+                React.createElement("button", { onClick: closeLocationDetails }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "Location Details"));
+            const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px calc(env(safe-area-inset-bottom) + 20px)' } },
+                React.createElement("div", { style: { position: 'relative', height: 160, borderRadius: 18, overflow: 'hidden', background: '#EAF0E4', backgroundImage: 'linear-gradient(0deg, rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px)', backgroundSize: '18px 18px' } },
+                    React.createElement("div", { style: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -100%)' } }, React.createElement(Icon, { name: "mappin", size: 30, color: THEME.coral, fill: THEME.coral })),
+                    React.createElement("button", { onClick: () => setLocationAddressEditing(true), style: { position: 'absolute', top: 10, right: 10, display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 14, background: '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' } },
+                        React.createElement(Icon, { name: "pencil", size: 12, color: PD.text }),
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: PD.text } }, "Edit"))),
+                React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: PD.sub, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 18 } }, "Business Address"),
+                locationAddressEditing
+                    ? React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 8 } },
+                        React.createElement("input", { value: bizOnboarding.address, onChange: (e) => setBizOnboarding((d) => ({ ...d, address: e.target.value })), placeholder: "Enter business address", style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none' } }),
+                        React.createElement("button", { onClick: () => setLocationAddressEditing(false), style: { padding: '0 16px', borderRadius: 12, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 13 } }, "Done"))
+                    : React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: PD.text, marginTop: 6 } }, bizOnboarding.address.trim() || 'No address set'),
+                React.createElement("div", { style: { marginTop: 18 } },
+                    toggleRow("Show address on profile", "Let customers see your address", businessLocationSettings.showAddress, () => setBusinessLocationSettings((s) => ({ ...s, showAddress: !s.showAddress }))),
+                    toggleRow("Map pin on profile", "Show your location on the map", businessLocationSettings.showMapPin, () => setBusinessLocationSettings((s) => ({ ...s, showMapPin: !s.showMapPin }))),
+                    toggleRow("Directions link", "Let customers get directions", businessLocationSettings.showDirections, () => setBusinessLocationSettings((s) => ({ ...s, showDirections: !s.showDirections })))),
+                React.createElement("button", { onClick: () => setLocationModePickerOpen(true), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', marginTop: 4 } },
+                    React.createElement("div", { style: { textAlign: 'left' } },
+                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: PD.text, margin: 0 } }, "Service Type"),
+                        React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, bizOnboarding.locationMode || 'Not set')),
+                    React.createElement(Icon, { name: "chevronright", size: 15, color: PD.sub })),
+                React.createElement("button", { onClick: () => { setBizOnboarding((d) => ({ ...d, address: '' })); flashToast('Address removed'); }, style: { width: '100%', textAlign: 'center', padding: '16px 0', marginTop: 20, borderRadius: 20, border: `1px solid ${PD.border}` } },
+                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: '#D0304A' } }, "Remove Address")));
+            return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 6, background: T.background, display: 'flex', flexDirection: 'column' } }, header, body,
+                locationModePickerOpen && React.createElement("div", { onClick: () => setLocationModePickerOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 2 } },
+                    React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `16px 18px calc(env(safe-area-inset-bottom) + 16px)` } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, marginBottom: 12 } }, "Service Type"),
+                        BIZ_LOCATION_MODES.map((m) => {
+                            const active = bizOnboarding.locationMode === m;
+                            return React.createElement("button", { key: m, onClick: () => { setBizOnboarding((d) => ({ ...d, locationMode: m })); setLocationModePickerOpen(false); }, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 4px', borderBottom: `1px solid ${PD.border}` } },
+                                React.createElement("span", { style: { fontSize: 14, color: PD.text, fontWeight: active ? 700 : 400 } }, m),
+                                active && React.createElement(Icon, { name: "check", size: 15, color: THEME.coral }));
+                        }))));
+        })(),
+        providerDashboardOpen && serviceAreaSettingsOpen && serviceAreaDraft && (() => {
+            const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const draft = serviceAreaDraft;
+            const dist = draft.isCustom ? (Number(draft.customDistanceMi) || 0) : draft.distanceMi;
+            const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: `calc(env(safe-area-inset-top) + 8px) 18px 8px`, borderBottom: `1px solid ${PD.border}` } },
+                React.createElement("button", { onClick: closeServiceAreaSettings }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "Service Area"));
+            const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px calc(env(safe-area-inset-bottom) + 100px)' } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("div", { style: { flex: 1, paddingRight: 14 } },
+                        React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: PD.text, margin: 0 } }, "Do you travel to customers?"),
+                        React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 3 } }, "Show customers that you can come to their location.")),
+                    React.createElement(ToggleSwitch, { on: draft.enabled, onChange: () => setServiceAreaDraft((d) => ({ ...d, enabled: !d.enabled })) })),
+                draft.enabled && React.createElement(React.Fragment, null,
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: PD.sub, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 24 } }, "How far will you travel?"),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 } },
+                        [5, 10, 15, 25, 50].map((mi) => {
+                            const active = !draft.isCustom && draft.distanceMi === mi;
+                            return React.createElement("button", { key: mi, onClick: () => setServiceAreaDraft((d) => ({ ...d, distanceMi: mi, isCustom: false })), style: { padding: '9px 16px', borderRadius: 16, background: active ? THEME.coral : T.surfaceSecondary, border: `1px solid ${active ? THEME.coral : PD.border}` } },
+                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: active ? '#fff' : PD.text } }, mi + " mi"));
+                        }),
+                        React.createElement("button", { onClick: () => setServiceAreaDraft((d) => ({ ...d, isCustom: true })), style: { display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 16, background: draft.isCustom ? THEME.coral : T.surfaceSecondary, border: `1px solid ${draft.isCustom ? THEME.coral : PD.border}` } },
+                            React.createElement(Icon, { name: "pencil", size: 12, color: draft.isCustom ? '#fff' : PD.text }),
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: draft.isCustom ? '#fff' : PD.text } }, "Custom"))),
+                    draft.isCustom && React.createElement("input", { value: draft.customDistanceMi, onChange: (e) => setServiceAreaDraft((d) => ({ ...d, customDistanceMi: e.target.value.replace(/[^0-9]/g, '') })), inputMode: "numeric", placeholder: "Max miles", style: { marginTop: 10, width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none' } }),
+                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: PD.text, marginTop: 24 } }, "Travel Fee"),
+                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "Charge customers a fee for traveling"),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 10 } },
+                        [['free', 'Free'], ['custom', 'Custom Fee']].map(([id, label]) => {
+                            const active = draft.feeType === id;
+                            return React.createElement("button", { key: id, onClick: () => setServiceAreaDraft((d) => ({ ...d, feeType: id })), style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 14, border: `1.5px solid ${active ? THEME.coral : PD.border}` } },
+                                React.createElement("div", { style: { width: 16, height: 16, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement("div", { style: { width: 6, height: 6, borderRadius: '50%', background: '#fff' } })),
+                                React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: PD.text } }, label));
+                        })),
+                    draft.feeType === 'custom' && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px' } },
+                        React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: PD.text } }, "$"),
+                        React.createElement("input", { value: draft.customFee, onChange: (e) => setServiceAreaDraft((d) => ({ ...d, customFee: e.target.value.replace(/[^0-9.]/g, '') })), inputMode: "decimal", placeholder: "0", style: { flex: 1, border: 'none', outline: 'none', fontSize: 14, color: PD.text } })),
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: PD.sub, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 24 } }, "Service Area Preview"),
+                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "This is the area where you'll travel to customers."),
+                    React.createElement("div", { style: { position: 'relative', height: 180, borderRadius: 18, overflow: 'hidden', marginTop: 10, background: '#EAF0E4', backgroundImage: 'linear-gradient(0deg, rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px)', backgroundSize: '18px 18px' } },
+                        React.createElement("div", { style: { position: 'absolute', top: '50%', left: '50%', width: Math.min(220, 40 + dist * 3), height: Math.min(220, 40 + dist * 3), transform: 'translate(-50%, -50%)', borderRadius: '50%', background: 'rgba(151,196,0,0.18)', border: `1.5px solid ${THEME.coral}` } }),
+                        React.createElement("div", { style: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -100%)' } }, React.createElement(Icon, { name: "mappin", size: 26, color: THEME.coral, fill: THEME.coral })))));
+            return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 6, background: T.background, display: 'flex', flexDirection: 'column' } }, header, body,
+                React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 'calc(env(safe-area-inset-bottom) + 16px)' } },
+                    React.createElement("button", { onClick: saveServiceArea, style: { width: '100%', height: 52, borderRadius: 26, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Save Changes")));
         })(),
         providerDashboardOpen && earningsInsightsOpen && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
