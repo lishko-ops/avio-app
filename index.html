@@ -6030,7 +6030,7 @@ function App() {
                 opts = opts || {};
                 return React.createElement("div", { key: k, style: { display: 'flex', justifyContent: 'space-between', padding: '7px 0' } },
                     React.createElement("span", { style: { fontSize: 12.5, color: BF.sub } }, k),
-                    React.createElement("span", { style: { fontSize: opts.strong ? 14 : 12.5, fontWeight: opts.strong ? 700 : 600, color: BF.text } }, v));
+                    React.createElement("span", { style: { fontSize: opts.strong ? 14 : 12.5, fontWeight: opts.strong ? 700 : 600, color: opts.strong ? THEME.coral : BF.text } }, v));
             }
             const services = bookingTarget.id === MY_PROVIDER_ID
                 ? providerServices.map((s) => ({ id: s.id, name: s.name, durationMin: s.durationMinutes, price: s.price }))
@@ -6096,7 +6096,7 @@ function App() {
                             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
                                 React.createElement("div", { style: { textAlign: 'right' } },
                                     sPromo && React.createElement("p", { style: { fontSize: 11, color: BF.sub, textDecoration: 'line-through', margin: 0 } }, money(sPromo.originalPrice)),
-                                    React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: sPromo ? THEME.coral : BF.text } }, money(sPromo ? sPromo.finalPrice : s.price))),
+                                    React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: THEME.coral } }, money(sPromo ? sPromo.finalPrice : s.price))),
                                 React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${active ? '#161616' : '#D1D1D6'}`, background: active ? '#161616' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" }))));
                     })));
             }
@@ -6124,7 +6124,7 @@ function App() {
                     const isToday2 = calYear2 === today.getFullYear() && calMonthIdx2 === today.getMonth() && day === today.getDate();
                     const selected2 = day === bookingSelectedDay;
                     return React.createElement("button", { key: day, disabled, onClick: () => { setBookingSelectedDay(day); setSelTime(null); }, style: { padding: '6px 0', opacity: disabled ? 0.3 : 1 } },
-                        React.createElement("span", { style: { width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontSize: 13, fontWeight: selected2 ? 700 : 500, background: selected2 ? '#161616' : 'transparent', color: selected2 ? '#fff' : BF.text, border: !selected2 && isToday2 ? `1.5px solid #161616` : 'none' } }, day));
+                        React.createElement("span", { style: { width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontSize: 13, fontWeight: selected2 ? 700 : 500, background: selected2 ? '#161616' : 'transparent', color: selected2 ? '#fff' : BF.text, border: !selected2 && isToday2 ? `1.5px solid ${THEME.coral}` : 'none' } }, day));
                 }));
                 const quickBtns = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 14 } },
                     React.createElement("button", { onClick: () => { setBookingCalMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setBookingSelectedDay(today.getDate()); setSelTime(null); }, style: { flex: 1, padding: '9px 0', borderRadius: 14, border: `1px solid ${BF.border}`, fontSize: 12.5, fontWeight: 600, color: BF.text } }, "Today"),
@@ -6223,7 +6223,7 @@ function App() {
                             React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, b.date),
                             React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, b.timeRange || b.time),
                             React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, b.service),
-                            React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: BF.text, marginTop: 2 } }, money(b.total)))),
+                            React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: THEME.coral, marginTop: 2 } }, money(b.total)))),
                     React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, width: '100%', marginTop: 24 } },
                         React.createElement("button", { onClick: () => addToAppleCalendar(b), style: { width: '100%', height: 50, borderRadius: 25, border: '1.5px solid #161616', background: '#fff', color: '#161616', fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } }, React.createElement(Icon, { name: "calendar", size: 15, color: "#161616" }), "Add to Calendar"),
                         React.createElement("button", { onClick: () => { closeBookingFlow(); setTab('bookings'); setBookingsSubTab('upcoming'); }, style: { width: '100%', height: 50, borderRadius: 25, background: '#161616', color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "View Bookings")),
