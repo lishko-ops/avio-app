@@ -977,7 +977,6 @@ const FEED = [
         businessType: 'restaurant', address: '418 Bedford Ave, Brooklyn, NY 11249', phone: '(718) 555-0198', priceTier: '$$$', cuisine: 'Japanese Restaurant',
         areas: makeDefaultRestaurantAreas(), tables: makeDefaultRestaurantTables(), combinations: makeDefaultRestaurantCombinations(),
         hours: makeDefaultRestaurantHours(), durationRules: DEFAULT_RESTAURANT_DURATION_RULES, bufferMinutes: 15, intervalMinutes: 30, maxPartySize: 10, minAdvanceHours: 1, advanceDays: 60,
-        menu: [{ name: 'Chef\'s Omakase (10pc)', price: 78 }, { name: 'Salmon Nigiri (2pc)', price: 9 }, { name: 'Spicy Tuna Roll', price: 14 }, { name: 'Miso Black Cod', price: 34 }, { name: 'Sake Flight', price: 22 }],
     },
     { id: 't-fadedistrict', category: 'Beauty', name: 'Fade District', location: 'Brooklyn, NY', rating: 4.9, price: 32, likes: '1.6K', comments: 49, saves: '1.1K', blurb: 'Lining up the details that matter.', verified: true, distance: '0.9 mi', openStatus: 'Open Now · Closes 9PM', hashtags: ['#barbershop', '#brooklyn', '#fade'], friendsBooked: 15, avatarColor: '#000000', locationMode: 'At my business location', image: 'assets/shorts/thumbs/barber-1.jpg', video: 'assets/shorts/biz/barber-1',
         staff: [{ id: 't-fadedistrict-jc', name: 'JC', customHours: null }, { id: 't-fadedistrict-marco', name: 'Marco', customHours: null }],
@@ -4396,7 +4395,7 @@ function App() {
             React.createElement(Icon, { name: "star", size: 14, color: THEME.gold, fill: THEME.gold }),
             React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: RP.text } }, item.rating.toFixed(1)),
             React.createElement("span", { style: { fontSize: 12.5, color: RP.sub } }, `(326 reviews) · ${item.openStatus}`));
-        const RESTAURANT_TABS = [{ id: 'overview', label: 'Overview' }, { id: 'menu', label: 'Menu' }, { id: 'reviews', label: 'Reviews' }, { id: 'info', label: 'Info' }];
+        const RESTAURANT_TABS = [{ id: 'overview', label: 'Overview' }, { id: 'reviews', label: 'Reviews' }, { id: 'info', label: 'Info' }];
         const tabsRow = React.createElement("div", { style: { display: 'flex', gap: 22, padding: '18px 18px 0', borderBottom: `1px solid ${RP.border}` } }, RESTAURANT_TABS.map((t) => {
             const active = restaurantProfileTab === t.id;
             return React.createElement("button", { key: t.id, onClick: () => setRestaurantProfileTab(t.id), style: { paddingBottom: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 } },
@@ -4430,10 +4429,6 @@ function App() {
             React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: RP.text, margin: 0 } }, "About"),
             React.createElement("p", { style: { fontSize: 12.5, color: RP.sub, marginTop: 6, lineHeight: 1.5 } }, item.blurb),
             React.createElement("p", { style: { fontSize: 12, color: RP.sub, marginTop: 10 } }, r.address));
-        const menuSection = React.createElement("div", { style: { padding: '18px 18px 0' } },
-            (r.menu || []).map((m, i, arr) => React.createElement("div", { key: m.name, style: { display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: i < arr.length - 1 ? `1px solid ${RP.border}` : 'none' } },
-                React.createElement("span", { style: { fontSize: 13.5, color: RP.text, fontWeight: 500 } }, m.name),
-                React.createElement("span", { style: { fontSize: 13.5, color: RP.text, fontWeight: 700 } }, `$${m.price}`))));
         const SAMPLE_REVIEWS = [
             { name: 'Jordan M.', rating: 5, text: 'Best pasta in Brooklyn, hands down. The tagliatelle was perfect and service was warm without being slow.' },
             { name: 'Casey R.', rating: 5, text: 'Cozy date-night spot. We sat outdoors and the patio heaters made it comfortable even in fall.' },
@@ -4459,9 +4454,8 @@ function App() {
                     React.createElement("span", { style: { fontSize: 12.5, color: h ? RP.text : RP.sub } }, h ? `${hhmmToLabel(h.start)} – ${h.end === '23:59' ? '12:00 AM' : hhmmToLabel(h.end)}` : 'Closed'));
             }));
         const tabBody = restaurantProfileTab === 'overview' ? React.createElement(React.Fragment, null, reservationCard, aboutSection)
-            : restaurantProfileTab === 'menu' ? menuSection
-                : restaurantProfileTab === 'reviews' ? reviewsSection
-                    : infoSection;
+            : restaurantProfileTab === 'reviews' ? reviewsSection
+                : infoSection;
         return React.createElement("div", { key: "restaurantProfile", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 11, display: 'flex', flexDirection: 'column' } },
             React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto' } },
                 hero, ratingRow, tabsRow, tabBody, React.createElement("div", { style: { height: 40 } })));
