@@ -425,8 +425,18 @@ const BUSINESS_INCOMING_BOOKINGS = [
     { id: 'ib11', customerName: 'Amanda W.', initials: 'AW', service: 'Highlights', price: 150, time: '11:00 AM', status: 'completed', avatarColor: '#97C400', dateGroup: 'past', dateLabel: 'Aug 6' },
     { id: 'ib12', customerName: 'Taylor R.', initials: 'TR', service: 'Hair Color', price: 120, time: '2:30 PM', status: 'cancelled', avatarColor: '#FFFFFF', dateGroup: 'past', dateLabel: 'Aug 5' },
 ];
-const UPLOAD_CATEGORIES = ['Beauty', 'Barber', 'Home Services', 'Parties', 'Restaurants', 'Educational'];
-const UPLOAD_EDIT_PANELS = ['Trim & Cover', 'Details', 'Settings', 'Preview'];
+const THRILLZ_DURATIONS = [15, 30, 60, 90];
+const THRILLZ_TOPICS = ['Barber', 'Fade', 'Haircut', 'Beard', 'Hair Color', 'Nail Salon', 'Manicure', 'Lashes', 'Makeup', 'Photographer', 'Wedding', 'Jet Ski', 'Fitness', 'Personal Trainer', 'Massage', 'Cleaning', 'Restaurant', 'Events', 'Tattoo', 'Skincare'];
+const THRILLZ_SOUND_LIBRARY = [
+    { id: 'snd1', name: 'Golden Hour', artist: 'Bay Loops', duration: '0:32' },
+    { id: 'snd2', name: 'Fresh Cut', artist: 'Nova Beats', duration: '0:28' },
+    { id: 'snd3', name: 'City Lights', artist: 'Dre Marlo', duration: '0:41' },
+    { id: 'snd4', name: 'Studio Flow', artist: 'Kaiya J', duration: '0:36' },
+    { id: 'snd5', name: 'On the Rise', artist: 'Cass & Wren', duration: '0:30' },
+    { id: 'snd6', name: 'Level Up', artist: 'Tempo Six', duration: '0:44' },
+    { id: 'snd7', name: 'Sunday Glow', artist: 'Marlin Rae', duration: '0:33' },
+    { id: 'snd8', name: 'Weekend Mode', artist: 'DJ Coastline', duration: '0:38' },
+];
 const CONVERSATIONS_SEED = [
     { id: 'c1', name: 'Fade Kings', category: 'Barbershop', rating: 4.9, verified: true, online: true, unread: 2, initials: 'FK', responseTime: '~5 min', hasBookingThread: true,
         messages: [
@@ -2010,13 +2020,35 @@ function App() {
     const fileInputRef = useRef(null);
     const uploadFileRef = useRef(null);
     const discoverScrollRef = useRef(null);
+    const uploadPreviewVideoRef = useRef(null);
+    const uploadCoverVideoRef = useRef(null);
+    const uploadPostTimerRef = useRef(null);
     const [uploadOpen, setUploadOpen] = useState(false);
     const [uploadStep, setUploadStep] = useState('options');
     const [uploadVideoUrl, setUploadVideoUrl] = useState(null);
-    const [uploadEditPanel, setUploadEditPanel] = useState(0);
-    const [uploadForm, setUploadForm] = useState({ caption: '', category: UPLOAD_CATEGORIES[0], location: '', tags: '', price: '', bookingAvailable: true, offerOn: false, offer: '', commentsOn: true, allowDuet: true, allowStitch: true, saveDraft: false });
-    const [publishForm, setPublishForm] = useState({ businessName: '', shortDescription: '', offer: '', bookingLink: '', visibility: 'public' });
-    const [taggedBusinessIds, setTaggedBusinessIds] = useState([]);
+    // --- Create a Thrillz flow (Step 1-8 reference flow) ---
+    const [uploadDuration, setUploadDuration] = useState(30);
+    const [uploadCaption, setUploadCaption] = useState('');
+    const [uploadTopics, setUploadTopics] = useState([]);
+    const [uploadLocationText, setUploadLocationText] = useState('');
+    const [uploadTagBusinessId, setUploadTagBusinessId] = useState(null);
+    const [uploadTagServiceId, setUploadTagServiceId] = useState(null);
+    const [uploadCommentsOn, setUploadCommentsOn] = useState(true);
+    const [uploadSound, setUploadSound] = useState(null);
+    const [uploadMusicVolume, setUploadMusicVolume] = useState(80);
+    const [uploadOriginalVolume, setUploadOriginalVolume] = useState(100);
+    const [uploadTrimRange, setUploadTrimRange] = useState({ start: 0, end: 100 });
+    const [uploadCoverTime, setUploadCoverTime] = useState(0);
+    const [uploadCoverImage, setUploadCoverImage] = useState(null);
+    const [uploadVideoDuration, setUploadVideoDuration] = useState(0);
+    const [uploadSheet, setUploadSheet] = useState(null); // 'trim' | 'cover' | 'sound' | 'tag' | 'location' | 'topics' | null
+    const [uploadTagSearch, setUploadTagSearch] = useState('');
+    const [uploadLocationSearch, setUploadLocationSearch] = useState('');
+    const [uploadPostProgress, setUploadPostProgress] = useState(0);
+    const [uploadPostError, setUploadPostError] = useState(null);
+    const [uploadExitConfirmOpen, setUploadExitConfirmOpen] = useState(false);
+    const [uploadPreviewPlaying, setUploadPreviewPlaying] = useState(false);
+    const [uploadJustPublishedId, setUploadJustPublishedId] = useState(null);
     function getTaggableBusinesses() {
         const now = Date.now();
         const cutoff = now - 7 * 24 * 60 * 60 * 1000;
@@ -2038,19 +2070,60 @@ function App() {
         });
         return Array.from(seen.values()).sort((a, b) => b.bookingTime - a.bookingTime);
     }
-    function toggleTaggedBusiness(id) {
-        setTaggedBusinessIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
-    }
+    // --- Create a Thrillz: flow control ---
     function openUploadFlow() { setUploadOpen(true); setUploadStep('options'); }
     function resetUploadForm() {
         uploadFileRef.current = null;
+        if (uploadPostTimerRef.current) { clearInterval(uploadPostTimerRef.current); uploadPostTimerRef.current = null; }
         setUploadVideoUrl(null);
-        setUploadEditPanel(0);
-        setTaggedBusinessIds([]);
-        setUploadForm({ caption: '', category: UPLOAD_CATEGORIES[0], location: '', tags: '', price: '', bookingAvailable: true, offerOn: false, offer: '', commentsOn: true, allowDuet: true, allowStitch: true, saveDraft: false });
-        setPublishForm({ businessName: '', shortDescription: '', offer: '', bookingLink: '', visibility: 'public' });
+        setUploadDuration(30);
+        setUploadCaption('');
+        setUploadTopics([]);
+        setUploadLocationText('');
+        setUploadTagBusinessId(null);
+        setUploadTagServiceId(null);
+        setUploadCommentsOn(true);
+        setUploadSound(null);
+        setUploadMusicVolume(80);
+        setUploadOriginalVolume(100);
+        setUploadTrimRange({ start: 0, end: 100 });
+        setUploadCoverTime(0);
+        setUploadCoverImage(null);
+        setUploadVideoDuration(0);
+        setUploadSheet(null);
+        setUploadTagSearch('');
+        setUploadLocationSearch('');
+        setUploadPostProgress(0);
+        setUploadPostError(null);
+        setUploadExitConfirmOpen(false);
+        setUploadPreviewPlaying(false);
+        setUploadJustPublishedId(null);
+    }
+    function hasMeaningfulUploadProgress() { return !!uploadVideoUrl; }
+    function requestCloseUploadFlow() {
+        if (hasMeaningfulUploadProgress() && uploadStep !== 'success' && uploadStep !== 'posting')
+            setUploadExitConfirmOpen(true);
+        else
+            closeUploadFlow();
     }
     function closeUploadFlow() { setUploadOpen(false); setUploadStep('options'); resetUploadForm(); }
+    function saveUploadAsDraft() {
+        if (uploadVideoUrl) {
+            const draftId = 'draft-' + Date.now();
+            if (uploadFileRef.current)
+                idbSaveBlob(draftId, uploadFileRef.current).catch(() => { });
+            setDrafts((prev) => [{
+                id: draftId, blurb: uploadCaption, location: uploadLocationText,
+                customVideoUrl: uploadVideoUrl, image: uploadCoverImage, topics: uploadTopics,
+                taggedBusinessId: uploadTagBusinessId, taggedServiceId: uploadTagServiceId,
+                sound: uploadSound, commentsOn: uploadCommentsOn,
+            }, ...prev]);
+            flashToast('Saved to Drafts');
+        }
+        setUploadOpen(false);
+        setUploadStep('options');
+        resetUploadForm();
+    }
     function triggerFilePicker(captureMode) {
         if (!fileInputRef.current)
             return;
@@ -2066,47 +2139,151 @@ function App() {
             return;
         uploadFileRef.current = file;
         setUploadVideoUrl(URL.createObjectURL(file));
-        setUploadStep('edit');
-        setUploadEditPanel(0);
+        setUploadTrimRange({ start: 0, end: 100 });
+        setUploadCoverTime(0);
+        setUploadCoverImage(null);
+        setUploadStep('preview');
         e.target.value = '';
     }
-    function publishShort() {
-        const isCustomerPost = accountType !== 'business';
-        const taggedVisits = isCustomerPost ? getTaggableBusinesses().filter((v) => taggedBusinessIds.includes(v.id)) : [];
-        if (isCustomerPost && !taggedVisits.length)
+    function captureCoverFromVideoEl(videoEl, atTime) {
+        if (!videoEl)
             return;
-        const primaryTag = taggedVisits[0];
-        const newItem = {
-            id: 'short-' + Date.now(),
-            category: isCustomerPost && primaryTag ? primaryTag.category : uploadForm.category,
-            name: isCustomerPost ? 'Levi D.' : (publishForm.businessName.trim() || 'My Business'),
-            location: uploadForm.location.trim() || (primaryTag ? primaryTag.location : 'Your city'),
-            rating: 5.0, price: Number(uploadForm.price) || (primaryTag ? primaryTag.price : 50),
-            likes: '0', comments: 0, saves: '0',
-            blurb: publishForm.shortDescription.trim() || uploadForm.caption.trim(),
-            verified: false, distance: '0 mi',
-            openStatus: uploadForm.bookingAvailable ? 'Available Today' : 'Booking paused',
-            hashtags: uploadForm.tags.split(/\s+/).filter(Boolean),
-            friendsBooked: 0, avatarColor: THEME.violet, image: null, video: null,
-            customVideoUrl: uploadVideoUrl,
-            mine: true,
-            isCustomerPost,
-            taggedBusinessIds: [...new Set(taggedVisits.map((v) => v.providerId))],
-            verifiedTags: taggedVisits.map((v) => ({ businessId: v.providerId, businessName: v.name, service: v.service, verified: true })),
+        const finish = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = videoEl.videoWidth || 360;
+                canvas.height = videoEl.videoHeight || 640;
+                canvas.getContext('2d').drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+                setUploadCoverImage(canvas.toDataURL('image/jpeg', 0.85));
+            } catch (err) { /* frame not decodable yet — keep previous cover */ }
         };
-        if (uploadFileRef.current) {
-            idbSaveBlob(newItem.id, uploadFileRef.current).catch(() => { });
-            uploadFileRef.current = null;
+        if (Math.abs(videoEl.currentTime - atTime) < 0.08) {
+            finish();
         }
-        setFeed((prev) => [newItem, ...prev]);
-        setUploadStep('success');
+        else {
+            const onSeeked = () => { videoEl.removeEventListener('seeked', onSeeked); finish(); };
+            videoEl.addEventListener('seeked', onSeeked);
+            try { videoEl.currentTime = atTime; } catch (err) { }
+        }
     }
-    function viewPublishedShort() {
-        setTab('discover');
-        setShortsFeedTab('forYou');
-        closeUploadFlow();
-        requestAnimationFrame(() => { if (discoverScrollRef.current) discoverScrollRef.current.scrollTo({ top: 0, behavior: 'instant' }); });
+    function handlePreviewVideoLoaded(e) {
+        const v = e.currentTarget;
+        setUploadVideoDuration(v.duration || 0);
+        if (!uploadCoverImage)
+            captureCoverFromVideoEl(v, Math.min(0.15, (v.duration || 1) * 0.1));
     }
+    function getUploadTagBusiness() {
+        if (!uploadTagBusinessId)
+            return null;
+        if (uploadTagBusinessId === MY_PROVIDER_ID)
+            return { id: MY_PROVIDER_ID, name: bizOnboarding.businessName.trim() || 'My Business', category: bizOnboarding.category || 'Business', location: bizOnboarding.address || 'Your area', avatarColor: THEME.coral, verified: businessVerified };
+        return feed.find((f) => f.id === uploadTagBusinessId) || null;
+    }
+    function getBusinessServicesForTag(business) {
+        if (!business)
+            return [];
+        if (business.id === MY_PROVIDER_ID)
+            return providerServices.map((s) => ({ id: s.id, name: s.name, price: s.price, durationMin: s.durationMinutes }));
+        return getServicesForTarget(business);
+    }
+    function getAllTaggableBusinesses() {
+        return feed.filter((f) => !f.mine && f.category && f.name);
+    }
+    function toggleUploadTopic(topic) {
+        setUploadTopics((prev) => prev.includes(topic) ? prev.filter((t) => t !== topic) : (prev.length >= 5 ? prev : [...prev, topic]));
+    }
+    function startPostThrillz() {
+        if (uploadStep === 'posting')
+            return;
+        setUploadPostError(null);
+        setUploadStep('posting');
+        setUploadPostProgress(0);
+        if (uploadPostTimerRef.current)
+            clearInterval(uploadPostTimerRef.current);
+        uploadPostTimerRef.current = setInterval(() => {
+            setUploadPostProgress((p) => {
+                const next = Math.min(100, p + (6 + Math.random() * 10));
+                if (next >= 100) {
+                    clearInterval(uploadPostTimerRef.current);
+                    uploadPostTimerRef.current = null;
+                    finalizePostThrillz();
+                    return 100;
+                }
+                return next;
+            });
+        }, 160);
+    }
+    function finalizePostThrillz() {
+        try {
+            const isCustomerPost = accountType !== 'business';
+            const taggedBusiness = getUploadTagBusiness();
+            const taggedServices = taggedBusiness ? getBusinessServicesForTag(taggedBusiness) : [];
+            const taggedService = taggedServices.find((s) => s.id === uploadTagServiceId) || null;
+            const eligibleVisit = isCustomerPost ? getTaggableBusinesses().find((v) => v.providerId === uploadTagBusinessId) : null;
+            const newItem = {
+                id: 'thrillz-' + Date.now(),
+                category: taggedBusiness ? taggedBusiness.category : (isCustomerPost ? 'Beauty' : (bizOnboarding.category || 'Beauty')),
+                name: isCustomerPost ? (customerProfile.fullName.trim() || 'You') : (bizOnboarding.businessName.trim() || 'My Business'),
+                location: uploadLocationText.trim() || (taggedBusiness ? taggedBusiness.location : 'Your city'),
+                rating: 5.0,
+                price: taggedService ? taggedService.price : (taggedBusiness ? (taggedBusiness.price || 50) : 50),
+                likes: '0', comments: 0, saves: '0',
+                blurb: uploadCaption.trim(),
+                verified: false, distance: '0 mi',
+                openStatus: 'Available Today',
+                hashtags: uploadTopics.map((t) => '#' + t.replace(/\s+/g, '').toLowerCase()),
+                topics: uploadTopics,
+                friendsBooked: 0,
+                avatarColor: isCustomerPost ? THEME.violet : THEME.coral,
+                image: uploadCoverImage,
+                video: null,
+                customVideoUrl: uploadVideoUrl,
+                mine: true,
+                isCustomerPost,
+                commentsOn: uploadCommentsOn,
+                sound: uploadSound,
+                taggedBusinessIds: taggedBusiness ? [taggedBusiness.id] : [],
+                verifiedTags: taggedBusiness ? [{ businessId: taggedBusiness.id, businessName: taggedBusiness.name, service: taggedService ? taggedService.name : '', verified: !!eligibleVisit || !isCustomerPost }] : [],
+            };
+            if (uploadFileRef.current)
+                idbSaveBlob(newItem.id, uploadFileRef.current).catch(() => { });
+            setFeed((prev) => [newItem, ...prev]);
+            setUploadJustPublishedId(newItem.id);
+            setUploadStep('success');
+        }
+        catch (err) {
+            setUploadPostError("Couldn't post Thrillz");
+        }
+    }
+    function goToMyThrillzAfterPost() {
+        setUploadOpen(false);
+        setUploadStep('options');
+        resetUploadForm();
+        if (accountType === 'business') {
+            openMyBusinessProfile();
+        }
+        else {
+            setProviderDashboardOpen(false);
+            setCustomerProfileView('main');
+            setCustomerProfileTab('thrillz');
+            setCustomerProfileOpen(true);
+        }
+    }
+    useEffect(() => {
+        if (uploadStep !== 'preview' && uploadPreviewVideoRef.current)
+            uploadPreviewVideoRef.current.pause();
+    }, [uploadStep]);
+    useEffect(() => {
+        if (uploadPreviewVideoRef.current)
+            uploadPreviewVideoRef.current.volume = Math.max(0, Math.min(1, uploadOriginalVolume / 100));
+    }, [uploadOriginalVolume, uploadVideoUrl, uploadStep]);
+    useEffect(() => {
+        if (uploadStep === 'success') {
+            const t = setTimeout(() => { goToMyThrillzAfterPost(); }, 1700);
+            return () => clearTimeout(t);
+        }
+    }, [uploadStep]);
+    useEffect(() => () => { if (uploadPostTimerRef.current) clearInterval(uploadPostTimerRef.current); }, []);
     const [balance, setBalance] = useState(120.4);
     const [toast, setToast] = useState(null);
     const [likedIds, setLikedIds] = useState(() => new Set());
@@ -2212,6 +2389,10 @@ function App() {
     const bizPanelTouchRef = useRef(null);
     const lastTapRef = useRef({ time: 0, id: null });
     const [accountType, setAccountType] = useState(() => loadLS('avio_account_type_v2', null) || (() => { try { return localStorage.getItem('avio_account_type'); } catch (e) { return null; } })() || 'personal');
+    useEffect(() => {
+        if (uploadStep === 'details' && accountType === 'business' && !uploadTagBusinessId)
+            setUploadTagBusinessId(MY_PROVIDER_ID);
+    }, [uploadStep, accountType]);
     const [hasBusinessProfile, setHasBusinessProfile] = useState(() => loadLS('avio_has_business_profile', false) || loadLS('avio_account_type_v2', null) === 'business');
     useEffect(() => { saveLS('avio_has_business_profile', hasBusinessProfile); }, [hasBusinessProfile]);
     const [modeSwitcherOpen, setModeSwitcherOpen] = useState(false);
@@ -5807,7 +5988,7 @@ function App() {
                 posts.length === 0
                     ? React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, textAlign: 'center', padding: '24px 0' } }, "No Thrillz posted yet — tap Create to post your first one.")
                     : React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1.5, background: T.surface } },
-                        posts.slice(0, 8).map((post, i) => React.createElement("button", { key: post.id, onClick: () => openPostViewer(item, posts, i), style: { position: 'relative', aspectRatio: '3 / 5', overflow: 'hidden', background: '#000' } },
+                        posts.slice(0, 8).map((post, i) => React.createElement("button", { key: post.id, onClick: () => openPostViewer(item, posts, i), style: { position: 'relative', aspectRatio: '3 / 5', overflow: 'hidden', background: post.image ? undefined : '#000', backgroundImage: post.image ? `url(${post.image})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' } },
                             React.createElement("div", { style: { position: 'absolute', left: 4, bottom: 4, display: 'flex', alignItems: 'center', gap: 2 } },
                                 React.createElement("span", { style: { fontSize: 7.5, color: "#fff" } }, "▶"),
                                 React.createElement("span", { style: { fontSize: 8.5, fontWeight: 600, color: "#fff" } }, formatCount(parseCount(post.likes || '0'))))))),
@@ -6300,7 +6481,7 @@ function App() {
             const goTo = (i) => { if (i >= 0 && i < posts.length) setPostViewer({ item, posts, index: i }); };
             const postVideoSrc = post.videoUrl || (post.video ? `${post.video}.mp4` : null);
             const backdrop = postVideoSrc
-                ? React.createElement("video", { key: post.id, src: postVideoSrc, autoPlay: true, muted: true, loop: true, playsInline: true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000' } })
+                ? React.createElement("video", { key: post.id, src: postVideoSrc, poster: post.image || undefined, autoPlay: true, muted: true, loop: true, playsInline: true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000' } })
                 : React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: post.image ? `url(${post.image})` : 'none', backgroundColor: post.image ? undefined : THEME.ink, backgroundSize: 'cover', backgroundPosition: 'center' } });
             return React.createElement("div", { key: "postviewer", style: { position: 'absolute', inset: 0, zIndex: 12, background: THEME.ink, overflow: 'hidden' } },
                 backdrop,
@@ -8181,125 +8362,301 @@ function App() {
                     React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: a.danger ? '#D0304A' : T.textPrimary } }, a.label)))));
         })())),
         uploadOpen && (() => {
-            const UP = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
-            const inputStyle = { width: '100%', border: `1px solid ${UP.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: UP.text, outline: 'none', background: T.inputBackground, fontFamily: 'inherit' };
-            function fieldWrap(label, node) {
-                return React.createElement("div", { key: label, style: { marginTop: 16 } },
-                    React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: UP.sub, marginBottom: 6 } }, label),
-                    node);
+            const UP = { bg: LIGHT_THEME.background, surface: LIGHT_THEME.surface, surfaceAlt: LIGHT_THEME.surfaceSecondary, text: LIGHT_THEME.textPrimary, sub: LIGHT_THEME.textSecondary, border: LIGHT_THEME.border, inputBg: LIGHT_THEME.inputBackground };
+            const green = THEME.coral;
+            const isBiz = accountType === 'business';
+            const taggedBusiness = getUploadTagBusiness();
+            const taggedServices = taggedBusiness ? getBusinessServicesForTag(taggedBusiness) : [];
+            const taggedServiceObj = taggedServices.find((s) => s.id === uploadTagServiceId) || null;
+
+            function pageHeader(leftNode, title, rightNode, z) {
+                return React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 16px) 18px 14px`, borderBottom: `1px solid ${UP.border}`, background: UP.bg, position: 'relative', zIndex: z || 1 } },
+                    React.createElement("div", { style: { minWidth: 34, display: 'flex' } }, leftNode),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: UP.text, margin: 0, flex: 1, textAlign: 'center' } }, title),
+                    React.createElement("div", { style: { minWidth: 34, display: 'flex', justifyContent: 'flex-end' } }, rightNode));
             }
-            function toggleRow(label, on, onChange, sub) {
-                return React.createElement("div", { key: label, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: `1px solid ${UP.border}` } },
-                    React.createElement("div", null,
-                        React.createElement("p", { style: { fontSize: 13, fontWeight: 600, color: UP.text, margin: 0 } }, label),
-                        sub && React.createElement("p", { style: { fontSize: 11, color: UP.sub, marginTop: 2 } }, sub)),
-                    React.createElement(ToggleSwitch, { on: on, onChange: onChange }));
+            function iconBtn(iconName, onClick, color) {
+                return React.createElement("button", { onClick, style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: iconName, size: 20, color: color || UP.text }));
             }
-            const optionsStep = uploadStep === 'options' && React.createElement("div", { onClick: closeUploadFlow, style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-end', zIndex: 14 } },
-                React.createElement("div", { onClick: (e) => e.stopPropagation(), className: "avio-upload-sheet", style: { width: '100%', background: T.modalBackground, borderRadius: '32px 32px 0 0', padding: '10px 20px calc(env(safe-area-inset-bottom) + 20px)' } },
-                    React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: T.border, margin: '0 auto 18px' } }),
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: UP.text, margin: 0, textAlign: 'center' } }, "Create Short"),
-                    React.createElement("p", { style: { fontSize: 12.5, color: UP.sub, textAlign: 'center', marginTop: 4 } }, "Show off your experience and help others book it."),
-                    React.createElement("button", { onClick: () => triggerFilePicker(null), style: { width: '100%', marginTop: 18, border: `1.5px dashed ${UP.border}`, borderRadius: 20, padding: '32px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, background: T.surfaceSecondary } },
-                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: T.surface, border: `1px solid ${UP.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "upload", size: 19, color: UP.text })),
-                        React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: UP.text, marginTop: 4 } }, "Upload a Video"),
-                        React.createElement("span", { style: { fontSize: 11.5, color: UP.sub, textAlign: 'center' } }, "Drag & drop or choose from your library")),
-                    React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } },
-                        [{ icon: 'camera', label: 'Record Video', onClick: () => triggerFilePicker('environment') },
-                            { icon: 'image', label: 'Photo Library', onClick: () => triggerFilePicker(null) },
-                            { icon: 'folder', label: 'Drafts', onClick: () => flashToast('No drafts yet') }].map((opt, i, arr) => React.createElement("button", { key: opt.label, onClick: opt.onClick, style: { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 4px', borderBottom: i < arr.length - 1 ? `1px solid ${UP.border}` : 'none' } },
-                            React.createElement(Icon, { name: opt.icon, size: 18, color: UP.text }),
-                            React.createElement("span", { style: { fontSize: 14, color: UP.text, fontWeight: 500 } }, opt.label))))));
-            let editBody;
-            if (uploadEditPanel === 0) {
-                editBody = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px 20px' } },
-                    React.createElement("div", { style: { width: '100%', aspectRatio: '9 / 16', maxHeight: '46vh', margin: '0 auto', borderRadius: 20, overflow: 'hidden', background: '#000' } },
-                        uploadVideoUrl && React.createElement("video", { src: uploadVideoUrl, controls: true, playsInline: true, style: { width: '100%', height: '100%', objectFit: 'cover' } })),
-                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: UP.text, marginTop: 18 } }, "Trim"),
-                    React.createElement("input", { type: "range", min: 0, max: 100, defaultValue: 0, style: { width: '100%', marginTop: 8, accentColor: THEME.coral } }),
-                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: UP.text, marginTop: 18 } }, "Cover"),
-                    React.createElement("p", { style: { fontSize: 11.5, color: UP.sub, marginTop: 2 } }, "Choose a cover for your short"),
-                    React.createElement("div", { style: { width: 56, height: 76, borderRadius: 10, overflow: 'hidden', background: '#000', marginTop: 8 } }, uploadVideoUrl && React.createElement("video", { src: uploadVideoUrl, muted: true, style: { width: '100%', height: '100%', objectFit: 'cover' } })));
+            function detailRow(label, valueText, onClick, placeholder) {
+                return React.createElement("button", { key: label, onClick, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '15px 0', borderBottom: `1px solid ${UP.border}`, textAlign: 'left' } },
+                    React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: UP.text, flexShrink: 0 } }, label),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 } },
+                        React.createElement("span", { style: { fontSize: 13, color: valueText ? UP.text : UP.sub, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 170 } }, valueText || placeholder || 'Add'),
+                        onClick && React.createElement(Icon, { name: "chevronright", size: 15, color: UP.sub })));
             }
-            else if (uploadEditPanel === 1) {
-                editBody = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px 20px' } },
-                    fieldWrap("Caption", React.createElement("textarea", { value: uploadForm.caption, onChange: (e) => setUploadForm((f) => ({ ...f, caption: e.target.value })), rows: 3, maxLength: 100, placeholder: "Summer vibes this weekend...", style: { ...inputStyle, resize: 'none' } })),
-                    fieldWrap("Category", React.createElement("select", { value: uploadForm.category, onChange: (e) => setUploadForm((f) => ({ ...f, category: e.target.value })), style: inputStyle }, UPLOAD_CATEGORIES.map((c) => React.createElement("option", { key: c, value: c }, c)))),
-                    fieldWrap("Location", React.createElement("input", { value: uploadForm.location, onChange: (e) => setUploadForm((f) => ({ ...f, location: e.target.value })), placeholder: "Los Angeles, CA", style: inputStyle })),
-                    fieldWrap("Tags", React.createElement("input", { value: uploadForm.tags, onChange: (e) => setUploadForm((f) => ({ ...f, tags: e.target.value })), placeholder: "#dj #wedding #party", style: inputStyle })),
-                    fieldWrap("Price (optional)", React.createElement("input", { value: uploadForm.price, onChange: (e) => setUploadForm((f) => ({ ...f, price: e.target.value })), placeholder: "From $500", inputMode: "numeric", style: inputStyle })),
-                    React.createElement("div", { style: { marginTop: 16 } }, toggleRow("Booking Available", uploadForm.bookingAvailable, () => setUploadForm((f) => ({ ...f, bookingAvailable: !f.bookingAvailable })), "Let viewers book straight from your post")));
+            function sheetShell(title, onClose, content, extraStyle) {
+                return React.createElement("div", { onClick: onClose, style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 16 } },
+                    React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxHeight: '82vh', display: 'flex', flexDirection: 'column', background: UP.bg, borderRadius: '28px 28px 0 0', padding: `10px 20px calc(env(safe-area-inset-bottom) + 18px)`, ...extraStyle } },
+                        React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: UP.border, margin: '0 auto 16px', flexShrink: 0 } }),
+                        title && React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 } },
+                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: UP.text, margin: 0 } }, title),
+                            React.createElement("button", { onClick: onClose }, React.createElement(Icon, { name: "x", size: 18, color: UP.sub }))),
+                        content));
             }
-            else if (uploadEditPanel === 2) {
-                editBody = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px 20px' } },
-                    toggleRow("Add Offer (optional)", uploadForm.offerOn, () => setUploadForm((f) => ({ ...f, offerOn: !f.offerOn }))),
-                    uploadForm.offerOn && React.createElement("input", { value: uploadForm.offer, onChange: (e) => setUploadForm((f) => ({ ...f, offer: e.target.value })), placeholder: "10% OFF for first time bookings", style: { ...inputStyle, marginTop: 10, marginBottom: 6 } }),
-                    toggleRow("Comments", uploadForm.commentsOn, () => setUploadForm((f) => ({ ...f, commentsOn: !f.commentsOn }))),
-                    toggleRow("Allow Duet", uploadForm.allowDuet, () => setUploadForm((f) => ({ ...f, allowDuet: !f.allowDuet }))),
-                    toggleRow("Allow Stitch", uploadForm.allowStitch, () => setUploadForm((f) => ({ ...f, allowStitch: !f.allowStitch }))),
-                    toggleRow("Save as Draft", uploadForm.saveDraft, () => setUploadForm((f) => ({ ...f, saveDraft: !f.saveDraft })), "You can save this as a draft and come back later"));
-            }
-            else {
-                editBody = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' } },
-                    React.createElement("div", { style: { position: 'relative', width: '80%', aspectRatio: '9 / 16', maxHeight: '56vh', borderRadius: 22, overflow: 'hidden', background: '#000', marginTop: 10 } },
-                        uploadVideoUrl && React.createElement("video", { src: uploadVideoUrl, controls: true, autoPlay: true, loop: true, playsInline: true, style: { width: '100%', height: '100%', objectFit: 'cover' } }),
-                        React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0) 60%, rgba(0,0,0,0.6) 100%)' } }),
-                        React.createElement("div", { style: { position: 'absolute', left: 12, right: 12, bottom: 12 } },
-                            React.createElement("p", { style: { color: '#fff', fontWeight: 700, fontSize: 13, margin: 0 } }, "Levi D."),
-                            React.createElement("p", { style: { color: 'rgba(255,255,255,0.85)', fontSize: 11, marginTop: 2 } }, uploadForm.caption || "Your caption appears here"))),
-                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: UP.text, marginTop: 16 } }, "Preview"),
-                    React.createElement("p", { style: { fontSize: 11.5, color: UP.sub, marginTop: 2, textAlign: 'center' } }, "This is how your short will appear."));
-            }
-            const editStep = uploadStep === 'edit' && React.createElement("div", { className: "avio-upload-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 14, display: 'flex', flexDirection: 'column' } },
-                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px` } },
-                    React.createElement("button", { onClick: uploadEditPanel === 0 ? closeUploadFlow : () => setUploadEditPanel((p) => p - 1), style: { fontSize: 14, color: UP.text } }, uploadEditPanel === 0 ? "Cancel" : "Back"),
-                    React.createElement("button", { onClick: () => uploadEditPanel < 3 ? setUploadEditPanel((p) => p + 1) : setUploadStep('publish'), style: { fontSize: 14, fontWeight: 700, color: UP.text } }, "Next")),
-                editBody,
-                React.createElement("div", { style: { flexShrink: 0, display: 'flex', justifyContent: 'center', gap: 6, padding: '10px 0 calc(env(safe-area-inset-bottom) + 14px)' } },
-                    UPLOAD_EDIT_PANELS.map((_, i) => React.createElement("span", { key: i, style: { width: i === uploadEditPanel ? 16 : 6, height: 6, borderRadius: 3, background: i === uploadEditPanel ? THEME.coral : '#E5E5EA', transition: 'width 0.2s' } }))));
-            const publishStep = uploadStep === 'publish' && React.createElement("div", { className: "avio-upload-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 14, display: 'flex', flexDirection: 'column' } },
-                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${UP.border}` } },
-                    React.createElement("button", { onClick: () => setUploadStep('edit') }, React.createElement(Icon, { name: "arrowleft", size: 17, color: UP.text })),
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: UP.text, margin: 0, flex: 1, textAlign: 'center', marginRight: 17 } }, "Publish Short")),
-                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
-                    fieldWrap("Tag Business", (() => {
-                        const taggable = getTaggableBusinesses();
-                        if (!taggable.length)
-                            return React.createElement("p", { style: { fontSize: 12.5, color: UP.sub, lineHeight: 1.5 } }, "You don't have any completed bookings in the last 7 days. Book a business, and once your appointment happens you can tag them in a post about your experience.");
-                        return React.createElement(React.Fragment, null,
-                            React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: UP.sub, letterSpacing: 0.3, textTransform: 'uppercase', marginBottom: 10 } }, "Recent Visits"),
-                            React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, taggable.map((v) => {
-                                const active = taggedBusinessIds.includes(v.id);
-                                return React.createElement("button", { key: v.id, onClick: () => toggleTaggedBusiness(v.id), style: { display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, border: `1.5px solid ${active ? THEME.coral : UP.border}`, background: active ? T.surfaceSecondary : T.surface } },
-                                    v.image
-                                        ? React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, backgroundImage: `url(${v.image})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } })
-                                        : React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, background: v.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: avatarFg(v.avatarColor), flexShrink: 0 } }, v.name.charAt(0)),
-                                    React.createElement("div", { style: { flex: 1, textAlign: 'left', minWidth: 0 } },
-                                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: UP.text, margin: 0 } }, v.name),
-                                        React.createElement("p", { style: { fontSize: 11.5, color: UP.sub, margin: '2px 0 0' } }, v.service, " · Visited ", v.bookingDateLabel)),
-                                    React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: THEME.coral, flexShrink: 0 } }, "✓ Eligible"),
-                                    React.createElement("div", { style: { width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" })));
-                            })));
-                    })()),
-                    fieldWrap("Short Description", React.createElement("textarea", { value: publishForm.shortDescription, onChange: (e) => setPublishForm((f) => ({ ...f, shortDescription: e.target.value })), rows: 3, maxLength: 150, placeholder: "Professional DJ services for weddings, clubs, private events and more.", style: { ...inputStyle, resize: 'none' } })),
-                    fieldWrap("Offer (optional)", React.createElement("input", { value: publishForm.offer || uploadForm.offer, onChange: (e) => setPublishForm((f) => ({ ...f, offer: e.target.value })), placeholder: "10% OFF for first time bookings", style: inputStyle })),
-                    fieldWrap("Booking Link", React.createElement("button", { onClick: () => flashToast('Booking page linked automatically'), style: { ...inputStyle, textAlign: 'left', color: publishForm.bookingLink ? UP.text : UP.sub, display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, publishForm.bookingLink || "Set your booking page", React.createElement(Icon, { name: "chevronright", size: 13, color: UP.sub }))),
-                    fieldWrap("Visibility", React.createElement("div", { style: { display: 'flex', gap: 8 } }, [{ id: 'public', label: 'Public', icon: 'globe' }, { id: 'followers', label: 'Followers', icon: 'user' }, { id: 'private', label: 'Private', icon: 'lock' }].map((v) => {
-                        const active = publishForm.visibility === v.id;
-                        return React.createElement("button", { key: v.id, onClick: () => setPublishForm((f) => ({ ...f, visibility: v.id })), style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '12px 4px', borderRadius: 14, border: `1.5px solid ${active ? THEME.coral : UP.border}`, background: active ? T.surfaceSecondary : T.surface } },
-                            React.createElement(Icon, { name: v.icon, size: 16, color: active ? THEME.coral : UP.sub }),
-                            React.createElement("span", { style: { fontSize: 11, fontWeight: active ? 700 : 500, color: active ? THEME.coral : UP.sub } }, v.label));
-                    })))),
-                React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${UP.border}` } },
-                    React.createElement("button", { disabled: accountType !== 'business' && taggedBusinessIds.length === 0, onClick: publishShort, style: { width: '100%', height: 54, borderRadius: 27, background: (accountType !== 'business' && taggedBusinessIds.length === 0) ? '#E5E5EA' : THEME.coral, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "Publish Short")));
-            const successStep = uploadStep === 'success' && React.createElement("div", { className: "avio-upload-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', textAlign: 'center' } },
-                React.createElement("div", { style: { width: 76, height: 76, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 } }, React.createElement(Icon, { name: "check", size: 32, color: "#fff" })),
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: T.textPrimary, margin: 0 } }, "Your short is live!"),
-                React.createElement("p", { style: { fontSize: 13, color: T.textSecondary, marginTop: 8, lineHeight: 1.4 } }, "It's now visible to everyone and customers can book you."),
-                React.createElement("button", { onClick: viewPublishedShort, style: { marginTop: 32, width: '100%', maxWidth: 280, height: 50, borderRadius: 25, background: THEME.coral, color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "View Short"),
-                React.createElement("button", { onClick: () => flashToast('Share link copied'), style: { marginTop: 16, fontSize: 13, color: T.textPrimary, fontWeight: 600 } }, "Share"),
-                React.createElement("button", { onClick: closeUploadFlow, style: { marginTop: 14, fontSize: 13, color: T.textSecondary } }, "Done"));
-            return React.createElement(React.Fragment, null, optionsStep, editStep, publishStep, successStep);
+
+            // ---------- STEP 1 — Create (choose source) ----------
+            const optionsStep = uploadStep === 'options' && React.createElement("div", { key: "options", style: { position: 'absolute', inset: 0, background: UP.bg, zIndex: 14, display: 'flex', flexDirection: 'column' } },
+                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 16px) 20px 8px` } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: UP.text, margin: 0 } }, "Create"),
+                    iconBtn("x", requestCloseUploadFlow)),
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '22px 22px 20px', display: 'flex', flexDirection: 'column', gap: 14 } },
+                    [
+                        { icon: 'camera', title: 'Record Video', sub: 'Capture a new Thrillz using your camera.', onClick: () => setUploadStep('record') },
+                        { icon: 'upload', title: 'Upload from Camera Roll', sub: 'Choose a video from your gallery.', onClick: () => triggerFilePicker(null) },
+                    ].map((opt) => React.createElement("button", { key: opt.title, onClick: opt.onClick, style: { width: '100%', border: `1.5px solid ${UP.border}`, borderRadius: 24, padding: '30px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: UP.surface } },
+                        React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', background: 'rgba(151,196,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: opt.icon, size: 22, color: green })),
+                        React.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: UP.text, fontFamily: 'Space Grotesk, sans-serif' } }, opt.title),
+                        React.createElement("span", { style: { fontSize: 12.5, color: UP.sub, textAlign: 'center' } }, opt.sub)))),
+                React.createElement("p", { style: { flexShrink: 0, textAlign: 'center', fontSize: 12, fontWeight: 600, color: UP.sub, padding: '0 0 calc(env(safe-area-inset-bottom) + 18px)' } }, "Max 90 seconds"));
+
+            // ---------- STEP 2 — Record / capture ----------
+            const recordTools = [
+                { icon: 'repeat', label: 'Flip', onClick: () => flashToast('Camera flipped') },
+                { icon: 'sliders', label: 'Speed', onClick: () => flashToast('Speed — coming soon') },
+                { icon: 'clock', label: 'Timer', onClick: () => flashToast('Timer — coming soon') },
+                { icon: 'sparkles', label: 'Filters', onClick: () => flashToast('Filters — coming soon') },
+                { icon: 'star', label: 'Adjust', onClick: () => flashToast('Adjust — coming soon') },
+            ];
+            const recordStep = uploadStep === 'record' && React.createElement("div", { key: "record", style: { position: 'absolute', inset: 0, background: '#000', zIndex: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
+                React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 42%, rgba(151,196,0,0.10), rgba(0,0,0,0) 60%)' } }),
+                React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 18, right: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 } },
+                    iconBtn("x", requestCloseUploadFlow, "#fff"),
+                    React.createElement("button", { onClick: () => setUploadSheet('sound'), style: { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 16, background: 'rgba(255,255,255,0.14)' } },
+                        React.createElement(Icon, { name: "music", size: 13, color: "#fff" }),
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "#fff" } }, uploadSound ? uploadSound.name : "Add sound")),
+                    React.createElement("div", { style: { width: 34 } })),
+                React.createElement("div", { style: { position: 'absolute', right: 14, top: '18%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22, zIndex: 2 } },
+                    recordTools.map((t) => React.createElement("button", { key: t.label, onClick: t.onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
+                        React.createElement(Icon, { name: t.icon, size: 20, color: "#fff" }),
+                        React.createElement("span", { style: { fontSize: 9.5, fontWeight: 600, color: "rgba(255,255,255,0.85)" } }, t.label)))),
+                React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10 } },
+                    React.createElement(Icon, { name: "camera", size: 34, color: "rgba(255,255,255,0.35)" }),
+                    React.createElement("p", { style: { fontSize: 12.5, color: "rgba(255,255,255,0.45)" } }, "Tap the record button to open your camera")),
+                React.createElement("div", { style: { flexShrink: 0, display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 18 } },
+                    THRILLZ_DURATIONS.map((d) => React.createElement("button", { key: d, onClick: () => setUploadDuration(d), style: { padding: '6px 14px', borderRadius: 16, background: uploadDuration === d ? green : 'rgba(255,255,255,0.12)' } },
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#fff" } }, d + "s")))),
+                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 34px calc(env(safe-area-inset-bottom) + 22px)` } },
+                    React.createElement("button", { onClick: () => flashToast('Effects — coming soon'), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: 22, background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "sparkles", size: 18, color: "#fff" })),
+                        React.createElement("span", { style: { fontSize: 10.5, color: "#fff", fontWeight: 600 } }, "Effects")),
+                    React.createElement("button", { className: "avio-press", onClick: () => triggerFilePicker('environment'), style: { width: 76, height: 76, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement("svg", { width: 76, height: 76, viewBox: "0 0 76 76" },
+                            React.createElement("circle", { cx: 38, cy: 38, r: 34, fill: "none", stroke: green, strokeWidth: 4.5 }),
+                            React.createElement("circle", { cx: 38, cy: 38, r: 26, fill: "#fff" }))),
+                    React.createElement("button", { onClick: () => triggerFilePicker(null), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: 22, background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "upload", size: 18, color: "#fff" })),
+                        React.createElement("span", { style: { fontSize: 10.5, color: "#fff", fontWeight: 600 } }, "Upload"))));
+
+            // ---------- STEP 3 — Preview / editor ----------
+            const filmstrip = React.createElement("div", { style: { display: 'flex', gap: 2, marginTop: 12, borderRadius: 10, overflow: 'hidden', height: 52 } },
+                Array.from({ length: 8 }).map((_, i) => React.createElement("div", { key: i, style: { flex: 1, backgroundImage: uploadCoverImage ? `url(${uploadCoverImage})` : 'none', backgroundColor: uploadCoverImage ? undefined : '#111', backgroundSize: 'cover', backgroundPosition: 'center', filter: `brightness(${0.75 + (i % 3) * 0.12})` } })));
+            const trimmedSeconds = uploadVideoDuration ? Math.max(0.5, uploadVideoDuration * (uploadTrimRange.end - uploadTrimRange.start) / 100) : 0;
+            const previewStep = uploadStep === 'preview' && React.createElement("div", { key: "preview", style: { position: 'absolute', inset: 0, background: UP.bg, zIndex: 14, display: 'flex', flexDirection: 'column' } },
+                pageHeader(iconBtn("arrowleft", () => setUploadStep('options')), "Preview", React.createElement("button", { onClick: () => setUploadStep('details'), style: { fontSize: 15, fontWeight: 700, color: green } }, "Next")),
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '18px 20px calc(env(safe-area-inset-bottom) + 20px)' } },
+                    React.createElement("div", { onClick: () => { const v = uploadPreviewVideoRef.current; if (!v) return; if (v.paused) { v.play().catch(() => { }); setUploadPreviewPlaying(true); } else { v.pause(); setUploadPreviewPlaying(false); } }, style: { position: 'relative', width: '100%', aspectRatio: '9 / 16', maxHeight: '52vh', margin: '0 auto', borderRadius: 22, overflow: 'hidden', background: '#000' } },
+                        uploadVideoUrl && React.createElement("video", { ref: uploadPreviewVideoRef, src: uploadVideoUrl, autoPlay: true, loop: true, playsInline: true, onLoadedMetadata: handlePreviewVideoLoaded, onPlay: () => setUploadPreviewPlaying(true), onPause: () => setUploadPreviewPlaying(false), style: { width: '100%', height: '100%', objectFit: 'cover' } }),
+                        !uploadPreviewPlaying && React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.15)' } }, React.createElement(Icon, { name: "playcircle", size: 46, color: "#fff" }))),
+                    filmstrip,
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 14 } },
+                        React.createElement("button", { onClick: () => setUploadSheet('trim'), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 0', borderRadius: 16, border: `1px solid ${UP.border}` } },
+                            React.createElement(Icon, { name: "scissors", size: 16, color: UP.text }),
+                            React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: UP.text } }, "Trim")),
+                        React.createElement("button", { onClick: () => setUploadSheet('cover'), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 0', borderRadius: 16, border: `1px solid ${UP.border}` } },
+                            React.createElement(Icon, { name: "image", size: 16, color: UP.text }),
+                            React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: UP.text } }, "Adjust Cover"))),
+                    React.createElement("button", { onClick: () => setUploadSheet('sound'), style: { width: '100%', marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', borderRadius: 16, border: `1px solid ${UP.border}`, background: uploadSound ? 'rgba(151,196,0,0.08)' : UP.surface } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 } },
+                            React.createElement(Icon, { name: "music", size: 16, color: uploadSound ? green : UP.sub }),
+                            React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: UP.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, uploadSound ? `♫ ${uploadSound.name} — ${uploadSound.artist}` : "Add Sound")),
+                        uploadSound
+                            ? React.createElement("button", { onClick: (e) => { e.stopPropagation(); setUploadSound(null); } }, React.createElement(Icon, { name: "x", size: 15, color: UP.sub }))
+                            : React.createElement(Icon, { name: "chevronright", size: 15, color: UP.sub })),
+                    trimmedSeconds > 0 && React.createElement("p", { style: { fontSize: 11.5, color: UP.sub, marginTop: 10, textAlign: 'center' } }, `Duration: ${trimmedSeconds.toFixed(1)}s`)));
+
+            // ---------- Trim sheet ----------
+            const trimSheet = uploadSheet === 'trim' && sheetShell("Trim", () => setUploadSheet(null), (() => {
+                const [localRange, setLocalRange] = [uploadTrimRange, setUploadTrimRange];
+                return React.createElement("div", null,
+                    React.createElement("div", { style: { width: '100%', aspectRatio: '9 / 16', maxHeight: '30vh', margin: '0 auto', borderRadius: 16, overflow: 'hidden', background: '#000' } },
+                        uploadVideoUrl && React.createElement("video", { src: uploadVideoUrl, muted: true, autoPlay: true, loop: true, playsInline: true, style: { width: '100%', height: '100%', objectFit: 'cover' } })),
+                    React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: UP.text, marginTop: 16 } }, "Start"),
+                    React.createElement("input", { type: "range", min: 0, max: 95, value: localRange.start, onChange: (e) => { const start = Math.min(Number(e.target.value), localRange.end - 5); setLocalRange((r) => ({ ...r, start: Math.max(0, start) })); }, style: { width: '100%', accentColor: green } }),
+                    React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: UP.text, marginTop: 12 } }, "End"),
+                    React.createElement("input", { type: "range", min: 5, max: 100, value: localRange.end, onChange: (e) => { const end = Math.max(Number(e.target.value), localRange.start + 5); setLocalRange((r) => ({ ...r, end: Math.min(100, end) })); }, style: { width: '100%', accentColor: green } }),
+                    React.createElement("p", { style: { fontSize: 12, color: UP.sub, marginTop: 8, textAlign: 'center' } }, uploadVideoDuration ? `${(uploadVideoDuration * (localRange.end - localRange.start) / 100).toFixed(1)}s selected` : ''),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 16 } },
+                        React.createElement("button", { onClick: () => setLocalRange({ start: 0, end: 100 }), style: { flex: 1, padding: '13px 0', borderRadius: 22, border: `1px solid ${UP.border}`, fontSize: 13.5, fontWeight: 600, color: UP.text } }, "Reset"),
+                        React.createElement("button", { onClick: () => setUploadSheet(null), style: { flex: 1, padding: '13px 0', borderRadius: 22, background: green, fontSize: 13.5, fontWeight: 700, color: "#fff" } }, "Save")));
+            })());
+
+            // ---------- Cover sheet ----------
+            const coverSheet = uploadSheet === 'cover' && sheetShell("Adjust Cover", () => setUploadSheet(null),
+                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center' } },
+                    React.createElement("div", { style: { width: 120, aspectRatio: '9 / 16', borderRadius: 14, overflow: 'hidden', background: '#000' } },
+                        uploadVideoUrl && React.createElement("video", { ref: uploadCoverVideoRef, src: uploadVideoUrl, muted: true, playsInline: true, style: { width: '100%', height: '100%', objectFit: 'cover' } })),
+                    React.createElement("input", { type: "range", min: 0, max: Math.max(uploadVideoDuration, 0.1), step: 0.05, value: uploadCoverTime, onChange: (e) => { const t = Number(e.target.value); setUploadCoverTime(t); if (uploadCoverVideoRef.current) uploadCoverVideoRef.current.currentTime = t; }, style: { width: '100%', marginTop: 16, accentColor: green } }),
+                    React.createElement("p", { style: { fontSize: 12, color: UP.sub, marginTop: 6 } }, "Scrub to choose the frame everyone sees first"),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 16, width: '100%' } },
+                        React.createElement("button", { onClick: () => setUploadSheet(null), style: { flex: 1, padding: '13px 0', borderRadius: 22, border: `1px solid ${UP.border}`, fontSize: 13.5, fontWeight: 600, color: UP.text } }, "Cancel"),
+                        React.createElement("button", { onClick: () => { captureCoverFromVideoEl(uploadCoverVideoRef.current, uploadCoverTime); setUploadSheet(null); }, style: { flex: 1, padding: '13px 0', borderRadius: 22, background: green, fontSize: 13.5, fontWeight: 700, color: "#fff" } }, "Confirm"))));
+
+            // ---------- Sound sheet ----------
+            const soundSheet = uploadSheet === 'sound' && sheetShell("Add Sound", () => setUploadSheet(null),
+                React.createElement("div", { className: "avio-scroll", style: { overflowY: 'auto' } },
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+                        THRILLZ_SOUND_LIBRARY.map((s) => {
+                            const active = uploadSound && uploadSound.id === s.id;
+                            return React.createElement("button", { key: s.id, onClick: () => setUploadSound({ id: s.id, name: s.name, artist: s.artist }), style: { display: 'flex', alignItems: 'center', gap: 12, padding: '11px 6px', borderRadius: 14, background: active ? 'rgba(151,196,0,0.10)' : 'transparent' } },
+                                React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: active ? green : UP.surfaceAlt, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "music", size: 16, color: active ? "#fff" : UP.sub })),
+                                React.createElement("div", { style: { flex: 1, textAlign: 'left', minWidth: 0 } },
+                                    React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: UP.text, margin: 0 } }, s.name),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: UP.sub, margin: '2px 0 0' } }, s.artist, " · ", s.duration)),
+                                active && React.createElement(Icon, { name: "check", size: 16, color: green }));
+                        })),
+                    uploadSound && React.createElement("div", { style: { marginTop: 18, paddingTop: 16, borderTop: `1px solid ${UP.border}` } },
+                        React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: UP.text } }, "Music Volume"),
+                        React.createElement("input", { type: "range", min: 0, max: 100, value: uploadMusicVolume, onChange: (e) => setUploadMusicVolume(Number(e.target.value)), style: { width: '100%', accentColor: green } }),
+                        React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: UP.text, marginTop: 10 } }, "Original Audio Volume"),
+                        React.createElement("input", { type: "range", min: 0, max: 100, value: uploadOriginalVolume, onChange: (e) => setUploadOriginalVolume(Number(e.target.value)), style: { width: '100%', accentColor: green } }),
+                        React.createElement("button", { onClick: () => setUploadSound(null), style: { marginTop: 12, fontSize: 12.5, fontWeight: 700, color: '#D0304A' } }, "Remove Sound"))));
+
+            // ---------- Topics sheet ----------
+            const topicsSheet = uploadSheet === 'topics' && sheetShell("Add Topics", () => setUploadSheet(null),
+                React.createElement("div", { className: "avio-scroll", style: { overflowY: 'auto' } },
+                    React.createElement("p", { style: { fontSize: 12, color: UP.sub, marginBottom: 12 } }, "Choose up to 5 topics to help people discover this Thrillz."),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
+                        THRILLZ_TOPICS.map((t) => {
+                            const active = uploadTopics.includes(t);
+                            return React.createElement("button", { key: t, onClick: () => toggleUploadTopic(t), style: { padding: '9px 15px', borderRadius: 18, border: `1.5px solid ${active ? green : UP.border}`, background: active ? green : UP.surface } },
+                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: active ? '#fff' : UP.text } }, t));
+                        })),
+                    React.createElement("button", { onClick: () => setUploadSheet(null), style: { width: '100%', marginTop: 20, padding: '14px 0', borderRadius: 24, background: green, fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: 'Space Grotesk, sans-serif' } }, "Done")));
+
+            // ---------- STEP 4b — Tag Business / Service (dedicated page) ----------
+            const tagResults = isBiz ? [] : getAllTaggableBusinesses().filter((b) => b.name.toLowerCase().includes(uploadTagSearch.toLowerCase()));
+            const eligibleIds = new Set(getTaggableBusinesses().map((v) => v.providerId));
+            const tagPage = uploadSheet === 'tag' && React.createElement("div", { key: "tag", style: { position: 'absolute', inset: 0, background: UP.bg, zIndex: 16, display: 'flex', flexDirection: 'column' } },
+                pageHeader(iconBtn("arrowleft", () => setUploadSheet(null)), "Tag Business / Service"),
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '14px 20px calc(env(safe-area-inset-bottom) + 20px)' } },
+                    taggedBusiness && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, background: 'rgba(151,196,0,0.10)', marginBottom: 14 } },
+                        React.createElement(Icon, { name: "tag", size: 16, color: green }),
+                        React.createElement("span", { style: { flex: 1, fontSize: 13, fontWeight: 700, color: UP.text } }, `Tagged: ${taggedBusiness.name}${taggedServiceObj ? ' — ' + taggedServiceObj.name : ''}`),
+                        React.createElement("button", { onClick: () => { setUploadTagBusinessId(null); setUploadTagServiceId(null); } }, React.createElement(Icon, { name: "x", size: 15, color: UP.sub }))),
+                    isBiz
+                        ? React.createElement("button", { onClick: () => setUploadTagBusinessId(MY_PROVIDER_ID), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, border: `1.5px solid ${uploadTagBusinessId === MY_PROVIDER_ID ? green : UP.border}`, background: UP.surface } },
+                            React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13 } }, (bizOnboarding.businessName.trim() || 'M').charAt(0)),
+                            React.createElement("div", { style: { flex: 1, textAlign: 'left' } },
+                                React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: UP.text, margin: 0 } }, bizOnboarding.businessName.trim() || 'My Business'),
+                                React.createElement("p", { style: { fontSize: 11.5, color: UP.sub, margin: '2px 0 0' } }, "Your business")))
+                        : React.createElement(React.Fragment, null,
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${UP.border}`, borderRadius: 14, padding: '10px 14px', marginBottom: 12 } },
+                                React.createElement(Icon, { name: "search", size: 15, color: UP.sub }),
+                                React.createElement("input", { value: uploadTagSearch, onChange: (e) => setUploadTagSearch(e.target.value), placeholder: "Search businesses or services", style: { flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13.5, color: UP.text } })),
+                            tagResults.length === 0
+                                ? React.createElement("p", { style: { fontSize: 12.5, color: UP.sub, textAlign: 'center', padding: '20px 0' } }, "No businesses found.")
+                                : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, tagResults.slice(0, 25).map((b) => {
+                                    const active = uploadTagBusinessId === b.id;
+                                    const eligible = eligibleIds.has(b.id);
+                                    return React.createElement("button", { key: b.id, onClick: () => { setUploadTagBusinessId(b.id); setUploadTagServiceId(null); }, style: { display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, border: `1.5px solid ${active ? green : UP.border}`, background: UP.surface } },
+                                        b.image
+                                            ? React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, backgroundImage: `url(${b.image})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } })
+                                            : React.createElement("div", { style: { width: 36, height: 36, borderRadius: 18, background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: avatarFg(b.avatarColor), flexShrink: 0 } }, b.name.charAt(0)),
+                                        React.createElement("div", { style: { flex: 1, textAlign: 'left', minWidth: 0 } },
+                                            React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: UP.text, margin: 0 } }, b.name),
+                                            React.createElement("p", { style: { fontSize: 11.5, color: UP.sub, margin: '2px 0 0' } }, b.category, b.location ? ' · ' + b.location : '')),
+                                        eligible && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: green, flexShrink: 0 } }, "✓ Visited"));
+                                }))),
+                    taggedBusiness && taggedServices.length > 0 && React.createElement("div", { style: { marginTop: 18 } },
+                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: UP.sub, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 10 } }, "Which service is this?"),
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, taggedServices.map((s) => {
+                            const active = uploadTagServiceId === s.id;
+                            return React.createElement("button", { key: s.id, onClick: () => setUploadTagServiceId(active ? null : s.id), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 14, border: `1.5px solid ${active ? green : UP.border}`, background: active ? 'rgba(151,196,0,0.08)' : UP.surface } },
+                                React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: UP.text } }, s.name),
+                                React.createElement("span", { style: { fontSize: 12.5, color: UP.sub } }, money(s.price)));
+                        })))),
+                React.createElement("div", { style: { flexShrink: 0, padding: '12px 20px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${UP.border}` } },
+                    React.createElement("button", { onClick: () => setUploadSheet(null), style: { width: '100%', padding: '14px 0', borderRadius: 24, background: green, fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: 'Space Grotesk, sans-serif' } }, "Done")));
+
+            // ---------- STEP 4c — Location (dedicated page) ----------
+            const locationSuggestions = Array.from(new Set(getAllTaggableBusinesses().map((b) => b.location).filter(Boolean))).filter((l) => l.toLowerCase().includes(uploadLocationSearch.toLowerCase())).slice(0, 8);
+            const locationPage = uploadSheet === 'location' && React.createElement("div", { key: "location", style: { position: 'absolute', inset: 0, background: UP.bg, zIndex: 16, display: 'flex', flexDirection: 'column' } },
+                pageHeader(iconBtn("arrowleft", () => setUploadSheet(null)), "Add Location"),
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '14px 20px' } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${UP.border}`, borderRadius: 14, padding: '10px 14px' } },
+                        React.createElement(Icon, { name: "mappin", size: 15, color: UP.sub }),
+                        React.createElement("input", { value: uploadLocationSearch, onChange: (e) => setUploadLocationSearch(e.target.value), placeholder: "City, State", style: { flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13.5, color: UP.text }, autoFocus: true })),
+                    React.createElement("button", { disabled: !uploadLocationSearch.trim(), onClick: () => { setUploadLocationText(uploadLocationSearch.trim()); setUploadSheet(null); }, style: { width: '100%', marginTop: 12, padding: '13px 0', borderRadius: 22, background: uploadLocationSearch.trim() ? green : UP.surfaceAlt, fontSize: 13.5, fontWeight: 700, color: uploadLocationSearch.trim() ? '#fff' : UP.sub } }, "Use this location"),
+                    locationSuggestions.length > 0 && React.createElement("div", { style: { marginTop: 18 } },
+                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: UP.sub, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 8 } }, "Suggestions"),
+                        locationSuggestions.map((l) => React.createElement("button", { key: l, onClick: () => { setUploadLocationText(l); setUploadLocationSearch(l); setUploadSheet(null); }, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 4px', borderBottom: `1px solid ${UP.border}` } },
+                            React.createElement(Icon, { name: "mappin", size: 14, color: UP.sub }),
+                            React.createElement("span", { style: { fontSize: 13.5, color: UP.text } }, l))))));
+
+            // ---------- STEP 4 — Add Details ----------
+            const detailsStep = uploadStep === 'details' && React.createElement("div", { key: "details", style: { position: 'absolute', inset: 0, background: UP.bg, zIndex: 14, display: 'flex', flexDirection: 'column' } },
+                pageHeader(iconBtn("arrowleft", () => setUploadStep('preview')), "Add Details", iconBtn("info", () => flashToast('Add a caption, tags, location and topics so people can discover and book this Thrillz.'))),
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 20px 20px' } },
+                    React.createElement("div", { style: { display: 'flex', gap: 12 } },
+                        React.createElement("div", { style: { width: 62, height: 84, borderRadius: 12, overflow: 'hidden', background: '#000', flexShrink: 0, backgroundImage: uploadCoverImage ? `url(${uploadCoverImage})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative' } },
+                            React.createElement("span", { style: { position: 'absolute', left: 4, bottom: 4, fontSize: 8.5, fontWeight: 700, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.6)' } }, "Cover")),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("textarea", { value: uploadCaption, onChange: (e) => setUploadCaption(e.target.value.slice(0, 150)), rows: 3, maxLength: 150, placeholder: "Write a caption...", style: { width: '100%', border: 'none', outline: 'none', resize: 'none', fontSize: 13.5, color: UP.text, fontFamily: 'inherit', background: 'transparent' } }),
+                            React.createElement("p", { style: { textAlign: 'right', fontSize: 11, color: UP.sub, margin: 0 } }, `${uploadCaption.length}/150`))),
+                    React.createElement("div", { style: { marginTop: 6 } },
+                        detailRow("Tag Business / Service", taggedBusiness ? `${taggedBusiness.name}${taggedServiceObj ? ' · ' + taggedServiceObj.name : ''}` : '', () => setUploadSheet('tag')),
+                        detailRow("Add Location", uploadLocationText, () => setUploadSheet('location')),
+                        detailRow("Add Topics", uploadTopics.length ? uploadTopics.join(', ') : '', () => setUploadSheet('topics')),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 0', borderBottom: `1px solid ${UP.border}` } },
+                            React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: UP.text } }, "Who can see this?"),
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                                React.createElement(Icon, { name: "globe", size: 14, color: UP.sub }),
+                                React.createElement("span", { style: { fontSize: 13, color: UP.sub } }, "Public"))),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 0' } },
+                            React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: UP.text } }, "Allow Comments"),
+                            React.createElement(ToggleSwitch, { on: uploadCommentsOn, onChange: () => setUploadCommentsOn((v) => !v) })))),
+                React.createElement("div", { style: { flexShrink: 0, padding: '12px 20px calc(env(safe-area-inset-bottom) + 16px)', borderTop: `1px solid ${UP.border}` } },
+                    React.createElement("button", { onClick: startPostThrillz, style: { width: '100%', height: 54, borderRadius: 27, background: green, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "Post Thrillz")));
+
+            // ---------- STEP 5 — Posting ----------
+            const circumference = 2 * Math.PI * 54;
+            const postingStep = uploadStep === 'posting' && React.createElement("div", { key: "posting", style: { position: 'absolute', inset: 0, background: UP.bg, zIndex: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', textAlign: 'center' } },
+                uploadPostError
+                    ? React.createElement(React.Fragment, null,
+                        React.createElement(Icon, { name: "warningtriangle", size: 40, color: "#D0304A" }),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: UP.text, marginTop: 18 } }, "Couldn't post Thrillz"),
+                        React.createElement("p", { style: { fontSize: 13, color: UP.sub, marginTop: 8, lineHeight: 1.4 } }, "Check your connection and try again. Your video and edits are safe."),
+                        React.createElement("button", { onClick: startPostThrillz, style: { marginTop: 26, width: '100%', maxWidth: 280, height: 50, borderRadius: 25, background: green, color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "Try Again"),
+                        React.createElement("button", { onClick: saveUploadAsDraft, style: { marginTop: 14, fontSize: 13, color: UP.sub, fontWeight: 600 } }, "Save to Draft"))
+                    : React.createElement(React.Fragment, null,
+                        React.createElement("div", { style: { position: 'relative', width: 130, height: 130 } },
+                            React.createElement("svg", { width: 130, height: 130, viewBox: "0 0 130 130", style: { transform: 'rotate(-90deg)' } },
+                                React.createElement("circle", { cx: 65, cy: 65, r: 54, fill: "none", stroke: UP.border, strokeWidth: 9 }),
+                                React.createElement("circle", { cx: 65, cy: 65, r: 54, fill: "none", stroke: green, strokeWidth: 9, strokeLinecap: "round", strokeDasharray: circumference, strokeDashoffset: circumference * (1 - uploadPostProgress / 100), style: { transition: 'stroke-dashoffset 0.15s linear' } })),
+                            React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                                React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: UP.text } }, `${Math.round(uploadPostProgress)}%`))),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: UP.text, marginTop: 22 } }, "Posting Thrillz…"),
+                        React.createElement("p", { style: { fontSize: 13, color: UP.sub, marginTop: 6 } }, "Almost there!"),
+                        React.createElement("p", { style: { fontSize: 12.5, color: UP.sub, marginTop: 2 } }, "This won't take long.")));
+
+            // ---------- STEP 6 — Success ----------
+            const successStep = uploadStep === 'success' && React.createElement("div", { key: "success", style: { position: 'absolute', inset: 0, background: UP.bg, zIndex: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', textAlign: 'center' } },
+                React.createElement("div", { className: "avio-press", style: { width: 78, height: 78, borderRadius: '50%', background: green, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 } }, React.createElement(Icon, { name: "check", size: 34, color: "#fff" })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 21, color: UP.text, margin: 0 } }, "Thrillz Posted!"),
+                React.createElement("p", { style: { fontSize: 13, color: UP.sub, marginTop: 8, lineHeight: 1.4 } }, "Your Thrillz is now live and visible to everyone."),
+                React.createElement("button", { onClick: goToMyThrillzAfterPost, style: { marginTop: 32, width: '100%', maxWidth: 280, height: 50, borderRadius: 25, background: green, color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "View Thrillz"));
+
+            // ---------- Exit / draft-safety confirm ----------
+            const exitConfirmSheet = uploadExitConfirmOpen && React.createElement("div", { key: "exitconfirm", style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 18, padding: '0 32px' } },
+                React.createElement("div", { style: { width: '100%', maxWidth: 320, background: UP.surface, borderRadius: 22, padding: 24, textAlign: 'center' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: UP.text, margin: 0 } }, "Save this Thrillz?"),
+                    React.createElement("p", { style: { fontSize: 12.5, color: UP.sub, marginTop: 8, lineHeight: 1.45 } }, "You have unsaved changes. What would you like to do?"),
+                    React.createElement("button", { onClick: saveUploadAsDraft, style: { width: '100%', marginTop: 18, padding: '13px 0', borderRadius: 24, background: green, color: '#fff', fontWeight: 700, fontSize: 14 } }, "Save Draft"),
+                    React.createElement("button", { onClick: closeUploadFlow, style: { width: '100%', marginTop: 10, padding: '13px 0', borderRadius: 24, background: UP.surfaceAlt, color: '#D0304A', fontWeight: 700, fontSize: 14 } }, "Discard"),
+                    React.createElement("button", { onClick: () => setUploadExitConfirmOpen(false), style: { width: '100%', marginTop: 10, padding: '13px 0', fontWeight: 600, fontSize: 13.5, color: UP.sub } }, "Keep Editing")));
+
+            return React.createElement(React.Fragment, null, optionsStep, recordStep, previewStep, detailsStep, postingStep, successStep, trimSheet, coverSheet, soundSheet, topicsSheet, tagPage, locationPage, exitConfirmSheet);
         })(),
         toast && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }, toast))));
 }
