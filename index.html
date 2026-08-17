@@ -2306,6 +2306,21 @@ function App() {
             const video = cameraVideoRef.current;
             const canvas = cameraCanvasRef.current;
             if (video && canvas && video.readyState >= 2) {
+                // Keep the canvas's actual pixel buffer in lockstep with its on-screen CSS box.
+                // Without this, a buffer locked to a fixed 9:16 shape gets cropped a SECOND time
+                // by CSS object-fit: cover whenever the box itself isn't 9:16 (e.g. the record
+                // screen's live area on a wide iPad) — that double-crop is what compounds into a
+                // heavily zoomed-in preview. Matching the buffer to the box makes this the only crop.
+                const rect = canvas.getBoundingClientRect();
+                if (rect.width > 0 && rect.height > 0) {
+                    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+                    const targetW = Math.max(1, Math.round(rect.width * dpr));
+                    const targetH = Math.max(1, Math.round(rect.height * dpr));
+                    if (canvas.width !== targetW)
+                        canvas.width = targetW;
+                    if (canvas.height !== targetH)
+                        canvas.height = targetH;
+                }
                 const live = cameraLiveRef.current;
                 const w = canvas.width, h = canvas.height;
                 const ctx = canvas.getContext('2d');
