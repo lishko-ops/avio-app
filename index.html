@@ -348,6 +348,8 @@ const BOOKING_SERVICE_MULTIPLIERS = [1, 0.5, 1.35, 2.5];
 function getServicesForTarget(item) {
     if (!item)
         return [];
+    if (item.services && item.services.length)
+        return item.services;
     const base = item.price || 50;
     const list = BOOKING_SERVICE_TEMPLATES[item.category] || BOOKING_SERVICE_TEMPLATES.Beauty;
     return list.map((s, i) => ({ id: `${item.id}-svc${i}`, name: s.name, durationMin: s.durationMin, price: Math.max(15, Math.round(base * (BOOKING_SERVICE_MULTIPLIERS[i] || 1))) }));
@@ -617,6 +619,9 @@ function timeLabelToMinutes(t) {
         h = 0;
     return h * 60 + m;
 }
+function formatTimeRange(startMinutes, durationMinutes) {
+    return `${minutesToTimeLabel(startMinutes)} – ${minutesToTimeLabel(startMinutes + durationMinutes)}`;
+}
 function hhmmToLabel(hhmm) {
     return minutesToTimeLabel(timeStrToMinutes(hhmm));
 }
@@ -768,7 +773,13 @@ function ToggleSwitch({ on, onChange }) {
 }
 const FEED = [
     { id: 'f0', category: 'Beauty', name: 'Fade House', location: 'Miami, FL', rating: 4.9, price: 35, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Clean fade. Sharp lines. Precision cuts. Premium experience.', verified: true, distance: '0.5 mi', openStatus: 'Open Now', hashtags: ['#barbershop', '#miami', '#fade'], friendsBooked: 120, avatarColor: '#161616', locationMode: 'At my business location',
-        staff: [{ id: 'f0-staff-jessie', name: 'Jessie', customHours: null }, { id: 'f0-staff-jackie', name: 'Jackie', customHours: null }] },
+        staff: [{ id: 'f0-staff-jessie', name: 'Jessie', customHours: null }, { id: 'f0-staff-jackie', name: 'Jackie', customHours: null }],
+        services: [
+            { id: 'f0-svc0', name: 'Basic Fade', durationMin: 30, price: 35 },
+            { id: 'f0-svc1', name: 'Beard Trim', durationMin: 20, price: 20 },
+            { id: 'f0-svc2', name: 'Fade + Beard', durationMin: 45, price: 50 },
+            { id: 'f0-svc3', name: 'VIP Experience', durationMin: 60, price: 80, popular: true },
+        ] },
     { id: 'f1', category: 'Home Services', name: 'Sparkle Squad Cleaning', location: 'Denver, CO', rating: 4.8, price: 120, likes: '1.3K', comments: 42, saves: '2.1K', blurb: 'Deep clean, move-in/move-out, eco-friendly products.', verified: true, distance: '1.2 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#cleaning', '#denver', '#freshhome'], friendsBooked: 8, avatarColor: '#3F6FBF', locationMode: 'I travel to customers',
         deal: { id: 'deal-f1', enabled: true, type: 'percent', value: 15, label: '15% OFF TODAY', activatedAt: 0, eligibleServiceIds: null } },
     { id: 'f2', category: 'Home Services', name: 'Fresh Start Cleaners', location: 'Miami, FL', rating: 4.9, price: 90, likes: '892', comments: 18, saves: '1.4K', blurb: 'Residential and post-construction cleaning.', verified: true, distance: '2.4 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#cleaning', '#miami', '#ecofriendly'], friendsBooked: 5, avatarColor: '#3FBF8A', locationMode: 'I travel to customers' },
@@ -2377,7 +2388,7 @@ function App() {
     const [bookingCalMonth, setBookingCalMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
     const [bookingSelectedDay, setBookingSelectedDay] = useState(() => new Date().getDate());
     const [selTime, setSelTime] = useState(null);
-    const [customerInfo, setCustomerInfo] = useState({ fullName: '', phone: '', email: '', notes: '' });
+    const [customerInfo, setCustomerInfo] = useState({ fullName: '', phone: '', notes: '' });
     const [customerProfile, setCustomerProfile] = useState(() => loadLS('avio_customer_profile', { fullName: 'Levi Dery', username: 'levidery', bio: '', location: '', website: '', email: 'levi@example.com', phone: '(917) 987-6543', avatarPhoto: null }));
     useEffect(() => { saveLS('avio_customer_profile', customerProfile); }, [customerProfile]);
     const [customerProfileOpen, setCustomerProfileOpen] = useState(false);
@@ -2443,7 +2454,6 @@ function App() {
     const [customerProfileTab, setCustomerProfileTab] = useState('thrillz');
     const [customerFollowSearch, setCustomerFollowSearch] = useState('');
     const [paymentMethod, setPaymentMethod] = useState(null);
-    const [agreedToPolicy, setAgreedToPolicy] = useState(false);
     const [confirmedBooking, setConfirmedBooking] = useState(null);
     const calYear = calendarMonth.getFullYear();
     const calMonthIdx = calendarMonth.getMonth();
@@ -2751,6 +2761,32 @@ function App() {
         }
         return slots.map((m) => ({ minutes: m, label: minutesToTimeLabel(m) }));
     }
+    // Same walk as generateAvailableSlots, but returns every slot in business hours — booked/
+    // conflicting ones included and flagged unavailable — so the picker can show them crossed out
+    // instead of silently omitting them.
+    function generateDaySlots(providerId, dateObj, durationMinutes, staff, excludeBookingId) {
+        const hours = (staff && staff.customHours) ? (staff.customHours[dateObj.getDay()] || null) : getProviderHoursForDate(providerId, dateObj);
+        if (!hours || !durationMinutes)
+            return [];
+        const dayStart = timeStrToMinutes(hours.start);
+        const dayEnd = timeStrToMinutes(hours.end);
+        const busy = getBusyIntervalsForDate(providerId, dateObj, staff, excludeBookingId);
+        const merged = [];
+        busy.forEach((iv) => {
+            const last = merged[merged.length - 1];
+            if (last && iv.start <= last.end)
+                last.end = Math.max(last.end, iv.end);
+            else
+                merged.push({ ...iv });
+        });
+        const STEP = 30;
+        const slots = [];
+        for (let t = dayStart; t + durationMinutes <= dayEnd; t += STEP) {
+            const conflict = merged.some((iv) => t < iv.end && t + durationMinutes > iv.start);
+            slots.push({ minutes: t, label: minutesToTimeLabel(t), available: !conflict });
+        }
+        return slots;
+    }
     function getStaffForTarget(item) {
         if (!item)
             return [];
@@ -2831,21 +2867,32 @@ function App() {
         setProfileDrag(null);
         setBookingTarget(item);
         const hasStaff = getStaffForTarget(item).length > 0;
-        setBookingStep(preselectedService ? (hasStaff ? 'staff' : 'datetime') : 'service');
+        setBookingStep(preselectedService ? (hasStaff ? 'staff' : 'date') : 'service');
         setSelectedService(preselectedService || null);
         setSelectedStaff(null);
         setBookingCalMonth(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
         setBookingSelectedDay(new Date().getDate());
         setSelTime(null);
-        setCustomerInfo({ fullName: '', phone: isPhoneLikeIdentifier(authDraft.identifier || '') ? authDraft.identifier : '', email: !isPhoneLikeIdentifier(authDraft.identifier || '') ? (authDraft.identifier || '') : '', notes: '' });
-        setPaymentMethod(null);
-        setAgreedToPolicy(false);
+        setCustomerInfo({ fullName: '', phone: isPhoneLikeIdentifier(authDraft.identifier || '') ? authDraft.identifier : '', notes: '' });
+        setPaymentMethod('saved');
         setConfirmedBooking(null);
     }
     function closeBookingFlow() { setBookingTarget(null); }
     function finalizeBooking() {
         if (!bookingTarget || !selectedService || selTime == null)
             return;
+        const d = new Date(bookingCalMonth.getFullYear(), bookingCalMonth.getMonth(), bookingSelectedDay);
+        // Re-check availability at the moment of payment, immediately before creating the booking —
+        // the slot list the customer looked at a moment ago may already be stale if someone else
+        // grabbed it in the meantime. If it's gone, we never charge and never create a duplicate.
+        const freshSlots = generateAvailableSlots(bookingTarget.id, d, selectedService.durationMin, selectedStaff);
+        const stillOpen = freshSlots.some((s) => s.minutes === selTime);
+        if (!stillOpen) {
+            flashToast('That time was just booked. Please choose another available time.');
+            setSelTime(null);
+            setBookingStep('time');
+            return;
+        }
         // This is the single authoritative pricing calculation. It re-reads the deal and
         // re-derives eligibility from a freshly-read timestamp right here — it never trusts
         // any promo/price value computed earlier for display on the service or checkout
@@ -2858,14 +2905,13 @@ function App() {
         const finalPrice = promo ? promo.finalPrice : originalPrice;
         const tax = Math.round(finalPrice * 0.08 * 100) / 100;
         const total = Math.round((finalPrice + tax) * 100) / 100;
-        const d = new Date(bookingCalMonth.getFullYear(), bookingCalMonth.getMonth(), bookingSelectedDay);
         const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const initials = bookingTarget.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
         const confirmationNumber = 'AV' + Math.random().toString(36).slice(2, 8).toUpperCase();
         const booking = {
             id: 'b' + Date.now(), name: bookingTarget.name, service: selectedService.name, business: bookingTarget.name, category: bookingTarget.category,
             providerId: bookingTarget.id, durationMinutes: selectedService.durationMin,
-            date: label, day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), time: minutesToTimeLabel(selTime), total, status: 'confirmed',
+            date: label, day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), time: minutesToTimeLabel(selTime), timeRange: formatTimeRange(selTime, selectedService.durationMin), total, status: 'confirmed',
             address: bookingTarget.location || 'Address shared after booking', duration: formatDuration(selectedService.durationMin), logoText: initials,
             confirmationNumber, paymentMethod, staffId: selectedStaff ? selectedStaff.id : null, staffName: selectedStaff ? selectedStaff.name : null,
             bookingCreatedAt, originalPrice, finalPrice,
@@ -5147,7 +5193,7 @@ function App() {
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                         React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BK.text, margin: 0 } }, b.business || b.name),
                         React.createElement("p", { style: { fontSize: 11.5, color: BK.sub, margin: '1px 0 0' } }, b.service),
-                        React.createElement("p", { style: { fontSize: 11, color: BK.sub, margin: '2px 0 0' } }, b.date, " · ", b.time)),
+                        React.createElement("p", { style: { fontSize: 11, color: BK.sub, margin: '2px 0 0' } }, b.date, " · ", b.timeRange || b.time)),
                     React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
                         React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize', display: 'inline-block' } }, b.status),
                         React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: BK.text, margin: '5px 0 0' } }, money(b.total))));
@@ -5977,9 +6023,14 @@ function App() {
                 return React.createElement("div", { key: label, style: { marginBottom: 16 } },
                     React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: BF.sub, marginBottom: 6 } }, label), node);
             }
-            function row2(icon, text) {
-                return React.createElement("div", { key: text, style: { display: 'flex', alignItems: 'center', gap: 8 } },
-                    React.createElement("span", { style: { fontSize: 12 } }, icon), React.createElement("span", { style: { fontSize: 12, color: BF.text } }, text));
+            function sectionLabel(text) {
+                return React.createElement("p", { key: text, style: { fontSize: 12.5, fontWeight: 700, color: BF.text, margin: '20px 0 10px' } }, text);
+            }
+            function summaryRow(k, v, opts) {
+                opts = opts || {};
+                return React.createElement("div", { key: k, style: { display: 'flex', justifyContent: 'space-between', padding: '7px 0' } },
+                    React.createElement("span", { style: { fontSize: 12.5, color: BF.sub } }, k),
+                    React.createElement("span", { style: { fontSize: opts.strong ? 14 : 12.5, fontWeight: opts.strong ? 700 : 600, color: BF.text } }, v));
             }
             const services = bookingTarget.id === MY_PROVIDER_ID
                 ? providerServices.map((s) => ({ id: s.id, name: s.name, durationMin: s.durationMinutes, price: s.price }))
@@ -5991,6 +6042,13 @@ function App() {
             const calDaysInMonth2 = new Date(calYear2, calMonthIdx2 + 1, 0).getDate();
             const calCells2 = [...Array(calFirstWeekday2).fill(null), ...Array.from({ length: calDaysInMonth2 }, (_, i) => i + 1)];
             const isPastDay = (day) => new Date(calYear2, calMonthIdx2, day) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const isDayUnavailable = (day) => {
+                if (isPastDay(day))
+                    return true;
+                const dObj = new Date(calYear2, calMonthIdx2, day);
+                const hours = (selectedStaff && selectedStaff.customHours) ? (selectedStaff.customHours[dObj.getDay()] || null) : getProviderHoursForDate(bookingTarget.id, dObj);
+                return !hours;
+            };
             const selectedDateObj = new Date(calYear2, calMonthIdx2, bookingSelectedDay);
             const activeDeal = resolveProviderDeal(bookingTarget.id, MY_PROVIDER_ID, providerDeal, FEED);
             const promoPreview = selectedService ? resolvePromotionSnapshot(activeDeal, selectedService, Date.now()) : null;
@@ -5998,11 +6056,12 @@ function App() {
             const tax = selectedService ? Math.round(priceBeforeTax * 0.08 * 100) / 100 : 0;
             const total = selectedService ? Math.round((priceBeforeTax + tax) * 100) / 100 : 0;
             const initials2 = bookingTarget.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
-            const paymentLabel = { apple: 'Apple Pay', card: 'Credit/Debit Card', google: 'Google Pay', saved: 'Saved Card', gift: 'Gift Card', promo: 'Promo Code' }[paymentMethod] || '—';
+            const paymentLabel = { apple: 'Apple Pay', card: 'Credit/Debit Card', google: 'Google Pay', saved: 'VISA •••• 4242', gift: 'Gift Card', promo: 'Promo Code' }[paymentMethod] || 'Choose a payment method';
             const staffOptions = getStaffForTarget(bookingTarget);
-            const STEP_TITLES = { service: 'Book Now', staff: 'Choose Your Barber', datetime: 'Select Date & Time', info: 'Your Information', payment: 'Payment', confirm: 'Confirm Booking', success: '' };
-            const STEP_ORDER = staffOptions.length > 0 ? ['service', 'staff', 'datetime', 'info', 'payment', 'confirm'] : ['service', 'datetime', 'info', 'payment', 'confirm'];
+            const STEP_TITLES = { service: 'Book', staff: 'Choose Your Barber', date: 'Choose Date', time: 'Choose Time', info: 'Your Information', review: 'Review Booking', paymentPicker: 'Payment Method', success: '' };
+            const STEP_ORDER = staffOptions.length > 0 ? ['service', 'staff', 'date', 'time', 'info', 'review'] : ['service', 'date', 'time', 'info', 'review'];
             function goBack() {
+                if (bookingStep === 'paymentPicker') { setBookingStep('review'); return; }
                 const idx = STEP_ORDER.indexOf(bookingStep);
                 if (idx <= 0) { closeBookingFlow(); return; }
                 setBookingStep(STEP_ORDER[idx - 1]);
@@ -6010,9 +6069,9 @@ function App() {
             const header = bookingStep !== 'success' && React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${BF.border}` } },
                 React.createElement("button", { onClick: goBack }, React.createElement(Icon, { name: "arrowleft", size: 17, color: BF.text })),
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: BF.text, margin: 0 } }, STEP_TITLES[bookingStep]),
-                bookingStep === 'service' ? React.createElement("div", { style: { display: 'flex', gap: 14 } },
-                    React.createElement("button", { onClick: () => flashToast('Share link copied') }, React.createElement(Icon, { name: "share", size: 16, color: BF.text })),
-                    React.createElement("button", { onClick: () => flashToast('Saved') }, React.createElement(Icon, { name: "heart", size: 17, color: BF.text }))) : React.createElement("div", { style: { width: 17 } }));
+                bookingStep === 'paymentPicker'
+                    ? React.createElement("div", { style: { width: 17 } })
+                    : React.createElement("button", { onClick: closeBookingFlow }, React.createElement(Icon, { name: "x", size: 18, color: BF.text })));
             let body;
             if (bookingStep === 'service') {
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px 20px' } },
@@ -6021,26 +6080,24 @@ function App() {
                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
                                 React.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: BF.text } }, bookingTarget.name),
-                                bookingTarget.verified && React.createElement("div", { style: { width: 14, height: 14, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" }))),
-                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 } },
-                                React.createElement(Icon, { name: "star", size: 11, color: "#F5A623", fill: "#F5A623" }),
-                                React.createElement("span", { style: { fontSize: 12, color: BF.text, fontWeight: 600 } }, bookingTarget.rating ? bookingTarget.rating.toFixed(1) : '5.0'),
-                                React.createElement("span", { style: { fontSize: 11.5, color: BF.sub } }, `(${bookingTarget.comments || 0})`)),
+                                bookingTarget.verified && React.createElement("div", { style: { width: 14, height: 14, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" }))),
                             React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 2 } }, bookingTarget.location || 'Location shared after booking'))),
-                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: BF.text, marginTop: 22, marginBottom: 10 } }, "Choose a service"),
+                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: BF.text, marginTop: 22, marginBottom: 10 } }, "Select a service"),
                     React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, services.map((s) => {
                         const active = selectedService && selectedService.name === s.name;
                         const sPromo = resolvePromotionSnapshot(activeDeal, s, Date.now());
-                        return React.createElement("button", { key: s.name, onClick: () => setSelectedService(s), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', borderRadius: 16, border: `1.5px solid ${active ? THEME.coral : BF.border}`, background: active ? '#FAFAFA' : '#fff' } },
+                        return React.createElement("button", { key: s.name, onClick: () => setSelectedService(s), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', borderRadius: 16, border: `1.5px solid ${active ? '#161616' : BF.border}`, background: active ? '#FAFAFA' : '#fff' } },
                             React.createElement("div", { style: { textAlign: 'left' } },
                                 React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BF.text, margin: 0 } }, s.name),
-                                React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 3 } }, formatDuration(s.durationMin)),
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 } },
+                                    React.createElement("span", { style: { fontSize: 11.5, color: BF.sub } }, formatDuration(s.durationMin)),
+                                    s.popular && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral, background: 'rgba(151,196,0,0.12)', borderRadius: 8, padding: '2px 7px' } }, "Popular")),
                                 sPromo && React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, color: THEME.coral, marginTop: 3 } }, sPromo.promotionLabel)),
                             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
                                 React.createElement("div", { style: { textAlign: 'right' } },
                                     sPromo && React.createElement("p", { style: { fontSize: 11, color: BF.sub, textDecoration: 'line-through', margin: 0 } }, money(sPromo.originalPrice)),
                                     React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: sPromo ? THEME.coral : BF.text } }, money(sPromo ? sPromo.finalPrice : s.price))),
-                                React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" }))));
+                                React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${active ? '#161616' : '#D1D1D6'}`, background: active ? '#161616' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" }))));
                     })));
             }
             else if (bookingStep === 'staff') {
@@ -6050,129 +6107,147 @@ function App() {
                     React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, staffChoices.map((o) => {
                         const active = (selectedStaff ? selectedStaff.id : null) === o.id;
                         const oInitials = o.id === null ? '★' : o.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
-                        return React.createElement("button", { key: o.id || 'any', onClick: () => setSelectedStaff(o.id === null ? null : staffOptions.find((s) => s.id === o.id)), style: { display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, border: `1.5px solid ${active ? THEME.coral : BF.border}`, background: active ? '#FAFAFA' : '#fff' } },
-                            React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', background: o.id === null ? THEME.coral : '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, flexShrink: 0 } }, oInitials),
+                        return React.createElement("button", { key: o.id || 'any', onClick: () => setSelectedStaff(o.id === null ? null : staffOptions.find((s) => s.id === o.id)), style: { display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, border: `1.5px solid ${active ? '#161616' : BF.border}`, background: active ? '#FAFAFA' : '#fff' } },
+                            React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, flexShrink: 0 } }, oInitials),
                             React.createElement("div", { style: { flex: 1, textAlign: 'left' } },
                                 React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BF.text, margin: 0 } }, o.name),
                                 o.subtitle && React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 2 } }, o.subtitle)),
-                            React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" })));
+                            React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${active ? '#161616' : '#D1D1D6'}`, background: active ? '#161616' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" })));
                     })));
             }
-            else if (bookingStep === 'datetime') {
+            else if (bookingStep === 'date') {
                 const weekdayRow2 = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginTop: 8 } }, ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => React.createElement("div", { key: i, style: { textAlign: 'center', fontSize: 11, color: BF.sub } }, d)));
                 const monthGrid2 = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: 6, marginTop: 6 } }, calCells2.map((day, i) => {
                     if (day === null)
                         return React.createElement("div", { key: 'e' + i });
-                    const past = isPastDay(day);
+                    const disabled = isDayUnavailable(day);
                     const isToday2 = calYear2 === today.getFullYear() && calMonthIdx2 === today.getMonth() && day === today.getDate();
                     const selected2 = day === bookingSelectedDay;
-                    return React.createElement("button", { key: day, disabled: past, onClick: () => setBookingSelectedDay(day), style: { padding: '6px 0', opacity: past ? 0.3 : 1 } },
-                        React.createElement("span", { style: { width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontSize: 13, fontWeight: selected2 ? 700 : 500, background: selected2 ? THEME.coral : 'transparent', color: selected2 ? '#fff' : BF.text, border: !selected2 && isToday2 ? `1.5px solid ${THEME.coral}` : 'none' } }, day));
+                    return React.createElement("button", { key: day, disabled, onClick: () => { setBookingSelectedDay(day); setSelTime(null); }, style: { padding: '6px 0', opacity: disabled ? 0.3 : 1 } },
+                        React.createElement("span", { style: { width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontSize: 13, fontWeight: selected2 ? 700 : 500, background: selected2 ? '#161616' : 'transparent', color: selected2 ? '#fff' : BF.text, border: !selected2 && isToday2 ? `1.5px solid #161616` : 'none' } }, day));
                 }));
                 const quickBtns = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 14 } },
-                    React.createElement("button", { onClick: () => { setBookingCalMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setBookingSelectedDay(today.getDate()); }, style: { flex: 1, padding: '9px 0', borderRadius: 14, border: `1px solid ${BF.border}`, fontSize: 12.5, fontWeight: 600, color: BF.text } }, "Today"),
-                    React.createElement("button", { onClick: () => { const t = new Date(today); t.setDate(t.getDate() + 1); setBookingCalMonth(new Date(t.getFullYear(), t.getMonth(), 1)); setBookingSelectedDay(t.getDate()); }, style: { flex: 1, padding: '9px 0', borderRadius: 14, border: `1px solid ${BF.border}`, fontSize: 12.5, fontWeight: 600, color: BF.text } }, "Tomorrow"));
+                    React.createElement("button", { onClick: () => { setBookingCalMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setBookingSelectedDay(today.getDate()); setSelTime(null); }, style: { flex: 1, padding: '9px 0', borderRadius: 14, border: `1px solid ${BF.border}`, fontSize: 12.5, fontWeight: 600, color: BF.text } }, "Today"),
+                    React.createElement("button", { onClick: () => { const t = new Date(today); t.setDate(t.getDate() + 1); setBookingCalMonth(new Date(t.getFullYear(), t.getMonth(), 1)); setBookingSelectedDay(t.getDate()); setSelTime(null); }, style: { flex: 1, padding: '9px 0', borderRadius: 14, border: `1px solid ${BF.border}`, fontSize: 12.5, fontWeight: 600, color: BF.text } }, "Tomorrow"));
                 const calNav2 = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 } },
                     React.createElement("button", { onClick: () => setBookingCalMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1)), style: { width: 28, height: 28, borderRadius: '50%', border: `1px solid ${BF.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 12, color: BF.text })),
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: BF.text, margin: 0 } }, bookingCalMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })),
                     React.createElement("button", { onClick: () => setBookingCalMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1)), style: { width: 28, height: 28, borderRadius: '50%', border: `1px solid ${BF.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement("span", { style: { display: 'flex', transform: 'rotate(180deg)' } }, React.createElement(Icon, { name: "arrowleft", size: 12, color: BF.text }))));
-                const availableSlots = selectedService ? generateAvailableSlots(bookingTarget.id, selectedDateObj, selectedService.durationMin, selectedStaff) : [];
-                const timeGrid = React.createElement("div", { style: { marginTop: 22 } },
-                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: BF.text, marginBottom: 10 } }, "Select Time"),
-                    availableSlots.length === 0
-                        ? React.createElement("p", { style: { fontSize: 12.5, color: BF.sub, padding: '14px 0' } }, "No open slots long enough for this service on this day — try another date.")
-                        : React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } }, availableSlots.map((slot) => {
-                            const active = selTime === slot.minutes;
-                            return React.createElement("button", { key: slot.minutes, onClick: () => setSelTime(slot.minutes), style: { padding: '11px 0', borderRadius: 16, fontSize: 13, fontWeight: 600, border: `1.5px solid ${active ? THEME.coral : BF.border}`, background: active ? THEME.coral : '#fff', color: active ? '#fff' : BF.text } }, slot.label);
-                        })),
-                    React.createElement("p", { style: { fontSize: 10.5, color: BF.sub, marginTop: 10 } }, "All times are in your local timezone"));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px 20px' } },
-                    quickBtns, calNav2, weekdayRow2, monthGrid2, timeGrid);
+                    quickBtns, calNav2, weekdayRow2, monthGrid2,
+                    React.createElement("p", { style: { fontSize: 10.5, color: BF.sub, marginTop: 16 } }, "Only dates with availability can be selected."));
+            }
+            else if (bookingStep === 'time') {
+                const daySlots = selectedService ? generateDaySlots(bookingTarget.id, selectedDateObj, selectedService.durationMin, selectedStaff) : [];
+                const timeGrid = React.createElement("div", null,
+                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: BF.text, marginBottom: 2 } }, selectedDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })),
+                    React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginBottom: 14 } }, "Unavailable times are grayed out."),
+                    daySlots.length === 0
+                        ? React.createElement("p", { style: { fontSize: 12.5, color: BF.sub, padding: '14px 0' } }, "No slots long enough for this service on this day — try another date.")
+                        : React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 } }, daySlots.map((slot) => {
+                            const active = selTime === slot.minutes;
+                            return React.createElement("button", { key: slot.minutes, disabled: !slot.available, onClick: () => setSelTime(slot.minutes), style: { padding: '10px 0', borderRadius: 14, fontSize: 12.5, fontWeight: 600, border: `1.5px solid ${active ? '#161616' : slot.available ? BF.border : '#F0F0F0'}`, background: active ? '#161616' : '#fff', color: active ? '#fff' : slot.available ? BF.text : '#C7C7CC', textDecoration: slot.available ? 'none' : 'line-through' } }, slot.label);
+                        })),
+                    React.createElement("p", { style: { fontSize: 10.5, color: BF.sub, marginTop: 14 } }, "All times are in your local timezone"));
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } }, timeGrid);
             }
             else if (bookingStep === 'info') {
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
+                    React.createElement("p", { style: { fontSize: 12, color: BF.sub, marginBottom: 18, marginTop: -4 } }, "We'll contact you about your booking."),
                     fieldWrap2("Full Name", React.createElement("input", { value: customerInfo.fullName, onChange: (e) => setCustomerInfo((f) => ({ ...f, fullName: e.target.value })), placeholder: "Your full name", style: inputStyle2 })),
                     fieldWrap2("Phone Number", React.createElement("input", { value: customerInfo.phone, onChange: (e) => setCustomerInfo((f) => ({ ...f, phone: e.target.value })), placeholder: "(555) 555-0100", style: inputStyle2 })),
-                    fieldWrap2("Email", React.createElement("input", { value: customerInfo.email, onChange: (e) => setCustomerInfo((f) => ({ ...f, email: e.target.value })), placeholder: "you@email.com", style: inputStyle2 })),
-                    fieldWrap2("Special Requests (Optional)", React.createElement("textarea", { value: customerInfo.notes, onChange: (e) => setCustomerInfo((f) => ({ ...f, notes: e.target.value })), rows: 3, placeholder: "e.g. Fade on the sides", style: { ...inputStyle2, resize: 'none' } })));
+                    fieldWrap2("Add a note (optional)", React.createElement(React.Fragment, null,
+                        React.createElement("textarea", { value: customerInfo.notes, maxLength: 250, onChange: (e) => setCustomerInfo((f) => ({ ...f, notes: e.target.value })), rows: 3, placeholder: "Any special requests?", style: { ...inputStyle2, resize: 'none' } }),
+                        React.createElement("p", { style: { fontSize: 10.5, color: BF.sub, textAlign: 'right', marginTop: 4 } }, `${customerInfo.notes.length}/250`))));
             }
-            else if (bookingStep === 'payment') {
+            else if (bookingStep === 'paymentPicker') {
                 const methods = [
-                    { id: 'card', label: 'Credit or Debit Card', icon: 'card' },
+                    { id: 'saved', label: 'VISA •••• 4242', icon: 'card' },
+                    { id: 'card', label: 'Add Credit or Debit Card', icon: 'card' },
                     { id: 'google', label: 'Google Pay', icon: 'wallet' },
-                    { id: 'saved', label: 'Saved Cards · VISA •••• 4242', icon: 'card' },
                     { id: 'gift', label: 'Gift Card', icon: 'gift' },
                     { id: 'promo', label: 'Promo Code', icon: 'tag' },
                 ];
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
-                    React.createElement("button", { onClick: () => { setPaymentMethod('apple'); setBookingStep('confirm'); }, style: { width: '100%', height: 52, borderRadius: 26, background: '#161616', color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } }, React.createElement(Icon, { name: "wallet", size: 16, color: "#fff" }), " Apple Pay"),
+                    React.createElement("button", { onClick: () => { setPaymentMethod('apple'); setBookingStep('review'); }, style: { width: '100%', height: 50, borderRadius: 25, background: '#161616', color: '#fff', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } }, React.createElement(Icon, { name: "wallet", size: 16, color: "#fff" }), " Apple Pay"),
                     React.createElement("div", { style: { marginTop: 16, display: 'flex', flexDirection: 'column' } }, methods.map((m, i, arr) => {
                         const active = paymentMethod === m.id;
-                        return React.createElement("button", { key: m.id, onClick: () => setPaymentMethod(m.id), style: { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 4px', borderBottom: i < arr.length - 1 ? `1px solid ${BF.border}` : 'none' } },
+                        return React.createElement("button", { key: m.id, onClick: () => { setPaymentMethod(m.id); setBookingStep('review'); }, style: { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 4px', borderBottom: i < arr.length - 1 ? `1px solid ${BF.border}` : 'none' } },
                             React.createElement(Icon, { name: m.icon, size: 17, color: BF.text }),
                             React.createElement("span", { style: { fontSize: 13.5, color: BF.text, fontWeight: 500, flex: 1, textAlign: 'left' } }, m.label),
-                            active && React.createElement(Icon, { name: "check", size: 15, color: THEME.coral }));
+                            active && React.createElement(Icon, { name: "check", size: 15, color: "#161616" }));
                     })));
             }
-            else if (bookingStep === 'confirm') {
+            else if (bookingStep === 'review') {
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
-                    React.createElement("div", { style: { background: '#FAFAFA', borderRadius: 16, padding: 14 } },
-                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12 } },
-                            React.createElement("div", { style: { width: 44, height: 44, borderRadius: 12, background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, flexShrink: 0 } }, initials2),
-                            React.createElement("div", null,
-                                React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BF.text, margin: 0 } }, bookingTarget.name),
-                                React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 2 } }, selectedService ? selectedService.name : ''))),
-                        React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: `1px solid #ECECEE` } }, [
-                            ...(staffOptions.length > 0 ? [['Barber', selectedStaff ? selectedStaff.name : 'Any Available']] : []),
-                            ['Date', selectedDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })],
-                            ['Time', selTime != null ? minutesToTimeLabel(selTime) : '—'],
-                            ['Duration', selectedService ? formatDuration(selectedService.durationMin) : '—'],
-                            ['Location', bookingTarget.location || '—'],
-                            ...(promoPreview ? [['Original Price', money(promoPreview.originalPrice)]] : []),
-                            ...(promoPreview ? [[promoPreview.promotionLabel, '-' + money(promoPreview.discountAmount)]] : []),
-                            ['Price', money(total)],
-                            ['Payment', paymentLabel],
-                        ].map(([k, v]) => React.createElement("div", { key: k, style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0' } }, React.createElement("span", { style: { fontSize: 12, color: promoPreview && k === promoPreview.promotionLabel ? THEME.coral : BF.sub, fontWeight: promoPreview && k === promoPreview.promotionLabel ? 700 : 400 } }, k), React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: promoPreview && k === promoPreview.promotionLabel ? THEME.coral : BF.text } }, v))))),
-                    React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 16, lineHeight: 1.5 } }, "Cancellation Policy: You can cancel or reschedule up to 2 hours before your appointment."),
-                    React.createElement("button", { onClick: () => setAgreedToPolicy((v) => !v), style: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 } },
-                        React.createElement("div", { style: { width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${agreedToPolicy ? THEME.coral : '#D1D1D6'}`, background: agreedToPolicy ? THEME.coral : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, agreedToPolicy && React.createElement(Icon, { name: "check", size: 12, color: "#fff" })),
-                        React.createElement("span", { style: { fontSize: 12, color: BF.text } }, "I agree to the cancellation policy")));
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12 } },
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: 12, background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, flexShrink: 0 } }, initials2),
+                        React.createElement("div", null,
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
+                                React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: BF.text } }, bookingTarget.name),
+                                bookingTarget.verified && React.createElement("div", { style: { width: 13, height: 13, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 7, color: "#fff" }))),
+                            React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 2 } }, bookingTarget.location || ''))),
+                    sectionLabel("Booking Summary"),
+                    React.createElement("div", { style: { background: '#FAFAFA', borderRadius: 16, padding: '4px 14px' } },
+                        summaryRow('Service', selectedService ? selectedService.name : '—'),
+                        summaryRow('Date', selectedDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })),
+                        summaryRow('Time', selTime != null ? minutesToTimeLabel(selTime) : '—'),
+                        summaryRow('Duration', selectedService ? formatDuration(selectedService.durationMin) : '—'),
+                        ...(staffOptions.length > 0 ? [summaryRow('Barber', selectedStaff ? selectedStaff.name : 'Any Available')] : []),
+                        ...(promoPreview ? [summaryRow('Original Price', money(promoPreview.originalPrice))] : []),
+                        ...(promoPreview ? [summaryRow(promoPreview.promotionLabel, '-' + money(promoPreview.discountAmount))] : []),
+                        React.createElement("div", { style: { borderTop: '1px solid #ECECEE', margin: '4px 0' } }),
+                        summaryRow('Total', money(total), { strong: true })),
+                    sectionLabel("Your Information"),
+                    React.createElement("div", { style: { background: '#FAFAFA', borderRadius: 16, padding: '4px 14px' } },
+                        summaryRow('Name', customerInfo.fullName.trim() || '—'),
+                        summaryRow('Phone', customerInfo.phone.trim() || '—')),
+                    sectionLabel("Payment Method"),
+                    React.createElement("button", { onClick: () => setBookingStep('paymentPicker'), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 16, border: `1px solid ${BF.border}` } },
+                        React.createElement(Icon, { name: "card", size: 16, color: BF.text }),
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: BF.text, flex: 1, textAlign: 'left' } }, paymentLabel),
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, "Change")));
             }
             else {
                 const b = confirmedBooking;
-                body = b && React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 24px calc(env(safe-area-inset-bottom) + 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' } },
-                    React.createElement("div", { style: { width: 76, height: 76, borderRadius: '50%', background: '#22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'calc(env(safe-area-inset-top) + 40px)' } }, React.createElement(Icon, { name: "check", size: 32, color: "#fff" })),
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: BF.text, marginTop: 20 } }, "Booking Confirmed!"),
-                    React.createElement("p", { style: { fontSize: 13, color: BF.sub, marginTop: 6 } }, "Your appointment has been successfully booked."),
+                body = b && React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 24px calc(env(safe-area-inset-bottom) + 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' } },
+                    React.createElement("button", { onClick: closeBookingFlow, style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', right: 0, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 18, color: BF.sub })),
+                    React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', border: '2.5px solid #22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'calc(env(safe-area-inset-top) + 44px)' } }, React.createElement(Icon, { name: "check", size: 28, color: "#22C55E" })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: BF.text, marginTop: 20 } }, "You're All Set!"),
+                    React.createElement("p", { style: { fontSize: 13, color: BF.sub, marginTop: 6 } }, "Your booking is confirmed."),
                     React.createElement("div", { style: { width: '100%', background: '#FAFAFA', borderRadius: 18, padding: 16, marginTop: 24, textAlign: 'left' } },
-                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12 } },
-                            React.createElement("div", { style: { width: 44, height: 44, borderRadius: 12, background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, flexShrink: 0 } }, b.logoText),
-                            React.createElement("div", null, React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BF.text, margin: 0 } }, b.business), React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 2 } }, b.service))),
-                        React.createElement("div", { style: { marginTop: 12, paddingTop: 12, borderTop: '1px solid #ECECEE', display: 'flex', flexDirection: 'column', gap: 6 } },
-                            b.staffName && row2('💈', b.staffName), row2('📅', `${b.date} · ${b.time}`), row2('📍', b.address),
-                            b.promotionApplied && row2('🏷', `${b.promotionLabel} · You saved ${money(b.discountAmount)}`),
-                            row2('💳', money(b.total)), row2('#', b.confirmationNumber))),
-                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', width: '100%', marginTop: 22 } },
-                        [['calendar', 'Add to Calendar', () => addToAppleCalendar(b)], ['message', 'Message', () => flashToast('Messaging ' + b.business)], ['send', 'Directions', () => flashToast('Opening directions to ' + b.address)], ['share', 'Share', () => flashToast('Share link copied')]].map(([icon, label, onClick]) => React.createElement("button", { key: label, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 } }, React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: icon, size: 17, color: BF.text })), React.createElement("span", { style: { fontSize: 10, color: BF.sub } }, label)))),
-                    React.createElement("button", { onClick: closeBookingFlow, style: { width: '100%', height: 54, borderRadius: 27, background: THEME.coral, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', marginTop: 28 } }, "Done"));
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                            React.createElement("span", { style: { fontSize: 14.5, fontWeight: 700, color: BF.text } }, b.business),
+                            React.createElement("div", { style: { width: 14, height: 14, borderRadius: '50%', background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" }))),
+                        React.createElement("div", { style: { marginTop: 10, paddingTop: 10, borderTop: '1px solid #ECECEE', display: 'flex', flexDirection: 'column', gap: 4 } },
+                            React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, b.date),
+                            React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, b.timeRange || b.time),
+                            React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, b.service),
+                            React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: BF.text, marginTop: 2 } }, money(b.total)))),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, width: '100%', marginTop: 24 } },
+                        React.createElement("button", { onClick: () => addToAppleCalendar(b), style: { width: '100%', height: 50, borderRadius: 25, border: '1.5px solid #161616', background: '#fff', color: '#161616', fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } }, React.createElement(Icon, { name: "calendar", size: 15, color: "#161616" }), "Add to Calendar"),
+                        React.createElement("button", { onClick: () => { closeBookingFlow(); setTab('bookings'); setBookingsSubTab('upcoming'); }, style: { width: '100%', height: 50, borderRadius: 25, background: '#161616', color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "View Bookings")),
+                    b.confirmationNumber && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 18 } },
+                        React.createElement(Icon, { name: "lock", size: 11, color: BF.sub }),
+                        React.createElement("span", { style: { fontSize: 11, color: BF.sub } }, `A confirmation text has been sent to ${customerInfo.phone.trim()}`)));
             }
             let footer = null;
-            const ctaStyle = (ready) => ({ width: '100%', height: 52, borderRadius: 26, background: ready ? THEME.coral : '#EDEDED', color: ready ? '#fff' : '#B5B5B8', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' });
+            const ctaStyle = (ready) => ({ width: '100%', height: 52, borderRadius: 26, background: ready ? '#161616' : '#EDEDED', color: ready ? '#fff' : '#B5B5B8', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' });
             const footerWrap = (node) => React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${BF.border}` } }, node);
             if (bookingStep === 'service')
-                footer = footerWrap(React.createElement("button", { disabled: !selectedService, onClick: () => setBookingStep(staffOptions.length > 0 ? 'staff' : 'datetime'), style: ctaStyle(!!selectedService) }, "Continue"));
+                footer = footerWrap(React.createElement("button", { disabled: !selectedService, onClick: () => setBookingStep(staffOptions.length > 0 ? 'staff' : 'date'), style: ctaStyle(!!selectedService) }, "Continue"));
             else if (bookingStep === 'staff')
-                footer = footerWrap(React.createElement("button", { onClick: () => setBookingStep('datetime'), style: ctaStyle(true) }, "Continue"));
-            else if (bookingStep === 'datetime')
+                footer = footerWrap(React.createElement("button", { onClick: () => setBookingStep('date'), style: ctaStyle(true) }, "Continue"));
+            else if (bookingStep === 'date')
+                footer = footerWrap(React.createElement("button", { disabled: isDayUnavailable(bookingSelectedDay), onClick: () => setBookingStep('time'), style: ctaStyle(!isDayUnavailable(bookingSelectedDay)) }, "Continue"));
+            else if (bookingStep === 'time')
                 footer = footerWrap(React.createElement("button", { disabled: selTime == null, onClick: () => setBookingStep('info'), style: ctaStyle(selTime != null) }, "Continue"));
             else if (bookingStep === 'info') {
-                const ready = customerInfo.fullName.trim() && customerInfo.phone.trim() && customerInfo.email.trim();
-                footer = footerWrap(React.createElement("button", { disabled: !ready, onClick: () => setBookingStep('payment'), style: ctaStyle(ready) }, "Continue to Payment"));
+                const ready = customerInfo.fullName.trim() && customerInfo.phone.trim();
+                footer = footerWrap(React.createElement("button", { disabled: !ready, onClick: () => setBookingStep('review'), style: ctaStyle(ready) }, "Continue"));
             }
-            else if (bookingStep === 'payment')
-                footer = paymentMethod && paymentMethod !== 'apple' ? footerWrap(React.createElement("button", { onClick: () => setBookingStep('confirm'), style: ctaStyle(true) }, "Continue")) : null;
-            else if (bookingStep === 'confirm')
-                footer = footerWrap(React.createElement("button", { disabled: !agreedToPolicy, onClick: finalizeBooking, style: ctaStyle(agreedToPolicy) }, "Confirm Booking"));
+            else if (bookingStep === 'review')
+                footer = footerWrap(React.createElement("button", { onClick: finalizeBooking, style: ctaStyle(true) }, `Pay ${money(total)}`));
             return React.createElement("div", { className: "avio-upload-page", style: { position: 'absolute', inset: 0, background: '#fff', zIndex: 10, display: 'flex', flexDirection: 'column' } }, header, body, footer);
         })(),
         rescheduleTarget && (() => {
@@ -7533,7 +7608,7 @@ function App() {
                     React.createElement("span", { style: { fontSize: 11, fontWeight: 700, padding: '5px 11px', borderRadius: 12, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize' } }, b.status),
                     React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E', display: 'flex', alignItems: 'center', gap: 4 } }, React.createElement(Icon, { name: "clock", size: 12, color: "#8A8A8E" }), b.duration)),
                 React.createElement("div", { style: { marginTop: 16, background: '#FAFAFA', borderRadius: 14, padding: 14 } },
-                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Date & Time"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, `${b.date} · ${b.time}`)),
+                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Date & Time"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616' } }, `${b.date} · ${b.timeRange || b.time}`)),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Location"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#161616', textAlign: 'right', maxWidth: 200 } }, b.address)),
                     b.promotionApplied && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "Promotion Applied"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, b.promotionLabel)),
                     b.promotionApplied && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: '#8A8A8E' } }, "You Saved"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, money(b.discountAmount))),
