@@ -2278,6 +2278,29 @@ function App() {
         cameraGrainPatternRef.current = pattern;
         return pattern;
     }
+    // Draws the source video into the destination box the same way CSS object-fit: cover does —
+    // scale to fill and crop the overhanging edge — instead of stretching the whole frame to fit,
+    // which is what was making the preview look "zoomed in" and distorted.
+    function drawVideoCover(ctx, video, w, h) {
+        const vw = video.videoWidth || w;
+        const vh = video.videoHeight || h;
+        const videoRatio = vw / vh;
+        const boxRatio = w / h;
+        let sx, sy, sw, sh;
+        if (videoRatio > boxRatio) {
+            sh = vh;
+            sw = vh * boxRatio;
+            sy = 0;
+            sx = (vw - sw) / 2;
+        }
+        else {
+            sw = vw;
+            sh = vw / boxRatio;
+            sx = 0;
+            sy = (vh - sh) / 2;
+        }
+        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+    }
     function startCameraCanvasLoop() {
         const draw = () => {
             const video = cameraVideoRef.current;
@@ -2292,7 +2315,7 @@ function App() {
                 ctx.save();
                 const mirror = live.facing === 'user' || live.effectId === 'mirror';
                 if (mirror) { ctx.translate(w, 0); ctx.scale(-1, 1); }
-                ctx.drawImage(video, 0, 0, w, h);
+                drawVideoCover(ctx, video, w, h);
                 ctx.restore();
                 ctx.filter = 'none';
                 if (live.effectId === 'vignette')
@@ -2315,7 +2338,12 @@ function App() {
         setCameraPermission('requesting');
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: facing || cameraFacing, width: { ideal: 720 }, height: { ideal: 1280 } },
+                // Deliberately no ideal width/height here: forcing a narrow portrait pixel size
+                // makes some cameras (notably iPads) pick a digitally-zoomed-in capture mode to
+                // satisfy it. Let the device report its natural field of view — the canvas draw
+                // loop below crops it to the 9:16 frame itself, the same way a normal camera app's
+                // preview does, instead of asking the hardware to zoom.
+                video: { facingMode: facing || cameraFacing },
                 audio: true,
             });
             cameraStreamRef.current = stream;
