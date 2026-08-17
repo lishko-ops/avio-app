@@ -68,6 +68,8 @@
   .avio-check-pop { animation: avioCheckPop 0.36s cubic-bezier(0.22,1,0.36,1); }
   @keyframes avioRingPulse { 0% { box-shadow: 0 0 0 0 rgba(151,196,0,0.28); } 100% { box-shadow: 0 0 0 14px rgba(151,196,0,0); } }
   .avio-ring-pulse { animation: avioRingPulse 1.4s ease-out infinite; }
+  @keyframes avioRecBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .avio-rec-dot { animation: avioRecBlink 1s ease-in-out infinite; }
   .avio-pill { transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease; }
   .avio-pill:active { transform: scale(0.96); }
   @keyframes avioShimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
@@ -437,6 +439,25 @@ const THRILLZ_SOUND_LIBRARY = [
     { id: 'snd7', name: 'Sunday Glow', artist: 'Marlin Rae', duration: '0:33' },
     { id: 'snd8', name: 'Weekend Mode', artist: 'DJ Coastline', duration: '0:38' },
 ];
+// Camera filters are baked into the recording by drawing the live video frame onto a canvas
+// with ctx.filter set to this CSS filter string, then recording canvas.captureStream() — so
+// what's shown live is exactly what ends up in the exported clip.
+const THRILLZ_CAMERA_FILTERS = [
+    { id: 'none', label: 'Original', css: 'none' },
+    { id: 'bw', label: 'B&W', css: 'grayscale(1)' },
+    { id: 'warm', label: 'Warm', css: 'sepia(0.35) saturate(1.3) contrast(1.05)' },
+    { id: 'cool', label: 'Cool', css: 'saturate(1.15) hue-rotate(-10deg) contrast(1.05)' },
+    { id: 'vivid', label: 'Vivid', css: 'saturate(1.5) contrast(1.15)' },
+    { id: 'fade', label: 'Fade', css: 'saturate(0.7) brightness(1.08) contrast(0.92)' },
+];
+const THRILLZ_CAMERA_EFFECTS = [
+    { id: 'none', label: 'None', icon: 'x' },
+    { id: 'vignette', label: 'Vignette', icon: 'eye' },
+    { id: 'mirror', label: 'Mirror', icon: 'repeat' },
+    { id: 'grain', label: 'Grain', icon: 'sparkles' },
+];
+const THRILLZ_SPEED_OPTIONS = [0.5, 1, 2, 3];
+const THRILLZ_TIMER_OPTIONS = [0, 3, 10];
 const CONVERSATIONS_SEED = [
     { id: 'c1', name: 'Fade Kings', category: 'Barbershop', rating: 4.9, verified: true, online: true, unread: 2, initials: 'FK', responseTime: '~5 min', hasBookingThread: true,
         messages: [
@@ -2053,6 +2074,20 @@ function App() {
     const uploadPreviewVideoRef = useRef(null);
     const uploadCoverVideoRef = useRef(null);
     const uploadPostTimerRef = useRef(null);
+    // --- Live in-app camera recording ---
+    const cameraVideoRef = useRef(null);
+    const cameraCanvasRef = useRef(null);
+    const cameraStreamRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const recordedChunksRef = useRef([]);
+    const cameraRafRef = useRef(null);
+    const recordTickRef = useRef(null);
+    const recordMaxTimeoutRef = useRef(null);
+    const countdownTimeoutRef = useRef(null);
+    const cameraGrainPatternRef = useRef(null);
+    // Mirrors the camera-adjustment state into a ref so the running rAF draw loop always reads
+    // the current values without needing to be torn down and restarted every frame.
+    const cameraLiveRef = useRef({ filterId: 'none', brightness: 100, contrast: 100, effectId: 'none', facing: 'environment' });
     const [uploadOpen, setUploadOpen] = useState(false);
     const [uploadStep, setUploadStep] = useState('options');
     const [uploadVideoUrl, setUploadVideoUrl] = useState(null);
@@ -2079,6 +2114,19 @@ function App() {
     const [uploadExitConfirmOpen, setUploadExitConfirmOpen] = useState(false);
     const [uploadPreviewPlaying, setUploadPreviewPlaying] = useState(false);
     const [uploadJustPublishedId, setUploadJustPublishedId] = useState(null);
+    const [uploadWasRecorded, setUploadWasRecorded] = useState(false);
+    const [uploadPlaybackRate, setUploadPlaybackRate] = useState(1);
+    const [cameraPermission, setCameraPermission] = useState('idle'); // idle | requesting | granted | denied | error
+    const [cameraFacing, setCameraFacing] = useState('environment');
+    const [cameraRecording, setCameraRecording] = useState(false);
+    const [cameraElapsedMs, setCameraElapsedMs] = useState(0);
+    const [cameraCountdown, setCameraCountdown] = useState(0);
+    const [cameraTimerOption, setCameraTimerOption] = useState(0);
+    const [cameraSpeed, setCameraSpeed] = useState(1);
+    const [cameraFilterId, setCameraFilterId] = useState('none');
+    const [cameraBrightness, setCameraBrightness] = useState(100);
+    const [cameraContrast, setCameraContrast] = useState(100);
+    const [cameraEffectId, setCameraEffectId] = useState('none');
     function getTaggableBusinesses() {
         const now = Date.now();
         const cutoff = now - 7 * 24 * 60 * 60 * 1000;
@@ -2128,6 +2176,14 @@ function App() {
         setUploadExitConfirmOpen(false);
         setUploadPreviewPlaying(false);
         setUploadJustPublishedId(null);
+        setUploadWasRecorded(false);
+        setUploadPlaybackRate(1);
+        setCameraTimerOption(0);
+        setCameraSpeed(1);
+        setCameraFilterId('none');
+        setCameraBrightness(100);
+        setCameraContrast(100);
+        setCameraEffectId('none');
     }
     function hasMeaningfulUploadProgress() { return !!uploadVideoUrl; }
     function requestCloseUploadFlow() {
@@ -2172,8 +2228,238 @@ function App() {
         setUploadTrimRange({ start: 0, end: 100 });
         setUploadCoverTime(0);
         setUploadCoverImage(null);
+        setUploadWasRecorded(false);
+        setUploadPlaybackRate(1);
         setUploadStep('preview');
         e.target.value = '';
+    }
+    // --- Live in-app camera recording ---
+    function pickCameraMimeType() {
+        if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported)
+            return '';
+        const candidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
+        return candidates.find((t) => MediaRecorder.isTypeSupported(t)) || '';
+    }
+    function stopCameraStream() {
+        if (cameraRafRef.current) {
+            cancelAnimationFrame(cameraRafRef.current);
+            cameraRafRef.current = null;
+        }
+        if (cameraStreamRef.current) {
+            cameraStreamRef.current.getTracks().forEach((t) => t.stop());
+            cameraStreamRef.current = null;
+        }
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            try { mediaRecorderRef.current.stop(); } catch (err) { }
+        }
+        mediaRecorderRef.current = null;
+        recordedChunksRef.current = [];
+    }
+    function drawCameraVignette(ctx, w, h) {
+        const grad = ctx.createRadialGradient(w / 2, h / 2, h * 0.35, w / 2, h / 2, h * 0.72);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.55)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, h);
+    }
+    function getCameraGrainPattern(ctx) {
+        if (cameraGrainPatternRef.current)
+            return cameraGrainPatternRef.current;
+        const tile = document.createElement('canvas');
+        tile.width = 64;
+        tile.height = 64;
+        const tctx = tile.getContext('2d');
+        const imgData = tctx.createImageData(64, 64);
+        for (let i = 0; i < imgData.data.length; i += 4) {
+            const v = Math.random() * 255;
+            imgData.data[i] = v;
+            imgData.data[i + 1] = v;
+            imgData.data[i + 2] = v;
+            imgData.data[i + 3] = 26;
+        }
+        tctx.putImageData(imgData, 0, 0);
+        const pattern = ctx.createPattern(tile, 'repeat');
+        cameraGrainPatternRef.current = pattern;
+        return pattern;
+    }
+    function startCameraCanvasLoop() {
+        const draw = () => {
+            const video = cameraVideoRef.current;
+            const canvas = cameraCanvasRef.current;
+            if (video && canvas && video.readyState >= 2) {
+                const live = cameraLiveRef.current;
+                const w = canvas.width, h = canvas.height;
+                const ctx = canvas.getContext('2d');
+                const filter = THRILLZ_CAMERA_FILTERS.find((f) => f.id === live.filterId) || THRILLZ_CAMERA_FILTERS[0];
+                const filterParts = [filter.css !== 'none' ? filter.css : '', `brightness(${live.brightness}%)`, `contrast(${live.contrast}%)`].filter(Boolean);
+                ctx.filter = filterParts.join(' ') || 'none';
+                ctx.save();
+                const mirror = live.facing === 'user' || live.effectId === 'mirror';
+                if (mirror) { ctx.translate(w, 0); ctx.scale(-1, 1); }
+                ctx.drawImage(video, 0, 0, w, h);
+                ctx.restore();
+                ctx.filter = 'none';
+                if (live.effectId === 'vignette')
+                    drawCameraVignette(ctx, w, h);
+                else if (live.effectId === 'grain') {
+                    ctx.fillStyle = getCameraGrainPattern(ctx);
+                    ctx.fillRect(0, 0, w, h);
+                }
+            }
+            cameraRafRef.current = requestAnimationFrame(draw);
+        };
+        cameraRafRef.current = requestAnimationFrame(draw);
+    }
+    async function startCameraStream(facing) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            setCameraPermission('error');
+            return;
+        }
+        stopCameraStream();
+        setCameraPermission('requesting');
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: facing || cameraFacing, width: { ideal: 720 }, height: { ideal: 1280 } },
+                audio: true,
+            });
+            cameraStreamRef.current = stream;
+            if (cameraVideoRef.current) {
+                cameraVideoRef.current.srcObject = stream;
+                cameraVideoRef.current.play().catch(() => { });
+            }
+            setCameraPermission('granted');
+            startCameraCanvasLoop();
+        }
+        catch (err) {
+            console.error('Camera access error:', err);
+            const denied = err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError' || err.name === 'SecurityError');
+            setCameraPermission(denied ? 'denied' : 'error');
+        }
+    }
+    function flipCamera() {
+        if (cameraRecording) {
+            flashToast('Stop recording to flip the camera');
+            return;
+        }
+        const next = cameraFacing === 'user' ? 'environment' : 'user';
+        setCameraFacing(next);
+        startCameraStream(next);
+    }
+    function handleRecordingStopped() {
+        const chunks = recordedChunksRef.current;
+        recordedChunksRef.current = [];
+        if (!chunks.length) {
+            flashToast("Recording failed — try again");
+            return;
+        }
+        const blob = new Blob(chunks, { type: chunks[0].type || 'video/webm' });
+        if (blob.size === 0) {
+            flashToast("Recording failed — try again");
+            return;
+        }
+        uploadFileRef.current = blob;
+        setUploadVideoUrl(URL.createObjectURL(blob));
+        setUploadWasRecorded(true);
+        setUploadPlaybackRate(cameraSpeed);
+        setUploadTrimRange({ start: 0, end: 100 });
+        setUploadCoverTime(0);
+        setUploadCoverImage(null);
+        stopCameraStream();
+        setUploadStep('preview');
+    }
+    function beginRecordingNow() {
+        const canvas = cameraCanvasRef.current;
+        const stream = cameraStreamRef.current;
+        if (!canvas || !stream || typeof MediaRecorder === 'undefined') {
+            flashToast("Recording isn't supported on this device/browser — try Upload instead");
+            return;
+        }
+        let canvasStream;
+        try {
+            canvasStream = canvas.captureStream(30);
+        }
+        catch (err) {
+            flashToast("Recording isn't supported on this device/browser — try Upload instead");
+            return;
+        }
+        const audioTrack = stream.getAudioTracks()[0];
+        if (audioTrack)
+            canvasStream.addTrack(audioTrack);
+        recordedChunksRef.current = [];
+        let recorder;
+        try {
+            const mimeType = pickCameraMimeType();
+            recorder = mimeType ? new MediaRecorder(canvasStream, { mimeType }) : new MediaRecorder(canvasStream);
+        }
+        catch (err) {
+            flashToast("Recording isn't supported on this device/browser — try Upload instead");
+            return;
+        }
+        recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunksRef.current.push(e.data); };
+        recorder.onstop = handleRecordingStopped;
+        mediaRecorderRef.current = recorder;
+        recorder.start();
+        setCameraRecording(true);
+        setCameraElapsedMs(0);
+        const startedAt = Date.now();
+        recordTickRef.current = setInterval(() => setCameraElapsedMs(Date.now() - startedAt), 100);
+        recordMaxTimeoutRef.current = setTimeout(() => stopCameraRecording(), uploadDuration * 1000);
+    }
+    function stopCameraRecording() {
+        if (recordMaxTimeoutRef.current) {
+            clearTimeout(recordMaxTimeoutRef.current);
+            recordMaxTimeoutRef.current = null;
+        }
+        if (recordTickRef.current) {
+            clearInterval(recordTickRef.current);
+            recordTickRef.current = null;
+        }
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive')
+            mediaRecorderRef.current.stop();
+        setCameraRecording(false);
+    }
+    function toggleCameraRecordButton() {
+        if (cameraPermission !== 'granted')
+            return;
+        if (cameraRecording) {
+            stopCameraRecording();
+            return;
+        }
+        if (cameraCountdown > 0) {
+            cancelCameraCountdown();
+            return;
+        }
+        if (cameraTimerOption > 0) {
+            let remaining = cameraTimerOption;
+            setCameraCountdown(remaining);
+            const tick = () => {
+                remaining -= 1;
+                if (remaining <= 0) {
+                    setCameraCountdown(0);
+                    beginRecordingNow();
+                }
+                else {
+                    setCameraCountdown(remaining);
+                    countdownTimeoutRef.current = setTimeout(tick, 1000);
+                }
+            };
+            countdownTimeoutRef.current = setTimeout(tick, 1000);
+        }
+        else {
+            beginRecordingNow();
+        }
+    }
+    function cancelCameraCountdown() {
+        if (countdownTimeoutRef.current) {
+            clearTimeout(countdownTimeoutRef.current);
+            countdownTimeoutRef.current = null;
+        }
+        setCameraCountdown(0);
+    }
+    function retakeThrillzVideo() {
+        setUploadVideoUrl(null);
+        setUploadWasRecorded(false);
+        setUploadStep('record');
     }
     function captureCoverFromVideoEl(videoEl, atTime) {
         if (!videoEl)
@@ -2272,6 +2558,7 @@ function App() {
                 isCustomerPost,
                 commentsOn: uploadCommentsOn,
                 sound: uploadSound,
+                playbackRate: uploadPlaybackRate,
                 taggedBusinessIds: taggedBusiness ? [taggedBusiness.id] : [],
                 verifiedTags: taggedBusiness ? [{ businessId: taggedBusiness.id, businessName: taggedBusiness.name, service: taggedService ? taggedService.name : '', verified: !!eligibleVisit || !isCustomerPost }] : [],
             };
@@ -2307,6 +2594,28 @@ function App() {
         if (uploadPreviewVideoRef.current)
             uploadPreviewVideoRef.current.volume = Math.max(0, Math.min(1, uploadOriginalVolume / 100));
     }, [uploadOriginalVolume, uploadVideoUrl, uploadStep]);
+    useEffect(() => {
+        if (uploadPreviewVideoRef.current)
+            uploadPreviewVideoRef.current.playbackRate = uploadPlaybackRate;
+    }, [uploadPlaybackRate, uploadVideoUrl, uploadStep]);
+    // Live camera lifecycle: open the camera when the record screen mounts, always release it
+    // (stop tracks, cancel the draw loop, clear timers) the moment it's no longer showing.
+    useEffect(() => {
+        if (uploadStep === 'record') {
+            startCameraStream(cameraFacing);
+        }
+        else {
+            stopCameraStream();
+            setCameraPermission('idle');
+            setCameraRecording(false);
+            setCameraElapsedMs(0);
+            cancelCameraCountdown();
+        }
+    }, [uploadStep]);
+    useEffect(() => () => stopCameraStream(), []);
+    useEffect(() => {
+        cameraLiveRef.current = { filterId: cameraFilterId, brightness: cameraBrightness, contrast: cameraContrast, effectId: cameraEffectId, facing: cameraFacing };
+    }, [cameraFilterId, cameraBrightness, cameraContrast, cameraEffectId, cameraFacing]);
     useEffect(() => {
         if (uploadStep === 'success') {
             const t = setTimeout(() => { goToMyThrillzAfterPost(); }, 1700);
@@ -6650,7 +6959,7 @@ function App() {
             const goTo = (i) => { if (i >= 0 && i < posts.length) setPostViewer({ item, posts, index: i }); };
             const postVideoSrc = post.videoUrl || (post.video ? `${post.video}.mp4` : null);
             const backdrop = postVideoSrc
-                ? React.createElement("video", { key: post.id, src: postVideoSrc, poster: post.image || undefined, autoPlay: true, muted: true, loop: true, playsInline: true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000' } })
+                ? React.createElement("video", { key: post.id, ref: (el) => { if (el) el.playbackRate = post.playbackRate || 1; }, src: postVideoSrc, poster: post.image || undefined, autoPlay: true, muted: true, loop: true, playsInline: true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000' } })
                 : React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: post.image ? `url(${post.image})` : 'none', backgroundColor: post.image ? undefined : THEME.ink, backgroundSize: 'cover', backgroundPosition: 'center' } });
             return React.createElement("div", { key: "postviewer", style: { position: 'absolute', inset: 0, zIndex: 12, background: THEME.ink, overflow: 'hidden' } },
                 backdrop,
@@ -8581,38 +8890,64 @@ function App() {
 
             // ---------- STEP 2 — Record / capture ----------
             const recordTools = [
-                { icon: 'repeat', label: 'Flip', onClick: () => flashToast('Camera flipped') },
-                { icon: 'sliders', label: 'Speed', onClick: () => flashToast('Speed — coming soon') },
-                { icon: 'clock', label: 'Timer', onClick: () => flashToast('Timer — coming soon') },
-                { icon: 'sparkles', label: 'Filters', onClick: () => flashToast('Filters — coming soon') },
-                { icon: 'star', label: 'Adjust', onClick: () => flashToast('Adjust — coming soon') },
+                { icon: 'repeat', label: 'Flip', active: false, onClick: flipCamera },
+                { icon: 'sliders', label: 'Speed', active: cameraSpeed !== 1, onClick: () => setUploadSheet('speed') },
+                { icon: 'clock', label: 'Timer', active: cameraTimerOption > 0, onClick: () => setUploadSheet('timer') },
+                { icon: 'sparkles', label: 'Filters', active: cameraFilterId !== 'none', onClick: () => setUploadSheet('filters') },
+                { icon: 'star', label: 'Adjust', active: cameraBrightness !== 100 || cameraContrast !== 100, onClick: () => setUploadSheet('adjust') },
             ];
+            const formatElapsedMs = (ms) => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+            const cameraPermissionOverlay = cameraPermission !== 'granted' && (() => {
+                if (cameraPermission === 'requesting' || cameraPermission === 'idle')
+                    return React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 } },
+                        React.createElement("div", { className: "avio-spin", style: { width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(255,255,255,0.2)', borderTopColor: green } }),
+                        React.createElement("p", { style: { fontSize: 13, color: "rgba(255,255,255,0.7)" } }, "Requesting camera access…"));
+                const denied = cameraPermission === 'denied';
+                return React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', textAlign: 'center', gap: 10 } },
+                    React.createElement("div", { style: { width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: denied ? "lock" : "warningtriangle", size: 24, color: "#fff" })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: "#fff", marginTop: 2 } }, denied ? "Camera access needed" : "Camera unavailable"),
+                    React.createElement("p", { style: { fontSize: 12.5, color: "rgba(255,255,255,0.65)", lineHeight: 1.5 } }, denied
+                        ? "BookVado needs camera and microphone access to record a Thrillz. Allow access in your browser's site settings (tap the site/lock icon in the address bar), then try again."
+                        : "We couldn't start the camera on this device or browser. You can still upload a video instead."),
+                    React.createElement("button", { className: "avio-press", onClick: () => startCameraStream(cameraFacing), style: { marginTop: 6, padding: '12px 26px', borderRadius: 22, background: green, fontWeight: 700, fontSize: 13.5, color: "#fff", fontFamily: 'Space Grotesk, sans-serif' } }, "Try Again"),
+                    React.createElement("button", { onClick: () => triggerFilePicker(null), style: { fontSize: 12.5, fontWeight: 600, color: "rgba(255,255,255,0.75)" } }, "Upload a video instead"));
+            })();
             const recordStep = uploadStep === 'record' && React.createElement("div", { key: "record", style: { position: 'absolute', inset: 0, background: '#000', zIndex: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
-                React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 42%, rgba(151,196,0,0.10), rgba(0,0,0,0) 60%)' } }),
+                React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 42%, rgba(151,196,0,0.10), rgba(0,0,0,0) 60%)', pointerEvents: 'none' } }),
                 React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 18, right: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 } },
                     iconBtn("x", requestCloseUploadFlow, "#fff"),
                     React.createElement("button", { onClick: () => setUploadSheet('sound'), style: { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 16, background: 'rgba(255,255,255,0.14)' } },
                         React.createElement(Icon, { name: "music", size: 13, color: "#fff" }),
                         React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "#fff" } }, uploadSound ? uploadSound.name : "Add sound")),
                     React.createElement("div", { style: { width: 34 } })),
+                cameraRecording && React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 62px)', left: 0, right: 0, display: 'flex', justifyContent: 'center', zIndex: 3 } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 14, background: 'rgba(0,0,0,0.5)' } },
+                        React.createElement("span", { className: "avio-rec-dot", style: { width: 8, height: 8, borderRadius: '50%', background: '#FF3B30' } }),
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: "#fff", fontVariantNumeric: 'tabular-nums' } }, formatElapsedMs(cameraElapsedMs)))),
                 React.createElement("div", { style: { position: 'absolute', right: 14, top: '18%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 22, zIndex: 2 } },
                     recordTools.map((t) => React.createElement("button", { key: t.label, onClick: t.onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
-                        React.createElement(Icon, { name: t.icon, size: 20, color: "#fff" }),
-                        React.createElement("span", { style: { fontSize: 9.5, fontWeight: 600, color: "rgba(255,255,255,0.85)" } }, t.label)))),
-                React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 10 } },
-                    React.createElement(Icon, { name: "camera", size: 34, color: "rgba(255,255,255,0.35)" }),
-                    React.createElement("p", { style: { fontSize: 12.5, color: "rgba(255,255,255,0.45)" } }, "Tap the record button to open your camera")),
+                        React.createElement(Icon, { name: t.icon, size: 20, color: t.active ? green : "#fff" }),
+                        React.createElement("span", { style: { fontSize: 9.5, fontWeight: 600, color: t.active ? green : "rgba(255,255,255,0.85)" } }, t.label)))),
+                React.createElement("div", { style: { flex: 1, position: 'relative', overflow: 'hidden' } },
+                    React.createElement("canvas", { ref: cameraCanvasRef, width: 720, height: 1280, style: { width: '100%', height: '100%', objectFit: 'cover', display: cameraPermission === 'granted' ? 'block' : 'none' } }),
+                    React.createElement("video", { ref: cameraVideoRef, muted: true, playsInline: true, style: { display: 'none' } }),
+                    cameraPermissionOverlay,
+                    cameraCountdown > 0 && React.createElement("div", { onClick: cancelCameraCountdown, style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.35)', zIndex: 3 } },
+                        React.createElement("span", { key: cameraCountdown, className: "avio-check-pop", style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 96, color: "#fff" } }, cameraCountdown))),
                 React.createElement("div", { style: { flexShrink: 0, display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 18 } },
-                    THRILLZ_DURATIONS.map((d) => React.createElement("button", { key: d, onClick: () => setUploadDuration(d), style: { padding: '6px 14px', borderRadius: 16, background: uploadDuration === d ? green : 'rgba(255,255,255,0.12)' } },
+                    THRILLZ_DURATIONS.map((d) => React.createElement("button", { key: d, disabled: cameraRecording, onClick: () => setUploadDuration(d), style: { padding: '6px 14px', borderRadius: 16, background: uploadDuration === d ? green : 'rgba(255,255,255,0.12)', opacity: cameraRecording ? 0.4 : 1 } },
                         React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#fff" } }, d + "s")))),
                 React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 34px calc(env(safe-area-inset-bottom) + 22px)` } },
-                    React.createElement("button", { onClick: () => flashToast('Effects — coming soon'), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
-                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: 22, background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "sparkles", size: 18, color: "#fff" })),
-                        React.createElement("span", { style: { fontSize: 10.5, color: "#fff", fontWeight: 600 } }, "Effects")),
-                    React.createElement("button", { className: "avio-press", onClick: () => triggerFilePicker('environment'), style: { width: 76, height: 76, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement("button", { onClick: () => setUploadSheet('effects'), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: 22, background: cameraEffectId !== 'none' ? 'rgba(151,196,0,0.25)' : 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "sparkles", size: 18, color: cameraEffectId !== 'none' ? green : "#fff" })),
+                        React.createElement("span", { style: { fontSize: 10.5, color: cameraEffectId !== 'none' ? green : "#fff", fontWeight: 600 } }, "Effects")),
+                    React.createElement("button", { className: "avio-press", onClick: toggleCameraRecordButton, style: { width: 76, height: 76, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                         React.createElement("svg", { width: 76, height: 76, viewBox: "0 0 76 76" },
-                            React.createElement("circle", { cx: 38, cy: 38, r: 34, fill: "none", stroke: green, strokeWidth: 4.5 }),
-                            React.createElement("circle", { cx: 38, cy: 38, r: 26, fill: "#fff" }))),
+                            React.createElement("circle", { cx: 38, cy: 38, r: 34, fill: "none", stroke: cameraRecording ? '#FF3B30' : green, strokeWidth: 4.5 }),
+                            cameraRecording
+                                ? React.createElement("rect", { x: 27, y: 27, width: 22, height: 22, rx: 6, fill: "#FF3B30" })
+                                : React.createElement("circle", { cx: 38, cy: 38, r: 26, fill: "#fff" }))),
                     React.createElement("button", { onClick: () => triggerFilePicker(null), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
                         React.createElement("div", { style: { width: 44, height: 44, borderRadius: 22, background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "upload", size: 18, color: "#fff" })),
                         React.createElement("span", { style: { fontSize: 10.5, color: "#fff", fontWeight: 600 } }, "Upload"))));
@@ -8622,7 +8957,7 @@ function App() {
                 Array.from({ length: 8 }).map((_, i) => React.createElement("div", { key: i, style: { flex: 1, backgroundImage: uploadCoverImage ? `url(${uploadCoverImage})` : 'none', backgroundColor: uploadCoverImage ? undefined : '#111', backgroundSize: 'cover', backgroundPosition: 'center', filter: `brightness(${0.75 + (i % 3) * 0.12})` } })));
             const trimmedSeconds = uploadVideoDuration ? Math.max(0.5, uploadVideoDuration * (uploadTrimRange.end - uploadTrimRange.start) / 100) : 0;
             const previewStep = uploadStep === 'preview' && React.createElement("div", { key: "preview", style: { position: 'absolute', inset: 0, background: UP.bg, zIndex: 14, display: 'flex', flexDirection: 'column' } },
-                pageHeader(iconBtn("arrowleft", () => setUploadStep('options')), "Preview", React.createElement("button", { onClick: () => setUploadStep('details'), style: { fontSize: 15, fontWeight: 700, color: green } }, "Next")),
+                pageHeader(iconBtn("arrowleft", uploadWasRecorded ? retakeThrillzVideo : () => setUploadStep('options')), "Preview", React.createElement("button", { onClick: () => setUploadStep('details'), style: { fontSize: 15, fontWeight: 700, color: green } }, "Next")),
                 React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '18px 20px calc(env(safe-area-inset-bottom) + 20px)' } },
                     React.createElement("div", { onClick: () => { const v = uploadPreviewVideoRef.current; if (!v) return; if (v.paused) { v.play().catch(() => { }); setUploadPreviewPlaying(true); } else { v.pause(); setUploadPreviewPlaying(false); } }, style: { position: 'relative', width: '100%', aspectRatio: '9 / 16', maxHeight: '52vh', margin: '0 auto', borderRadius: 22, overflow: 'hidden', background: '#000' } },
                         uploadVideoUrl && React.createElement("video", { ref: uploadPreviewVideoRef, src: uploadVideoUrl, autoPlay: true, loop: true, playsInline: true, onLoadedMetadata: handlePreviewVideoLoaded, onPlay: () => setUploadPreviewPlaying(true), onPause: () => setUploadPreviewPlaying(false), style: { width: '100%', height: '100%', objectFit: 'cover' } }),
@@ -8702,6 +9037,41 @@ function App() {
                                 React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: active ? '#fff' : UP.text } }, t));
                         })),
                     React.createElement("button", { onClick: () => setUploadSheet(null), style: { width: '100%', marginTop: 20, padding: '14px 0', borderRadius: 24, background: green, fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: 'Space Grotesk, sans-serif' } }, "Done")));
+
+            // ---------- Camera control sheets (Speed / Timer / Filters / Adjust / Effects) ----------
+            const speedSheet = uploadSheet === 'speed' && sheetShell("Speed", () => setUploadSheet(null),
+                React.createElement("div", { style: { display: 'flex', gap: 8 } }, THRILLZ_SPEED_OPTIONS.map((s) => {
+                    const active = cameraSpeed === s;
+                    return React.createElement("button", { key: s, onClick: () => { setCameraSpeed(s); setUploadSheet(null); }, style: { flex: 1, padding: '14px 0', borderRadius: 16, border: `1.5px solid ${active ? green : UP.border}`, background: active ? green : UP.surface } },
+                        React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: active ? '#fff' : UP.text } }, s + "x"));
+                })));
+            const timerSheet = uploadSheet === 'timer' && sheetShell("Timer", () => setUploadSheet(null),
+                React.createElement("div", { style: { display: 'flex', gap: 8 } }, THRILLZ_TIMER_OPTIONS.map((s) => {
+                    const active = cameraTimerOption === s;
+                    return React.createElement("button", { key: s, onClick: () => { setCameraTimerOption(s); setUploadSheet(null); }, style: { flex: 1, padding: '14px 0', borderRadius: 16, border: `1.5px solid ${active ? green : UP.border}`, background: active ? green : UP.surface } },
+                        React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: active ? '#fff' : UP.text } }, s === 0 ? "Off" : s + "s"));
+                })));
+            const filtersSheet = uploadSheet === 'filters' && sheetShell("Filters", () => setUploadSheet(null),
+                React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } }, THRILLZ_CAMERA_FILTERS.map((f) => {
+                    const active = cameraFilterId === f.id;
+                    return React.createElement("button", { key: f.id, onClick: () => { setCameraFilterId(f.id); setUploadSheet(null); }, style: { padding: '10px 16px', borderRadius: 18, border: `1.5px solid ${active ? green : UP.border}`, background: active ? green : UP.surface } },
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: active ? '#fff' : UP.text } }, f.label));
+                })));
+            const adjustSheet = uploadSheet === 'adjust' && sheetShell("Adjust", () => setUploadSheet(null),
+                React.createElement("div", null,
+                    React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: UP.text } }, "Brightness"),
+                    React.createElement("input", { type: "range", min: 60, max: 140, value: cameraBrightness, onChange: (e) => setCameraBrightness(Number(e.target.value)), style: { width: '100%', accentColor: green } }),
+                    React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: UP.text, marginTop: 14 } }, "Contrast"),
+                    React.createElement("input", { type: "range", min: 60, max: 140, value: cameraContrast, onChange: (e) => setCameraContrast(Number(e.target.value)), style: { width: '100%', accentColor: green } }),
+                    React.createElement("button", { onClick: () => { setCameraBrightness(100); setCameraContrast(100); }, style: { marginTop: 14, fontSize: 12.5, fontWeight: 700, color: UP.sub } }, "Reset"),
+                    React.createElement("button", { onClick: () => setUploadSheet(null), style: { width: '100%', marginTop: 16, padding: '14px 0', borderRadius: 24, background: green, fontSize: 14, fontWeight: 700, color: "#fff", fontFamily: 'Space Grotesk, sans-serif' } }, "Done")));
+            const effectsSheet = uploadSheet === 'effects' && sheetShell("Effects", () => setUploadSheet(null),
+                React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } }, THRILLZ_CAMERA_EFFECTS.map((f) => {
+                    const active = cameraEffectId === f.id;
+                    return React.createElement("button", { key: f.id, onClick: () => { setCameraEffectId(f.id); setUploadSheet(null); }, style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 18, border: `1.5px solid ${active ? green : UP.border}`, background: active ? green : UP.surface } },
+                        React.createElement(Icon, { name: f.icon, size: 14, color: active ? '#fff' : UP.sub }),
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: active ? '#fff' : UP.text } }, f.label));
+                })));
 
             // ---------- STEP 4b — Tag Business / Service (dedicated page) ----------
             const tagResults = isBiz ? [] : getAllTaggableBusinesses().filter((b) => b.name.toLowerCase().includes(uploadTagSearch.toLowerCase()));
@@ -8825,7 +9195,7 @@ function App() {
                     React.createElement("button", { onClick: closeUploadFlow, style: { width: '100%', marginTop: 10, padding: '13px 0', borderRadius: 24, background: UP.surfaceAlt, color: '#D0304A', fontWeight: 700, fontSize: 14 } }, "Discard"),
                     React.createElement("button", { onClick: () => setUploadExitConfirmOpen(false), style: { width: '100%', marginTop: 10, padding: '13px 0', fontWeight: 600, fontSize: 13.5, color: UP.sub } }, "Keep Editing")));
 
-            return React.createElement(React.Fragment, null, optionsStep, recordStep, previewStep, detailsStep, postingStep, successStep, trimSheet, coverSheet, soundSheet, topicsSheet, tagPage, locationPage, exitConfirmSheet);
+            return React.createElement(React.Fragment, null, optionsStep, recordStep, previewStep, detailsStep, postingStep, successStep, trimSheet, coverSheet, soundSheet, topicsSheet, speedSheet, timerSheet, filtersSheet, adjustSheet, effectsSheet, tagPage, locationPage, exitConfirmSheet);
         })(),
         toast && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }, toast))));
 }
