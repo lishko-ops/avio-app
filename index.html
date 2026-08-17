@@ -2895,6 +2895,7 @@ function App() {
     const shortTouchRef = useRef(null);
     const shortVideoRefs = useRef({});
     const shortItemRefs = useRef({});
+    const shortsObserverRef = useRef(null);
     const [feedSoundOn] = useState(true);
     useEffect(() => {
         if (tab !== 'discover')
@@ -3395,11 +3396,16 @@ function App() {
         return result;
     }, [shortsFeedTab, followedIds, feed, filterToggles]);
     useEffect(() => {
-        if (tab !== 'discover')
+        if (tab !== 'discover') {
+            shortsObserverRef.current = null;
             return;
-        const els = Object.entries(shortItemRefs.current).filter(([, el]) => el);
-        if (!els.length)
-            return;
+        }
+        // Elements register themselves with this observer as they mount (see the item
+        // container's ref callback below) instead of being snapshotted once here — the
+        // Thrillz feed's real elements often don't exist yet on this effect's first run
+        // (e.g. still behind the splash screen or logged-out gate), and this effect's
+        // deps never change again afterward, so a one-time snapshot would silently
+        // observe nothing and autoplay/pause would never work.
         const observer = new IntersectionObserver((entries) => {
             entries.forEach((entry) => {
                 const id = entry.target.dataset.shortId;
@@ -3417,9 +3423,10 @@ function App() {
                 }
             });
         }, { threshold: [0, 0.6, 1] });
-        els.forEach(([, el]) => observer.observe(el));
-        return () => observer.disconnect();
-    }, [filteredFeed, tab, feedSoundOn]);
+        shortsObserverRef.current = observer;
+        Object.values(shortItemRefs.current).forEach((el) => { if (el) observer.observe(el); });
+        return () => { observer.disconnect(); shortsObserverRef.current = null; };
+    }, [tab, feedSoundOn]);
     const [bookingStep, setBookingStep] = useState('service');
     const [customerServiceLocation, setCustomerServiceLocation] = useState('business');
     const [customerServiceAddress, setCustomerServiceAddress] = useState('');
@@ -5695,7 +5702,19 @@ function App() {
             const isBurstHere = likeBurst && likeBurst.itemId === item.id;
             const burstOverlay = isBurstHere && React.createElement("div", { key: likeBurst.key, style: { position: 'absolute', left: likeBurst.x, top: likeBurst.y, zIndex: 6, pointerEvents: 'none', transform: 'translate(-50%,-50%)', animation: 'avioLikeBurst 0.7s ease' } },
                 React.createElement(Icon, { name: "diamond", size: 90, color: THEME.coral, fill: THEME.coral }));
-            return React.createElement("div", { key: item.id, ref: (el) => { if (el) shortItemRefs.current[item.id] = el; }, "data-short-id": item.id, onTouchStart: (e) => handleShortTouchStart(e, item), onTouchMove: (e) => handleShortTouchMove(e, item), onTouchEnd: (e) => handleShortTouchEnd(e, item), style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
+            return React.createElement("div", { key: item.id, ref: (el) => {
+                    if (el) {
+                        shortItemRefs.current[item.id] = el;
+                        if (shortsObserverRef.current)
+                            shortsObserverRef.current.observe(el);
+                    }
+                    else {
+                        const prev = shortItemRefs.current[item.id];
+                        if (prev && shortsObserverRef.current)
+                            shortsObserverRef.current.unobserve(prev);
+                        delete shortItemRefs.current[item.id];
+                    }
+                }, "data-short-id": item.id, onTouchStart: (e) => handleShortTouchStart(e, item), onTouchMove: (e) => handleShortTouchMove(e, item), onTouchEnd: (e) => handleShortTouchEnd(e, item), style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
                 React.createElement("div", { style: { position: 'absolute', inset: 0, transform: `translateX(${-dragProgress * 46}px)`, opacity: 1 - dragProgress * 0.35, transition: innerTransition } },
                     backdrop, scrim, brand, actionStack, infoBlock, bookCta),
                 arrowOverlay, burstOverlay);
