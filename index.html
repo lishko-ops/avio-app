@@ -512,6 +512,14 @@ const BOOKING_STATUS_STYLE = {
     quote_requested: { bg: '#EDEDED', color: '#6B6B6B', border: 'none' },
 };
 const BOOKING_STATUS_LABEL = { confirmed: 'Confirmed', pending: 'Pending', completed: 'Completed', cancelled: 'Cancelled', quote_requested: 'Quote Requested' };
+const CANCEL_REASONS = [
+    { id: 'scheduling', label: 'Scheduling conflict' },
+    { id: 'emergency', label: 'Emergency' },
+    { id: 'staff', label: 'Staff unavailable' },
+    { id: 'customer', label: 'Customer requested' },
+    { id: 'service', label: 'Service unavailable' },
+    { id: 'other', label: 'Other' },
+];
 const BUSINESS_INCOMING_BOOKINGS = [
     { id: 'ib1', customerName: 'Michael R.', initials: 'MR', service: "Men's Fade", price: 45, time: '10:00 AM', status: 'confirmed', avatarColor: '#000000', dateGroup: 'today' },
     { id: 'ib2', customerName: 'Sarah M.', initials: 'SM', service: 'Balayage', price: 180, time: '11:30 AM', status: 'confirmed', avatarColor: '#97C400', dateGroup: 'today' },
@@ -3177,6 +3185,49 @@ function App() {
         setBusinessBookings((prev) => prev.map((b) => b.id === id ? { ...b, status } : b));
         setBusinessBookingDetail((prev) => prev && prev.id === id ? { ...prev, status } : prev);
         flashToast(status === 'completed' ? 'Marked as completed' : 'Booking cancelled');
+    }
+    const CANCEL_FLOW_STEPS = ['select', 'confirm', 'reason', 'review', 'success'];
+    const [cancelFlowOpen, setCancelFlowOpen] = useState(false);
+    const [cancelFlowStep, setCancelFlowStep] = useState('select');
+    const [cancelFlowDir, setCancelFlowDir] = useState('fwd');
+    const [cancelSelectedIds, setCancelSelectedIds] = useState(() => new Set());
+    const [cancelSubTab, setCancelSubTab] = useState('upcoming');
+    const [cancelReason, setCancelReason] = useState(null);
+    const [cancelReasonOther, setCancelReasonOther] = useState('');
+    const [cancelNote, setCancelNote] = useState('');
+    const [cancelSubmitting, setCancelSubmitting] = useState(false);
+    function openCancelFlow() {
+        setCancelSelectedIds(new Set());
+        setCancelSubTab('upcoming');
+        setCancelReason(null);
+        setCancelReasonOther('');
+        setCancelNote('');
+        setCancelSubmitting(false);
+        setCancelFlowDir('fwd');
+        setCancelFlowStep('select');
+        setCancelFlowOpen(true);
+    }
+    function closeCancelFlow() { setCancelFlowOpen(false); }
+    function cancelFlowGoTo(step) {
+        const curIdx = CANCEL_FLOW_STEPS.indexOf(cancelFlowStep);
+        const nextIdx = CANCEL_FLOW_STEPS.indexOf(step);
+        setCancelFlowDir(nextIdx >= curIdx ? 'fwd' : 'back');
+        setCancelFlowStep(step);
+    }
+    function toggleCancelBookingSelected(id) {
+        setCancelSelectedIds((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+    }
+    function confirmCancellation() {
+        if (cancelSubmitting) return;
+        setCancelSubmitting(true);
+        const ids = cancelSelectedIds;
+        const reasonText = cancelReason === 'other' ? cancelReasonOther.trim() : (CANCEL_REASONS.find((r) => r.id === cancelReason) || {}).label;
+        const noteText = cancelNote.trim();
+        setTimeout(() => {
+            setBusinessBookings((prev) => prev.map((b) => ids.has(b.id) ? { ...b, status: 'cancelled', cancellationReason: reasonText, cancellationNote: noteText, refundAmount: b.price, refundStatus: 'refunded', cancelledAt: Date.now() } : b));
+            setCancelSubmitting(false);
+            cancelFlowGoTo('success');
+        }, 850);
     }
     const [providerDeal, setProviderDeal] = useState(() => {
         const defaults = { id: 'deal-main', enabled: false, type: 'percent', value: 20, label: '20% OFF TODAY', activatedAt: null, expiresAt: null, eligibleServiceIds: null };
@@ -8429,6 +8480,7 @@ function App() {
                     { id: 'addService', label: 'Add Service', onClick: () => { setProviderDashboardTab('services'); setServiceFormDraft({ id: null, name: '', bookingType: 'APPOINTMENT', durationMinutes: '', price: '', dailyRate: '', hourlyRate: '', basePrice: '' }); } },
                     { id: 'promote', label: 'Promote', onClick: () => setPromoDraftOpen(true) },
                     { id: 'restaurant', label: businessType === 'restaurant' ? 'Restaurant' : 'Set Up Restaurant', onClick: openRestaurantDashboard },
+                    { id: 'cancelBookings', label: 'Cancel Bookings', onClick: openCancelFlow },
                 ];
                 const quickActionsBar = React.createElement("div", { style: { marginTop: 26 } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
@@ -10171,6 +10223,198 @@ function App() {
                     React.createElement("button", { onClick: () => setUploadExitConfirmOpen(false), style: { width: '100%', marginTop: 10, padding: '13px 0', fontWeight: 600, fontSize: 13.5, color: UP.sub } }, "Keep Editing")));
 
             return React.createElement(React.Fragment, null, optionsStep, recordStep, previewStep, detailsStep, postingStep, successStep, trimSheet, coverSheet, soundSheet, topicsSheet, speedSheet, timerSheet, filtersSheet, adjustSheet, effectsSheet, tagPage, locationPage, exitConfirmSheet);
+        })(),
+        cancelFlowOpen && (() => {
+            const CF = { bg: T.background, alt: T.surfaceSecondary, sub: T.textSecondary, text: T.textPrimary, border: T.border, inputBg: T.inputBackground };
+            const green = THEME.coral;
+            const cfNow = new Date();
+            const cfTomorrow = new Date(cfNow);
+            cfTomorrow.setDate(cfTomorrow.getDate() + 1);
+            function cfDateObj(b) { return b.dateGroup === 'tomorrow' ? cfTomorrow : cfNow; }
+            function cfDateLabel(b) { return cfDateObj(b).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); }
+            const cancelableAll = businessBookings.filter((b) => b.status === 'confirmed' || b.status === 'pending');
+            const cancelableToday = cancelableAll.filter((b) => b.dateGroup === 'today');
+            const cancelableWeek = cancelableAll.filter((b) => b.dateGroup === 'today' || b.dateGroup === 'tomorrow');
+            const CANCEL_SUBTABS = [
+                { id: 'upcoming', label: `Upcoming (${cancelableAll.length})` },
+                { id: 'today', label: `Today (${cancelableToday.length})` },
+                { id: 'week', label: `This Week (${cancelableWeek.length})` },
+            ];
+            const cancelListForTab = cancelSubTab === 'today' ? cancelableToday : cancelSubTab === 'week' ? cancelableWeek : cancelableAll;
+            const cancelSelectedList = cancelableAll.filter((b) => cancelSelectedIds.has(b.id));
+            const cancelTotalRefund = cancelSelectedList.reduce((sum, b) => sum + b.price, 0);
+
+            function cfHeader(title, onBack) {
+                return React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 16px) 18px 14px`, borderBottom: `1px solid ${CF.border}`, background: CF.bg } },
+                    React.createElement("div", { style: { minWidth: 30, display: 'flex' } }, onBack && React.createElement("button", { onClick: onBack, style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: CF.text }))),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16.5, color: CF.text, margin: 0, flex: 1, textAlign: 'center' } }, title),
+                    React.createElement("div", { style: { minWidth: 30 } }));
+            }
+            function cfFooter(children) {
+                return React.createElement("div", { style: { flexShrink: 0, padding: `12px 18px calc(env(safe-area-inset-bottom) + 16px)`, borderTop: `1px solid ${CF.border}`, background: CF.bg } }, children);
+            }
+            function cfPrimaryButton(label, onClick, opts) {
+                opts = opts || {};
+                const disabled = !!opts.disabled;
+                const loading = !!opts.loading;
+                return React.createElement("button", { className: "avio-press", disabled: disabled || loading, onClick: (disabled || loading) ? undefined : onClick, style: { width: '100%', height: 54, borderRadius: 27, background: disabled ? CF.border : green, color: disabled ? CF.sub : '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    loading ? React.createElement("span", { className: "avio-spin", style: { width: 18, height: 18, borderRadius: '50%', border: '2.5px solid rgba(255,255,255,0.45)', borderTopColor: '#fff', display: 'inline-block' } }) : label);
+            }
+            function cfSelectCircle(active) {
+                return React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', border: `1.5px solid ${active ? green : CF.border}`, background: active ? green : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    active && React.createElement(Icon, { name: "check", size: 13, color: "#fff" }));
+            }
+            function cfBookingRow(b, opts) {
+                opts = opts || {};
+                const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
+                const selected = cancelSelectedIds.has(b.id);
+                return React.createElement(opts.selectable ? "button" : "div", { key: b.id, onClick: opts.selectable ? () => toggleCancelBookingSelected(b.id) : undefined, style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, border: `1.5px solid ${selected && opts.selectable ? green : CF.border}`, background: selected && opts.selectable ? 'rgba(151,196,0,0.06)' : 'transparent', textAlign: 'left', width: '100%' } },
+                    opts.selectable && cfSelectCircle(selected),
+                    React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(b.avatarColor), fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.initials),
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: CF.text, margin: 0 } }, b.customerName),
+                        React.createElement("p", { style: { fontSize: 11.5, color: CF.sub, margin: '2px 0 0' } }, `${b.dateGroup === 'tomorrow' ? 'Tomorrow' : 'Today'}, ${b.time} · ${b.service}`)),
+                    React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
+                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: CF.text, margin: 0 } }, money(b.price)),
+                        React.createElement("span", { style: { fontSize: 9.5, fontWeight: 700, padding: '3px 8px', borderRadius: 9, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize', display: 'inline-block', marginTop: 3 } }, BOOKING_STATUS_LABEL[b.status] || b.status)));
+            }
+            function cfDetailField(label, value, valueColor) {
+                return React.createElement("div", { key: label, style: { display: 'flex', justifyContent: 'space-between', padding: '9px 0' } },
+                    React.createElement("span", { style: { fontSize: 12.5, color: CF.sub } }, label),
+                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: valueColor || CF.text } }, value));
+            }
+
+            let content;
+            if (cancelFlowStep === 'select') {
+                content = React.createElement(React.Fragment, null,
+                    cfHeader('Cancel Bookings', closeCancelFlow),
+                    React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '14px 18px' } },
+                        React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 18, overflowX: 'auto' } },
+                            CANCEL_SUBTABS.map((t) => {
+                                const active = cancelSubTab === t.id;
+                                return React.createElement("button", { key: t.id, onClick: () => setCancelSubTab(t.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10, flexShrink: 0 } },
+                                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? CF.text : CF.sub, whiteSpace: 'nowrap' } }, t.label),
+                                    React.createElement("div", { style: { width: active ? 22 : 0, height: 2, borderRadius: 1, background: green } }));
+                            }),
+                            React.createElement("button", { key: 'custom', onClick: () => flashToast('Custom date range — coming soon'), style: { display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 10, flexShrink: 0 } },
+                                React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: CF.sub, whiteSpace: 'nowrap' } }, "Custom"),
+                                React.createElement(Icon, { name: "calendar", size: 15, color: CF.sub }))),
+                        React.createElement("p", { style: { fontSize: 12.5, color: CF.sub, margin: '12px 0 14px', lineHeight: 1.5 } }, "Cancel one or more bookings. Customers will be notified and refunded per policy."),
+                        cancelListForTab.length === 0
+                            ? React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '36px 18px 20px', textAlign: 'center' } },
+                                React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: CF.alt, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 } }, React.createElement(Icon, { name: "calendar", size: 30, color: '#C7C7CC' })),
+                                React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: CF.text, margin: 0 } }, "No bookings to cancel"))
+                            : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, cancelListForTab.map((b) => cfBookingRow(b, { selectable: true })))),
+                    cfFooter(React.createElement(React.Fragment, null,
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 } },
+                            React.createElement("span", { style: { fontSize: 12.5, color: CF.sub } }, `${cancelSelectedIds.size} booking${cancelSelectedIds.size === 1 ? '' : 's'} selected`),
+                            cancelSelectedIds.size > 0 && React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: CF.text } }, `Total refund ${money(cancelTotalRefund)}`)),
+                        cfPrimaryButton('Continue', () => cancelFlowGoTo('confirm'), { disabled: cancelSelectedIds.size === 0 }))));
+            }
+            else if (cancelFlowStep === 'confirm') {
+                const single = cancelSelectedList.length === 1 ? cancelSelectedList[0] : null;
+                content = React.createElement(React.Fragment, null,
+                    cfHeader('Cancel Booking', () => cancelFlowGoTo('select')),
+                    React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '20px 18px' } },
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: 22 } },
+                            React.createElement("div", { style: { width: 60, height: 60, borderRadius: '50%', border: `1.5px solid ${green}`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 } },
+                                React.createElement(Icon, { name: "calendar", size: 26, color: green })),
+                            React.createElement("p", { style: { fontSize: 13, color: CF.sub, margin: 0 } }, "You are about to cancel"),
+                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: CF.text, margin: '4px 0 0' } }, `${cancelSelectedList.length} booking${cancelSelectedList.length === 1 ? '' : 's'}`),
+                            single && React.createElement("p", { style: { fontSize: 13, color: CF.sub, margin: '2px 0 0' } }, `for ${single.customerName}`)),
+                        single
+                            ? React.createElement(React.Fragment, null,
+                                React.createElement("div", { style: { background: CF.alt, borderRadius: 14, padding: '4px 14px' } },
+                                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: CF.sub, textTransform: 'uppercase', margin: '10px 0 0' } }, "Booking Details"),
+                                    cfDetailField('Service', single.service),
+                                    cfDetailField('Date', cfDateLabel(single)),
+                                    cfDetailField('Time', single.time),
+                                    cfDetailField('Amount', money(single.price)),
+                                    cfDetailField('Status', BOOKING_STATUS_LABEL[single.status] || single.status)),
+                                React.createElement("div", { style: { marginTop: 14, background: 'rgba(151,196,0,0.08)', borderRadius: 14, padding: 14 } },
+                                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } },
+                                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: CF.text } }, "Refund to customer"),
+                                        React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: green } }, money(single.price))),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: CF.sub, margin: '6px 0 0', lineHeight: 1.4 } }, "Full refund will be issued to the customer.")))
+                            : React.createElement(React.Fragment, null,
+                                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, cancelSelectedList.map((b) => cfBookingRow(b, { selectable: false }))),
+                                React.createElement("div", { style: { marginTop: 14, background: 'rgba(151,196,0,0.08)', borderRadius: 14, padding: 14 } },
+                                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } },
+                                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: CF.text } }, "Refund to customers"),
+                                        React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: green } }, money(cancelTotalRefund))),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: CF.sub, margin: '6px 0 0', lineHeight: 1.4 } }, "Full refunds will be issued to each customer.")))),
+                    cfFooter(cfPrimaryButton('Continue to Reason', () => cancelFlowGoTo('reason'))));
+            }
+            else if (cancelFlowStep === 'reason') {
+                const canContinue = cancelReason && (cancelReason !== 'other' || cancelReasonOther.trim().length > 0);
+                content = React.createElement(React.Fragment, null,
+                    cfHeader('Why are you canceling?', () => cancelFlowGoTo('confirm')),
+                    React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '18px 18px' } },
+                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: CF.sub, textTransform: 'uppercase', margin: '0 0 10px' } }, "Select a reason"),
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column' } }, CANCEL_REASONS.map((r, i) => {
+                            const active = cancelReason === r.id;
+                            return React.createElement(React.Fragment, { key: r.id },
+                                React.createElement("button", { onClick: () => setCancelReason(r.id), style: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px 2px', borderBottom: i < CANCEL_REASONS.length - 1 ? `1px solid ${CF.border}` : 'none', width: '100%', textAlign: 'left' } },
+                                    React.createElement("div", { style: { width: 20, height: 20, borderRadius: '50%', border: `1.5px solid ${active ? green : CF.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                                        active && React.createElement("div", { style: { width: 10, height: 10, borderRadius: '50%', background: green } })),
+                                    React.createElement("span", { style: { fontSize: 14, color: CF.text } }, r.label)),
+                                active && r.id === 'other' && React.createElement("input", { value: cancelReasonOther, onChange: (e) => setCancelReasonOther(e.target.value), placeholder: 'Please specify', autoFocus: true, style: { width: '100%', background: CF.inputBg, border: `1px solid ${CF.border}`, borderRadius: 12, padding: '12px 14px', fontSize: 13.5, color: CF.text, outline: 'none', margin: '2px 0 10px' } }));
+                        })),
+                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: CF.sub, textTransform: 'uppercase', margin: '20px 0 10px' } }, "Add a note (optional)"),
+                        React.createElement("textarea", { value: cancelNote, onChange: (e) => setCancelNote(e.target.value.slice(0, 250)), placeholder: 'Add any additional details…', rows: 4, maxLength: 250, style: { width: '100%', background: CF.inputBg, border: `1px solid ${CF.border}`, borderRadius: 12, padding: 12, fontSize: 13.5, color: CF.text, outline: 'none', resize: 'none', fontFamily: 'inherit' } }),
+                        React.createElement("p", { style: { fontSize: 11, color: CF.sub, textAlign: 'right', margin: '6px 2px 0' } }, `${cancelNote.length}/250`)),
+                    cfFooter(cfPrimaryButton('Review Cancellation', () => cancelFlowGoTo('review'), { disabled: !canContinue })));
+            }
+            else if (cancelFlowStep === 'review') {
+                const single = cancelSelectedList.length === 1 ? cancelSelectedList[0] : null;
+                content = React.createElement(React.Fragment, null,
+                    cfHeader('Review Cancellation', () => cancelFlowGoTo('reason')),
+                    React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '18px 18px' } },
+                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: CF.sub, textTransform: 'uppercase', margin: '0 0 8px' } }, "Cancellation Summary"),
+                        React.createElement("div", { style: { background: CF.alt, borderRadius: 14, padding: '4px 14px', marginBottom: 16 } },
+                            single
+                                ? React.createElement(React.Fragment, null,
+                                    cfDetailField('Customer', single.customerName),
+                                    cfDetailField('Service', single.service),
+                                    cfDetailField('Date', cfDateLabel(single)),
+                                    cfDetailField('Time', single.time),
+                                    cfDetailField('Amount', money(single.price)))
+                                : cancelSelectedList.map((b, i) => React.createElement("div", { key: b.id, style: { padding: '10px 0', borderBottom: i < cancelSelectedList.length - 1 ? `1px solid ${CF.border}` : 'none' } },
+                                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } },
+                                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: CF.text } }, b.customerName),
+                                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: CF.text } }, money(b.price))),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: CF.sub, margin: '2px 0 0' } }, `${b.service} · ${cfDateLabel(b)}, ${b.time}`)))),
+                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: CF.sub, textTransform: 'uppercase', margin: '0 0 8px' } }, "Refund Summary"),
+                        React.createElement("div", { style: { background: CF.alt, borderRadius: 14, padding: '4px 14px', marginBottom: 16 } },
+                            cfDetailField('Refund to customer' + (cancelSelectedList.length > 1 ? 's' : ''), money(cancelTotalRefund), green),
+                            cfDetailField('Refund method', 'Original payment method'),
+                            cfDetailField('Refund timing', 'Immediately')),
+                        React.createElement("div", { style: { display: 'flex', gap: 10, alignItems: 'flex-start', background: 'rgba(151,196,0,0.08)', borderRadius: 14, padding: 14 } },
+                            React.createElement(Icon, { name: "shield", size: 17, color: green }),
+                            React.createElement("div", { style: { flex: 1 } },
+                                React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: CF.text, margin: 0 } }, "Cancellation Policy"),
+                                React.createElement("p", { style: { fontSize: 11.5, color: CF.sub, margin: '3px 0 0', lineHeight: 1.45 } }, "Customers are eligible for a full refund when the business cancels a booking. Frequent cancellations may affect your business reliability score.")))),
+                    cfFooter(cfPrimaryButton('Confirm Cancellation', confirmCancellation, { loading: cancelSubmitting })));
+            }
+            else {
+                const count = cancelSelectedList.length || cancelSelectedIds.size;
+                content = React.createElement(React.Fragment, null,
+                    cfHeader('Cancellation Complete', null),
+                    React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '24px 18px' } },
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', margin: '10px 0 24px' } },
+                            React.createElement("div", { className: "avio-check-pop", style: { width: 64, height: 64, borderRadius: '50%', background: green, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 } },
+                                React.createElement(Icon, { name: "check", size: 28, color: "#fff" })),
+                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: CF.text, margin: 0 } }, `Booking${count === 1 ? '' : 's'} Canceled`),
+                            React.createElement("p", { style: { fontSize: 12.5, color: CF.sub, margin: '6px 0 0' } }, count === 1 ? "It's been removed from your upcoming bookings and the customer has been notified." : "They've been removed from your upcoming bookings and the customers have been notified.")),
+                        React.createElement("div", { style: { border: `1px solid ${CF.border}`, borderRadius: 14, padding: 14 } },
+                            React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: CF.text, margin: '0 0 10px' } }, "What the customer receives"),
+                            ['Cancellation notification', 'Reason (if allowed by business settings)', 'Full refund confirmation', 'Updated booking status'].map((line) => React.createElement("div", { key: line, style: { display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0' } },
+                                React.createElement(Icon, { name: "check", size: 13, color: green }),
+                                React.createElement("span", { style: { fontSize: 12.5, color: CF.text } }, line))))),
+                    cfFooter(cfPrimaryButton('Done', closeCancelFlow)));
+            }
+
+            return React.createElement("div", { key: 'cancelflow-' + cancelFlowStep, className: 'avio-cancelflow ' + (cancelFlowDir === 'fwd' ? 'avio-settings-fwd' : 'avio-settings-back'), style: { position: 'absolute', inset: 0, zIndex: 15, background: CF.bg, display: 'flex', flexDirection: 'column' } }, content);
         })(),
         toast && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }, toast))));
 }
