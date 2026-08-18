@@ -5906,19 +5906,16 @@ function App() {
         tab === 'discover' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
             React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16, zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 11 } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 11 } },
-                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }].map((t) => {
-                        const active = shortsFeedTab === t.id;
+                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
+                        const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
                         const isMain = t.id === 'forYou';
-                        return React.createElement("button", { key: t.id, onClick: () => setShortsFeedTab(t.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
+                        const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
+                        return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
                             React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
                             React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: T.surface, transition: 'width 0.2s' } }));
                     })),
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14, paddingBottom: 4 } },
-                    React.createElement("button", { onClick: () => setFilterSheetOpen(true), style: { display: 'flex', alignItems: 'center', gap: 6 } },
-                        React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: filterSheetOpen ? '#fff' : 'rgba(255,255,255,0.75)' } }, "Filters"),
-                        React.createElement(Icon, { name: "sliders", size: 15, color: filterSheetOpen ? '#fff' : 'rgba(255,255,255,0.75)' })),
-                    React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex' } },
-                        React.createElement(Icon, { name: "search", size: 20, color: "#fff" })))),
+                React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', paddingBottom: 4 } },
+                    React.createElement(Icon, { name: "search", size: 20, color: "#fff" }))),
             React.createElement(Icon, { name: shortsFeedTab === 'following' ? "user" : "search", size: 22, color: THEME.mutedDark }),
             React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : "No shorts to show right now"),
             shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('forYou'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Browse Thrillz"))) : filteredFeed.map((item, itemIdx) => {
@@ -5949,10 +5946,11 @@ function App() {
             const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 56, zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10 } },
                 modeSwitcher,
                 React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 11 } },
-                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }].map((t) => {
-                        const active = shortsFeedTab === t.id;
+                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
+                        const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
+                        const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
                         const isMain = t.id === 'forYou';
-                        return React.createElement("button", { key: t.id, onClick: () => setShortsFeedTab(t.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
+                        return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
                             React.createElement("span", { style: { position: 'relative', display: 'inline-block' } },
                                 React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
                                 isMain && React.createElement("span", { style: { position: 'absolute', top: 0, right: -9, width: 6, height: 6, borderRadius: '50%', background: THEME.coral } })),
@@ -6063,9 +6061,6 @@ function App() {
                 arrowOverlay, burstOverlay, scrubBarOverlay);
         }))),
         tab === 'discover' && !customerProfileOpen && !businessProfileTarget && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 18px)', right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 } },
-            React.createElement("button", { onClick: () => setFilterSheetOpen(true), style: { display: 'flex', alignItems: 'center', gap: 6 } },
-                React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: filterSheetOpen ? '#fff' : 'rgba(255,255,255,0.75)' } }, "Filters"),
-                React.createElement(Icon, { name: "sliders", size: 15, color: filterSheetOpen ? '#fff' : 'rgba(255,255,255,0.75)' })),
             React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex' } },
                 React.createElement(Icon, { name: "search", size: 20, color: "#fff" })))),
         tab === 'browse' && (React.createElement("div", { style: { position: 'absolute', inset: 0, overflowY: 'auto', background: T.background, padding: `calc(env(safe-area-inset-top) + 16px) 0 calc(env(safe-area-inset-bottom) + 90px)` } }, (() => {
