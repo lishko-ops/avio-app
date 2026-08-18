@@ -498,7 +498,12 @@ function getBookingCta(business) {
 // 'preparing' status — Bookvado must never invent a venue's barcode, so the
 // credential field stays null until the (simulated) partner integration
 // returns one, see the setTimeout in finalizeActivityBooking.
-function buildTickets(bookingId, count, source, ticketType, holderName) {
+// `kind` names the ticket domain (attraction, movie, and — later — concert/
+// sports) purely for card/tile styling; `detailsPerTicket[i]` is an optional
+// array of { label, value } rows specific to that domain (seat, screen, row,
+// section, ...) so the wallet/detail viewer can render new domains without
+// any changes to their rendering code.
+function buildTickets(bookingId, count, source, ticketType, holderName, kind, detailsPerTicket) {
     return Array.from({ length: count }, (_, i) => ({
         id: bookingId + '-tk' + i,
         holder: (i === 0 && holderName) ? holderName : `Guest ${i + 1}`,
@@ -507,6 +512,8 @@ function buildTickets(bookingId, count, source, ticketType, holderName) {
         status: source === 'partner' ? 'preparing' : 'ready',
         credential: source === 'partner' ? null : (bookingId + '-' + i + '-' + Math.random().toString(36).slice(2, 10).toUpperCase()),
         usedAt: null,
+        kind: kind || 'attraction',
+        details: (detailsPerTicket && detailsPerTicket[i]) || [],
     }));
 }
 // Which Ticket Wallet tab a booking's tickets belong in — derived from the
@@ -2345,7 +2352,7 @@ function App() {
         return () => { cancelled = true; };
     }, []);
     const [bookingsSubTab, setBookingsSubTab] = useState('upcoming');
-    const [ticketWalletOpen, setTicketWalletOpen] = useState(false);
+    const [walletCategory, setWalletCategory] = useState('tickets');
     const [ticketWalletSubTab, setTicketWalletSubTab] = useState('upcoming');
     const [ticketDetail, setTicketDetail] = useState(null); // { bookingId, index }
     const [ticketScannerOpen, setTicketScannerOpen] = useState(false);
@@ -2375,6 +2382,17 @@ function App() {
             total: 70, status: 'confirmed', address: 'Las Vegas, NV', duration: '3h', logoText: 'NA',
             confirmationNumber: 'BVK9K21TR', customerName: 'Alex Rivera', customerPhone: '', notes: '',
             tickets: buildTickets('ab-seed2', 2, 'bookvado', 'Unlimited Play Pass', 'Alex Rivera') },
+        // Demo movie ticket — shows the same generic ticket architecture (kind +
+        // per-ticket `details`) already extending cleanly to a non-attraction
+        // domain, with no changes needed to the wallet/detail rendering code.
+        { id: 'mv-seed1', bookingType: 'movie', name: 'A Minecraft Movie', service: 'AMC Empire 25', business: 'A Minecraft Movie', category: 'Movies',
+            date: 'Tonight', dateKey: dateKey(new Date(2026, 7, 18)), day: 18, month: 7, year: 2026, time: '7:30 PM', timeMinutes: 1170, timeRange: null,
+            total: 32, status: 'confirmed', address: 'New York, NY', duration: '1h 41min', logoText: 'MV',
+            confirmationNumber: 'BVKMV441X', customerName: 'Alex Rivera', customerPhone: '', notes: '',
+            tickets: buildTickets('mv-seed1', 2, 'bookvado', 'Adult', 'Alex Rivera', 'movie', [
+                [{ label: 'Screen', value: 'Screen 6' }, { label: 'Seat', value: 'F8' }],
+                [{ label: 'Screen', value: 'Screen 6' }, { label: 'Seat', value: 'F9' }],
+            ]) },
     ]);
     const [calendarMonth, setCalendarMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
     const [selectedDay, setSelectedDay] = useState(() => new Date().getDate());
@@ -6880,7 +6898,7 @@ function App() {
             const hasTickets = bookings.some((b) => b.tickets && b.tickets.length);
             const header = React.createElement("div", { style: { padding: '0 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: BK.text, margin: 0 } }, "Bookings"),
-                hasTickets && React.createElement("button", { onClick: () => { setTicketWalletSubTab('upcoming'); setTicketWalletOpen(true); }, style: { display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 20, border: `1.5px solid ${THEME.coral}` } },
+                hasTickets && React.createElement("button", { onClick: () => { setWalletCategory('tickets'); setTicketWalletSubTab('upcoming'); setTab('wallet'); }, style: { display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 20, border: `1.5px solid ${THEME.coral}` } },
                     React.createElement(Icon, { name: "wallet", size: 15, color: THEME.coral }),
                     React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "Tickets")));
             const tabsRow = React.createElement("div", { style: { display: 'flex', gap: 20, padding: '18px 18px 0', borderBottom: `1px solid ${BK.border}` } }, CUS_TABS.map((t) => {
@@ -6916,6 +6934,65 @@ function App() {
                 header, tabsRow, cards, bookAgainBtn);
             return scrollContent;
         })())),
+        tab === 'wallet' && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: T.background } }, (() => {
+            const WK = { text: T.textPrimary, sub: T.textSecondary, border: T.border, alt: T.surfaceSecondary };
+            const CATS = [{ id: 'tickets', label: 'Tickets' }, { id: 'passes', label: 'Passes' }];
+            const header = React.createElement("div", { style: { padding: '0 18px' } },
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: WK.text, margin: 0 } }, "Wallet"));
+            const catRow = React.createElement("div", { style: { display: 'flex', gap: 20, padding: '18px 18px 0', borderBottom: `1px solid ${WK.border}` } }, CATS.map((c) => {
+                const active = walletCategory === c.id;
+                return React.createElement("button", { key: c.id, onClick: () => setWalletCategory(c.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
+                    React.createElement("span", { style: { fontSize: 14, fontWeight: active ? 700 : 500, color: active ? WK.text : WK.sub } }, c.label),
+                    React.createElement("div", { style: { width: active ? 22 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
+            }));
+            let body;
+            if (walletCategory === 'passes') {
+                body = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 18px 20px', textAlign: 'center' } },
+                    React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: WK.alt, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 } }, React.createElement(Icon, { name: "card", size: 28, color: '#C7C7CC' })),
+                    React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: WK.text, margin: 0 } }, "No passes yet"),
+                    React.createElement("p", { style: { fontSize: 12.5, color: WK.sub, marginTop: 6, maxWidth: 260, lineHeight: 1.5 } }, "Season passes and memberships you buy on Bookvado will appear here."));
+            }
+            else {
+                const TICKET_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'used', label: 'Used' }, { id: 'expired', label: 'Expired' }];
+                const subTabsRow = React.createElement("div", { style: { display: 'flex', gap: 8, padding: '14px 18px 0' } }, TICKET_TABS.map((t) => {
+                    const active = ticketWalletSubTab === t.id;
+                    return React.createElement("button", { key: t.id, onClick: () => setTicketWalletSubTab(t.id), style: { padding: '7px 14px', borderRadius: 16, background: active ? THEME.coral : WK.alt, color: active ? '#fff' : WK.sub, fontSize: 12.5, fontWeight: 700 } }, t.label);
+                }));
+                const ticketBookings = bookings.filter((b) => b.tickets && b.tickets.length);
+                const shown = ticketBookings.filter((b) => ticketBookingBucket(b) === ticketWalletSubTab)
+                    .sort((a, c) => (a.day != null && c.day != null) ? (new Date(a.year, a.month, a.day) - new Date(c.year, c.month, c.day)) : 0);
+                const emptyState = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 18px 20px', textAlign: 'center' } },
+                    React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: WK.alt, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 } }, React.createElement(Icon, { name: "wallet", size: 28, color: '#C7C7CC' })),
+                    React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: WK.text, margin: 0 } }, `No ${ticketWalletSubTab} tickets`),
+                    ticketWalletSubTab === 'upcoming' && React.createElement(React.Fragment, null,
+                        React.createElement("p", { style: { fontSize: 12.5, color: WK.sub, marginTop: 6, maxWidth: 260, lineHeight: 1.5 } }, "Tickets for attractions, movies, and other ticketed experiences you book on Bookvado will appear here automatically."),
+                        React.createElement("button", { onClick: () => { setTab('browse'); setActiveCat(null); }, style: { marginTop: 14, padding: '10px 22px', borderRadius: 20, background: THEME.coral, color: '#fff', fontSize: 12.5, fontWeight: 600 } }, "Explore")));
+                const cards = shown.length === 0 ? emptyState : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '16px 18px 0' } }, shown.map((b) => {
+                    const gStatus = ticketGroupStatus(b);
+                    const meta = TICKET_STATUS_META[gStatus];
+                    const isMovie = b.tickets[0].kind === 'movie';
+                    const tile = isMovie
+                        ? React.createElement("div", { style: { width: 42, height: 56, borderRadius: 10, flexShrink: 0, background: `linear-gradient(160deg, ${THEME.violet}, #2A1E63)`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "video", size: 17, color: "#fff" }))
+                        : React.createElement("div", { style: { width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.logoText || b.business.slice(0, 2).toUpperCase());
+                    const thirdLine = isMovie
+                        ? `${b.date} · ${b.time} · ${b.tickets.length} Ticket${b.tickets.length === 1 ? '' : 's'}`
+                        : `${b.date} · ${b.tickets.length} Ticket${b.tickets.length === 1 ? '' : 's'}`;
+                    return React.createElement("div", { key: b.id, style: { border: `1px solid ${WK.border}`, borderRadius: 18, padding: 14 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                            tile,
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: WK.text, margin: 0 } }, b.business),
+                                React.createElement("p", { style: { fontSize: 12, color: WK.sub, margin: '2px 0 0' } }, b.service),
+                                React.createElement("p", { style: { fontSize: 11.5, color: WK.sub, margin: '2px 0 0' } }, thirdLine))),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 } },
+                            React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: meta.color } }, meta.label),
+                            React.createElement("button", { onClick: () => setTicketDetail({ bookingId: b.id, index: 0 }), style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "View Tickets →")));
+                }));
+                body = React.createElement(React.Fragment, null, subTabsRow, cards);
+            }
+            return React.createElement("div", { className: "avio-scroll", style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 100px)` } },
+                header, catRow, body);
+        })())),
         React.createElement("div", { key: "safeAreaBacking", style: { position: 'fixed', left: 0, right: 0, bottom: 0, height: 'calc(env(safe-area-inset-bottom) + 4px)', background: '#000', zIndex: 3, pointerEvents: 'none' } }),
         !(tab === 'connect' && activeConversationId) && (() => {
             const navDark = showDarkChrome;
@@ -6924,7 +7001,7 @@ function App() {
             React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', paddingTop: 2, paddingLeft: 12, paddingRight: 12 } },
                 (accountType === 'business'
                     ? [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'business', icon: 'grid', label: 'Business' }, { id: 'profile', icon: 'user', label: 'Profile' }]
-                    : [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Bookings' }, { id: 'budget', icon: 'user', label: 'Profile' }])
+                    : [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Bookings' }, { id: 'wallet', icon: 'wallet', label: 'Wallet' }, { id: 'budget', icon: 'user', label: 'Profile' }])
                 .map((t, i) => {
                     if (!t) {
                         return React.createElement("div", { key: "create", style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, flexShrink: 0 } },
@@ -8377,7 +8454,7 @@ function App() {
                     React.createElement("button", { onClick: closeActivityBookingFlow, style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', right: 0, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 18, color: AF.sub })),
                     React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', border: '2.5px solid #22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'calc(env(safe-area-inset-top) + 44px)' } }, React.createElement(Icon, { name: "check", size: 28, color: "#22C55E" })),
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: AF.text, marginTop: 20 } }, "You're All Set!"),
-                    React.createElement("p", { style: { fontSize: 13, color: AF.sub, marginTop: 6 } }, "Your booking is confirmed."),
+                    React.createElement("p", { style: { fontSize: 13, color: AF.sub, marginTop: 6 } }, b.tickets && b.tickets.length ? (b.tickets.some((t) => t.status === 'preparing') ? "We're preparing your tickets." : "Your tickets are ready.") : "Your booking is confirmed."),
                     React.createElement("div", { style: { width: '100%', background: T.surfaceSecondary, borderRadius: 18, padding: 16, marginTop: 24, textAlign: 'left' } },
                         React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: AF.text, margin: 0 } }, b.business),
                         React.createElement("div", { style: { marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', gap: 4 } },
@@ -8386,7 +8463,11 @@ function App() {
                             React.createElement("span", { style: { fontSize: 12.5, color: AF.text } }, b.timeRange || b.time),
                             React.createElement("span", { style: { fontSize: 12.5, color: AF.text } }, `${b.partySize} People · ${b.spaceName}`),
                             React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: THEME.coral, marginTop: 2 } }, money(b.total)))),
-                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, width: '100%', marginTop: 24 } },
+                    b.tickets && b.tickets.length
+                        ? React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, width: '100%', marginTop: 24 } },
+                            React.createElement("button", { onClick: () => { closeActivityBookingFlow(); setTicketDetail({ bookingId: b.id, index: 0 }); }, style: { width: '100%', height: 50, borderRadius: 25, background: T.textPrimary, color: T.background, fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "View Tickets"),
+                            React.createElement("button", { onClick: () => addToAppleCalendar(b), style: { width: '100%', height: 50, borderRadius: 25, border: `1.5px solid ${T.textPrimary}`, background: 'transparent', color: T.textPrimary, fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } }, React.createElement(Icon, { name: "calendar", size: 15, color: T.textPrimary }), "Add to Calendar"))
+                        : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, width: '100%', marginTop: 24 } },
                         React.createElement("button", { onClick: () => addToAppleCalendar(b), style: { width: '100%', height: 50, borderRadius: 25, border: `1.5px solid ${T.textPrimary}`, background: 'transparent', color: T.textPrimary, fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } }, React.createElement(Icon, { name: "calendar", size: 15, color: T.textPrimary }), "Add to Calendar"),
                         React.createElement("button", { onClick: () => { closeActivityBookingFlow(); setTab('bookings'); setBookingsSubTab('upcoming'); }, style: { width: '100%', height: 50, borderRadius: 25, background: T.textPrimary, color: T.background, fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "View Booking")),
                     b.confirmationNumber && React.createElement("p", { style: { fontSize: 11, color: AF.sub, marginTop: 18 } }, `Confirmation #${b.confirmationNumber}`));
@@ -10566,43 +10647,6 @@ function App() {
 
             return React.createElement("div", { key: 'cancelflow-' + cancelFlowStep, className: 'avio-cancelflow ' + (cancelFlowDir === 'fwd' ? 'avio-settings-fwd' : 'avio-settings-back'), style: { position: 'absolute', inset: 0, zIndex: 15, background: CF.bg, display: 'flex', flexDirection: 'column' } }, content);
         })(),
-        ticketWalletOpen && (() => {
-            const TW = { bg: T.background, alt: T.surfaceSecondary, sub: T.textSecondary, text: T.textPrimary, border: T.border };
-            const ticketBookings = bookings.filter((b) => b.tickets && b.tickets.length);
-            const TICKET_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'used', label: 'Used' }, { id: 'expired', label: 'Expired' }];
-            const shown = ticketBookings.filter((b) => ticketBookingBucket(b) === ticketWalletSubTab)
-                .sort((a, c) => (a.day != null && c.day != null) ? (new Date(a.year, a.month, a.day) - new Date(c.year, c.month, c.day)) : 0);
-            const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 16px) 18px 14px`, borderBottom: `1px solid ${TW.border}` } },
-                React.createElement("div", { style: { minWidth: 30 } }, React.createElement("button", { onClick: () => setTicketWalletOpen(false), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: TW.text }))),
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16.5, color: TW.text, margin: 0, flex: 1, textAlign: 'center' } }, "Tickets"),
-                React.createElement("div", { style: { minWidth: 30 } }));
-            const tabsRow = React.createElement("div", { style: { flexShrink: 0, display: 'flex', gap: 20, padding: '4px 18px 0', borderBottom: `1px solid ${TW.border}` } }, TICKET_TABS.map((t) => {
-                const active = ticketWalletSubTab === t.id;
-                return React.createElement("button", { key: t.id, onClick: () => setTicketWalletSubTab(t.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
-                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? TW.text : TW.sub } }, t.label),
-                    React.createElement("div", { style: { width: active ? 22 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
-            }));
-            const emptyState = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 18px 20px', textAlign: 'center' } },
-                React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: TW.alt, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 } }, React.createElement(Icon, { name: "wallet", size: 28, color: '#C7C7CC' })),
-                React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: TW.text, margin: 0 } }, `No ${ticketWalletSubTab} tickets`));
-            const cards = shown.length === 0 ? emptyState : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '16px 18px 0' } }, shown.map((b) => {
-                const gStatus = ticketGroupStatus(b);
-                const meta = TICKET_STATUS_META[gStatus];
-                return React.createElement("div", { key: b.id, style: { border: `1px solid ${TW.border}`, borderRadius: 18, padding: 14 } },
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
-                        React.createElement("div", { style: { width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.logoText || b.business.slice(0, 2).toUpperCase()),
-                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                            React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: TW.text, margin: 0 } }, b.business),
-                            React.createElement("p", { style: { fontSize: 12, color: TW.sub, margin: '2px 0 0' } }, b.service),
-                            React.createElement("p", { style: { fontSize: 11.5, color: TW.sub, margin: '2px 0 0' } }, `${b.date} · ${b.tickets.length} Ticket${b.tickets.length === 1 ? '' : 's'}`))),
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 } },
-                        React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: meta.color } }, meta.label),
-                        React.createElement("button", { onClick: () => setTicketDetail({ bookingId: b.id, index: 0 }), style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "View Tickets →")));
-            }));
-            return React.createElement("div", { key: "ticketWallet", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: TW.bg, zIndex: 15, display: 'flex', flexDirection: 'column' } },
-                header, tabsRow,
-                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', paddingBottom: 20 } }, cards));
-        })(),
         ticketDetail && (() => {
             const booking = bookings.find((b) => b.id === ticketDetail.bookingId);
             if (!booking || !booking.tickets || !booking.tickets.length) return null;
@@ -10653,9 +10697,15 @@ function App() {
                         React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${TD.border}` } },
                             React.createElement("span", { style: { fontSize: 12, color: TD.sub } }, "Ticket Type"),
                             React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: TD.text } }, t.type)),
-                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${TD.border}` } },
+                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: (t.details && t.details.length) ? `1px solid ${TD.border}` : 'none' } },
                             React.createElement("span", { style: { fontSize: 12, color: TD.sub } }, "Ticket Holder"),
-                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: TD.text } }, t.holder))),
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: TD.text } }, t.holder)),
+                        // Domain-specific rows (seat, screen, row, section, ...) — driven entirely
+                        // by whatever the ticket's own `details` array carries, so a new ticket
+                        // kind (concert, sports, ...) never needs a change here.
+                        (t.details || []).map((d, i) => React.createElement("div", { key: d.label, style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: i === t.details.length - 1 ? 'none' : `1px solid ${TD.border}` } },
+                            React.createElement("span", { style: { fontSize: 12, color: TD.sub } }, d.label),
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: TD.text } }, d.value)))),
                     React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: meta.color, marginTop: 16 } }, meta.label),
                     t.source === 'partner' && React.createElement("p", { style: { fontSize: 11, color: TD.sub, marginTop: 6, textAlign: 'center' } }, `Official ticket provided by ${booking.business}`),
                     tickets.length > 1 && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 20, marginTop: 26 } },
