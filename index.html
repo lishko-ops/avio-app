@@ -3008,10 +3008,18 @@ function App() {
     const shortVideoRefs = useRef({});
     const shortItemRefs = useRef({});
     const shortsObserverRef = useRef(null);
+    const shortPosterRefs = useRef({});
     // Starts muted so the browser's autoplay policy never blocks the initial play() call —
     // unmuted autoplay is only allowed after a real user gesture, and without this every
     // video would silently fail to autoplay on scroll and require a manual tap to start.
-    const [feedSoundOn] = useState(false);
+    // The rail's volume button below lets the customer opt in to sound with one tap.
+    const [feedSoundOn, setFeedSoundOn] = useState(false);
+    useEffect(() => {
+        // Toggling mute on a video that's already playing is allowed without a fresh
+        // gesture (only *starting* unmuted playback requires one), so this can safely
+        // apply the new preference to whichever short is currently on screen.
+        Object.values(shortVideoRefs.current).forEach((v) => { if (v && !v.paused) v.muted = !feedSoundOn; });
+    }, [feedSoundOn]);
     useEffect(() => {
         if (tab !== 'discover')
             Object.values(shortVideoRefs.current).forEach((v) => { if (v) v.pause(); });
@@ -5838,9 +5846,11 @@ function App() {
             const backdrop = item.customVideoUrl
                 ? React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, src: item.customVideoUrl, muted: !feedSoundOn, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000', cursor: 'pointer' } })
                 : item.video
-                    ? React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, poster: item.image || undefined, muted: !feedSoundOn, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
-                        React.createElement("source", { src: item.video + '.webm', type: "video/webm" }),
-                        React.createElement("source", { src: item.video + '.mp4', type: "video/mp4" }))
+                    ? React.createElement(React.Fragment, { key: item.id + '-videowrap' },
+                        React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, muted: !feedSoundOn, loop: true, playsInline: true, onPlaying: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = 'none'; }, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
+                            React.createElement("source", { src: item.video + '.webm', type: "video/webm" }),
+                            React.createElement("source", { src: item.video + '.mp4', type: "video/mp4" })),
+                        item.image && React.createElement("img", { key: item.id + '-poster', ref: (el) => { if (el) shortPosterRefs.current[item.id] = el; }, src: item.image, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }))
                     : item.image
                     ? React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
                     : React.createElement("div", { style: { position: 'absolute', inset: 0, background: item.avatarColor || '#000' } });
@@ -5882,7 +5892,9 @@ function App() {
                             React.createElement("button", { className: "avio-rail-btn share", onClick: () => shareItem(item), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: '#fff' } },
                                 React.createElement("div", { style: { position: 'relative' } },
                                     React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "sendoutline", size: 26, color: "#fff" }))),
-                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, shareCount)));
+                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, shareCount)),
+                            React.createElement("button", { className: "avio-rail-btn", onClick: () => setFeedSoundOn((v) => !v), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: '#fff' } },
+                                React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: feedSoundOn ? "volumeon" : "volumeoff", size: 22, color: "#fff" }))));
                     })());
             const nameRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
                 React.createElement("button", { onClick: () => openBusinessProfile(item), style: { display: 'flex', alignItems: 'center', gap: 6 } },
