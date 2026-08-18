@@ -5943,8 +5943,9 @@ function App() {
                 React.createElement(Icon, { name: "store", size: 12, color: THEME.coral }),
                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, accountType === 'business' ? 'Business' : 'Customer'),
                 React.createElement(Icon, { name: "chevrondown", size: 11, color: THEME.coral }));
-            const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 56, zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10 } },
+            const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16, zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10 } },
                 modeSwitcher,
+                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', width: '100%' } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6 } },
                     [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
                         const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
@@ -5955,7 +5956,9 @@ function App() {
                                 React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
                                 isMain && React.createElement("span", { style: { position: 'absolute', top: 0, right: -9, width: 6, height: 6, borderRadius: '50%', background: THEME.coral } })),
                             React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: T.surface, transition: 'width 0.2s' } }));
-                    })));
+                    })),
+                React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', flexShrink: 0 } },
+                    React.createElement(Icon, { name: "search", size: 20, color: "#fff" }))));
             const actionStack = React.createElement("div", { style: { position: 'absolute', right: 'calc(3% - 15px)', bottom: 'calc(env(safe-area-inset-bottom) + 96px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, zIndex: 2 } },
                     (() => {
                         return React.createElement(React.Fragment, null,
@@ -6060,9 +6063,6 @@ function App() {
                     backdrop, scrim, brand, actionStack, infoBlock, bookCta),
                 arrowOverlay, burstOverlay, scrubBarOverlay);
         }))),
-        tab === 'discover' && !customerProfileOpen && !businessProfileTarget && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 18px)', right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 } },
-            React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex' } },
-                React.createElement(Icon, { name: "search", size: 20, color: "#fff" })))),
         tab === 'browse' && (React.createElement("div", { style: { position: 'absolute', inset: 0, overflowY: 'auto', background: T.background, padding: `calc(env(safe-area-inset-top) + 16px) 0 calc(env(safe-area-inset-bottom) + 90px)` } }, (() => {
             const categories = CATEGORIES.filter((c) => c.id !== 'shorts');
             const quickFilters = [
