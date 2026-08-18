@@ -5914,8 +5914,9 @@ function App() {
                             React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
                             React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: T.surface, transition: 'width 0.2s' } }));
                     })),
-                React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', paddingBottom: 4 } },
-                    React.createElement(Icon, { name: "search", size: 20, color: "#fff" }))),
+                React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
+                    React.createElement(Icon, { name: "search", size: 20, color: "#fff" }),
+                    React.createElement("span", { style: { width: 0, height: 2 } }))),
             React.createElement(Icon, { name: shortsFeedTab === 'following' ? "user" : "search", size: 22, color: THEME.mutedDark }),
             React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : "No shorts to show right now"),
             shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('forYou'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Browse Thrillz"))) : filteredFeed.map((item, itemIdx) => {
@@ -5957,8 +5958,9 @@ function App() {
                                 isMain && React.createElement("span", { style: { position: 'absolute', top: 0, right: -9, width: 6, height: 6, borderRadius: '50%', background: THEME.coral } })),
                             React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: T.surface, transition: 'width 0.2s' } }));
                     })),
-                React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', flexShrink: 0 } },
-                    React.createElement(Icon, { name: "search", size: 20, color: "#fff" }))));
+                React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
+                    React.createElement(Icon, { name: "search", size: 20, color: "#fff" }),
+                    React.createElement("span", { style: { width: 0, height: 2 } }))));
             const actionStack = React.createElement("div", { style: { position: 'absolute', right: 'calc(3% - 15px)', bottom: 'calc(env(safe-area-inset-bottom) + 96px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, zIndex: 2 } },
                     (() => {
                         return React.createElement(React.Fragment, null,
