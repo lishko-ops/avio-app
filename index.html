@@ -84,6 +84,9 @@
   .avio-settings-back { animation: avioSettingsBack 0.24s cubic-bezier(0.32, 0.72, 0, 1); }
   @keyframes avioSpin { to { transform: rotate(360deg); } }
   .avio-spin { animation: avioSpin 0.7s linear infinite; }
+  @keyframes avioScrubIn { from { opacity: 0; transform: scaleY(0.3); } to { opacity: 1; transform: scaleY(1); } }
+  .avio-scrub-bar { animation: avioScrubIn 0.14s cubic-bezier(0.22,1,0.36,1); opacity: 1; transition: opacity 0.2s ease; }
+  .avio-scrub-bar.avio-scrub-out { opacity: 0; }
   .avio-settings-row:active { background: #FAFAFA; }
   .avio-settings-tap { transition: opacity 0.12s ease, transform 0.12s ease; }
   .avio-settings-tap:active { opacity: 0.7; transform: scale(0.98); }
@@ -497,6 +500,10 @@ function formatDuration(min) {
     const m = min % 60;
     return m ? `${h}h ${m}min` : `${h}h`;
 }
+// Hidden Thrillz scrub bar: touches starting within this many px of the screen bottom are
+// reserved for scrubbing; the bar itself sits inset by SCRUB_BAR_MARGIN on each side.
+const SCRUB_ZONE_PX = 110;
+const SCRUB_BAR_MARGIN = 16;
 const BOOKING_STATUS_STYLE = {
     confirmed: { bg: THEME.coral, color: '#fff', border: 'none' },
     pending: { bg: '#EDEDED', color: '#6B6B6B', border: 'none' },
@@ -3009,6 +3016,34 @@ function App() {
     const shortItemRefs = useRef({});
     const shortsObserverRef = useRef(null);
     const shortPosterRefs = useRef({});
+    // Hidden scrub bar: which short (if any) currently has the bar visible, plus the
+    // .fill/.dot/.bar DOM node refs it drives directly (no React re-render per drag frame,
+    // so tracking the finger stays immediate instead of re-rendering all 65 cards).
+    const [scrubActiveId, setScrubActiveId] = useState(null);
+    const scrubBarRefs = useRef({});
+    // A fresh inline ref callback fires on every render (React can't tell it apart from a
+    // real unmount+remount), which would re-observe an already-visible card and immediately
+    // re-trigger its autoplay — fighting the scrub bar's pause. Caching one stable callback
+    // per short keeps observe/unobserve tied to real mount/unmount only.
+    const shortItemRefCallbacks = useRef({});
+    function getShortItemRefCallback(itemId) {
+        if (!shortItemRefCallbacks.current[itemId]) {
+            shortItemRefCallbacks.current[itemId] = (el) => {
+                if (el) {
+                    shortItemRefs.current[itemId] = el;
+                    if (shortsObserverRef.current)
+                        shortsObserverRef.current.observe(el);
+                }
+                else {
+                    const prev = shortItemRefs.current[itemId];
+                    if (prev && shortsObserverRef.current)
+                        shortsObserverRef.current.unobserve(prev);
+                    delete shortItemRefs.current[itemId];
+                }
+            };
+        }
+        return shortItemRefCallbacks.current[itemId];
+    }
     // Starts muted so the browser's autoplay policy never blocks the initial play() call —
     // unmuted autoplay is only allowed after a real user gesture, and without this every
     // video would silently fail to autoplay on scroll and require a manual tap to start.
@@ -4786,7 +4821,10 @@ function App() {
         const x = e.touches[0].clientX;
         const y = e.touches[0].clientY;
         const edge = x < window.innerWidth * 0.55;
-        shortTouchRef.current = { itemId: item.id, startX: x, startY: y, edge, axis: null, triggered: false };
+        // Touches that start in this bottom band are reserved for the hidden scrub bar,
+        // so they never compete with the restart/profile-reveal swipes above it.
+        const inScrubZone = y > window.innerHeight - SCRUB_ZONE_PX;
+        shortTouchRef.current = { itemId: item.id, startX: x, startY: y, edge, axis: null, triggered: false, inScrubZone, scrubbing: false };
     }
     function handleShortTouchMove(e, item) {
         const t = shortTouchRef.current;
@@ -4800,9 +4838,32 @@ function App() {
             t.axis = Math.abs(dy) > Math.abs(dx) ? 'vertical' : 'horizontal';
             if (t.axis === 'vertical')
                 return;
+            if (t.inScrubZone) {
+                const vid = shortVideoRefs.current[item.id];
+                if (vid && isFinite(vid.duration) && vid.duration > 0) {
+                    t.scrubbing = true;
+                    t.barLeft = SCRUB_BAR_MARGIN;
+                    t.barWidth = window.innerWidth - SCRUB_BAR_MARGIN * 2;
+                    vid.pause();
+                    setScrubActiveId(item.id);
+                }
+            }
         }
         if (t.axis === 'vertical')
             return;
+        if (t.scrubbing) {
+            const x = e.touches[0].clientX;
+            const progress = t.barWidth ? Math.min(1, Math.max(0, (x - t.barLeft) / t.barWidth)) : 0;
+            const vid = shortVideoRefs.current[item.id];
+            if (vid && isFinite(vid.duration))
+                vid.currentTime = progress * vid.duration;
+            const refs = scrubBarRefs.current[item.id];
+            if (refs && refs.fill && refs.dot) {
+                refs.fill.style.width = (progress * 100) + '%';
+                refs.dot.style.left = (progress * 100) + '%';
+            }
+            return;
+        }
         if (t.edge) {
             if (dx <= 0)
                 return;
@@ -4827,6 +4888,19 @@ function App() {
         shortTouchRef.current = null;
         if (!t || t.itemId !== item.id)
             return;
+        if (t.scrubbing) {
+            const vid = shortVideoRefs.current[item.id];
+            if (vid) {
+                const p = vid.play();
+                if (p && p.catch)
+                    p.catch(() => { });
+            }
+            const refs = scrubBarRefs.current[item.id];
+            if (refs && refs.bar)
+                refs.bar.classList.add('avio-scrub-out');
+            setTimeout(() => setScrubActiveId((cur) => cur === item.id ? null : cur), 220);
+            return;
+        }
         if (!t.axis) {
             const now = Date.now();
             const touch = e.changedTouches && e.changedTouches[0];
@@ -5950,22 +6024,28 @@ function App() {
             const isBurstHere = likeBurst && likeBurst.itemId === item.id;
             const burstOverlay = isBurstHere && React.createElement("div", { key: likeBurst.key, style: { position: 'absolute', left: likeBurst.x, top: likeBurst.y, zIndex: 6, pointerEvents: 'none', transform: 'translate(-50%,-50%)', animation: 'avioLikeBurst 0.7s ease' } },
                 React.createElement(Icon, { name: "diamond", size: 90, color: THEME.coral, fill: THEME.coral }));
-            return React.createElement("div", { key: item.id, ref: (el) => {
-                    if (el) {
-                        shortItemRefs.current[item.id] = el;
-                        if (shortsObserverRef.current)
-                            shortsObserverRef.current.observe(el);
-                    }
-                    else {
-                        const prev = shortItemRefs.current[item.id];
-                        if (prev && shortsObserverRef.current)
-                            shortsObserverRef.current.unobserve(prev);
-                        delete shortItemRefs.current[item.id];
-                    }
-                }, "data-short-id": item.id, onTouchStart: (e) => handleShortTouchStart(e, item), onTouchMove: (e) => handleShortTouchMove(e, item), onTouchEnd: (e) => handleShortTouchEnd(e, item), style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
+            const isScrubHere = scrubActiveId === item.id;
+            const scrubVid = isScrubHere ? shortVideoRefs.current[item.id] : null;
+            const scrubInitialPct = scrubVid && scrubVid.duration ? Math.min(100, Math.max(0, (scrubVid.currentTime / scrubVid.duration) * 100)) : 0;
+            const scrubBarOverlay = isScrubHere && React.createElement("div", {
+                key: item.id + '-scrub',
+                ref: (el) => { if (el) { scrubBarRefs.current[item.id] = scrubBarRefs.current[item.id] || {}; scrubBarRefs.current[item.id].bar = el; } },
+                className: "avio-scrub-bar",
+                style: { position: 'absolute', left: SCRUB_BAR_MARGIN, right: SCRUB_BAR_MARGIN, bottom: 'calc(env(safe-area-inset-bottom) + 58px)', zIndex: 3, height: 12, display: 'flex', alignItems: 'center', pointerEvents: 'none' },
+            },
+                React.createElement("div", { style: { position: 'relative', width: '100%', height: 2.5, borderRadius: 2, background: 'rgba(255,255,255,0.3)' } },
+                    React.createElement("div", {
+                        ref: (el) => { if (el) { scrubBarRefs.current[item.id] = scrubBarRefs.current[item.id] || {}; scrubBarRefs.current[item.id].fill = el; } },
+                        style: { position: 'absolute', left: 0, top: 0, bottom: 0, width: scrubInitialPct + '%', borderRadius: 2, background: THEME.coral },
+                    }),
+                    React.createElement("div", {
+                        ref: (el) => { if (el) { scrubBarRefs.current[item.id] = scrubBarRefs.current[item.id] || {}; scrubBarRefs.current[item.id].dot = el; } },
+                        style: { position: 'absolute', top: '50%', left: scrubInitialPct + '%', width: 11, height: 11, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 5px rgba(0,0,0,0.45)', transform: 'translate(-50%, -50%)' },
+                    })));
+            return React.createElement("div", { key: item.id, ref: getShortItemRefCallback(item.id), "data-short-id": item.id, onTouchStart: (e) => handleShortTouchStart(e, item), onTouchMove: (e) => handleShortTouchMove(e, item), onTouchEnd: (e) => handleShortTouchEnd(e, item), style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
                 React.createElement("div", { style: { position: 'absolute', inset: 0, transform: `translateX(${-dragProgress * 46}px)`, opacity: 1 - dragProgress * 0.35, transition: innerTransition } },
                     backdrop, scrim, brand, actionStack, infoBlock, bookCta),
-                arrowOverlay, burstOverlay);
+                arrowOverlay, burstOverlay, scrubBarOverlay);
         }))),
         tab === 'discover' && !customerProfileOpen && !businessProfileTarget && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 18px)', right: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 14 } },
             React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex' } },
