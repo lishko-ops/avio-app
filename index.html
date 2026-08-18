@@ -3008,7 +3008,10 @@ function App() {
     const shortVideoRefs = useRef({});
     const shortItemRefs = useRef({});
     const shortsObserverRef = useRef(null);
-    const [feedSoundOn] = useState(true);
+    // Starts muted so the browser's autoplay policy never blocks the initial play() call —
+    // unmuted autoplay is only allowed after a real user gesture, and without this every
+    // video would silently fail to autoplay on scroll and require a manual tap to start.
+    const [feedSoundOn] = useState(false);
     useEffect(() => {
         if (tab !== 'discover')
             Object.values(shortVideoRefs.current).forEach((v) => { if (v) v.pause(); });
