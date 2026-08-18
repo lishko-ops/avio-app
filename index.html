@@ -3014,12 +3014,11 @@ function App() {
     // video would silently fail to autoplay on scroll and require a manual tap to start.
     // The rail's volume button below lets the customer opt in to sound with one tap.
     const [feedSoundOn, setFeedSoundOn] = useState(false);
-    useEffect(() => {
-        // Toggling mute on a video that's already playing is allowed without a fresh
-        // gesture (only *starting* unmuted playback requires one), so this can safely
-        // apply the new preference to whichever short is currently on screen.
-        Object.values(shortVideoRefs.current).forEach((v) => { if (v && !v.paused) v.muted = !feedSoundOn; });
-    }, [feedSoundOn]);
+    // Tracks which short is currently playing so its immediate neighbors can be
+    // preloaded ahead of time — the standard trick behind TikTok/Reels-style
+    // instant playback, instead of every one of the 65 shorts fighting for
+    // bandwidth at once.
+    const [activeShortId, setActiveShortId] = useState(null);
     useEffect(() => {
         if (tab !== 'discover')
             Object.values(shortVideoRefs.current).forEach((v) => { if (v) v.pause(); });
@@ -3518,6 +3517,8 @@ function App() {
             result = result.filter((item) => !item.locationMode || item.locationMode === 'All' || activeLocationModes.has(item.locationMode));
         return result;
     }, [shortsFeedTab, followedIds, feed, filterToggles]);
+    const rawActiveShortIdx = filteredFeed.findIndex((f) => f.id === activeShortId);
+    const activeShortIdx = rawActiveShortIdx === -1 ? 0 : rawActiveShortIdx;
     useEffect(() => {
         if (tab !== 'discover') {
             shortsObserverRef.current = null;
@@ -3540,6 +3541,7 @@ function App() {
                     const p = vid.play();
                     if (p && p.catch)
                         p.catch(() => { });
+                    setActiveShortId(id);
                 }
                 else {
                     vid.pause();
@@ -5835,7 +5837,8 @@ function App() {
                     React.createElement(Icon, { name: "search", size: 20, color: "#fff" }))),
             React.createElement(Icon, { name: shortsFeedTab === 'following' ? "user" : "search", size: 22, color: THEME.mutedDark }),
             React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : "No shorts to show right now"),
-            shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('forYou'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Browse Thrillz"))) : filteredFeed.map((item) => {
+            shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('forYou'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Browse Thrillz"))) : filteredFeed.map((item, itemIdx) => {
+            const isNearActive = Math.abs(itemIdx - activeShortIdx) <= 1;
             const liked = likedIds.has(item.id);
             const followed = followedIds.has(item.id);
             const saved = savedShorts.has(item.id);
@@ -5847,7 +5850,7 @@ function App() {
                 ? React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, src: item.customVideoUrl, muted: !feedSoundOn, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000', cursor: 'pointer' } })
                 : item.video
                     ? React.createElement(React.Fragment, { key: item.id + '-videowrap' },
-                        React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, muted: !feedSoundOn, loop: true, playsInline: true, onPlaying: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = 'none'; }, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
+                        React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, muted: !feedSoundOn, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onPlaying: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = 'none'; }, onWaiting: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = ''; }, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
                             React.createElement("source", { src: item.video + '.webm', type: "video/webm" }),
                             React.createElement("source", { src: item.video + '.mp4', type: "video/mp4" })),
                         item.image && React.createElement("img", { key: item.id + '-poster', ref: (el) => { if (el) shortPosterRefs.current[item.id] = el; }, src: item.image, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }))
@@ -5893,7 +5896,15 @@ function App() {
                                 React.createElement("div", { style: { position: 'relative' } },
                                     React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "sendoutline", size: 26, color: "#fff" }))),
                                 React.createElement("span", { style: { fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, shareCount)),
-                            React.createElement("button", { className: "avio-rail-btn", onClick: () => setFeedSoundOn((v) => !v), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: '#fff' } },
+                            React.createElement("button", { className: "avio-rail-btn", onClick: () => {
+                                // Mutate .muted synchronously, inside the click handler's own call
+                                // stack — deferring it to an effect can land a tick too late for
+                                // strict mobile browsers that only grant unmuted playback within the
+                                // exact gesture that triggered it.
+                                const next = !feedSoundOn;
+                                Object.values(shortVideoRefs.current).forEach((vid) => { if (vid && !vid.paused) vid.muted = !next; });
+                                setFeedSoundOn(next);
+                            }, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: '#fff' } },
                                 React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: feedSoundOn ? "volumeon" : "volumeoff", size: 22, color: "#fff" }))));
                     })());
             const nameRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
