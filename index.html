@@ -5905,7 +5905,7 @@ function App() {
         React.createElement("input", { ref: fileInputRef, type: "file", accept: "video/*", style: { display: 'none' }, onChange: handleFileChosen }),
         tab === 'discover' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
             React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16, zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 11 } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 11 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6 } },
                     [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
                         const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
                         const isMain = t.id === 'forYou';
@@ -5945,7 +5945,7 @@ function App() {
                 React.createElement(Icon, { name: "chevrondown", size: 11, color: THEME.coral }));
             const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 56, zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10 } },
                 modeSwitcher,
-                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 11 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6 } },
                     [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
                         const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
                         const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
