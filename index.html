@@ -3603,7 +3603,10 @@ function App() {
     const rawActiveShortIdx = filteredFeed.findIndex((f) => f.id === activeShortId);
     const activeShortIdx = rawActiveShortIdx === -1 ? 0 : rawActiveShortIdx;
     useEffect(() => {
-        if (tab !== 'discover') {
+        // Also stays active while a profile's Thrillz viewer is open (postViewer) so
+        // autoplay/pause works there too, even if it was opened from a tab other than
+        // the main Thrillz feed — it reuses this exact same observer/callback.
+        if (tab !== 'discover' && !postViewer) {
             shortsObserverRef.current = null;
             return;
         }
@@ -3644,7 +3647,7 @@ function App() {
         shortsObserverRef.current = observer;
         Object.values(shortItemRefs.current).forEach((el) => { if (el) observer.observe(el); });
         return () => { observer.disconnect(); shortsObserverRef.current = null; };
-    }, [tab]);
+    }, [tab, postViewer]);
     const [bookingStep, setBookingStep] = useState('service');
     const [customerServiceLocation, setCustomerServiceLocation] = useState('business');
     const [customerServiceAddress, setCustomerServiceAddress] = useState('');
@@ -5957,25 +5960,7 @@ function App() {
                 React.createElement("input", { ref: settingsAttachInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleSettingsAttachFile }),
                 photoSheet));
     }
-    return React.createElement(AppThemeContext.Provider, { value: T }, React.createElement("div", { style: { width: '100%', margin: '0 auto', position: 'fixed', top: 0, bottom: 0, left: 0, right: 0, overflow: 'hidden', background: T.background } },
-        React.createElement("input", { ref: fileInputRef, type: "file", accept: "video/*", style: { display: 'none' }, onChange: handleFileChosen }),
-        tab === 'discover' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
-            React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16, zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6 } },
-                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
-                        const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
-                        const isMain = t.id === 'forYou';
-                        const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
-                        return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
-                            React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
-                            React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: T.surface, transition: 'width 0.2s' } }));
-                    })),
-                React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
-                    React.createElement(Icon, { name: "search", size: 20, color: "#fff" }),
-                    React.createElement("span", { style: { width: 0, height: 2 } }))),
-            React.createElement(Icon, { name: shortsFeedTab === 'following' ? "user" : "search", size: 22, color: THEME.mutedDark }),
-            React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : "No shorts to show right now"),
-            shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('forYou'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Browse Thrillz"))) : filteredFeed.map((item, itemIdx) => {
+    function renderShortCard(item, itemIdx, activeShortIdx, showFeedHeader) {
             const isNearActive = Math.abs(itemIdx - activeShortIdx) <= 1;
             const liked = likedIds.has(item.id);
             const followed = followedIds.has(item.id);
@@ -6002,7 +5987,7 @@ function App() {
                 React.createElement(Icon, { name: "chevrondown", size: 11, color: THEME.coral }));
             const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16, zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10 } },
                 modeSwitcher,
-                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', width: '100%', gap: 24 } },
+                showFeedHeader && React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', width: '100%', gap: 24 } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6 } },
                     [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
                         const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
@@ -6065,7 +6050,7 @@ function App() {
             const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 'calc(env(safe-area-inset-bottom) + 110px)', padding: '0 18px', zIndex: 2 } },
                 bookedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, taggedRow);
             const thrillCta = getBookingCta(primaryTagTarget);
-            const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(max(0px, env(safe-area-inset-bottom) - 37px) + 72px)', zIndex: 2, borderRadius: 18, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
+            const bookCta = !item.mine && React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(max(0px, env(safe-area-inset-bottom) - 37px) + 72px)', zIndex: 2, borderRadius: 18, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
                 React.createElement("button", { onClick: () => startBookingFor(primaryTagTarget), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 19.5px' } },
                     React.createElement(Icon, { name: "calendar", size: 14, color: "#fff" }),
                     React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12, color: "#fff" } }, thrillCta.label),
@@ -6110,7 +6095,26 @@ function App() {
                 React.createElement("div", { style: { position: 'absolute', inset: 0, transform: `translateX(${-dragProgress * 46}px)`, opacity: 1 - dragProgress * 0.35, transition: innerTransition } },
                     backdrop, scrim, brand, actionStack, infoBlock, bookCta),
                 arrowOverlay, burstOverlay, scrubBarOverlay);
-        }))),
+    }
+    return React.createElement(AppThemeContext.Provider, { value: T }, React.createElement("div", { style: { width: '100%', margin: '0 auto', position: 'fixed', top: 0, bottom: 0, left: 0, right: 0, overflow: 'hidden', background: T.background } },
+        React.createElement("input", { ref: fileInputRef, type: "file", accept: "video/*", style: { display: 'none' }, onChange: handleFileChosen }),
+        tab === 'discover' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
+            React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16, zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6 } },
+                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
+                        const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
+                        const isMain = t.id === 'forYou';
+                        const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
+                        return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
+                            React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
+                            React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: T.surface, transition: 'width 0.2s' } }));
+                    })),
+                React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
+                    React.createElement(Icon, { name: "search", size: 20, color: "#fff" }),
+                    React.createElement("span", { style: { width: 0, height: 2 } }))),
+            React.createElement(Icon, { name: shortsFeedTab === 'following' ? "user" : "search", size: 22, color: THEME.mutedDark }),
+            React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : "No shorts to show right now"),
+            shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('forYou'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Browse Thrillz"))) : filteredFeed.map((item, itemIdx) => renderShortCard(item, itemIdx, activeShortIdx, true)))),
         tab === 'browse' && (React.createElement("div", { style: { position: 'absolute', inset: 0, overflowY: 'auto', background: T.background, padding: `calc(env(safe-area-inset-top) + 16px) 0 calc(env(safe-area-inset-bottom) + 90px)` } }, (() => {
             const categories = CATEGORIES.filter((c) => c.id !== 'shorts');
             const quickFilters = [
@@ -7648,41 +7652,35 @@ function App() {
         })(),
         postViewer && (() => {
             const { item, posts, index } = postViewer;
-            const post = posts[index];
-            const goTo = (i) => { if (i >= 0 && i < posts.length) setPostViewer({ item, posts, index: i }); };
-            const postVideoSrc = post.videoUrl || (post.video ? `${post.video}.mp4` : null);
-            const backdrop = postVideoSrc
-                ? React.createElement("video", { key: post.id, ref: (el) => { if (el) el.playbackRate = post.playbackRate || 1; }, src: postVideoSrc, poster: post.image || undefined, autoPlay: true, muted: true, loop: true, playsInline: true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000' } })
-                : React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: post.image ? `url(${post.image})` : 'none', backgroundColor: post.image ? undefined : THEME.ink, backgroundSize: 'cover', backgroundPosition: 'center' } });
+            // Scope each grid post into a full Thrillz-feed-shaped item — spreading the
+            // profile's own info (name/location/services/booking data) as the base so
+            // renderShortCard (the exact same component the main feed uses) has
+            // everything it needs, then layering the post's own id/media/likes on top.
+            const scopedItems = posts.map((p) => ({ ...item, ...p, id: p.id }));
+            const rawActiveIdx = scopedItems.findIndex((p) => p.id === activeShortId);
+            const activeIdx = rawActiveIdx === -1 ? index : rawActiveIdx;
+            const currentPost = scopedItems[activeIdx] || scopedItems[index] || scopedItems[0];
             return React.createElement("div", { key: "postviewer", style: { position: 'absolute', inset: 0, zIndex: 12, background: THEME.ink, overflow: 'hidden' } },
-                backdrop,
-                React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.05) 30%, rgba(0,0,0,0.55))' } }),
-                React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 18, right: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                React.createElement("div", {
+                    className: "avio-scroll",
+                    style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' },
+                    // Land on the tapped post immediately on open, then never touch
+                    // scrollTop again — this only fires once per mount via the dataset
+                    // flag, so it doesn't fight the user's own swiping afterward.
+                    ref: (el) => { if (el && el.dataset.avioScrolled !== 'true') { el.scrollTop = index * (el.clientHeight || window.innerHeight); el.dataset.avioScrolled = 'true'; } },
+                }, scopedItems.map((post, i) => renderShortCard(post, i, activeIdx, false))),
+                React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 18, right: 18, zIndex: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
                     React.createElement("button", { onClick: closePostViewer, style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                         React.createElement(Icon, { name: "arrowleft", size: 20, color: "#fff" })),
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14 } },
-                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: '#fff' } }, `${index + 1} / ${posts.length}`),
-                        item.mine && React.createElement("button", { onClick: () => setThrillzManageOpen(true), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                            React.createElement("span", { style: { fontSize: 19, color: '#fff', letterSpacing: 1, lineHeight: 1 } }, "•••")))),
-                index > 0 && React.createElement("button", { onClick: () => goTo(index - 1), style: { position: 'absolute', left: 0, top: 0, bottom: 0, width: '30%' } }),
-                index < posts.length - 1 && React.createElement("button", { onClick: () => goTo(index + 1), style: { position: 'absolute', right: 0, top: 0, bottom: 0, width: '30%' } }),
-                React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 'calc(env(safe-area-inset-bottom) + 18px)' } },
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 } },
-                        item.image
-                            ? React.createElement("div", { style: { width: 32, height: 32, borderRadius: '50%', backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } })
-                            : React.createElement("div", { style: { width: 32, height: 32, borderRadius: '50%', background: item.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: avatarFg(item.avatarColor), flexShrink: 0 } }, item.name.charAt(0)),
-                        React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: '#fff' } }, item.name),
-                        React.createElement("span", { style: { fontSize: 12, color: 'rgba(255,255,255,0.7)' } }, post.likes, " likes")),
-                    !item.mine && React.createElement("button", { onClick: () => startBookingFor(item), style: { width: '100%', borderRadius: 14, background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '12px 16px' } },
-                        React.createElement(Icon, { name: "calendar", size: 17, color: "#fff" }),
-                        React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: "#fff" } }, getBookingCta(item).label))),
+                    item.mine && React.createElement("button", { onClick: () => setThrillzManageOpen(true), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement("span", { style: { fontSize: 19, color: '#fff', letterSpacing: 1, lineHeight: 1 } }, "•••"))),
                 item.mine && thrillzManageOpen && React.createElement("div", { onClick: () => setThrillzManageOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
                     React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `10px 8px calc(env(safe-area-inset-bottom) + 14px)` } },
                         React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: T.border, margin: '0 auto 10px' } }),
                         [
-                            { id: 'save', icon: 'download', label: 'Save to device', onClick: () => { downloadThrillzPost(post); setThrillzManageOpen(false); } },
-                            { id: 'edit', icon: 'pencil', label: 'Edit Thrillz', onClick: () => openEditThrillz(post) },
-                            { id: 'draft', icon: 'folder', label: 'Move to Drafts', onClick: () => moveThrillzToDrafts(post) },
+                            { id: 'save', icon: 'download', label: 'Save to device', onClick: () => { downloadThrillzPost(currentPost); setThrillzManageOpen(false); } },
+                            { id: 'edit', icon: 'pencil', label: 'Edit Thrillz', onClick: () => openEditThrillz(currentPost) },
+                            { id: 'draft', icon: 'folder', label: 'Move to Drafts', onClick: () => moveThrillzToDrafts(currentPost) },
                             { id: 'delete', icon: 'trash', label: 'Delete Thrillz', danger: true, onClick: () => { setThrillzManageOpen(false); setDeleteThrillzConfirmOpen(true); } },
                         ].map((opt) => React.createElement("button", { key: opt.id, onClick: opt.onClick, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 10px', borderBottom: opt.id !== 'delete' ? `1px solid ${T.border}` : 'none' } },
                             React.createElement(Icon, { name: opt.icon, size: 18, color: opt.danger ? '#D0304A' : T.textPrimary }),
@@ -7691,7 +7689,7 @@ function App() {
                     React.createElement("div", { style: { width: '100%', maxWidth: 320, background: T.surface, borderRadius: 20, padding: 22, textAlign: 'center' } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, margin: 0 } }, "Delete this Thrillz?"),
                         React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 8, lineHeight: 1.45 } }, "This will permanently delete your Thrillz. This action cannot be undone."),
-                        React.createElement("button", { onClick: () => deleteThrillz(post), style: { width: '100%', marginTop: 18, padding: '13px 0', borderRadius: 24, background: '#D0304A', color: '#fff', fontWeight: 700, fontSize: 14 } }, "Delete"),
+                        React.createElement("button", { onClick: () => deleteThrillz(currentPost), style: { width: '100%', marginTop: 18, padding: '13px 0', borderRadius: 24, background: '#D0304A', color: '#fff', fontWeight: 700, fontSize: 14 } }, "Delete"),
                         React.createElement("button", { onClick: () => setDeleteThrillzConfirmOpen(false), style: { width: '100%', marginTop: 10, padding: '13px 0', borderRadius: 24, background: T.surfaceSecondary, color: T.textPrimary, fontWeight: 700, fontSize: 14 } }, "Cancel"))),
                 item.mine && editThrillzOpen && React.createElement("div", { onClick: () => setEditThrillzOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-end', zIndex: 14 } },
                     React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
