@@ -3052,11 +3052,6 @@ function App() {
         }
         return shortItemRefCallbacks.current[itemId];
     }
-    // Starts muted so the browser's autoplay policy never blocks the initial play() call —
-    // unmuted autoplay is only allowed after a real user gesture, and without this every
-    // video would silently fail to autoplay on scroll and require a manual tap to start.
-    // The rail's volume button below lets the customer opt in to sound with one tap.
-    const [feedSoundOn, setFeedSoundOn] = useState(false);
     // Tracks which short is currently playing so its immediate neighbors can be
     // preloaded ahead of time — the standard trick behind TikTok/Reels-style
     // instant playback, instead of every one of the 65 shorts fighting for
@@ -3625,10 +3620,20 @@ function App() {
                 if (!vid)
                     return;
                 if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-                    vid.muted = !feedSoundOn;
+                    // Try unmuted first — sound should always be on by default. Some
+                    // mobile browsers still block unmuted autoplay without a fresh user
+                    // gesture; if that happens, fall back to a muted play so the video
+                    // at least keeps moving instead of freezing on the poster.
+                    vid.muted = false;
                     const p = vid.play();
-                    if (p && p.catch)
-                        p.catch(() => { });
+                    if (p && p.catch) {
+                        p.catch(() => {
+                            vid.muted = true;
+                            const p2 = vid.play();
+                            if (p2 && p2.catch)
+                                p2.catch(() => { });
+                        });
+                    }
                     setActiveShortId(id);
                 }
                 else {
@@ -3639,7 +3644,7 @@ function App() {
         shortsObserverRef.current = observer;
         Object.values(shortItemRefs.current).forEach((el) => { if (el) observer.observe(el); });
         return () => { observer.disconnect(); shortsObserverRef.current = null; };
-    }, [tab, feedSoundOn]);
+    }, [tab]);
     const [bookingStep, setBookingStep] = useState('service');
     const [customerServiceLocation, setCustomerServiceLocation] = useState('business');
     const [customerServiceAddress, setCustomerServiceAddress] = useState('');
@@ -5980,10 +5985,10 @@ function App() {
             const shareCount = formatCount(Math.round(parseCount(item.likes) * 0.4));
             const saveCount = formatCount(parseCount(item.saves) + (saved ? 1 : 0));
             const backdrop = item.customVideoUrl
-                ? React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, src: item.customVideoUrl, muted: !feedSoundOn, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000', cursor: 'pointer' } })
+                ? React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, src: item.customVideoUrl, muted: false, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000', cursor: 'pointer' } })
                 : item.video
                     ? React.createElement(React.Fragment, { key: item.id + '-videowrap' },
-                        React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, muted: !feedSoundOn, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onPlaying: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = 'none'; }, onWaiting: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = ''; }, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
+                        React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, muted: false, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onPlaying: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = 'none'; }, onWaiting: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = ''; }, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
                             React.createElement("source", { src: item.video + '.webm', type: "video/webm" }),
                             React.createElement("source", { src: item.video + '.mp4', type: "video/mp4" })),
                         item.image && React.createElement("img", { key: item.id + '-poster', ref: (el) => { if (el) shortPosterRefs.current[item.id] = el; }, src: item.image, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }))
@@ -6032,17 +6037,7 @@ function App() {
                             React.createElement("button", { className: "avio-rail-btn share", onClick: () => shareItem(item), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: '#fff' } },
                                 React.createElement("div", { style: { position: 'relative' } },
                                     React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "sendoutline", size: 26, color: "#fff" }))),
-                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, shareCount)),
-                            React.createElement("button", { className: "avio-rail-btn", onClick: () => {
-                                // Mutate .muted synchronously, inside the click handler's own call
-                                // stack — deferring it to an effect can land a tick too late for
-                                // strict mobile browsers that only grant unmuted playback within the
-                                // exact gesture that triggered it.
-                                const next = !feedSoundOn;
-                                Object.values(shortVideoRefs.current).forEach((vid) => { if (vid && !vid.paused) vid.muted = !next; });
-                                setFeedSoundOn(next);
-                            }, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: '#fff' } },
-                                React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: feedSoundOn ? "volumeon" : "volumeoff", size: 22, color: "#fff" }))));
+                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, shareCount)));
                     })());
             const nameRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
                 React.createElement("button", { onClick: () => openBusinessProfile(item), style: { display: 'flex', alignItems: 'center', gap: 6 } },
