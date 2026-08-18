@@ -9839,7 +9839,6 @@ function App() {
             if (b.status === 'confirmed' || b.status === 'pending') {
                 actions.push({ icon: 'clock', label: 'Reschedule', onClick: () => flashToast('Reschedule — coming soon') });
                 actions.push({ icon: 'check', label: 'Mark Complete', onClick: () => updateBusinessBookingStatus(b.id, 'completed') });
-                actions.push({ icon: 'x', label: 'Cancel Booking', danger: true, onClick: () => updateBusinessBookingStatus(b.id, 'cancelled') });
             }
             return React.createElement("div", { onClick: (e) => e.stopPropagation(), className: "avio-filter-sheet", style: { width: '100%', background: T.modalBackground, borderRadius: '24px 24px 0 0', padding: `14px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '85%', overflowY: 'auto' } },
                 React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: T.border, margin: '0 auto 14px' } }),
