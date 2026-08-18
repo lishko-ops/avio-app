@@ -4839,14 +4839,19 @@ function App() {
             if (t.axis === 'vertical')
                 return;
             if (t.inScrubZone) {
+                // Claim the gesture as soon as it's a horizontal drag in the scrub zone,
+                // even if the video's duration hasn't loaded yet — otherwise, on a real
+                // network-loaded video, a drag that starts a moment too early falls
+                // through to the old edge-swipe "restart" gesture below, which resets
+                // currentTime to 0 on release. Seeking itself waits for duration inside
+                // the move handler below, once it becomes available.
+                t.scrubbing = true;
+                t.barLeft = SCRUB_BAR_MARGIN;
+                t.barWidth = window.innerWidth - SCRUB_BAR_MARGIN * 2;
                 const vid = shortVideoRefs.current[item.id];
-                if (vid && isFinite(vid.duration) && vid.duration > 0) {
-                    t.scrubbing = true;
-                    t.barLeft = SCRUB_BAR_MARGIN;
-                    t.barWidth = window.innerWidth - SCRUB_BAR_MARGIN * 2;
+                if (vid)
                     vid.pause();
-                    setScrubActiveId(item.id);
-                }
+                setScrubActiveId(item.id);
             }
         }
         if (t.axis === 'vertical')
@@ -4855,7 +4860,7 @@ function App() {
             const x = e.touches[0].clientX;
             const progress = t.barWidth ? Math.min(1, Math.max(0, (x - t.barLeft) / t.barWidth)) : 0;
             const vid = shortVideoRefs.current[item.id];
-            if (vid && isFinite(vid.duration))
+            if (vid && isFinite(vid.duration) && vid.duration > 0)
                 vid.currentTime = progress * vid.duration;
             const refs = scrubBarRefs.current[item.id];
             if (refs && refs.fill && refs.dot) {
@@ -6007,7 +6012,7 @@ function App() {
             const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 'calc(env(safe-area-inset-bottom) + 110px)', padding: '0 18px', zIndex: 2 } },
                 bookedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, taggedRow);
             const thrillCta = getBookingCta(primaryTagTarget);
-            const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(env(safe-area-inset-bottom) + 68px)', zIndex: 2, borderRadius: 18, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
+            const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(max(0px, env(safe-area-inset-bottom) - 37px) + 72px)', zIndex: 2, borderRadius: 18, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
                 React.createElement("button", { onClick: () => startBookingFor(primaryTagTarget), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 19.5px' } },
                     React.createElement(Icon, { name: "calendar", size: 14, color: "#fff" }),
                     React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12, color: "#fff" } }, thrillCta.label),
@@ -6031,9 +6036,13 @@ function App() {
                 key: item.id + '-scrub',
                 ref: (el) => { if (el) { scrubBarRefs.current[item.id] = scrubBarRefs.current[item.id] || {}; scrubBarRefs.current[item.id].bar = el; } },
                 className: "avio-scrub-bar",
-                // Booking CTA raised only a little (bottom: 68px) and the bar sits low in
-                // that gap, close to the nav bar — clearance from both, touching neither.
-                style: { position: 'absolute', left: SCRUB_BAR_MARGIN, right: SCRUB_BAR_MARGIN, bottom: 'calc(env(safe-area-inset-bottom) + 60px)', zIndex: 3, height: 8, display: 'flex', alignItems: 'center', pointerEvents: 'none' },
+                // Positioned using the SAME max(0, safe-area - 37px) term as the nav bar's
+                // own bottom spacer (see the nav's height calc a bit further down), instead
+                // of raw env(safe-area-inset-bottom) — the nav only grows with part of that
+                // inset, so adding the full inset here made the bar drift much higher above
+                // the nav on devices with a real safe area (e.g. iPad with a home indicator)
+                // than on ones without. This keeps the gap to the nav constant everywhere.
+                style: { position: 'absolute', left: SCRUB_BAR_MARGIN, right: SCRUB_BAR_MARGIN, bottom: 'calc(max(0px, env(safe-area-inset-bottom) - 37px) + 62px)', zIndex: 3, height: 8, display: 'flex', alignItems: 'center', pointerEvents: 'none' },
             },
                 React.createElement("div", { style: { position: 'relative', width: '100%', height: 2.5, borderRadius: 2, background: 'rgba(255,255,255,0.3)' } },
                     React.createElement("div", {
