@@ -6007,7 +6007,7 @@ function App() {
             const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 'calc(env(safe-area-inset-bottom) + 110px)', padding: '0 18px', zIndex: 2 } },
                 bookedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, taggedRow);
             const thrillCta = getBookingCta(primaryTagTarget);
-            const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(env(safe-area-inset-bottom) + 62px)', zIndex: 2, borderRadius: 18, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
+            const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(env(safe-area-inset-bottom) + 76px)', zIndex: 2, borderRadius: 18, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
                 React.createElement("button", { onClick: () => startBookingFor(primaryTagTarget), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 19.5px' } },
                     React.createElement(Icon, { name: "calendar", size: 14, color: "#fff" }),
                     React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12, color: "#fff" } }, thrillCta.label),
@@ -6031,21 +6031,19 @@ function App() {
                 key: item.id + '-scrub',
                 ref: (el) => { if (el) { scrubBarRefs.current[item.id] = scrubBarRefs.current[item.id] || {}; scrubBarRefs.current[item.id].bar = el; } },
                 className: "avio-scrub-bar",
-                // Measured on-screen: the "Reserve a Table" / booking button's own bottom
-                // edge sits only ~5px above the nav bar's top edge (pre-existing layout,
-                // unrelated to this feature). The bar is sized and positioned to fit
-                // entirely inside that gap — real clearance from the button, flush with
-                // (never past) the nav's top edge — so it never overlaps either one.
-                style: { position: 'absolute', left: SCRUB_BAR_MARGIN, right: SCRUB_BAR_MARGIN, bottom: 'calc(env(safe-area-inset-bottom) + 59px)', zIndex: 3, height: 3, display: 'flex', alignItems: 'center', pointerEvents: 'none' },
+                // The booking CTA above was raised (bottom: 76px) specifically to open up
+                // real breathing room here — the bar sits with clearance from both the
+                // button above it and the nav bar below it, never touching either.
+                style: { position: 'absolute', left: SCRUB_BAR_MARGIN, right: SCRUB_BAR_MARGIN, bottom: 'calc(env(safe-area-inset-bottom) + 62px)', zIndex: 3, height: 11, display: 'flex', alignItems: 'center', pointerEvents: 'none' },
             },
-                React.createElement("div", { style: { position: 'relative', width: '100%', height: 2, borderRadius: 2, background: 'rgba(255,255,255,0.3)' } },
+                React.createElement("div", { style: { position: 'relative', width: '100%', height: 2.5, borderRadius: 2, background: 'rgba(255,255,255,0.3)' } },
                     React.createElement("div", {
                         ref: (el) => { if (el) { scrubBarRefs.current[item.id] = scrubBarRefs.current[item.id] || {}; scrubBarRefs.current[item.id].fill = el; } },
                         style: { position: 'absolute', left: 0, top: 0, bottom: 0, width: scrubInitialPct + '%', borderRadius: 2, background: THEME.coral },
                     }),
                     React.createElement("div", {
                         ref: (el) => { if (el) { scrubBarRefs.current[item.id] = scrubBarRefs.current[item.id] || {}; scrubBarRefs.current[item.id].dot = el; } },
-                        style: { position: 'absolute', top: '50%', left: scrubInitialPct + '%', width: 4, height: 4, borderRadius: '50%', background: '#fff', boxShadow: '0 0 3px rgba(0,0,0,0.5)', transform: 'translate(-50%, -50%)' },
+                        style: { position: 'absolute', top: '50%', left: scrubInitialPct + '%', width: 9, height: 9, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.45)', transform: 'translate(-50%, -50%)' },
                     })));
             return React.createElement("div", { key: item.id, ref: getShortItemRefCallback(item.id), "data-short-id": item.id, onTouchStart: (e) => handleShortTouchStart(e, item), onTouchMove: (e) => handleShortTouchMove(e, item), onTouchEnd: (e) => handleShortTouchEnd(e, item), style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
                 React.createElement("div", { style: { position: 'absolute', inset: 0, transform: `translateX(${-dragProgress * 46}px)`, opacity: 1 - dragProgress * 0.35, transition: innerTransition } },
