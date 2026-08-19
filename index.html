@@ -11810,7 +11810,7 @@ function App() {
                     subtitle && React.createElement("p", { style: { fontSize: 13, color: RS.sub, margin: '4px 0 0' } }, subtitle)),
                 React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px calc(env(safe-area-inset-bottom) + 18px)' } }, body),
                 footer && React.createElement("div", { style: { flexShrink: 0, padding: `12px 18px calc(env(safe-area-inset-bottom) + 14px)`, borderTop: `1px solid ${RS.border}` } }, footer));
-            const primaryBtn = (label, onClick, disabled) => React.createElement("button", { disabled, onClick, style: { width: '100%', padding: '14px 0', borderRadius: 26, background: THEME.bookGradient, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif', opacity: disabled ? 0.4 : 1 } }, label);
+            const primaryBtn = (label, onClick, disabled) => React.createElement("button", { disabled, onClick, style: { width: '100%', padding: '14px 0', borderRadius: 26, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif', opacity: disabled ? 0.4 : 1 } }, label);
 
             if (rescheduleFlow.step === 'select') {
                 const body = eligible.length === 0
@@ -11832,21 +11832,34 @@ function App() {
                 const firstWeekday = new Date(calYear, calMonthIdx, 1).getDay();
                 const daysInMonth = new Date(calYear, calMonthIdx + 1, 0).getDate();
                 const cells = [...Array(firstWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+                const today = new Date();
+                const goToQuickDate = (offsetDays) => {
+                    const d = new Date(today);
+                    d.setDate(d.getDate() + offsetDays);
+                    setRescheduleFlow((prev) => ({ ...prev, calMonth: new Date(d.getFullYear(), d.getMonth(), 1), newDay: d.getDate(), newTimeMinutes: null }));
+                };
+                const quickBtns = React.createElement("div", { style: { display: 'flex', gap: 8, marginBottom: 18 } },
+                    React.createElement("button", { onClick: () => goToQuickDate(0), style: { flex: 1, padding: '9px 0', borderRadius: 14, border: `1px solid ${RS.border}`, fontSize: 12.5, fontWeight: 600, color: RS.text } }, "Today"),
+                    React.createElement("button", { onClick: () => goToQuickDate(1), style: { flex: 1, padding: '9px 0', borderRadius: 14, border: `1px solid ${RS.border}`, fontSize: 12.5, fontWeight: 600, color: RS.text } }, "Tomorrow"));
+                const calNav = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 } },
+                    React.createElement("button", { onClick: () => setRescheduleFlow((prev) => ({ ...prev, calMonth: new Date(calYear, calMonthIdx - 1, 1), newDay: null })), style: { width: 28, height: 28, borderRadius: '50%', border: `1px solid ${RS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 12, color: RS.text })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: RS.text, margin: 0 } }, rescheduleFlow.calMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })),
+                    React.createElement("button", { onClick: () => setRescheduleFlow((prev) => ({ ...prev, calMonth: new Date(calYear, calMonthIdx + 1, 1), newDay: null })), style: { width: 28, height: 28, borderRadius: '50%', border: `1px solid ${RS.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement("span", { style: { display: 'flex', transform: 'rotate(180deg)' } }, React.createElement(Icon, { name: "arrowleft", size: 12, color: RS.text }))));
+                const weekdayRow = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' } },
+                    ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => React.createElement("p", { key: i, style: { fontSize: 11, color: RS.sub, textAlign: 'center', margin: 0 } }, d)));
+                const monthGrid = React.createElement("div", { className: "avio-cal-fade", style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: 6, marginTop: 6 } },
+                    cells.map((day, i) => {
+                        if (day == null) return React.createElement("div", { key: 'e' + i });
+                        const dObj = new Date(calYear, calMonthIdx, day);
+                        const unavailable = rescheduleIsDayUnavailable(booking, dObj);
+                        const isToday = calYear === today.getFullYear() && calMonthIdx === today.getMonth() && day === today.getDate();
+                        const selected = rescheduleFlow.newDay === day;
+                        return React.createElement("button", { key: day, disabled: unavailable, className: "avio-date-btn", onClick: () => setRescheduleFlow((prev) => ({ ...prev, newDay: day, newTimeMinutes: null })), style: { padding: '6px 0', opacity: unavailable ? 0.3 : 1 } },
+                            React.createElement("span", { style: { width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontSize: 13, fontWeight: selected ? 700 : 500, background: selected ? THEME.coral : 'transparent', color: selected ? '#fff' : RS.text, border: !selected && isToday ? `1.5px solid ${THEME.coral}` : 'none' } }, day));
+                    }));
                 const body = React.createElement(React.Fragment, null,
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 } },
-                        React.createElement("button", { onClick: () => setRescheduleFlow((prev) => ({ ...prev, calMonth: new Date(calYear, calMonthIdx - 1, 1), newDay: null })), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 16, color: RS.text })),
-                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: RS.text, margin: 0 } }, rescheduleFlow.calMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })),
-                        React.createElement("button", { onClick: () => setRescheduleFlow((prev) => ({ ...prev, calMonth: new Date(calYear, calMonthIdx + 1, 1), newDay: null })), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: 'rotate(180deg)' } }, React.createElement(Icon, { name: "arrowleft", size: 16, color: RS.text }))),
-                    React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6 } },
-                        ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => React.createElement("p", { key: i, style: { fontSize: 11, fontWeight: 700, color: RS.sub, textAlign: 'center', margin: 0 } }, d))),
-                    React.createElement("div", { className: "avio-cal-fade", style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 } },
-                        cells.map((day, i) => {
-                            if (day == null) return React.createElement("div", { key: 'e' + i });
-                            const dObj = new Date(calYear, calMonthIdx, day);
-                            const unavailable = rescheduleIsDayUnavailable(booking, dObj);
-                            const selected = rescheduleFlow.newDay === day;
-                            return React.createElement("button", { key: day, disabled: unavailable, className: "avio-date-btn", onClick: () => setRescheduleFlow((prev) => ({ ...prev, newDay: day, newTimeMinutes: null })), style: { aspectRatio: '1 / 1', borderRadius: 12, fontSize: 13, fontWeight: 600, color: unavailable ? '#C7C7CC' : selected ? '#fff' : RS.text, background: selected ? THEME.coral : 'transparent', opacity: unavailable ? 0.4 : 1 } }, day);
-                        })));
+                    quickBtns, calNav, weekdayRow, monthGrid,
+                    React.createElement("p", { style: { fontSize: 10.5, color: RS.sub, marginTop: 16 } }, "Only dates with availability can be selected."));
                 return shell("Select New Date", null, () => setRescheduleFlow((prev) => ({ ...prev, step: 'select' })), body, primaryBtn("Continue", () => setRescheduleFlow((prev) => ({ ...prev, step: 'time' })), !rescheduleFlow.newDay));
             }
             if (rescheduleFlow.step === 'time') {
@@ -11859,7 +11872,7 @@ function App() {
                         React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 } },
                             slots.map((s) => {
                                 const selected = rescheduleFlow.newTimeMinutes === s.minutes;
-                                return React.createElement("button", { key: s.minutes, disabled: !s.available, onClick: () => setRescheduleFlow((prev) => ({ ...prev, newTimeMinutes: s.minutes })), style: { padding: '12px 0', borderRadius: 14, border: selected ? `1.5px solid ${THEME.coral}` : `1px solid ${RS.border}`, background: selected ? THEME.coral : 'transparent', color: !s.available ? '#C7C7CC' : selected ? '#fff' : RS.text, fontSize: 12.5, fontWeight: 700, textDecoration: !s.available ? 'line-through' : 'none' } }, s.label);
+                                return React.createElement("button", { key: s.minutes, disabled: !s.available, onClick: () => setRescheduleFlow((prev) => ({ ...prev, newTimeMinutes: s.minutes })), style: { padding: '12px 0', borderRadius: 14, border: selected ? `1.5px solid ${THEME.coral}` : `1px solid ${RS.border}`, background: selected ? THEME.coral : RS.alt, color: !s.available ? '#C7C7CC' : selected ? '#fff' : RS.text, fontSize: 12.5, fontWeight: 700, textDecoration: !s.available ? 'line-through' : 'none' } }, s.label);
                             })));
                 return shell("Select New Time", null, () => setRescheduleFlow((prev) => ({ ...prev, step: 'date' })), body, primaryBtn("Continue", () => setRescheduleFlow((prev) => ({ ...prev, step: 'review' })), !rescheduleFlow.newTimeMinutes));
             }
