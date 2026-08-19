@@ -639,6 +639,76 @@ const CANCEL_REASONS = [
     { id: 'service', label: 'Service unavailable' },
     { id: 'other', label: 'Other' },
 ];
+// ============================================================================
+// Customer-mode booking management: Cancel / Reschedule / Check on Cancellations
+// ============================================================================
+// Reasons a CUSTOMER gives when cancelling their own booking — distinct from
+// CANCEL_REASONS above, which is Business Mode cancelling a booking it received.
+const CUSTOMER_CANCEL_REASONS = [
+    { id: 'plans', label: 'Change of plans' },
+    { id: 'conflict', label: 'Schedule conflict' },
+    { id: 'alternative', label: 'Found a better option' },
+    { id: 'weather', label: 'Weather' },
+    { id: 'personal', label: 'Personal reasons' },
+    { id: 'other', label: 'Other' },
+];
+// Every status a cancellation request can be in, in the order it's expected
+// to progress. 'declined' is a terminal branch off 'under_review' instead of
+// a step on this line.
+const CANCELLATION_STATUS_META = {
+    requested: { label: 'Cancellation Requested', color: THEME.gold, bg: 'rgba(245,166,35,0.14)' },
+    under_review: { label: 'Under Review', color: THEME.gold, bg: 'rgba(245,166,35,0.14)' },
+    approved: { label: 'Cancellation Approved', color: THEME.coral, bg: 'rgba(151,196,0,0.14)' },
+    cancelled: { label: 'Cancelled', color: THEME.coral, bg: 'rgba(151,196,0,0.14)' },
+    refund_processing: { label: 'Refund Processing', color: THEME.coral, bg: 'rgba(151,196,0,0.14)' },
+    refunded: { label: 'Refunded', color: THEME.coral, bg: 'rgba(151,196,0,0.14)' },
+    declined: { label: 'Cancellation Declined', color: '#D0304A', bg: 'rgba(208,48,74,0.12)' },
+};
+// A booking's cancellation fee/refund math, computed the same way at every
+// step of the flow (policy preview, confirmation, and the final record) so
+// the number a customer agrees to is always the number they actually get.
+// Bookvado's own 24-hours-out / 20% policy — a real deployment would read
+// this from the business's own cancellation terms instead of a flat rule.
+function cancellationQuote(b) {
+    const total = b.total || 0;
+    const startMs = b.day != null ? new Date(b.year, b.month, b.day, ...(() => {
+        const m = b.time && /^(\d{1,2}):(\d{2})\s*(AM|PM)?/i.exec(b.time);
+        if (!m) return [0, 0];
+        let hr = parseInt(m[1], 10);
+        if (m[3] && /PM/i.test(m[3]) && hr !== 12) hr += 12;
+        if (m[3] && /AM/i.test(m[3]) && hr === 12) hr = 0;
+        return [hr, parseInt(m[2], 10)];
+    })()).getTime() : null;
+    const hoursUntil = startMs != null ? (startMs - Date.now()) / 36e5 : Infinity;
+    const withinPenaltyWindow = hoursUntil < 24;
+    const feeAmount = withinPenaltyWindow ? Math.round(total * 0.2 * 100) / 100 : 0;
+    const refundAmount = Math.round((total - feeAmount) * 100) / 100;
+    return {
+        total, feeAmount, refundAmount, withinPenaltyWindow,
+        policyText: 'Cancellations made less than 24 hours before the scheduled time may be subject to a cancellation fee up to 20%.',
+    };
+}
+// Bookvado-issued tickets/bookings can cancel and refund instantly since
+// Bookvado holds the credential end to end (see the Tap-to-Enter redemption
+// protocol); anything sourced from a partner's own ticketing system needs
+// that business to actually approve the cancellation before it's final.
+function cancellationRequiresApproval(b) {
+    if (b.tickets && b.tickets.length)
+        return b.tickets.some((t) => t.source === 'partner');
+    return true;
+}
+function bookingIsCancelEligible(b) {
+    if (b.status === 'cancelled' || b.status === 'completed')
+        return false;
+    if (b.cancellationRequest && b.cancellationRequest.status !== 'declined')
+        return false;
+    if (b.day != null && new Date(b.year, b.month, b.day) < new Date(new Date().setHours(0, 0, 0, 0)))
+        return false;
+    return true;
+}
+function bookingIsRescheduleEligible(b) {
+    return bookingIsCancelEligible(b);
+}
 // A ticket's `status` is the durable, stored state; the Ticket Wallet groups a
 // booking's tickets into Upcoming/Used/Expired tabs by combining this with the
 // booking's own date (see ticketBookingBucket) rather than storing a separate
@@ -2857,6 +2927,132 @@ function App() {
         if (!ticket) return;
         setTapModeTicket({ bookingId, index, baselineRedeemed: ticket.admissionsRedeemed });
     }
+    // ---- Customer booking management: Cancel / Reschedule / Check on Cancellations ----
+    const [cancelFlow, setCancelFlow] = useState(null); // { step, bookingId, reasonId, note, submitting }
+    const [rescheduleFlow, setRescheduleFlow] = useState(null); // { step, bookingId, calMonth, newDay, newTimeMinutes, submitting }
+    const [checkCancellationsOpen, setCheckCancellationsOpen] = useState(false);
+    const [cancellationDetailBookingId, setCancellationDetailBookingId] = useState(null);
+    const [businessCancellationRequestsOpen, setBusinessCancellationRequestsOpen] = useState(false);
+    function openCustomerCancelFlow() { setCancelFlow({ step: 'select', bookingId: null, reasonId: null, note: '' }); }
+    function openCustomerRescheduleFlow() { setRescheduleFlow({ step: 'select', bookingId: null, calMonth: new Date(new Date().getFullYear(), new Date().getMonth(), 1), newDay: null, newTimeMinutes: null }); }
+    // Submits the customer's cancellation. Bookvado-sourced bookings resolve
+    // instantly (Bookvado holds the credential end to end); partner-sourced
+    // ones go to 'under_review' for the business to Approve/Decline — see
+    // cancellationRequiresApproval and the Business Mode Cancellation
+    // Requests screen, which reads and writes this exact same field.
+    function submitCancellation(booking, reasonId, note) {
+        const reason = CUSTOMER_CANCEL_REASONS.find((r) => r.id === reasonId);
+        const quote = cancellationQuote(booking);
+        const requiresApproval = cancellationRequiresApproval(booking);
+        const now = Date.now();
+        const request = {
+            id: 'cxl-' + booking.id + '-' + now,
+            reasonId, reasonLabel: reason ? reason.label : 'Other', note: note || '',
+            requestedAt: now, feeAmount: quote.feeAmount, refundAmount: quote.refundAmount, policyText: quote.policyText,
+            status: requiresApproval ? 'under_review' : 'refunded',
+            requiresApproval, reviewedAt: requiresApproval ? null : now, declineReason: null,
+        };
+        setBookings((prev) => prev.map((b) => b.id !== booking.id ? b : {
+            ...b,
+            cancellationRequest: request,
+            status: requiresApproval ? b.status : 'cancelled',
+        }));
+        return request;
+    }
+    // Business approves/declines a pending cancellation request — reads and
+    // writes the SAME `bookings` state the customer's screens do, so both
+    // sides are always looking at one record, never two disconnected copies.
+    function resolveCancellationRequest(bookingId, approve) {
+        setBookings((prev) => prev.map((b) => {
+            if (b.id !== bookingId || !b.cancellationRequest) return b;
+            if (!approve)
+                return { ...b, cancellationRequest: { ...b.cancellationRequest, status: 'declined', reviewedAt: Date.now() } };
+            return { ...b, status: 'cancelled', cancellationRequest: { ...b.cancellationRequest, status: 'approved', reviewedAt: Date.now() } };
+        }));
+        if (approve) {
+            setTimeout(() => {
+                setBookings((prev) => prev.map((b) => b.id !== bookingId ? b : (b.cancellationRequest ? { ...b, cancellationRequest: { ...b.cancellationRequest, status: 'refund_processing' } } : b)));
+            }, 1400);
+            setTimeout(() => {
+                setBookings((prev) => prev.map((b) => b.id !== bookingId ? b : (b.cancellationRequest ? { ...b, cancellationRequest: { ...b.cancellationRequest, status: 'refunded' } } : b)));
+            }, 2800);
+        }
+    }
+    // Whether a given calendar day can even be offered for reschedule. A
+    // booking with a real providerId defers to that provider's actual hours
+    // (generateDaySlots/getProviderHoursForDate, shared with the booking-
+    // creation flow); one without (e.g. a movie/event ticket with no venue
+    // hours system behind it) only blocks past dates rather than fabricating
+    // a fake closed day.
+    function rescheduleIsDayUnavailable(booking, dateObj) {
+        const todayMid = new Date(new Date().setHours(0, 0, 0, 0));
+        if (dateObj < todayMid)
+            return true;
+        if (booking.providerId)
+            return !getProviderHoursForDate(booking.providerId, dateObj);
+        return false;
+    }
+    const RESCHEDULE_FALLBACK_SLOTS = [540, 660, 780, 900, 1020]; // 9:00a, 11:00a, 1:00p, 3:00p, 5:00p
+    function rescheduleSlotsForDate(booking, dateObj) {
+        if (booking.providerId && booking.durationMinutes)
+            return generateDaySlots(booking.providerId, dateObj, booking.durationMinutes, null, booking.id);
+        // No provider-hours system to check against — still enforce no
+        // double-booking by rejecting any slot another booking at the same
+        // business already occupies on this date.
+        const dayKey = dateKey(dateObj);
+        return RESCHEDULE_FALLBACK_SLOTS.map((minutes) => ({
+            minutes, label: minutesToTimeLabel(minutes),
+            available: !bookings.some((b) => b.id !== booking.id && b.business === booking.business && b.dateKey === dayKey && b.timeMinutes === minutes && b.status !== 'cancelled'),
+        }));
+    }
+    // Moves the booking to its new date/time in place — since availability
+    // above is derived live from `bookings`, this single write is both the
+    // "release the old slot" and "reserve the new slot" step: the old
+    // date/time stops appearing busy the instant this booking no longer
+    // holds it, and the new one starts blocking others the instant it does.
+    function commitReschedule(booking, dateObj, timeMinutes) {
+        const label = minutesToTimeLabel(timeMinutes);
+        const dateLabel = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        setBookings((prev) => prev.map((b) => b.id !== booking.id ? b : {
+            ...b,
+            day: dateObj.getDate(), month: dateObj.getMonth(), year: dateObj.getFullYear(),
+            date: dateLabel, dateKey: dateKey(dateObj), time: label, timeMinutes,
+            timeRange: b.timeRange ? formatTimeRange(timeMinutes, b.durationMinutes || 60) : b.timeRange,
+        }));
+    }
+    // Drives the Cancel Bookings wizard's "processing" step — a real submit
+    // has to happen somewhere, and hooks can't live inside the conditionally
+    // rendered wizard IIFE below, so this watches the flow's step from the
+    // component's top level instead. Deliberately does NOT flip a
+    // `submitting` flag via setCancelFlow here: doing that would change
+    // `cancelFlow`'s identity, which reruns this effect and fires its own
+    // cleanup — clearing the very timer it just set — so the "processing"
+    // screen would spin forever. Depending only on `step` staying
+    // 'processing' is what makes the guard actually hold.
+    useEffect(() => {
+        if (!cancelFlow || cancelFlow.step !== 'processing')
+            return;
+        const timer = setTimeout(() => {
+            const booking = bookings.find((b) => b.id === cancelFlow.bookingId);
+            if (!booking) { setCancelFlow(null); return; }
+            const request = submitCancellation(booking, cancelFlow.reasonId, cancelFlow.note);
+            setCancelFlow((prev) => (prev && prev.bookingId === cancelFlow.bookingId) ? { ...prev, step: 'success', result: request } : prev);
+        }, 1500);
+        return () => clearTimeout(timer);
+    }, [cancelFlow]);
+    // Same idea for the Reschedule wizard's "processing" step.
+    useEffect(() => {
+        if (!rescheduleFlow || rescheduleFlow.step !== 'processing')
+            return;
+        const timer = setTimeout(() => {
+            const booking = bookings.find((b) => b.id === rescheduleFlow.bookingId);
+            if (!booking) { setRescheduleFlow(null); return; }
+            const dateObj = new Date(rescheduleFlow.calMonth.getFullYear(), rescheduleFlow.calMonth.getMonth(), rescheduleFlow.newDay);
+            commitReschedule(booking, dateObj, rescheduleFlow.newTimeMinutes);
+            setRescheduleFlow((prev) => (prev && prev.bookingId === rescheduleFlow.bookingId) ? { ...prev, step: 'success' } : prev);
+        }, 1500);
+        return () => clearTimeout(timer);
+    }, [rescheduleFlow]);
     // validateBookvadoCredential closes over `bookings` — keeping a ref to
     // the latest copy lets the real Web NFC listener below call the fresh
     // version on every incoming tap without tearing down and recreating the
@@ -5156,9 +5352,6 @@ function App() {
         setConfirmedBooking(booking);
         setBookingStep('success');
     }
-    // Customers never cancel a booking outright — they ask the business to
-    // cancel it (see the Booking Details "Request to Cancel" row) and the
-    // booking only becomes 'cancelled' once that request is approved.
     function openEditAddress(b) {
         setBookingDetail(null);
         setEditAddressForm({ ...b.serviceAddress });
@@ -7508,6 +7701,10 @@ function App() {
                 const isTicketed = b.tickets && b.tickets.length > 0;
                 const tGroupStatus = isTicketed ? ticketGroupStatus(b) : null;
                 const st = isTicketed ? TICKET_STATUS_META[tGroupStatus] : (BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed);
+                // A pending/in-flight cancellation request overrides the normal
+                // ticket/booking status pill so the customer always sees where
+                // their cancellation actually stands, on either card type.
+                const cxl = b.cancellationRequest && b.cancellationRequest.status !== 'declined' ? CANCELLATION_STATUS_META[b.cancellationRequest.status] : null;
                 return React.createElement("button", { key: b.id, className: "avio-card-in", onClick: () => isTicketed ? setTicketDetail({ bookingId: b.id, index: 0 }) : setBookingDetail(b), style: { animationDelay: `${i * 0.04}s`, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: T.surface, border: `1px solid ${BK.border}`, borderRadius: 18, padding: 12, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
                     React.createElement("div", { style: { width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.logoText || (b.business || b.name).slice(0, 2).toUpperCase()),
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
@@ -7516,14 +7713,21 @@ function App() {
                         React.createElement("p", { style: { fontSize: 11, color: BK.sub, margin: '2px 0 0' } }, (b.timeRange || b.time) ? `${b.date} · ${b.timeRange || b.time}` : b.date)),
                     isTicketed
                         ? React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
-                            React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: st.color } }, st.label),
+                            React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: cxl ? cxl.color : st.color } }, cxl ? cxl.label : st.label),
                             React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral, margin: '5px 0 0' } }, "View Tickets →"))
                         : React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
-                            React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: st.bg, color: st.color, border: st.border, display: 'inline-block' } }, BOOKING_STATUS_LABEL[b.status] || b.status),
+                            React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: cxl ? cxl.bg : st.bg, color: cxl ? cxl.color : st.color, border: cxl ? 'none' : st.border, display: 'inline-block' } }, cxl ? cxl.label : (BOOKING_STATUS_LABEL[b.status] || b.status)),
                             React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: BK.text, margin: '5px 0 0' } }, b.status === 'quote_requested' ? 'Awaiting quote' : money(b.total))));
             }));
+            const managementButtons = bookingsSubTab === 'upcoming' && shownBookings.length > 0 && React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '18px 18px 0' } },
+                React.createElement("button", { onClick: openCustomerCancelFlow, style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 13.5 } },
+                    React.createElement(Icon, { name: "x", size: 15, color: "#D0304A" }), "Cancel Bookings"),
+                React.createElement("button", { onClick: openCustomerRescheduleFlow, style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px solid ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } },
+                    React.createElement(Icon, { name: "clock", size: 15, color: THEME.coral }), "Reschedule Bookings"),
+                React.createElement("button", { onClick: () => setCheckCancellationsOpen(true), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px solid ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } },
+                    React.createElement(Icon, { name: "check", size: 15, color: THEME.coral }), "Check on Cancellations"));
             const scrollContent = React.createElement("div", { className: "avio-scroll", style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 100px)` } },
-                header, tabsRow, cards);
+                header, tabsRow, cards, managementButtons);
             return scrollContent;
         })())),
         tab === 'wallet' && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: T.background } }, (() => {
@@ -9270,6 +9474,20 @@ function App() {
                                 React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Ticket Scanner"),
                                 React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, "Scan and validate Bookvado tickets")),
                             React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }))));
+                // Reads/writes the SAME `bookings` state the customer's Check on
+                // Cancellations screen does — there's one cancellation request
+                // record per booking, not a separate copy per side.
+                const pendingCancellations = bookings.filter((b) => b.cancellationRequest && b.cancellationRequest.status === 'under_review');
+                const cancellationRequestsSection = React.createElement("div", { style: { marginTop: 26 } },
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: '0 0 10px', textTransform: 'uppercase' } }, "Cancellation Requests"),
+                    React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 18, overflow: 'hidden' } },
+                        React.createElement("button", { onClick: () => setBusinessCancellationRequestsOpen(true), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
+                            React.createElement(Icon, { name: "warningtriangle", size: 17, color: THEME.coral }),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Review Cancellation Requests"),
+                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, pendingCancellations.length === 0 ? 'Nothing pending right now' : `${pendingCancellations.length} awaiting your review`)),
+                            pendingCancellations.length > 0 && React.createElement("span", { style: { minWidth: 20, height: 20, borderRadius: 10, background: THEME.gold, color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' } }, pendingCancellations.length),
+                            React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }))));
                 const upcomingPreview = businessBookings.filter((b) => b.status === 'confirmed' || b.status === 'pending').slice(0, 3);
                 const upcomingBookingsSection = React.createElement("div", { style: { marginTop: 26 } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
@@ -9289,7 +9507,7 @@ function App() {
                                     React.createElement("span", { style: { fontSize: 9.5, fontWeight: 700, padding: '3px 8px', borderRadius: 9, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize', display: 'inline-block', marginTop: 3 } }, b.status)));
                         })));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `0 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    earningsCard, statsRow, locationServiceAreaRow, quickActionsBar, ticketingSection, upcomingBookingsSection);
+                    earningsCard, statsRow, locationServiceAreaRow, quickActionsBar, ticketingSection, cancellationRequestsSection, upcomingBookingsSection);
             }
             else if (providerDashboardTab === 'bookings') {
                 const BIZ_BOOKING_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'pending', label: 'Pending' }, { id: 'past', label: 'Past' }, { id: 'cancelled', label: 'Canceled' }];
@@ -11474,6 +11692,334 @@ function App() {
                                     React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: SC.text, minWidth: 90, textAlign: 'center' } }, `Redeem ${partialRedeemQty} of ${ticketScanResult.admissionsRemaining}`),
                                     React.createElement("button", { onClick: () => setPartialRedeemQty((q) => Math.min(ticketScanResult.admissionsRemaining, q + 1)), style: { width: 32, height: 32, borderRadius: '50%', border: `1px solid ${SC.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "plus", size: 14, color: SC.text })))),
                         !ticketScanResult.committed && React.createElement("button", { onClick: ticketScanResult.ok ? confirmEntry : () => setTicketScanResult(null), style: { width: '100%', maxWidth: 260, marginTop: 28, padding: '14px 0', borderRadius: 26, background: ticketScanResult.ok ? THEME.bookGradient : SC.alt, color: ticketScanResult.ok ? '#fff' : SC.text, fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, ticketScanResult.ok ? "Confirm Entry" : "Scan Another")));
+        })(),
+        // ==================== Cancel Bookings wizard ====================
+        cancelFlow && (() => {
+            const CX = { bg: T.background, alt: T.surfaceSecondary, sub: T.textSecondary, text: T.textPrimary, border: T.border };
+            const booking = cancelFlow.bookingId ? bookings.find((b) => b.id === cancelFlow.bookingId) : null;
+            const eligible = bookings.filter(bookingIsCancelEligible);
+            const quote = booking ? cancellationQuote(booking) : null;
+            const reason = CUSTOMER_CANCEL_REASONS.find((r) => r.id === cancelFlow.reasonId);
+            const shell = (title, subtitle, onBack, body, footer, zi) => React.createElement("div", { key: "cancelFlow", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: CX.bg, zIndex: zi || 17, display: 'flex', flexDirection: 'column' } },
+                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: `calc(env(safe-area-inset-top) + 16px) 18px 6px` } },
+                    onBack && React.createElement("button", { onClick: onBack, style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: CX.text }))),
+                React.createElement("div", { style: { padding: '2px 18px 0' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: CX.text, margin: 0 } }, title),
+                    subtitle && React.createElement("p", { style: { fontSize: 13, color: CX.sub, margin: '4px 0 0' } }, subtitle)),
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px calc(env(safe-area-inset-bottom) + 18px)' } }, body),
+                footer && React.createElement("div", { style: { flexShrink: 0, padding: `12px 18px calc(env(safe-area-inset-bottom) + 14px)`, borderTop: `1px solid ${CX.border}` } }, footer));
+            const summaryCard = (b) => React.createElement("div", { style: { border: `1px solid ${CX.border}`, borderRadius: 16, padding: 14, marginBottom: 14 } },
+                React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: CX.text, margin: 0 } }, b.business || b.name),
+                React.createElement("p", { style: { fontSize: 12.5, color: CX.sub, margin: '2px 0 0' } }, b.service),
+                React.createElement("p", { style: { fontSize: 12, color: CX.sub, margin: '2px 0 0' } }, (b.timeRange || b.time) ? `${b.date} · ${b.timeRange || b.time}` : b.date),
+                (b.tickets && b.tickets.length) > 0 && React.createElement("p", { style: { fontSize: 12, color: CX.sub, margin: '2px 0 0' } }, `${b.tickets.length} Ticket${b.tickets.length === 1 ? '' : 's'}`));
+            const moneyRow = (label, value, color, bold) => React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0' } },
+                React.createElement("span", { style: { fontSize: 13, color: CX.sub } }, label),
+                React.createElement("span", { style: { fontSize: 13.5, fontWeight: bold ? 700 : 600, color: color || CX.text } }, value));
+
+            if (cancelFlow.step === 'select') {
+                const body = eligible.length === 0
+                    ? React.createElement("p", { style: { fontSize: 13, color: CX.sub, textAlign: 'center', marginTop: 40 } }, "No bookings are currently eligible for cancellation.")
+                    : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, eligible.map((b) => {
+                        const selected = cancelFlow.bookingId === b.id;
+                        return React.createElement("button", { key: b.id, onClick: () => setCancelFlow((prev) => ({ ...prev, bookingId: b.id })), style: { textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 16, border: selected ? '1.5px solid #D0304A' : `1px solid ${CX.border}`, background: selected ? 'rgba(208,48,74,0.08)' : T.surface, transition: 'border-color 0.15s ease, background 0.15s ease' } },
+                            React.createElement("div", { style: { width: 40, height: 40, borderRadius: 11, flexShrink: 0, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 11.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.logoText || (b.business || b.name).slice(0, 2).toUpperCase()),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: CX.text, margin: 0 } }, b.business || b.name),
+                                React.createElement("p", { style: { fontSize: 11.5, color: CX.sub, margin: '2px 0 0' } }, (b.timeRange || b.time) ? `${b.date} · ${b.timeRange || b.time}` : b.date),
+                                (b.tickets && b.tickets.length) > 0 && React.createElement("p", { style: { fontSize: 11, color: CX.sub, margin: '1px 0 0' } }, `${b.tickets.length} Ticket${b.tickets.length === 1 ? '' : 's'}`)),
+                            selected && React.createElement("div", { className: "avio-check-pop", style: { width: 22, height: 22, borderRadius: '50%', background: '#D0304A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 12, color: "#fff" })));
+                    }));
+                const footer = React.createElement("button", { disabled: !cancelFlow.bookingId, onClick: () => setCancelFlow((prev) => ({ ...prev, step: 'reason' })), style: { width: '100%', padding: '14px 0', borderRadius: 26, background: '#D0304A', color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif', opacity: cancelFlow.bookingId ? 1 : 0.4 } }, "Continue");
+                return shell("Cancel Bookings", "Select a booking to cancel", () => setCancelFlow(null), body, footer);
+            }
+            if (cancelFlow.step === 'reason') {
+                const body = React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, CUSTOMER_CANCEL_REASONS.map((r) => {
+                        const selected = cancelFlow.reasonId === r.id;
+                        return React.createElement("button", { key: r.id, onClick: () => setCancelFlow((prev) => ({ ...prev, reasonId: r.id })), style: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '13px 14px', borderRadius: 14, border: selected ? '1.5px solid #D0304A' : `1px solid ${CX.border}`, background: selected ? 'rgba(208,48,74,0.08)' : 'transparent', textAlign: 'left' } },
+                            React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', border: `2px solid ${selected ? '#D0304A' : CX.border}`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, selected && React.createElement("div", { style: { width: 9, height: 9, borderRadius: '50%', background: '#D0304A' } })),
+                            React.createElement("span", { style: { fontSize: 13.5, fontWeight: 600, color: CX.text } }, r.label));
+                    })),
+                    cancelFlow.reasonId === 'other' && React.createElement("textarea", { value: cancelFlow.note, onChange: (e) => setCancelFlow((prev) => ({ ...prev, note: e.target.value })), placeholder: "Add a note (optional)", rows: 3, style: { width: '100%', marginTop: 12, padding: 12, borderRadius: 14, border: `1px solid ${CX.border}`, background: CX.alt, color: CX.text, fontSize: 13, fontFamily: 'inherit', resize: 'none' } }));
+                const footer = React.createElement("button", { disabled: !cancelFlow.reasonId, onClick: () => setCancelFlow((prev) => ({ ...prev, step: 'policy' })), style: { width: '100%', padding: '14px 0', borderRadius: 26, background: '#D0304A', color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif', opacity: cancelFlow.reasonId ? 1 : 0.4 } }, "Continue");
+                return shell("Why are you cancelling?", null, () => setCancelFlow((prev) => ({ ...prev, step: 'select' })), body, footer);
+            }
+            if (cancelFlow.step === 'policy') {
+                const body = React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { padding: 14, borderRadius: 16, background: 'rgba(208,48,74,0.08)', border: '1px solid rgba(208,48,74,0.25)', marginBottom: 16 } },
+                        React.createElement("p", { style: { fontSize: 12.5, color: CX.text, margin: 0, lineHeight: 1.6 } }, quote.policyText)),
+                    React.createElement("div", { style: { border: `1px solid ${CX.border}`, borderRadius: 16, padding: '4px 14px' } },
+                        moneyRow("Booking Total", money(quote.total)),
+                        quote.feeAmount > 0 && moneyRow("Cancellation Fee (20%)", '-' + money(quote.feeAmount), '#D0304A'),
+                        React.createElement("div", { style: { height: 1, background: CX.border, margin: '4px 0' } }),
+                        quote.refundAmount > 0
+                            ? moneyRow("Expected Refund", money(quote.refundAmount), THEME.coral, true)
+                            : moneyRow("Refund", "Non-refundable", '#D0304A', true)));
+                const footer = React.createElement("button", { onClick: () => setCancelFlow((prev) => ({ ...prev, step: 'confirm' })), style: { width: '100%', padding: '14px 0', borderRadius: 26, background: '#D0304A', color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Continue to Confirmation");
+                return shell("Cancellation Policy", null, () => setCancelFlow((prev) => ({ ...prev, step: 'reason' })), body, footer);
+            }
+            if (cancelFlow.step === 'confirm') {
+                const body = React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 } },
+                        React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', background: 'rgba(208,48,74,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement(Icon, { name: "warningtriangle", size: 24, color: "#D0304A" }))),
+                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: CX.text, textAlign: 'center', margin: '0 0 16px' } }, "Are you sure you want to cancel this booking?"),
+                    summaryCard(booking),
+                    React.createElement("div", { style: { border: `1px solid ${CX.border}`, borderRadius: 16, padding: '4px 14px' } },
+                        moneyRow("Reason", reason ? reason.label : 'Other'),
+                        quote.feeAmount > 0 && moneyRow("Cancellation Fee", money(quote.feeAmount), '#D0304A'),
+                        moneyRow("Expected Refund", money(quote.refundAmount), THEME.coral, true)));
+                const footer = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } },
+                    React.createElement("button", { onClick: () => setCancelFlow((prev) => ({ ...prev, step: 'processing', submitting: false })), style: { width: '100%', padding: '14px 0', borderRadius: 26, background: '#D0304A', color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Yes, Cancel Booking"),
+                    React.createElement("button", { onClick: () => setCancelFlow((prev) => ({ ...prev, step: 'policy' })), style: { width: '100%', padding: '13px 0', borderRadius: 26, border: `1px solid ${CX.border}`, color: CX.text, fontWeight: 600, fontSize: 14 } }, "Go Back"));
+                return shell("Confirm Cancellation", null, () => setCancelFlow((prev) => ({ ...prev, step: 'policy' })), body, footer);
+            }
+            if (cancelFlow.step === 'processing') {
+                const body = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 100 } },
+                    React.createElement("div", { className: "avio-spin", style: { width: 40, height: 40, borderRadius: '50%', border: `3px solid ${CX.border}`, borderTopColor: '#D0304A', marginBottom: 20 } }),
+                    React.createElement("p", { style: { fontSize: 13.5, color: CX.sub, textAlign: 'center' } }, "Please wait while we process your cancellation."));
+                return shell("Cancelling Your Booking", null, null, body, null);
+            }
+            if (cancelFlow.step === 'success') {
+                const r = cancelFlow.result;
+                const needsReview = r && r.requiresApproval;
+                const body = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 30, textAlign: 'center' } },
+                    React.createElement("div", { className: "avio-check-pop avio-ring-pulse", style: { width: 72, height: 72, borderRadius: '50%', background: needsReview ? THEME.gold : THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18 } },
+                        React.createElement(Icon, { name: "check", size: 32, color: "#fff" })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 800, fontSize: 21, color: CX.text, margin: 0 } }, needsReview ? "Cancellation Request Submitted ✓" : "Booking Cancelled"),
+                    React.createElement("p", { style: { fontSize: 13, color: CX.sub, marginTop: 8, maxWidth: 280, lineHeight: 1.5 } }, needsReview ? "Your cancellation request has been sent to the business for review." : "Your booking has been successfully cancelled."),
+                    !needsReview && r && React.createElement("div", { style: { marginTop: 18, width: '100%', border: `1px solid ${CX.border}`, borderRadius: 16, padding: 14 } },
+                        moneyRow("Refund Amount", money(r.refundAmount), THEME.coral, true),
+                        React.createElement("p", { style: { fontSize: 11.5, color: CX.sub, marginTop: 8, textAlign: 'left' } }, "Refund will be returned to your original payment method.")));
+                const footer = React.createElement("button", { onClick: () => { setCancelFlow(null); if (needsReview) { setCancellationDetailBookingId(booking.id); setCheckCancellationsOpen(true); } }, style: { width: '100%', padding: '14px 0', borderRadius: 26, background: needsReview ? THEME.bookGradient : THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, needsReview ? "Check Cancellation Status" : "Go to My Bookings");
+                return shell(needsReview ? "Request Submitted" : "Cancellation Successful", null, null, body, footer);
+            }
+            return null;
+        })(),
+        // ==================== Reschedule Bookings wizard ====================
+        rescheduleFlow && (() => {
+            const RS = { bg: T.background, alt: T.surfaceSecondary, sub: T.textSecondary, text: T.textPrimary, border: T.border };
+            const booking = rescheduleFlow.bookingId ? bookings.find((b) => b.id === rescheduleFlow.bookingId) : null;
+            const eligible = bookings.filter(bookingIsRescheduleEligible);
+            const shell = (title, subtitle, onBack, body, footer, zi) => React.createElement("div", { key: "rescheduleFlow", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: RS.bg, zIndex: zi || 17, display: 'flex', flexDirection: 'column' } },
+                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: `calc(env(safe-area-inset-top) + 16px) 18px 6px` } },
+                    onBack && React.createElement("button", { onClick: onBack, style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: RS.text }))),
+                React.createElement("div", { style: { padding: '2px 18px 0' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: RS.text, margin: 0 } }, title),
+                    subtitle && React.createElement("p", { style: { fontSize: 13, color: RS.sub, margin: '4px 0 0' } }, subtitle)),
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px calc(env(safe-area-inset-bottom) + 18px)' } }, body),
+                footer && React.createElement("div", { style: { flexShrink: 0, padding: `12px 18px calc(env(safe-area-inset-bottom) + 14px)`, borderTop: `1px solid ${RS.border}` } }, footer));
+            const primaryBtn = (label, onClick, disabled) => React.createElement("button", { disabled, onClick, style: { width: '100%', padding: '14px 0', borderRadius: 26, background: THEME.bookGradient, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif', opacity: disabled ? 0.4 : 1 } }, label);
+
+            if (rescheduleFlow.step === 'select') {
+                const body = eligible.length === 0
+                    ? React.createElement("p", { style: { fontSize: 13, color: RS.sub, textAlign: 'center', marginTop: 40 } }, "No bookings are currently eligible for rescheduling.")
+                    : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, eligible.map((b) => {
+                        const selected = rescheduleFlow.bookingId === b.id;
+                        return React.createElement("button", { key: b.id, onClick: () => setRescheduleFlow((prev) => ({ ...prev, bookingId: b.id, calMonth: new Date(b.year != null ? b.year : new Date().getFullYear(), b.month != null ? b.month : new Date().getMonth(), 1) })), style: { textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 16, border: selected ? `1.5px solid ${THEME.coral}` : `1px solid ${RS.border}`, background: selected ? 'rgba(151,196,0,0.08)' : T.surface } },
+                            React.createElement("div", { style: { width: 40, height: 40, borderRadius: 11, flexShrink: 0, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 11.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.logoText || (b.business || b.name).slice(0, 2).toUpperCase()),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: RS.text, margin: 0 } }, b.business || b.name),
+                                React.createElement("p", { style: { fontSize: 11.5, color: RS.sub, margin: '2px 0 0' } }, (b.timeRange || b.time) ? `${b.date} · ${b.timeRange || b.time}` : b.date)),
+                            selected && React.createElement("div", { className: "avio-check-pop", style: { width: 22, height: 22, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 12, color: "#fff" })));
+                    }));
+                return shell("Reschedule Bookings", "Select a booking to reschedule", () => setRescheduleFlow(null), body, primaryBtn("Continue", () => setRescheduleFlow((prev) => ({ ...prev, step: 'date' })), !rescheduleFlow.bookingId));
+            }
+            if (rescheduleFlow.step === 'date') {
+                const calYear = rescheduleFlow.calMonth.getFullYear();
+                const calMonthIdx = rescheduleFlow.calMonth.getMonth();
+                const firstWeekday = new Date(calYear, calMonthIdx, 1).getDay();
+                const daysInMonth = new Date(calYear, calMonthIdx + 1, 0).getDate();
+                const cells = [...Array(firstWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+                const body = React.createElement(React.Fragment, null,
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 } },
+                        React.createElement("button", { onClick: () => setRescheduleFlow((prev) => ({ ...prev, calMonth: new Date(calYear, calMonthIdx - 1, 1), newDay: null })), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 16, color: RS.text })),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: RS.text, margin: 0 } }, rescheduleFlow.calMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })),
+                        React.createElement("button", { onClick: () => setRescheduleFlow((prev) => ({ ...prev, calMonth: new Date(calYear, calMonthIdx + 1, 1), newDay: null })), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', transform: 'rotate(180deg)' } }, React.createElement(Icon, { name: "arrowleft", size: 16, color: RS.text }))),
+                    React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6 } },
+                        ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => React.createElement("p", { key: i, style: { fontSize: 11, fontWeight: 700, color: RS.sub, textAlign: 'center', margin: 0 } }, d))),
+                    React.createElement("div", { className: "avio-cal-fade", style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 } },
+                        cells.map((day, i) => {
+                            if (day == null) return React.createElement("div", { key: 'e' + i });
+                            const dObj = new Date(calYear, calMonthIdx, day);
+                            const unavailable = rescheduleIsDayUnavailable(booking, dObj);
+                            const selected = rescheduleFlow.newDay === day;
+                            return React.createElement("button", { key: day, disabled: unavailable, className: "avio-date-btn", onClick: () => setRescheduleFlow((prev) => ({ ...prev, newDay: day, newTimeMinutes: null })), style: { aspectRatio: '1 / 1', borderRadius: 12, fontSize: 13, fontWeight: 600, color: unavailable ? '#C7C7CC' : selected ? '#fff' : RS.text, background: selected ? THEME.coral : 'transparent', opacity: unavailable ? 0.4 : 1 } }, day);
+                        })));
+                return shell("Select New Date", null, () => setRescheduleFlow((prev) => ({ ...prev, step: 'select' })), body, primaryBtn("Continue", () => setRescheduleFlow((prev) => ({ ...prev, step: 'time' })), !rescheduleFlow.newDay));
+            }
+            if (rescheduleFlow.step === 'time') {
+                const dateObj = new Date(rescheduleFlow.calMonth.getFullYear(), rescheduleFlow.calMonth.getMonth(), rescheduleFlow.newDay);
+                const slots = rescheduleSlotsForDate(booking, dateObj);
+                const body = slots.length === 0
+                    ? React.createElement("p", { style: { fontSize: 13, color: RS.sub, textAlign: 'center', marginTop: 40 } }, "No times are available on this date. Please choose another date.")
+                    : React.createElement(React.Fragment, null,
+                        React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: RS.sub, marginBottom: 10 } }, dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })),
+                        React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 } },
+                            slots.map((s) => {
+                                const selected = rescheduleFlow.newTimeMinutes === s.minutes;
+                                return React.createElement("button", { key: s.minutes, disabled: !s.available, onClick: () => setRescheduleFlow((prev) => ({ ...prev, newTimeMinutes: s.minutes })), style: { padding: '12px 0', borderRadius: 14, border: selected ? `1.5px solid ${THEME.coral}` : `1px solid ${RS.border}`, background: selected ? THEME.coral : 'transparent', color: !s.available ? '#C7C7CC' : selected ? '#fff' : RS.text, fontSize: 12.5, fontWeight: 700, textDecoration: !s.available ? 'line-through' : 'none' } }, s.label);
+                            })));
+                return shell("Select New Time", null, () => setRescheduleFlow((prev) => ({ ...prev, step: 'date' })), body, primaryBtn("Continue", () => setRescheduleFlow((prev) => ({ ...prev, step: 'review' })), !rescheduleFlow.newTimeMinutes));
+            }
+            if (rescheduleFlow.step === 'review') {
+                const newDateObj = new Date(rescheduleFlow.calMonth.getFullYear(), rescheduleFlow.calMonth.getMonth(), rescheduleFlow.newDay);
+                const newDateLabel = newDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const newTimeLabel = minutesToTimeLabel(rescheduleFlow.newTimeMinutes);
+                const block = (label, dateLabel, timeLabel, dim) => React.createElement("div", { style: { border: `1px solid ${RS.border}`, borderRadius: 16, padding: 14, opacity: dim ? 0.6 : 1 } },
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: RS.sub, textTransform: 'uppercase', letterSpacing: 0.4, margin: 0 } }, label),
+                    React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: RS.text, margin: '8px 0 0' } }, dateLabel),
+                    React.createElement("p", { style: { fontSize: 13, color: RS.sub, margin: '2px 0 0' } }, timeLabel));
+                const body = React.createElement(React.Fragment, null,
+                    block("Current Booking", booking.date, booking.timeRange || booking.time, true),
+                    React.createElement("div", { style: { display: 'flex', justifyContent: 'center', margin: '10px 0' } }, React.createElement(Icon, { name: "chevrondown", size: 18, color: RS.sub })),
+                    block("New Booking", newDateLabel, newTimeLabel, false),
+                    React.createElement("p", { style: { fontSize: 11.5, color: RS.sub, marginTop: 14, textAlign: 'center' } }, "No rescheduling fee for this change."));
+                const footer = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } },
+                    primaryBtn("Confirm Reschedule", () => setRescheduleFlow((prev) => ({ ...prev, step: 'processing', submitting: false })), false),
+                    React.createElement("button", { onClick: () => setRescheduleFlow((prev) => ({ ...prev, step: 'time' })), style: { width: '100%', padding: '13px 0', borderRadius: 26, border: `1px solid ${RS.border}`, color: RS.text, fontWeight: 600, fontSize: 14 } }, "Go Back"));
+                return shell("Review Reschedule", null, () => setRescheduleFlow((prev) => ({ ...prev, step: 'time' })), body, footer);
+            }
+            if (rescheduleFlow.step === 'processing') {
+                const body = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 100 } },
+                    React.createElement("div", { className: "avio-spin", style: { width: 40, height: 40, borderRadius: '50%', border: `3px solid ${RS.border}`, borderTopColor: THEME.coral, marginBottom: 20 } }),
+                    React.createElement("p", { style: { fontSize: 13.5, color: RS.sub, textAlign: 'center' } }, "Please wait while we update your booking."));
+                return shell("Rescheduling Your Booking", null, null, body, null);
+            }
+            if (rescheduleFlow.step === 'success') {
+                const updated = bookings.find((b) => b.id === rescheduleFlow.bookingId) || booking;
+                const body = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 30, textAlign: 'center' } },
+                    React.createElement("div", { className: "avio-check-pop avio-ring-pulse", style: { width: 72, height: 72, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18 } },
+                        React.createElement(Icon, { name: "check", size: 32, color: "#fff" })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 800, fontSize: 21, color: RS.text, margin: 0 } }, "Booking Rescheduled!"),
+                    React.createElement("p", { style: { fontSize: 13, color: RS.sub, marginTop: 8 } }, "Your booking has been rescheduled successfully."),
+                    React.createElement("div", { style: { marginTop: 18, width: '100%', border: `1px solid ${RS.border}`, borderRadius: 16, padding: 14, textAlign: 'left' } },
+                        React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: RS.text, margin: 0 } }, updated.business || updated.name),
+                        React.createElement("p", { style: { fontSize: 12.5, color: RS.sub, margin: '4px 0 0' } }, updated.service),
+                        React.createElement("p", { style: { fontSize: 12.5, color: THEME.coral, fontWeight: 700, margin: '4px 0 0' } }, `${updated.date} · ${updated.timeRange || updated.time}`),
+                        (updated.tickets && updated.tickets.length) > 0 && React.createElement("p", { style: { fontSize: 11.5, color: RS.sub, margin: '4px 0 0' } }, `${updated.tickets.length} Ticket${updated.tickets.length === 1 ? '' : 's'}`)));
+                return shell("Reschedule Successful", null, null, body, primaryBtn("Go to My Bookings", () => setRescheduleFlow(null), false));
+            }
+            return null;
+        })(),
+        // ==================== Check on Cancellations ====================
+        checkCancellationsOpen && (() => {
+            const CC = { bg: T.background, alt: T.surfaceSecondary, sub: T.textSecondary, text: T.textPrimary, border: T.border };
+            const requests = bookings.filter((b) => b.cancellationRequest).sort((a, b) => b.cancellationRequest.requestedAt - a.cancellationRequest.requestedAt);
+            return React.createElement("div", { key: "checkCancellations", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: CC.bg, zIndex: 17, display: 'flex', flexDirection: 'column' } },
+                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: `calc(env(safe-area-inset-top) + 16px) 18px 6px` } },
+                    React.createElement("button", { onClick: () => setCheckCancellationsOpen(false), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: CC.text }))),
+                React.createElement("div", { style: { padding: '2px 18px 0' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: CC.text, margin: 0 } }, "Check on Cancellations"),
+                    React.createElement("p", { style: { fontSize: 13, color: CC.sub, margin: '4px 0 0' } }, "View your cancellation requests")),
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px calc(env(safe-area-inset-bottom) + 18px)' } },
+                    requests.length === 0
+                        ? React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 60, textAlign: 'center' } },
+                            React.createElement("div", { style: { width: 64, height: 64, borderRadius: '50%', background: CC.alt, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 } }, React.createElement(Icon, { name: "check", size: 26, color: '#C7C7CC' })),
+                            React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: CC.text, margin: 0 } }, "No cancellation requests"),
+                            React.createElement("p", { style: { fontSize: 12.5, color: CC.sub, marginTop: 6, maxWidth: 260, lineHeight: 1.5 } }, "Requests you submit from Cancel Bookings will show up here."))
+                        : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, requests.map((b) => {
+                            const req = b.cancellationRequest;
+                            const meta = CANCELLATION_STATUS_META[req.status];
+                            return React.createElement("button", { key: b.id, onClick: () => setCancellationDetailBookingId(b.id), style: { textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 16, border: `1px solid ${CC.border}`, background: T.surface } },
+                                React.createElement("div", { style: { width: 40, height: 40, borderRadius: 11, flexShrink: 0, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 11.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.logoText || (b.business || b.name).slice(0, 2).toUpperCase()),
+                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                    React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: CC.text, margin: 0 } }, b.business || b.name),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: CC.sub, margin: '2px 0 0' } }, (b.timeRange || b.time) ? `${b.date} · ${b.timeRange || b.time}` : b.date),
+                                    React.createElement("span", { style: { display: 'inline-block', marginTop: 5, fontSize: 10, fontWeight: 700, color: meta.color } }, meta.label)),
+                                React.createElement(Icon, { name: "chevronright", size: 14, color: CC.sub }));
+                        }))));
+        })(),
+        // ==================== Cancellation Details ====================
+        cancellationDetailBookingId && (() => {
+            const b = bookings.find((x) => x.id === cancellationDetailBookingId);
+            if (!b || !b.cancellationRequest) return null;
+            const req = b.cancellationRequest;
+            const meta = CANCELLATION_STATUS_META[req.status];
+            const CD = { bg: T.background, alt: T.surfaceSecondary, sub: T.textSecondary, text: T.textPrimary, border: T.border };
+            const STATUS_ORDER = ['requested', 'under_review', 'approved', 'refund_processing', 'refunded'];
+            const steps = req.status === 'declined'
+                ? [{ key: 'requested', label: 'Request Submitted', state: 'done' }, { key: 'under_review', label: 'Business Reviewing', state: 'done' }, { key: 'declined', label: 'Cancellation Declined', state: 'declined' }]
+                : (() => {
+                    const curIdx = STATUS_ORDER.indexOf(req.status);
+                    return [
+                        { key: 'requested', label: 'Request Submitted' },
+                        { key: 'under_review', label: 'Business Reviewing' },
+                        { key: 'approved', label: 'Cancellation Approved' },
+                        { key: 'refund_processing', label: 'Refund Processing' },
+                        { key: 'refunded', label: 'Refund Completed' },
+                    ].map((s, i) => ({ ...s, state: i < curIdx ? 'done' : i === curIdx ? 'current' : 'pending' }));
+                })();
+            const moneyRow = (label, value, color, bold) => React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '8px 0' } },
+                React.createElement("span", { style: { fontSize: 13, color: CD.sub } }, label),
+                React.createElement("span", { style: { fontSize: 13.5, fontWeight: bold ? 700 : 600, color: color || CD.text } }, value));
+            return React.createElement("div", { key: "cancellationDetail", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: CD.bg, zIndex: 18, display: 'flex', flexDirection: 'column' } },
+                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: `calc(env(safe-area-inset-top) + 16px) 18px 6px` } },
+                    React.createElement("button", { onClick: () => setCancellationDetailBookingId(null), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: CD.text }))),
+                React.createElement("div", { style: { padding: '2px 18px 0' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: CD.text, margin: 0 } }, "Cancellation Details")),
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px calc(env(safe-area-inset-bottom) + 18px)' } },
+                    React.createElement("div", { style: { border: `1px solid ${CD.border}`, borderRadius: 16, padding: 14, marginBottom: 16 } },
+                        React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: CD.text, margin: 0 } }, b.business || b.name),
+                        React.createElement("p", { style: { fontSize: 12.5, color: CD.sub, margin: '2px 0 0' } }, (b.timeRange || b.time) ? `${b.date} · ${b.timeRange || b.time}` : b.date),
+                        (b.tickets && b.tickets.length) > 0 && React.createElement("p", { style: { fontSize: 11.5, color: CD.sub, margin: '2px 0 0' } }, `${b.tickets.length} Ticket${b.tickets.length === 1 ? '' : 's'}`),
+                        React.createElement("span", { style: { display: 'inline-block', marginTop: 8, fontSize: 10.5, fontWeight: 700, padding: '4px 10px', borderRadius: 10, background: meta.bg, color: meta.color } }, meta.label)),
+                    React.createElement("div", { style: { border: `1px solid ${CD.border}`, borderRadius: 16, padding: '4px 14px', marginBottom: 20 } },
+                        moneyRow("Requested On", new Date(req.requestedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })),
+                        moneyRow("Reason", req.reasonLabel),
+                        req.note && moneyRow("Note", req.note),
+                        req.feeAmount > 0 && moneyRow("Cancellation Fee", money(req.feeAmount), '#D0304A'),
+                        moneyRow("Expected Refund", money(req.refundAmount), THEME.coral, true)),
+                    req.status === 'declined' && req.declineReason && React.createElement("div", { style: { padding: 12, borderRadius: 14, background: 'rgba(208,48,74,0.08)', marginBottom: 20 } },
+                        React.createElement("p", { style: { fontSize: 12.5, color: '#D0304A', margin: 0 } }, req.declineReason)),
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: CD.sub, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 14 } }, "Status Timeline"),
+                    steps.map((step, i) => React.createElement("div", { key: step.key, style: { display: 'flex', gap: 12 } },
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center' } },
+                            React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: step.state === 'done' ? THEME.coral : step.state === 'declined' ? '#D0304A' : step.state === 'current' ? THEME.gold : CD.alt } },
+                                (step.state === 'done' || step.state === 'declined') && React.createElement(Icon, { name: step.state === 'declined' ? 'x' : 'check', size: 12, color: "#fff" })),
+                            i < steps.length - 1 && React.createElement("div", { style: { width: 2, flex: 1, minHeight: 22, marginTop: 2, background: step.state === 'done' ? THEME.coral : CD.border } })),
+                        React.createElement("div", { style: { paddingBottom: 22 } },
+                            React.createElement("p", { style: { fontSize: 13.5, fontWeight: step.state === 'pending' ? 500 : 700, color: step.state === 'pending' ? CD.sub : CD.text, margin: 0 } },
+                                step.label + (step.state === 'done' ? ' ✓' : step.state === 'declined' ? ' ✗' : '')))))));
+        })(),
+        // ==================== Business Mode: Cancellation Requests ====================
+        businessCancellationRequestsOpen && (() => {
+            const BC = { bg: T.background, alt: T.surfaceSecondary, sub: T.textSecondary, text: T.textPrimary, border: T.border };
+            const requests = bookings.filter((b) => b.cancellationRequest).sort((a, b) => b.cancellationRequest.requestedAt - a.cancellationRequest.requestedAt);
+            const moneyRow = (label, value, color, bold) => React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '5px 0' } },
+                React.createElement("span", { style: { fontSize: 12.5, color: BC.sub } }, label),
+                React.createElement("span", { style: { fontSize: 13, fontWeight: bold ? 700 : 600, color: color || BC.text } }, value));
+            return React.createElement("div", { key: "businessCancellationRequests", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: BC.bg, zIndex: 17, display: 'flex', flexDirection: 'column' } },
+                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: `calc(env(safe-area-inset-top) + 16px) 18px 6px` } },
+                    React.createElement("button", { onClick: () => setBusinessCancellationRequestsOpen(false), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: BC.text }))),
+                React.createElement("div", { style: { padding: '2px 18px 0' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: BC.text, margin: 0 } }, "Cancellation Requests"),
+                    React.createElement("p", { style: { fontSize: 13, color: BC.sub, margin: '4px 0 0' } }, "Review and respond to customer cancellation requests")),
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px calc(env(safe-area-inset-bottom) + 18px)' } },
+                    requests.length === 0
+                        ? React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 60, textAlign: 'center' } },
+                            React.createElement("div", { style: { width: 64, height: 64, borderRadius: '50%', background: BC.alt, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 } }, React.createElement(Icon, { name: "check", size: 26, color: '#C7C7CC' })),
+                            React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: BC.text, margin: 0 } }, "No cancellation requests"),
+                            React.createElement("p", { style: { fontSize: 12.5, color: BC.sub, marginTop: 6, maxWidth: 260, lineHeight: 1.5 } }, "New customer cancellation requests will show up here."))
+                        : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 12 } }, requests.map((b) => {
+                            const req = b.cancellationRequest;
+                            const meta = CANCELLATION_STATUS_META[req.status];
+                            const pending = req.status === 'under_review';
+                            return React.createElement("div", { key: b.id, style: { border: `1px solid ${BC.border}`, borderRadius: 16, padding: 14 } },
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 } },
+                                    React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 11, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.logoText || (b.business || b.name).slice(0, 2).toUpperCase()),
+                                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BC.text, margin: 0 } }, b.customerName || 'Customer'),
+                                        React.createElement("p", { style: { fontSize: 11.5, color: BC.sub, margin: '2px 0 0' } }, `${b.service} · ${(b.timeRange || b.time) ? `${b.date} · ${b.timeRange || b.time}` : b.date}`)),
+                                    React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: meta.bg, color: meta.color, flexShrink: 0 } }, meta.label)),
+                                moneyRow("Reason", req.reasonLabel),
+                                req.feeAmount > 0 && moneyRow("Cancellation Fee", money(req.feeAmount), '#D0304A'),
+                                moneyRow("Refund If Approved", money(req.refundAmount), THEME.coral, true),
+                                pending && React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 12 } },
+                                    React.createElement("button", { onClick: () => resolveCancellationRequest(b.id, true), style: { flex: 1, padding: '11px 0', borderRadius: 20, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 12.5 } }, "Approve Cancellation"),
+                                    React.createElement("button", { onClick: () => resolveCancellationRequest(b.id, false), style: { flex: 1, padding: '11px 0', borderRadius: 20, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 12.5 } }, "Decline Cancellation")));
+                        }))));
         })(),
         ticketingSetupOpen && (() => {
             const TS = { bg: T.background, alt: T.surfaceSecondary, sub: T.textSecondary, text: T.textPrimary, border: T.border };
