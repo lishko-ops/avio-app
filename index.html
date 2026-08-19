@@ -7037,9 +7037,8 @@ function App() {
                             React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: st.bg, color: st.color, border: st.border, display: 'inline-block' } }, BOOKING_STATUS_LABEL[b.status] || b.status),
                             React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: BK.text, margin: '5px 0 0' } }, b.status === 'quote_requested' ? 'Awaiting quote' : money(b.total))));
             }));
-            const bookAgainBtn = shownBookings.length > 0 && React.createElement("button", { onClick: () => { setTab('browse'); setActiveCat(null); }, style: { margin: '18px 18px 0', width: 'calc(100% - 36px)', padding: '13px 0', borderRadius: 14, border: `1.5px dashed ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } }, "+ Book Again");
             const scrollContent = React.createElement("div", { className: "avio-scroll", style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 100px)` } },
-                header, tabsRow, cards, bookAgainBtn);
+                header, tabsRow, cards);
             return scrollContent;
         })())),
         tab === 'wallet' && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: T.background } }, (() => {
