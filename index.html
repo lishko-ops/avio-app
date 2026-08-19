@@ -2668,7 +2668,8 @@ function App() {
     const [showSplash, setShowSplash] = useState(true);
     const [authView, setAuthView] = useState('welcome');
     const [authDraft, setAuthDraft] = useState({ firstName: '', lastName: '', identifier: '', password: '', otp: ['', '', '', '', '', ''] });
-    const [bizOnboarding, setBizOnboarding] = useState({ businessName: '', category: '', services: [], locationMode: '', address: '', serviceArea: '', description: '' });
+    const [bizOnboarding, setBizOnboarding] = useState(() => loadLS('avio_biz_onboarding', { businessName: '', category: '', subcategory: '', services: [], locationMode: '', address: '', serviceArea: '', description: '', phone: '', email: '', photo: null }));
+    useEffect(() => { saveLS('avio_biz_onboarding', bizOnboarding); }, [bizOnboarding]);
     const [bizCategoryPickerOpen, setBizCategoryPickerOpen] = useState(false);
     const [bizCategorySearch, setBizCategorySearch] = useState('');
     const [businessProfile, setBusinessProfile] = useState(() => loadLS('avio_business_profile', null));
@@ -3876,6 +3877,10 @@ function App() {
     const [swipeArrow, setSwipeArrow] = useState(null);
     const [profileDrag, setProfileDrag] = useState(null);
     const [businessProfileTarget, setBusinessProfileTarget] = useState(null);
+    const [editBusinessProfileOpen, setEditBusinessProfileOpen] = useState(false);
+    const [editProfileDraft, setEditProfileDraft] = useState(null);
+    const [editProfileDiscardConfirm, setEditProfileDiscardConfirm] = useState(false);
+    const editProfilePhotoInputRef = useRef(null);
     const [bizDraftsOpen, setBizDraftsOpen] = useState(false);
     const [bizProfileTab, setBizProfileTab] = useState('videos');
     const [postViewer, setPostViewer] = useState(null);
@@ -5893,11 +5898,78 @@ function App() {
             location: bizOnboarding.address || 'Your area',
             description: bizOnboarding.description || '',
             locationMode: bizOnboarding.locationMode || '',
+            image: bizOnboarding.photo || null,
             rating: 4.9,
             likes: '850',
             verified: businessVerified,
             mine: true,
         });
+    }
+    function openEditBusinessProfile() {
+        setEditProfileDraft({
+            businessName: bizOnboarding.businessName.trim() || 'My Business',
+            category: bizOnboarding.category || '',
+            subcategory: bizOnboarding.subcategory || '',
+            description: bizOnboarding.description || '',
+            phone: bizOnboarding.phone || '',
+            email: bizOnboarding.email || '',
+            photo: bizOnboarding.photo || null,
+        });
+        setEditProfileDiscardConfirm(false);
+        setEditBusinessProfileOpen(true);
+    }
+    function isEditProfileDirty() {
+        if (!editProfileDraft)
+            return false;
+        return editProfileDraft.businessName !== (bizOnboarding.businessName.trim() || 'My Business')
+            || editProfileDraft.category !== (bizOnboarding.category || '')
+            || editProfileDraft.subcategory !== (bizOnboarding.subcategory || '')
+            || editProfileDraft.description !== (bizOnboarding.description || '')
+            || editProfileDraft.phone !== (bizOnboarding.phone || '')
+            || editProfileDraft.email !== (bizOnboarding.email || '')
+            || editProfileDraft.photo !== (bizOnboarding.photo || null);
+    }
+    function closeEditBusinessProfile(force) {
+        if (!force && isEditProfileDirty()) {
+            setEditProfileDiscardConfirm(true);
+            return;
+        }
+        setEditBusinessProfileOpen(false);
+        setEditProfileDraft(null);
+        setEditProfileDiscardConfirm(false);
+    }
+    function saveBusinessProfile() {
+        if (!editProfileDraft || !editProfileDraft.businessName.trim())
+            return;
+        const updated = {
+            businessName: editProfileDraft.businessName.trim(),
+            category: editProfileDraft.category.trim(),
+            subcategory: editProfileDraft.subcategory.trim(),
+            description: editProfileDraft.description.trim(),
+            phone: editProfileDraft.phone.trim(),
+            email: editProfileDraft.email.trim(),
+            photo: editProfileDraft.photo,
+        };
+        setBizOnboarding((prev) => ({ ...prev, ...updated }));
+        // businessProfileTarget is a point-in-time snapshot captured when the profile was
+        // opened, not a live view of bizOnboarding — without this, the already-open profile
+        // screen would keep showing the pre-edit name/photo until closed and reopened.
+        setBusinessProfileTarget((prev) => prev && prev.id === MY_PROVIDER_ID
+            ? { ...prev, name: updated.businessName, category: updated.category, description: updated.description, image: updated.photo }
+            : prev);
+        setEditBusinessProfileOpen(false);
+        setEditProfileDraft(null);
+        setEditProfileDiscardConfirm(false);
+        flashToast('Profile updated');
+    }
+    function handleEditProfilePhotoFile(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file)
+            return;
+        const reader = new FileReader();
+        reader.onload = () => setEditProfileDraft((d) => ({ ...d, photo: reader.result }));
+        reader.readAsDataURL(file);
+        e.target.value = '';
     }
     function openCustomerProfile() {
         setProviderDashboardOpen(false);
@@ -8160,6 +8232,7 @@ function App() {
         businessProfileTarget && businessProfileTarget.businessType === 'restaurant' && renderRestaurantProfileScreen(businessProfileTarget),
         businessProfileTarget && businessProfileTarget.businessType !== 'restaurant' && (() => {
             const item = businessProfileTarget;
+            const isOwnProfile = item.id === MY_PROVIDER_ID;
             const P = profileDrag && profileDrag.itemId === item.id ? profileDrag : { progress: 1, dragging: false };
             const followed = followedIds.has(item.id);
             const followersCount = formatCount(Math.round(parseCount(item.likes) * 3.4));
@@ -8224,7 +8297,10 @@ function App() {
                         React.createElement("p", { style: { fontSize: 12, color: T.textSecondary, marginTop: 3 } }, s.label)))));
             const bioRow = item.description && React.createElement("p", { style: { fontSize: 12.5, color: '#484848', lineHeight: 1.45, padding: '14px 18px 0' } }, item.description);
             const actionRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, padding: '16px 18px 0' } },
-                React.createElement("button", { onClick: () => toggleFollow(item.id), style: { flex: 1, padding: '13px 0', borderRadius: 24, background: followed ? 'transparent' : T.textPrimary, border: followed ? '1px solid #E0E0E0' : 'none', color: followed ? T.textPrimary : T.background, fontWeight: 700, fontSize: 14 } }, followed ? "Following" : "Follow"),
+                isOwnProfile
+                    ? React.createElement("button", { onClick: openEditBusinessProfile, style: { flex: 1, padding: '13px 0', borderRadius: 24, background: T.textPrimary, border: 'none', color: T.background, fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 } },
+                        "Edit", React.createElement(Icon, { name: "pencil", size: 13, color: T.background }))
+                    : React.createElement("button", { onClick: () => toggleFollow(item.id), style: { flex: 1, padding: '13px 0', borderRadius: 24, background: followed ? 'transparent' : T.textPrimary, border: followed ? '1px solid #E0E0E0' : 'none', color: followed ? T.textPrimary : T.background, fontWeight: 700, fontSize: 14 } }, followed ? "Following" : "Follow"),
                 React.createElement("button", { onClick: () => flashToast('Message — coming soon'), style: { width: 46, height: 46, borderRadius: 14, border: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                     React.createElement(Icon, { name: "messageoutline", size: 18, color: "#161616" })));
             const activeProfileDealLabel = (item.mine || item.id === MY_PROVIDER_ID) ? (providerDeal.enabled ? providerDeal.label : null) : (item.deal && item.deal.enabled ? item.deal.label : null);
@@ -8311,9 +8387,66 @@ function App() {
                 React.createElement("button", { onClick: () => flashToast('All comments — coming soon'), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 16, padding: '10px 0', fontSize: 13, fontWeight: 700, color: THEME.coral } },
                     `View all ${reviewCount} comments`, React.createElement(Icon, { name: "chevronright", size: 14, color: THEME.coral })));
             const activeSection = bizProfileTab === 'services' ? servicesSection : bizProfileTab === 'reviews' ? commentsSection : thrillzSection;
-            const isOwnProfile = item.id === MY_PROVIDER_ID;
             return React.createElement("div", { key: "bizprofile", onTouchStart: handleBizPanelTouchStart, onTouchMove: handleBizPanelTouchMove, onTouchEnd: handleBizPanelTouchEnd, style: { position: 'absolute', inset: 0, zIndex: isOwnProfile ? 2 : 11, background: T.background, overflowY: 'auto', paddingBottom: isOwnProfile ? 'calc(env(safe-area-inset-bottom) + 90px)' : 40, transform: `translateX(${(1 - P.progress) * 100}%)`, transition: P.dragging ? 'none' : 'transform 0.28s cubic-bezier(0.22,1,0.36,1)' } },
                 header, avatarRow, statsRow, bioRow, actionRow, profileDealBadge, tabsRow, activeSection);
+        })(),
+        editBusinessProfileOpen && editProfileDraft && (() => {
+            const d = editProfileDraft;
+            const EP = { text: '#161616', sub: '#8A8A8E', border: '#ECECEE' };
+            const inputStyleEP = { width: '100%', border: `1px solid ${EP.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 13.5, color: EP.text, outline: 'none', background: '#fff', fontFamily: 'inherit' };
+            const fieldLabel = (text) => React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: EP.sub, marginBottom: 6 } }, text);
+            const sectionTitle = (text) => React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: EP.text, margin: '26px 0 14px' } }, text);
+            const chevronRow = (label, value, onClick) => React.createElement("button", { key: label, onClick, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '13px 0', borderBottom: `1px solid ${EP.border}`, textAlign: 'left' } },
+                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                    React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: EP.sub, margin: 0 } }, label),
+                    React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: EP.text, marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, value)),
+                React.createElement(Icon, { name: "chevronright", size: 15, color: '#C7C7CC' }));
+            const travelLabel = businessTravel.enabled ? 'Yes, I travel to customers' : 'No, customers come to me';
+            const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${EP.border}` } },
+                React.createElement("button", { onClick: () => closeEditBusinessProfile(false) }, React.createElement(Icon, { name: "arrowleft", size: 18, color: EP.text })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15.5, color: EP.text, margin: 0 } }, "Edit Profile"),
+                React.createElement("button", { disabled: !d.businessName.trim(), onClick: saveBusinessProfile, style: { fontSize: 14, fontWeight: 700, color: d.businessName.trim() ? THEME.coral : '#C7C7CC' } }, "Save"));
+            const photoSection = React.createElement("div", { style: { padding: '20px 18px 0' } },
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: EP.text, margin: '0 0 14px' } }, "Profile Photo"),
+                React.createElement("button", { onClick: () => editProfilePhotoInputRef.current && editProfilePhotoInputRef.current.click(), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '4px 0 20px', borderBottom: `1px solid ${EP.border}` } },
+                    d.photo
+                        ? React.createElement("div", { style: { width: 56, height: 56, borderRadius: '50%', backgroundImage: `url(${d.photo})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } })
+                        : React.createElement("div", { style: { width: 56, height: 56, borderRadius: '50%', background: THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: '#fff', flexShrink: 0 } }, (d.businessName || 'M').charAt(0)),
+                    React.createElement("span", { style: { flex: 1, textAlign: 'left', fontSize: 13.5, fontWeight: 600, color: THEME.coral } }, "Tap to change photo"),
+                    React.createElement(Icon, { name: "chevronright", size: 15, color: '#C7C7CC' })),
+                React.createElement("input", { ref: editProfilePhotoInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleEditProfilePhotoFile }));
+            const businessInfoSection = React.createElement("div", { style: { padding: '0 18px' } },
+                sectionTitle("Business Information"),
+                React.createElement("div", { style: { marginBottom: 16 } }, fieldLabel("Business Name"),
+                    React.createElement("input", { value: d.businessName, onChange: (e) => setEditProfileDraft({ ...d, businessName: e.target.value }), placeholder: "My Business", style: inputStyleEP })),
+                React.createElement("div", { style: { marginBottom: 16 } }, fieldLabel("Category"),
+                    React.createElement("input", { value: d.category, onChange: (e) => setEditProfileDraft({ ...d, category: e.target.value }), placeholder: "e.g. Barber Shop", style: inputStyleEP })),
+                React.createElement("div", { style: { marginBottom: 16 } }, fieldLabel("Subcategory"),
+                    React.createElement("input", { value: d.subcategory, onChange: (e) => setEditProfileDraft({ ...d, subcategory: e.target.value }), placeholder: "e.g. Men's Haircuts", style: inputStyleEP })),
+                React.createElement("div", { style: { marginBottom: 4 } }, fieldLabel("Description"),
+                    React.createElement("textarea", { value: d.description, onChange: (e) => setEditProfileDraft({ ...d, description: e.target.value.slice(0, 300) }), maxLength: 300, rows: 3, placeholder: "Tell customers what you do...", style: { ...inputStyleEP, resize: 'none' } }),
+                    React.createElement("p", { style: { fontSize: 10.5, color: '#B5B5B8', textAlign: 'right', marginTop: 4 } }, `${d.description.length}/300`)));
+            const contactSection = React.createElement("div", { style: { padding: '0 18px' } },
+                sectionTitle("Contact Information"),
+                React.createElement("div", { style: { marginBottom: 16 } }, fieldLabel("Phone Number"),
+                    React.createElement("input", { type: "tel", value: d.phone, onChange: (e) => setEditProfileDraft({ ...d, phone: e.target.value }), placeholder: "(555) 123-4567", style: inputStyleEP })),
+                React.createElement("div", { style: { marginBottom: 4 } }, fieldLabel("Email"),
+                    React.createElement("input", { type: "email", value: d.email, onChange: (e) => setEditProfileDraft({ ...d, email: e.target.value }), placeholder: "mybusiness@email.com", style: inputStyleEP })));
+            const locationSection = React.createElement("div", { style: { padding: '0 18px 28px' } },
+                sectionTitle("Location & Service Area"),
+                chevronRow("Business Address", bizOnboarding.address.trim() || 'Add your business address', () => setLocationDetailsOpen(true)),
+                chevronRow("Service Areas", formatServiceAreaSummary(businessTravel), openServiceAreaSettings),
+                chevronRow("Travel to Customers", travelLabel, openServiceAreaSettings));
+            const discardModal = editProfileDiscardConfirm && React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2, padding: '0 32px' } },
+                React.createElement("div", { style: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 20, padding: 22, textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: EP.text, margin: 0 } }, "Discard changes?"),
+                    React.createElement("p", { style: { fontSize: 12.5, color: EP.sub, marginTop: 8, lineHeight: 1.45 } }, "Your profile changes haven't been saved."),
+                    React.createElement("button", { onClick: () => setEditProfileDiscardConfirm(false), style: { width: '100%', marginTop: 18, padding: '13px 0', borderRadius: 24, background: EP.text, color: '#fff', fontWeight: 700, fontSize: 14 } }, "Keep Editing"),
+                    React.createElement("button", { onClick: () => closeEditBusinessProfile(true), style: { width: '100%', marginTop: 10, padding: '13px 0', borderRadius: 24, background: '#F5F5F5', color: '#D0304A', fontWeight: 700, fontSize: 14 } }, "Discard")));
+            return React.createElement("div", { key: "editbizprofile", style: { position: 'absolute', inset: 0, zIndex: 3, background: '#fff', display: 'flex', flexDirection: 'column' } },
+                header,
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', paddingBottom: 30 } }, photoSection, businessInfoSection, contactSection, locationSection),
+                discardModal);
         })(),
         rsvFlow && (() => {
             const f = rsvFlow;
@@ -10155,7 +10288,7 @@ function App() {
                     React.createElement("button", { onClick: () => setScheduleConflictPrompt(null), style: { width: '100%', marginTop: 10, padding: '13px 0', borderRadius: 24, background: T.surfaceSecondary, color: T.textPrimary, fontWeight: 700, fontSize: 14 } }, "OK")));
             return React.createElement("div", { key: providerDashboardTab === 'hours' ? 'schedule-' + scheduleView : undefined, className: providerDashboardTab === 'hours' ? 'avio-settings-fwd' : undefined, style: { position: 'absolute', inset: 0, zIndex: 2, background: T.background, display: 'flex', flexDirection: 'column' } }, header, providerDashboardTab !== 'overview' && tabsRow, body, scheduleDeleteConfirmModal, scheduleConflictModal);
         })(),
-        providerDashboardOpen && locationDetailsOpen && (() => {
+        (providerDashboardOpen || editBusinessProfileOpen) && locationDetailsOpen && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
             function toggleRow(label, sub, on, onChange) {
                 return React.createElement("div", { key: label, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 0', borderBottom: `1px solid ${PD.border}` } },
@@ -10201,7 +10334,7 @@ function App() {
                                 active && React.createElement(Icon, { name: "check", size: 15, color: THEME.coral }));
                         }))));
         })(),
-        providerDashboardOpen && serviceAreaSettingsOpen && serviceAreaDraft && (() => {
+        (providerDashboardOpen || editBusinessProfileOpen) && serviceAreaSettingsOpen && serviceAreaDraft && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
             const draft = serviceAreaDraft;
             const dist = draft.isCustom ? (Number(draft.customDistanceMi) || 0) : draft.distanceMi;
