@@ -24,7 +24,7 @@
   html, body, #root { height: 100%; margin: 0; overscroll-behavior: none; background: #fff; }
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
   .avio-scroll::-webkit-scrollbar { display: none; }
-  .avio-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+  .avio-scroll { -ms-overflow-style: none; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   button { font-family: inherit; cursor: pointer; border: none; background: none; }
   #fallback { display:none; color:#F8F4EC; font-family: sans-serif; padding: 24px; text-align:center; }
   @keyframes avioPulse { 0%, 100% { box-shadow: 0 10px 26px rgba(0,0,0,0.35), 0 0 0 0 rgba(255,255,255,0.4); } 50% { box-shadow: 0 10px 26px rgba(0,0,0,0.35), 0 0 0 13px rgba(255,255,255,0); } }
@@ -3228,6 +3228,34 @@ function App() {
         }
         return shortItemRefCallbacks.current[itemId];
     }
+    // Same stable-callback trick for the <video>/poster <img> themselves — these now
+    // actually mount and unmount as a short scrolls in and out of the preload window
+    // (see renderShortCard), so a stale ref left behind by an unmounted video would
+    // point at a detached node the observer could still try to play/pause.
+    const shortVideoRefCallbacks = useRef({});
+    function getShortVideoRefCallback(itemId) {
+        if (!shortVideoRefCallbacks.current[itemId]) {
+            shortVideoRefCallbacks.current[itemId] = (el) => {
+                if (el)
+                    shortVideoRefs.current[itemId] = el;
+                else
+                    delete shortVideoRefs.current[itemId];
+            };
+        }
+        return shortVideoRefCallbacks.current[itemId];
+    }
+    const shortPosterRefCallbacks = useRef({});
+    function getShortPosterRefCallback(itemId) {
+        if (!shortPosterRefCallbacks.current[itemId]) {
+            shortPosterRefCallbacks.current[itemId] = (el) => {
+                if (el)
+                    shortPosterRefs.current[itemId] = el;
+                else
+                    delete shortPosterRefs.current[itemId];
+            };
+        }
+        return shortPosterRefCallbacks.current[itemId];
+    }
     // Tracks which short is currently playing so its immediate neighbors can be
     // preloaded ahead of time — the standard trick behind TikTok/Reels-style
     // instant playback, instead of every one of the 65 shorts fighting for
@@ -6172,6 +6200,15 @@ function App() {
     }
     function renderShortCard(item, itemIdx, activeShortIdx, showFeedHeader) {
             const isNearActive = Math.abs(itemIdx - activeShortIdx) <= 1;
+            // Only the active card plus its immediate neighbors ever get a real <video>
+            // element — with 65+ shorts in the feed, mounting every one of them at once
+            // used to fire dozens of simultaneous video requests the moment the feed
+            // opened, starving the one video actually on screen and making it stutter/
+            // take forever to start. Everything outside this window shows its static
+            // poster only (still swaps to full video the instant it scrolls into range,
+            // since the window is centered on the currently active index, one step
+            // ahead of wherever the user is about to scroll).
+            const inMountWindow = Math.abs(itemIdx - activeShortIdx) <= 2;
             const liked = likedIds.has(item.id);
             const followed = followedIds.has(item.id);
             const saved = savedShorts.has(item.id);
@@ -6179,14 +6216,21 @@ function App() {
             const commentCount = item.comments + ((commentsByItem[item.id] || []).length);
             const shareCount = formatCount(Math.round(parseCount(item.likes) * 0.4));
             const saveCount = formatCount(parseCount(item.saves) + (saved ? 1 : 0));
+            const posterOnly = item.image
+                ? React.createElement("img", { key: item.id + '-poster-only', src: item.image, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } })
+                : React.createElement("div", { style: { position: 'absolute', inset: 0, background: item.avatarColor || '#000' } });
             const backdrop = item.customVideoUrl
-                ? React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, src: item.customVideoUrl, muted: false, loop: true, playsInline: true, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000', cursor: 'pointer' } })
+                ? (inMountWindow
+                    ? React.createElement("video", { key: item.id + '-video', ref: getShortVideoRefCallback(item.id), src: item.customVideoUrl, muted: false, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000', cursor: 'pointer' } })
+                    : posterOnly)
                 : item.video
-                    ? React.createElement(React.Fragment, { key: item.id + '-videowrap' },
-                        React.createElement("video", { key: item.id + '-video', ref: (el) => { if (el) shortVideoRefs.current[item.id] = el; }, muted: false, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onPlaying: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = 'none'; }, onWaiting: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = ''; }, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
-                            React.createElement("source", { src: item.video + '.webm', type: "video/webm" }),
-                            React.createElement("source", { src: item.video + '.mp4', type: "video/mp4" })),
-                        item.image && React.createElement("img", { key: item.id + '-poster', ref: (el) => { if (el) shortPosterRefs.current[item.id] = el; }, src: item.image, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }))
+                    ? (inMountWindow
+                        ? React.createElement(React.Fragment, { key: item.id + '-videowrap' },
+                            React.createElement("video", { key: item.id + '-video', ref: getShortVideoRefCallback(item.id), muted: false, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onPlaying: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = 'none'; }, onWaiting: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = ''; }, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
+                                React.createElement("source", { src: item.video + '.webm', type: "video/webm" }),
+                                React.createElement("source", { src: item.video + '.mp4', type: "video/mp4" })),
+                            item.image && React.createElement("img", { key: item.id + '-poster', ref: getShortPosterRefCallback(item.id), src: item.image, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }))
+                        : posterOnly)
                     : item.image
                     ? React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
                     : React.createElement("div", { style: { position: 'absolute', inset: 0, background: item.avatarColor || '#000' } });
@@ -6301,7 +6345,11 @@ function App() {
                         ref: (el) => { if (el) { scrubBarRefs.current[item.id] = scrubBarRefs.current[item.id] || {}; scrubBarRefs.current[item.id].dot = el; } },
                         style: { position: 'absolute', top: '50%', left: scrubInitialPct + '%', width: 7, height: 7, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.45)', transform: 'translate(-50%, -50%)' },
                     })));
-            return React.createElement("div", { key: item.id, ref: getShortItemRefCallback(item.id), "data-short-id": item.id, onTouchStart: (e) => handleShortTouchStart(e, item), onTouchMove: (e) => handleShortTouchMove(e, item), onTouchEnd: (e) => handleShortTouchEnd(e, item), style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden' } },
+            // `contain` lets the browser skip layout/paint work for the ~60 other cards
+            // sitting off-screen in this scroll-snap list instead of tracking them as if
+            // they might affect the page outside their own box — a big part of what made
+            // scrolling feel twitchy with dozens of full-viewport video cards mounted at once.
+            return React.createElement("div", { key: item.id, ref: getShortItemRefCallback(item.id), "data-short-id": item.id, onTouchStart: (e) => handleShortTouchStart(e, item), onTouchMove: (e) => handleShortTouchMove(e, item), onTouchEnd: (e) => handleShortTouchEnd(e, item), style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden', contain: 'content' } },
                 React.createElement("div", { style: { position: 'absolute', inset: 0, transform: `translateX(${-dragProgress * 46}px)`, opacity: 1 - dragProgress * 0.35, transition: innerTransition } },
                     backdrop, scrim, brand, actionStack, infoBlock, bookCta),
                 arrowOverlay, burstOverlay, scrubBarOverlay);
