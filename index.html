@@ -2730,7 +2730,6 @@ function App() {
         return () => { cancelled = true; };
     }, []);
     const [bookingsSubTab, setBookingsSubTab] = useState('upcoming');
-    const [walletCategory, setWalletCategory] = useState('tickets');
     const [ticketWalletSubTab, setTicketWalletSubTab] = useState('upcoming');
     const [ticketDetail, setTicketDetail] = useState(null); // { bookingId, index }
     const [ticketScannerOpen, setTicketScannerOpen] = useState(false);
@@ -2740,12 +2739,12 @@ function App() {
     useEffect(() => { saveLS('avio_biz_ticketing_mode', businessTicketingMode); }, [businessTicketingMode]);
     const [bookingTarget, setBookingTarget] = useState(null);
     const [bookings, setBookings] = useState([
-        { id: 'b1', name: 'John Barber', service: 'Haircut', business: 'John Barber', category: 'Beauty', date: 'Aug 6', day: 6, month: 7, year: 2026, time: '9:00 AM', total: 45, status: 'confirmed', address: '123 Main St, New York, NY', duration: '45 min', durationMinutes: 45, logoText: 'JB' },
-        { id: 'b2', name: 'Luxury Nails', service: 'Nails', business: 'Luxury Nails', category: 'Beauty', date: 'Aug 6', day: 6, month: 7, year: 2026, time: '11:30 AM', total: 65, status: 'confirmed', address: '456 Broadway, New York, NY', duration: '1h 15 min', durationMinutes: 75, logoText: 'LN' },
-        { id: 'b3', name: 'DJ Alex', service: 'DJ Event', business: 'DJ Alex', category: 'Parties', date: 'Aug 6', day: 6, month: 7, year: 2026, time: '2:00 PM', total: 350, status: 'confirmed', address: '789 Park Ave, New York, NY', duration: '3h', durationMinutes: 180, logoText: 'DJ' },
-        { id: 'b4', name: 'John Barber', service: 'Haircut', business: 'John Barber', category: 'Beauty', date: 'Aug 7', day: 7, month: 7, year: 2026, time: '2:00 PM', total: 45, status: 'confirmed', address: '123 Main St, New York, NY', duration: '45 min', durationMinutes: 45, logoText: 'JB' },
+        { id: 'b1', name: 'John Barber', service: 'Haircut', business: 'John Barber', category: 'Beauty', date: 'Aug 20', day: 20, month: 7, year: 2026, time: '9:00 AM', total: 45, status: 'confirmed', address: '123 Main St, New York, NY', duration: '45 min', durationMinutes: 45, logoText: 'JB' },
+        { id: 'b2', name: 'Luxury Nails', service: 'Nails', business: 'Luxury Nails', category: 'Beauty', date: 'Aug 20', day: 20, month: 7, year: 2026, time: '11:30 AM', total: 65, status: 'confirmed', address: '456 Broadway, New York, NY', duration: '1h 15 min', durationMinutes: 75, logoText: 'LN' },
+        { id: 'b3', name: 'DJ Alex', service: 'DJ Event', business: 'DJ Alex', category: 'Parties', date: 'Aug 20', day: 20, month: 7, year: 2026, time: '2:00 PM', total: 350, status: 'confirmed', address: '789 Park Ave, New York, NY', duration: '3h', durationMinutes: 180, logoText: 'DJ' },
+        { id: 'b4', name: 'John Barber', service: 'Haircut', business: 'John Barber', category: 'Beauty', date: 'Aug 21', day: 21, month: 7, year: 2026, time: '2:00 PM', total: 45, status: 'confirmed', address: '123 Main St, New York, NY', duration: '45 min', durationMinutes: 45, logoText: 'JB' },
         { id: 'b5', name: 'Zen Spa', service: 'Massage', business: 'Zen Spa', category: 'Beauty', date: 'Aug 3', day: 3, month: 7, year: 2026, time: '4:00 PM', total: 120, status: 'completed', address: '22 Wellness Way, New York, NY', duration: '1h', durationMinutes: 60, logoText: 'ZS' },
-        { id: 'b6', name: 'FitLife Coach', service: 'Personal Training', business: 'FitLife Coach', category: 'Educational', date: 'Aug 9', day: 9, month: 7, year: 2026, time: '8:00 AM', total: 80, status: 'pending', address: '10 Fit St, New York, NY', duration: '1h', durationMinutes: 60, logoText: 'FL' },
+        { id: 'b6', name: 'FitLife Coach', service: 'Personal Training', business: 'FitLife Coach', category: 'Educational', date: 'Aug 23', day: 23, month: 7, year: 2026, time: '8:00 AM', total: 80, status: 'pending', address: '10 Fit St, New York, NY', duration: '1h', durationMinutes: 60, logoText: 'FL' },
         { id: 'ab-seed1', bookingType: 'activity', name: 'Wave Kingdom Water Park', service: 'Day Pass', business: 'Wave Kingdom Water Park', category: 'Rentals',
             providerId: 't-wavekingdom', activityId: 'act-daypass', spaceId: 'space-park', spaceName: 'Park Entry', partySize: 4, durationMinutes: 480,
             date: 'Aug 25, 2026', dateKey: dateKey(new Date(2026, 7, 25)), day: 25, month: 7, year: 2026, time: '9:30 AM', timeMinutes: 570, timeRange: '9:30 AM – 5:30 PM',
@@ -7910,100 +7909,57 @@ function App() {
                 header, searchRow, avatarRow, filterRow, list);
         })())),
         tab === 'bookings' && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: T.background } }, (() => {
-            const BK = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const BK = { text: T.textPrimary, sub: T.textSecondary, border: T.border, alt: T.surfaceSecondary };
             const today = new Date();
             const nowMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-            const todayLabel = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
 
             const bookingSortMs = (b) => b.day != null ? new Date(b.year, b.month, b.day).getTime() : (b.bookingCreatedAt || 0);
             const isUpcoming = (b) => (b.status === 'confirmed' || b.status === 'pending' || b.status === 'quote_requested') && (b.day == null || new Date(b.year, b.month, b.day).getTime() >= nowMidnight.getTime());
-            const upcomingBookings = bookings.filter(isUpcoming).sort((a, c) => bookingSortMs(a) - bookingSortMs(c));
-            const pastBookings = bookings.filter((b) => !isUpcoming(b)).sort((a, c) => bookingSortMs(c) - bookingSortMs(a));
-            const CUS_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'past', label: 'Past' }];
+            // Tickets/passes are a completely different purchase type from normal service
+            // bookings and must never appear mixed into Upcoming/Past — they live only
+            // under the Tickets & Passes tab below.
+            const isTicketedBooking = (b) => b.tickets && b.tickets.length > 0;
+            const upcomingBookings = bookings.filter((b) => !isTicketedBooking(b) && isUpcoming(b)).sort((a, c) => bookingSortMs(a) - bookingSortMs(c));
+            const pastBookings = bookings.filter((b) => !isTicketedBooking(b) && !isUpcoming(b)).sort((a, c) => bookingSortMs(c) - bookingSortMs(a));
+            const ticketBookings = bookings.filter(isTicketedBooking);
+            const hasTickets = ticketBookings.length > 0;
+            const CUS_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'past', label: 'Past' }, { id: 'tickets', label: 'Tickets & Passes' }];
             const shownBookings = bookingsSubTab === 'past' ? pastBookings : upcomingBookings;
-            const hasTickets = bookings.some((b) => b.tickets && b.tickets.length);
             const header = React.createElement("div", { style: { padding: '0 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: BK.text, margin: 0 } }, "Bookings"),
-                hasTickets && React.createElement("button", { onClick: () => { setWalletCategory('tickets'); setTicketWalletSubTab('upcoming'); setTab('wallet'); }, style: { display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 20, border: `1.5px solid ${THEME.coral}` } },
-                    React.createElement(Icon, { name: "wallet", size: 15, color: THEME.coral }),
+                hasTickets && React.createElement("button", { onClick: () => { setTicketWalletSubTab('upcoming'); setBookingsSubTab('tickets'); }, style: { display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 20, border: `1.5px solid ${THEME.coral}` } },
+                    React.createElement(Icon, { name: "card", size: 15, color: THEME.coral }),
                     React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "Tickets")));
-            const tabsRow = React.createElement("div", { style: { display: 'flex', gap: 20, padding: '18px 18px 0', borderBottom: `1px solid ${BK.border}` } }, CUS_TABS.map((t) => {
+            const tabsRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 20, padding: '18px 18px 0', borderBottom: `1px solid ${BK.border}`, overflowX: 'auto' } }, CUS_TABS.map((t) => {
                 const active = bookingsSubTab === t.id;
-                return React.createElement("button", { key: t.id, onClick: () => setBookingsSubTab(t.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
-                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? BK.text : BK.sub } }, t.label),
-                    React.createElement("div", { style: { width: active ? 22 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
-            }));
-            const emptyState = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 18px 20px', textAlign: 'center' } },
-                React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 } }, React.createElement(Icon, { name: "calendar", size: 30, color: '#C7C7CC' })),
-                React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: BK.text, margin: 0 } }, bookingsSubTab === 'past' ? "No past bookings yet" : "No upcoming bookings"),
-                bookingsSubTab === 'upcoming' && React.createElement("button", { onClick: () => { setTab('browse'); setActiveCat(null); }, style: { marginTop: 14, padding: '10px 22px', borderRadius: 20, background: THEME.coral, color: '#fff', fontSize: 12.5, fontWeight: 600 } }, "Browse Services"));
-            const cards = shownBookings.length === 0 ? emptyState : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '16px 18px 0' } }, shownBookings.map((b, i) => {
-                const isTicketed = b.tickets && b.tickets.length > 0;
-                const tGroupStatus = isTicketed ? ticketGroupStatus(b) : null;
-                const st = isTicketed ? TICKET_STATUS_META[tGroupStatus] : (BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed);
-                // A pending/in-flight cancellation request overrides the normal
-                // ticket/booking status pill so the customer always sees where
-                // their cancellation actually stands, on either card type.
-                const cxl = b.cancellationRequest && b.cancellationRequest.status !== 'declined' ? CANCELLATION_STATUS_META[b.cancellationRequest.status] : null;
-                return React.createElement("button", { key: b.id, className: "avio-card-in", onClick: () => isTicketed ? setTicketDetail({ bookingId: b.id, index: 0 }) : setBookingDetail(b), style: { animationDelay: `${i * 0.04}s`, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: T.surface, border: `1px solid ${BK.border}`, borderRadius: 18, padding: 12, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
-                    React.createElement("div", { style: { width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.logoText || (b.business || b.name).slice(0, 2).toUpperCase()),
-                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BK.text, margin: 0 } }, b.business || b.name),
-                        React.createElement("p", { style: { fontSize: 11.5, color: BK.sub, margin: '1px 0 0' } }, isTicketed ? `${b.service} · ${b.tickets.length} Ticket${b.tickets.length === 1 ? '' : 's'}` : b.service),
-                        React.createElement("p", { style: { fontSize: 11, color: BK.sub, margin: '2px 0 0' } }, (b.timeRange || b.time) ? `${b.date} · ${b.timeRange || b.time}` : b.date)),
-                    isTicketed
-                        ? React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
-                            React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: cxl ? cxl.color : st.color } }, cxl ? cxl.label : st.label),
-                            React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral, margin: '5px 0 0' } }, "View Tickets →"))
-                        : React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
-                            React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: cxl ? cxl.bg : st.bg, color: cxl ? cxl.color : st.color, border: cxl ? 'none' : st.border, display: 'inline-block' } }, cxl ? cxl.label : (BOOKING_STATUS_LABEL[b.status] || b.status)),
-                            React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: BK.text, margin: '5px 0 0' } }, b.status === 'quote_requested' ? 'Awaiting quote' : money(b.total))));
-            }));
-            const managementButtons = bookingsSubTab === 'upcoming' && shownBookings.length > 0 && React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '18px 18px 0' } },
-                React.createElement("button", { onClick: openCustomerCancelFlow, style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 13.5 } },
-                    React.createElement(Icon, { name: "x", size: 15, color: "#D0304A" }), "Cancel Bookings"),
-                React.createElement("button", { onClick: openCustomerRescheduleFlow, style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px solid ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } },
-                    React.createElement(Icon, { name: "clock", size: 15, color: THEME.coral }), "Reschedule Bookings"),
-                React.createElement("button", { onClick: () => setCheckCancellationsOpen(true), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px solid ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } },
-                    React.createElement(Icon, { name: "check", size: 15, color: THEME.coral }), "Check on Cancellations"));
-            const scrollContent = React.createElement("div", { className: "avio-scroll", style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 100px)` } },
-                header, tabsRow, cards, managementButtons);
-            return scrollContent;
-        })())),
-        tab === 'wallet' && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: T.background } }, (() => {
-            const WK = { text: T.textPrimary, sub: T.textSecondary, border: T.border, alt: T.surfaceSecondary };
-            const CATS = [{ id: 'tickets', label: 'Tickets' }, { id: 'passes', label: 'Passes' }];
-            const header = React.createElement("div", { style: { padding: '0 18px' } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: WK.text, margin: 0 } }, "Wallet"));
-            const catRow = React.createElement("div", { style: { display: 'flex', gap: 20, padding: '18px 18px 0', borderBottom: `1px solid ${WK.border}` } }, CATS.map((c) => {
-                const active = walletCategory === c.id;
-                return React.createElement("button", { key: c.id, onClick: () => setWalletCategory(c.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
-                    React.createElement("span", { style: { fontSize: 14, fontWeight: active ? 700 : 500, color: active ? WK.text : WK.sub } }, c.label),
+                return React.createElement("button", { key: t.id, onClick: () => setBookingsSubTab(t.id), style: { flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
+                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? BK.text : BK.sub, whiteSpace: 'nowrap' } }, t.label),
                     React.createElement("div", { style: { width: active ? 22 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
             }));
             let body;
-            if (walletCategory === 'passes') {
-                body = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 18px 20px', textAlign: 'center' } },
-                    React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: WK.alt, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 } }, React.createElement(Icon, { name: "card", size: 28, color: '#C7C7CC' })),
-                    React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: WK.text, margin: 0 } }, "No passes yet"),
-                    React.createElement("p", { style: { fontSize: 12.5, color: WK.sub, marginTop: 6, maxWidth: 260, lineHeight: 1.5 } }, "Season passes and memberships you buy on Bookvado will appear here."));
-            }
-            else {
-                const TICKET_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'used', label: 'Used' }, { id: 'expired', label: 'Expired' }];
+            if (bookingsSubTab === 'tickets') {
+                const TICKET_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'used', label: 'Used' }];
                 const subTabsRow = React.createElement("div", { style: { display: 'flex', gap: 8, padding: '14px 18px 0' } }, TICKET_TABS.map((t) => {
                     const active = ticketWalletSubTab === t.id;
-                    return React.createElement("button", { key: t.id, onClick: () => setTicketWalletSubTab(t.id), style: { padding: '7px 14px', borderRadius: 16, background: active ? THEME.coral : WK.alt, color: active ? '#fff' : WK.sub, fontSize: 12.5, fontWeight: 700 } }, t.label);
+                    return React.createElement("button", { key: t.id, onClick: () => setTicketWalletSubTab(t.id), style: { padding: '7px 14px', borderRadius: 16, background: active ? THEME.coral : BK.alt, color: active ? '#fff' : BK.sub, fontSize: 12.5, fontWeight: 700 } }, t.label);
                 }));
-                const ticketBookings = bookings.filter((b) => b.tickets && b.tickets.length);
-                const shown = ticketBookings.filter((b) => ticketBookingBucket(b) === ticketWalletSubTab)
-                    .sort((a, c) => (a.day != null && c.day != null) ? (new Date(a.year, a.month, a.day) - new Date(c.year, c.month, c.day)) : 0);
-                const emptyState = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 18px 20px', textAlign: 'center' } },
-                    React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: WK.alt, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 } }, React.createElement(Icon, { name: "wallet", size: 28, color: '#C7C7CC' })),
-                    React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: WK.text, margin: 0 } }, `No ${ticketWalletSubTab} tickets`),
-                    ticketWalletSubTab === 'upcoming' && React.createElement(React.Fragment, null,
-                        React.createElement("p", { style: { fontSize: 12.5, color: WK.sub, marginTop: 6, maxWidth: 260, lineHeight: 1.5 } }, "Tickets for attractions, movies, and other ticketed experiences you book on Bookvado will appear here automatically."),
-                        React.createElement("button", { onClick: () => { setTab('browse'); setActiveCat(null); }, style: { marginTop: 14, padding: '10px 22px', borderRadius: 20, background: THEME.coral, color: '#fff', fontSize: 12.5, fontWeight: 600 } }, "Explore")));
-                const cards = shown.length === 0 ? emptyState : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '16px 18px 0' } }, shown.map((b) => {
+                // "Expired" is intentionally folded into "Used" — there is no third tab,
+                // just a history bucket for anything no longer redeemable.
+                const shownTickets = ticketBookings.filter((b) => {
+                    const bucket = ticketBookingBucket(b);
+                    return ticketWalletSubTab === 'used' ? (bucket === 'used' || bucket === 'expired') : bucket === ticketWalletSubTab;
+                }).sort((a, c) => (a.day != null && c.day != null) ? (new Date(a.year, a.month, a.day) - new Date(c.year, c.month, c.day)) : 0);
+                const ticketEmptyState = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 18px 20px', textAlign: 'center' } },
+                    React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: BK.alt, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 } }, React.createElement(Icon, { name: "card", size: 28, color: '#C7C7CC' })),
+                    ticketWalletSubTab === 'upcoming'
+                        ? React.createElement(React.Fragment, null,
+                            React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: BK.text, margin: 0 } }, "No upcoming tickets or passes"),
+                            React.createElement("p", { style: { fontSize: 12.5, color: BK.sub, marginTop: 6, maxWidth: 260, lineHeight: 1.5 } }, "Tickets and passes you purchase will appear here."),
+                            React.createElement("button", { onClick: () => { setTab('browse'); setActiveCat(null); }, style: { marginTop: 14, padding: '10px 22px', borderRadius: 20, background: THEME.coral, color: '#fff', fontSize: 12.5, fontWeight: 600 } }, "Explore"))
+                        : React.createElement(React.Fragment, null,
+                            React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: BK.text, margin: 0 } }, "No used tickets yet"),
+                            React.createElement("p", { style: { fontSize: 12.5, color: BK.sub, marginTop: 6, maxWidth: 260, lineHeight: 1.5 } }, "Tickets you've already used will appear here.")));
+                const ticketCards = shownTickets.length === 0 ? ticketEmptyState : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '16px 18px 0' } }, shownTickets.map((b) => {
                     const gStatus = ticketGroupStatus(b);
                     const meta = TICKET_STATUS_META[gStatus];
                     const isMovie = b.tickets[0].kind === 'movie';
@@ -8013,21 +7969,55 @@ function App() {
                     const thirdLine = isMovie
                         ? `${b.date} · ${b.time} · ${b.tickets.length} Ticket${b.tickets.length === 1 ? '' : 's'}`
                         : `${b.date} · ${b.tickets.length} Ticket${b.tickets.length === 1 ? '' : 's'}`;
-                    return React.createElement("div", { key: b.id, style: { border: `1px solid ${WK.border}`, borderRadius: 18, padding: 14 } },
+                    return React.createElement("div", { key: b.id, style: { border: `1px solid ${BK.border}`, borderRadius: 18, padding: 14 } },
                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
                             tile,
                             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: WK.text, margin: 0 } }, b.business),
-                                React.createElement("p", { style: { fontSize: 12, color: WK.sub, margin: '2px 0 0' } }, b.service),
-                                React.createElement("p", { style: { fontSize: 11.5, color: WK.sub, margin: '2px 0 0' } }, thirdLine))),
+                                React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: BK.text, margin: 0 } }, b.business),
+                                React.createElement("p", { style: { fontSize: 12, color: BK.sub, margin: '2px 0 0' } }, b.service),
+                                React.createElement("p", { style: { fontSize: 11.5, color: BK.sub, margin: '2px 0 0' } }, thirdLine))),
                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 } },
                             React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: meta.color } }, meta.label),
-                            React.createElement("button", { onClick: () => setTicketDetail({ bookingId: b.id, index: 0 }), style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "View Tickets →")));
+                            React.createElement("button", { onClick: () => setTicketDetail({ bookingId: b.id, index: 0 }), style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, `${b.tickets.length === 1 ? 'View Ticket' : 'View Tickets'} →`)));
                 }));
-                body = React.createElement(React.Fragment, null, subTabsRow, cards);
+                body = React.createElement(React.Fragment, null, subTabsRow, ticketCards);
             }
-            return React.createElement("div", { className: "avio-scroll", style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 100px)` } },
-                header, catRow, body);
+            else {
+                const emptyState = React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 18px 20px', textAlign: 'center' } },
+                    React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: BK.alt, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 } }, React.createElement(Icon, { name: "calendar", size: 30, color: '#C7C7CC' })),
+                    bookingsSubTab === 'past'
+                        ? React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: BK.text, margin: 0 } }, "No past bookings yet")
+                        : React.createElement(React.Fragment, null,
+                            React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: BK.text, margin: 0 } }, "No upcoming bookings"),
+                            React.createElement("p", { style: { fontSize: 12.5, color: BK.sub, marginTop: 6, maxWidth: 260, lineHeight: 1.5 } }, "When you book a service or reservation, it will appear here.")),
+                    bookingsSubTab === 'upcoming' && React.createElement("button", { onClick: () => { setTab('browse'); setActiveCat(null); }, style: { marginTop: 14, padding: '10px 22px', borderRadius: 20, background: THEME.coral, color: '#fff', fontSize: 12.5, fontWeight: 600 } }, "Browse Services"));
+                const cards = shownBookings.length === 0 ? emptyState : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '16px 18px 0' } }, shownBookings.map((b, i) => {
+                    const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
+                    // A pending/in-flight cancellation request overrides the normal booking
+                    // status pill so the customer always sees where it actually stands.
+                    const cxl = b.cancellationRequest && b.cancellationRequest.status !== 'declined' ? CANCELLATION_STATUS_META[b.cancellationRequest.status] : null;
+                    return React.createElement("button", { key: b.id, className: "avio-card-in", onClick: () => setBookingDetail(b), style: { animationDelay: `${i * 0.04}s`, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: T.surface, border: `1px solid ${BK.border}`, borderRadius: 18, padding: 12, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
+                        React.createElement("div", { style: { width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.logoText || (b.business || b.name).slice(0, 2).toUpperCase()),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BK.text, margin: 0 } }, b.business || b.name),
+                            React.createElement("p", { style: { fontSize: 11.5, color: BK.sub, margin: '1px 0 0' } }, b.service),
+                            React.createElement("p", { style: { fontSize: 11, color: BK.sub, margin: '2px 0 0' } }, (b.timeRange || b.time) ? `${b.date} · ${b.timeRange || b.time}` : b.date)),
+                        React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
+                            React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: cxl ? cxl.bg : st.bg, color: cxl ? cxl.color : st.color, border: cxl ? 'none' : st.border, display: 'inline-block' } }, cxl ? cxl.label : (BOOKING_STATUS_LABEL[b.status] || b.status)),
+                            React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: BK.text, margin: '5px 0 0' } }, b.status === 'quote_requested' ? 'Awaiting quote' : money(b.total))));
+                }));
+                const managementButtons = bookingsSubTab === 'upcoming' && shownBookings.length > 0 && React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '18px 18px 0' } },
+                    React.createElement("button", { onClick: openCustomerCancelFlow, style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 13.5 } },
+                        React.createElement(Icon, { name: "x", size: 15, color: "#D0304A" }), "Cancel Bookings"),
+                    React.createElement("button", { onClick: openCustomerRescheduleFlow, style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px solid ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } },
+                        React.createElement(Icon, { name: "clock", size: 15, color: THEME.coral }), "Reschedule Bookings"),
+                    React.createElement("button", { onClick: () => setCheckCancellationsOpen(true), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px solid ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } },
+                        React.createElement(Icon, { name: "check", size: 15, color: THEME.coral }), "Check on Cancellations"));
+                body = React.createElement(React.Fragment, null, cards, managementButtons);
+            }
+            const scrollContent = React.createElement("div", { className: "avio-scroll", style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 100px)` } },
+                header, tabsRow, body);
+            return scrollContent;
         })())),
         React.createElement("div", { key: "safeAreaBacking", style: { position: 'fixed', left: 0, right: 0, bottom: 0, height: 'calc(env(safe-area-inset-bottom) + 4px)', background: '#000', zIndex: 3, pointerEvents: 'none' } }),
         !(tab === 'connect' && activeConversationId) && (() => {
@@ -8037,7 +8027,7 @@ function App() {
             React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', paddingTop: 2, paddingLeft: 12, paddingRight: 12 } },
                 (accountType === 'business'
                     ? [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'business', icon: 'grid', label: 'Business' }, { id: 'profile', icon: 'user', label: 'Profile' }]
-                    : [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Bookings' }, { id: 'wallet', icon: 'wallet', label: 'Wallet' }, { id: 'budget', icon: 'user', label: 'Profile' }])
+                    : [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'bookings', icon: 'calendar', label: 'Bookings' }, { id: 'budget', icon: 'user', label: 'Profile' }])
                 .map((t, i) => {
                     if (!t) {
                         return React.createElement("div", { key: "create", style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, flexShrink: 0 } },
@@ -9462,7 +9452,7 @@ function App() {
                                 : React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: THEME.coral, marginTop: 2 } }, money(b.total)))),
                     React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, width: '100%', marginTop: 24 } },
                         !bIsQuote && React.createElement("button", { onClick: () => addToAppleCalendar(b), style: { width: '100%', height: 50, borderRadius: 25, border: '1.5px solid #161616', background: T.surface, color: T.textPrimary, fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } }, React.createElement(Icon, { name: "calendar", size: 15, color: "#161616" }), "Add to Calendar"),
-                        React.createElement("button", { onClick: () => { closeBookingFlow(); setTab('bookings'); setBookingsSubTab('upcoming'); }, style: { width: '100%', height: 50, borderRadius: 25, background: T.textPrimary, color: T.background, fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, bIsQuote ? "View Requests" : "View Bookings")),
+                        React.createElement("button", { onClick: () => { closeBookingFlow(); setTab('bookings'); setBookingsSubTab(b.tickets && b.tickets.length ? 'tickets' : 'upcoming'); setTicketWalletSubTab('upcoming'); }, style: { width: '100%', height: 50, borderRadius: 25, background: T.textPrimary, color: T.background, fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, bIsQuote ? "View Requests" : (b.tickets && b.tickets.length ? "View Tickets" : "View Bookings"))),
                     b.confirmationNumber && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 18 } },
                         React.createElement(Icon, { name: "lock", size: 11, color: BF.sub }),
                         React.createElement("span", { style: { fontSize: 11, color: BF.sub } }, `A confirmation text has been sent to ${customerInfo.phone.trim()}`)));
