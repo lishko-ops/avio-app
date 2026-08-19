@@ -409,7 +409,10 @@ function getServicesForTarget(item) {
 // the app (demo data, the generic fallback above, or a business's own service editor) carries
 // both fields so the flow never has to guess.
 const BOOKING_TYPES = ['APPOINTMENT', 'HOURLY_SESSION', 'DURATION_PACKAGE', 'RENTAL', 'VENUE', 'VARIABLE_SERVICE', 'QUOTE_REQUEST'];
-function computeBookingStepOrder(service, staffOptions) {
+// `travelEnabled` inserts the Service Location step right after date/time — only for the
+// booking types where "the provider travels to you" is a meaningful concept (a fixed venue
+// rental or a hired-out space isn't something a provider "brings" to a customer's address).
+function computeBookingStepOrder(service, staffOptions, travelEnabled) {
     if (!service)
         return ['service'];
     const bt = service.bookingType || 'APPOINTMENT';
@@ -418,7 +421,7 @@ function computeBookingStepOrder(service, staffOptions) {
     if (bt === 'VENUE')
         return ['service', 'date', 'venueDetails', 'info', 'review'];
     if (bt === 'VARIABLE_SERVICE')
-        return ['service', 'variableOptions', 'date', 'time', 'info', 'review'];
+        return ['service', 'variableOptions', 'date', 'time', ...(travelEnabled ? ['serviceLocation'] : []), 'info', 'review'];
     if (bt === 'QUOTE_REQUEST')
         return ['service', 'info', 'review'];
     const steps = ['service'];
@@ -426,7 +429,10 @@ function computeBookingStepOrder(service, staffOptions) {
         steps.push('staff');
     if (service.requiresGuests)
         steps.push('guests');
-    steps.push('date', 'time', 'info', 'review');
+    steps.push('date', 'time');
+    if (travelEnabled)
+        steps.push('serviceLocation');
+    steps.push('info', 'review');
     return steps;
 }
 function rentalDaysBetween(startDate, endDate) {
@@ -634,7 +640,12 @@ const PARTNER_TICKET_DELAY_MS = 2600;
 const CANCEL_REQUEST_RESPONSE_DELAY_MS = 3200;
 const RESCHEDULE_REQUEST_RESPONSE_DELAY_MS = 3200;
 const BUSINESS_INCOMING_BOOKINGS = [
-    { id: 'ib1', customerName: 'Michael R.', initials: 'MR', service: "Men's Fade", price: 45, time: '10:00 AM', status: 'confirmed', avatarColor: '#000000', dateGroup: 'today' },
+    // Seeded with a real service address so the business-side "Service Location" section and
+    // "Get Directions" (to the customer's address, never the business's own) are demonstrable
+    // as soon as a business turns on "I travel to customers" — matches what a real mobile
+    // booking's businessBookingDetail would carry once customer/business bookings are unified.
+    { id: 'ib1', customerName: 'Michael R.', initials: 'MR', service: "Men's Fade", price: 45, time: '10:00 AM', status: 'confirmed', avatarColor: '#000000', dateGroup: 'today',
+        serviceAddress: { street: '88 Bedford Ave', unit: 'Apt 3', city: 'Brooklyn', state: 'NY', zip: '11249', notes: 'Buzzer is broken — please call on arrival.', full: '88 Bedford Ave, Apt 3, Brooklyn, NY 11249', distanceMi: 6.2 }, travelFee: 10 },
     { id: 'ib2', customerName: 'Sarah M.', initials: 'SM', service: 'Balayage', price: 180, time: '11:30 AM', status: 'confirmed', avatarColor: '#97C400', dateGroup: 'today' },
     { id: 'ib3', customerName: 'Jessica T.', initials: 'JT', service: 'Hair Color', price: 120, time: '1:00 PM', status: 'pending', avatarColor: '#FFFFFF', dateGroup: 'today' },
     { id: 'ib4', customerName: 'David L.', initials: 'DL', service: 'Beard Trim', price: 30, time: '3:30 PM', status: 'confirmed', avatarColor: '#000000', dateGroup: 'today' },
@@ -2281,6 +2292,43 @@ function estimateAddressDistanceMi(address) {
         hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
     return hash % 35;
 }
+// A service address is only usable once street/city/state/zip are all present — apt/unit
+// and notes stay optional. Formats consistently for both the booking's stored `address`
+// string and every place a customer's service location gets displayed.
+function serviceAddressIsComplete(form) {
+    return !!(form && form.street.trim() && form.city.trim() && form.state.trim() && form.zip.trim());
+}
+function formatServiceAddress(form) {
+    if (!form)
+        return '';
+    const line1 = [form.street.trim(), form.unit.trim()].filter(Boolean).join(', ');
+    const line2 = [form.city.trim(), [form.state.trim(), form.zip.trim()].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    return [line1, line2].filter(Boolean).join(', ');
+}
+// "Search for an address" has no real Places API to call, so instead of faking one it does the
+// one honest, useful thing it can: split a single pasted line like "123 Main St, Apt 4B,
+// Hoboken, NJ 07030" into the same structured fields the manual form uses. Never invents data.
+function parseAddressSearchText(text) {
+    const parts = (text || '').split(',').map((p) => p.trim()).filter(Boolean);
+    if (parts.length === 0)
+        return null;
+    const result = { street: '', unit: '', city: '', state: '', zip: '' };
+    const last = parts[parts.length - 1] || '';
+    const stateZipMatch = last.match(/^([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$/);
+    if (stateZipMatch && parts.length >= 3) {
+        result.state = stateZipMatch[1].toUpperCase();
+        result.zip = stateZipMatch[2];
+        result.city = parts[parts.length - 2] || '';
+        result.street = parts[0] || '';
+        result.unit = parts.length > 3 ? parts.slice(1, parts.length - 2).join(', ') : '';
+    }
+    else {
+        result.street = parts[0] || '';
+        result.city = parts[1] || '';
+        result.state = parts[2] || '';
+    }
+    return result;
+}
 function App() {
     var _a;
     const [themeMode, setThemeModeRaw] = useState(() => {
@@ -3271,7 +3319,10 @@ function App() {
     const [dashboardChartSelectedDay, setDashboardChartSelectedDay] = useState(null);
     // --- Business Location & Service Area ---
     const [businessTravel, setBusinessTravel] = useState(() => loadLS('avio_business_travel', {
-        enabled: false, distanceMi: 15, isCustom: false, customDistanceMi: '', feeType: 'free', customFee: '',
+        enabled: false, startingAddress: '',
+        distanceMi: 15, isCustom: false, customDistanceMi: '',
+        maxDistanceMi: 25, isCustomMax: false, customMaxDistanceMi: '',
+        feeType: 'none', flatFee: '', perMileRate: '', freeMi: '', extendedFee: '',
     }));
     useEffect(() => { saveLS('avio_business_travel', businessTravel); }, [businessTravel]);
     const [businessLocationSettings, setBusinessLocationSettings] = useState(() => loadLS('avio_business_location_settings', {
@@ -3293,22 +3344,53 @@ function App() {
         flashToast('Service area updated');
         closeServiceAreaSettings();
     }
+    // The "normal" radius — inside this, only the base fee (if any) applies.
     function serviceAreaDistanceMi(travel) {
         if (!travel || !travel.enabled)
             return 0;
-        return travel.isCustom ? (Number(travel.customDistanceMi) || 0) : travel.distanceMi;
+        return travel.isCustom ? (Number(travel.customDistanceMi) || 0) : (travel.distanceMi || 0);
     }
-    function serviceAreaFeeAmount(travel) {
-        if (!travel || !travel.enabled || travel.feeType !== 'custom')
+    // The hard cap — addresses beyond this can never be booked. Never allowed to be smaller
+    // than the normal radius, since the normal radius must always be reachable.
+    function serviceAreaMaxDistanceMi(travel) {
+        if (!travel || !travel.enabled)
             return 0;
-        return Number(travel.customFee) || 0;
+        const max = travel.isCustomMax ? (Number(travel.customMaxDistanceMi) || 0) : (travel.maxDistanceMi || 0);
+        return Math.max(max, serviceAreaDistanceMi(travel));
+    }
+    // Single source of truth for what a given distance costs and how it's treated —
+    // used identically at booking time, at address-edit time, and for display previews.
+    // tier: 'primary' (within the normal radius) | 'extended' (beyond normal, within the
+    // max — the business's extra fee applies) | 'outside' (beyond max — cannot book).
+    function computeTravelFee(travel, distanceMi) {
+        if (!travel || !travel.enabled || distanceMi == null)
+            return { fee: 0, tier: 'outside' };
+        const primary = serviceAreaDistanceMi(travel);
+        const max = serviceAreaMaxDistanceMi(travel);
+        if (distanceMi > max)
+            return { fee: 0, tier: 'outside' };
+        let fee = 0;
+        if (travel.feeType === 'flat')
+            fee = Number(travel.flatFee) || 0;
+        else if (travel.feeType === 'perMile')
+            fee = distanceMi * (Number(travel.perMileRate) || 0);
+        else if (travel.feeType === 'freeThenPerMile')
+            fee = Math.max(0, distanceMi - (Number(travel.freeMi) || 0)) * (Number(travel.perMileRate) || 0);
+        const tier = distanceMi > primary ? 'extended' : 'primary';
+        if (tier === 'extended')
+            fee += Number(travel.extendedFee) || 0;
+        return { fee: Math.round(fee * 100) / 100, tier };
     }
     function formatServiceAreaSummary(travel) {
         if (!travel || !travel.enabled)
             return 'Travel to customers: Off';
         const dist = serviceAreaDistanceMi(travel);
-        const fee = serviceAreaFeeAmount(travel);
-        return `Travel to customers: On · Up to ${dist} mi${fee > 0 ? ` · $${fee} fee` : ''}`;
+        const max = serviceAreaMaxDistanceMi(travel);
+        const feeLabel = travel.feeType === 'flat' ? ` · $${Number(travel.flatFee) || 0} fee`
+            : travel.feeType === 'perMile' ? ` · $${Number(travel.perMileRate) || 0}/mi`
+                : travel.feeType === 'freeThenPerMile' ? ` · free ${Number(travel.freeMi) || 0} mi, then $${Number(travel.perMileRate) || 0}/mi`
+                    : '';
+        return `Travel to customers: On · Up to ${dist} mi${max > dist ? ` (max ${max} mi)` : ''}${feeLabel}`;
     }
     // Any business can be looked up for its travel info this way — my own business reads the
     // configurable settings above; other (seeded) businesses fall back to a sensible default
@@ -3319,7 +3401,7 @@ function App() {
         if (business.id === MY_PROVIDER_ID)
             return businessTravel;
         if (business.locationMode === 'I travel to customers' || business.locationMode === 'All')
-            return { enabled: true, distanceMi: 15, isCustom: false, feeType: 'free', customFee: '' };
+            return { enabled: true, startingAddress: business.location || '', distanceMi: 15, isCustom: false, maxDistanceMi: 25, isCustomMax: false, feeType: 'none', flatFee: '', perMileRate: '', freeMi: '', extendedFee: '' };
         return { enabled: false };
     }
     const [daysRankMode, setDaysRankMode] = useState('bookings');
@@ -3807,7 +3889,12 @@ function App() {
     }, [tab, postViewer]);
     const [bookingStep, setBookingStep] = useState('service');
     const [customerServiceLocation, setCustomerServiceLocation] = useState('business');
-    const [customerServiceAddress, setCustomerServiceAddress] = useState('');
+    const [customerAddressForm, setCustomerAddressForm] = useState({ street: '', unit: '', city: '', state: '', zip: '', notes: '' });
+    const [addressSearchText, setAddressSearchText] = useState('');
+    const [addressEntryMode, setAddressEntryMode] = useState(null); // null | 'current' | 'search' | 'manual'
+    const [editAddressTarget, setEditAddressTarget] = useState(null); // booking id
+    const [editAddressForm, setEditAddressForm] = useState({ street: '', unit: '', city: '', state: '', zip: '', notes: '' });
+    const [editAddressStep, setEditAddressStep] = useState('form'); // 'form' | 'review'
     const [selectedService, setSelectedService] = useState(null);
     const [selectedStaff, setSelectedStaff] = useState(null);
     const [bookingCalMonth, setBookingCalMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
@@ -4322,7 +4409,7 @@ function App() {
         setProfileDrag(null);
         setBookingTarget(item);
         const staffOptions = getStaffForTarget(item);
-        const order = computeBookingStepOrder(preselectedService, staffOptions);
+        const order = computeBookingStepOrder(preselectedService, staffOptions, getBusinessTravelInfo(item).enabled);
         setBookingStep(preselectedService ? order[1] : 'service');
         setSelectedService(preselectedService || null);
         setSelectedStaff(null);
@@ -4332,8 +4419,14 @@ function App() {
         setCustomerInfo({ fullName: '', phone: isPhoneLikeIdentifier(authDraft.identifier || '') ? authDraft.identifier : '', notes: '' });
         setPaymentMethod('saved');
         setConfirmedBooking(null);
-        setCustomerServiceLocation('business');
-        setCustomerServiceAddress('');
+        // Pure "I travel to customers" businesses have no valid "at their location" option at
+        // all, so default straight to collecting the customer's address instead of defaulting
+        // to a choice the business can't actually fulfill — this is what used to let a mobile
+        // booking silently fall through with no service address ever collected.
+        setCustomerServiceLocation(item.locationMode === 'I travel to customers' ? 'customer' : 'business');
+        setCustomerAddressForm({ street: '', unit: '', city: '', state: '', zip: '', notes: '' });
+        setAddressSearchText('');
+        setAddressEntryMode(null);
         setBookingGuests(1);
         setRentalReturnMonth(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
         setRentalReturnDay(null);
@@ -4452,7 +4545,7 @@ function App() {
                 returnDate: returnLabel, rentalDays: days,
                 time: null, timeRange: `${startLabel} – ${returnLabel}`, total, status: 'confirmed',
                 address: bookingTarget.location || 'Address shared after booking', logoText: initials,
-                serviceLocation: 'business', customerAddress: null, travelFee: 0,
+                serviceLocation: 'business', serviceAddress: null, travelFee: 0,
                 confirmationNumber, paymentMethod, staffId: null, staffName: null,
                 bookingCreatedAt, originalPrice: subtotal, finalPrice: subtotal,
                 discountAmount: 0, promotionApplied: false, promotionId: null, promotionLabel: null, promotionType: null, promotionValue: null, promotionAppliedAt: null,
@@ -4477,7 +4570,7 @@ function App() {
                 time: minutesToTimeLabel(venueStartMin), timeRange: `${minutesToTimeLabel(venueStartMin)} – ${minutesToTimeLabel(venueEndMin)}`,
                 venueHours: hours, guests: bookingGuests, total, status: 'confirmed',
                 address: bookingTarget.location || 'Address shared after booking', logoText: initials,
-                serviceLocation: 'business', customerAddress: null, travelFee: 0,
+                serviceLocation: 'business', serviceAddress: null, travelFee: 0,
                 confirmationNumber, paymentMethod, staffId: null, staffName: null,
                 bookingCreatedAt, originalPrice: subtotal, finalPrice: subtotal,
                 discountAmount: 0, promotionApplied: false, promotionId: null, promotionLabel: null, promotionType: null, promotionValue: null, promotionAppliedAt: null,
@@ -4494,7 +4587,7 @@ function App() {
                 providerId: bookingTarget.id, bookingType: bkType,
                 date: 'Pending', day: null, month: null, year: null, time: null, timeRange: null, total: 0, status: 'quote_requested',
                 address: bookingTarget.location || 'Address shared after booking', logoText: initials,
-                serviceLocation: 'business', customerAddress: null, travelFee: 0,
+                serviceLocation: 'business', serviceAddress: null, travelFee: 0,
                 confirmationNumber, paymentMethod: null, staffId: null, staffName: null,
                 bookingCreatedAt, originalPrice: 0, finalPrice: 0,
                 discountAmount: 0, promotionApplied: false, promotionId: null, promotionLabel: null, promotionType: null, promotionValue: null, promotionAppliedAt: null,
@@ -4506,21 +4599,29 @@ function App() {
         }
         // APPOINTMENT / HOURLY_SESSION / DURATION_PACKAGE / VARIABLE_SERVICE — time-slot-based flow
         // Re-validate the service location/radius at the moment of payment — never trust the
-        // 'info' step's check alone, since it's possible to reach this point with stale state.
+        // serviceLocation step's check alone, since it's possible to reach this point with stale
+        // state. A mobile booking must NEVER confirm without a complete, in-range address.
         const travelInfo = getBusinessTravelInfo(bookingTarget);
-        const travelRadiusMi = serviceAreaDistanceMi(travelInfo);
-        const travelFeeAmt = serviceAreaFeeAmount(travelInfo);
-        const customerAddressTrimmed = customerServiceAddress.trim();
         const serviceLocation = customerServiceLocation === 'customer' && travelInfo.enabled ? 'customer' : 'business';
+        let serviceAddress = null;
+        let travelFee = 0;
         if (serviceLocation === 'customer') {
-            const estimatedDistanceMi = customerAddressTrimmed ? estimateAddressDistanceMi(customerAddressTrimmed) : null;
-            if (!customerAddressTrimmed || estimatedDistanceMi == null || estimatedDistanceMi > travelRadiusMi) {
-                flashToast("This location is outside this business's service area.");
-                setBookingStep('info');
+            if (!serviceAddressIsComplete(customerAddressForm)) {
+                flashToast('Please enter a complete service address.');
+                setBookingStep('serviceLocation');
                 return;
             }
+            const fullAddress = formatServiceAddress(customerAddressForm);
+            const distanceMi = estimateAddressDistanceMi(fullAddress);
+            const calc = computeTravelFee(travelInfo, distanceMi);
+            if (calc.tier === 'outside') {
+                flashToast("This provider doesn't currently travel to this location.");
+                setBookingStep('serviceLocation');
+                return;
+            }
+            serviceAddress = { ...customerAddressForm, full: fullAddress, distanceMi };
+            travelFee = calc.fee;
         }
-        const travelFee = serviceLocation === 'customer' ? travelFeeAmt : 0;
         // Re-check availability at the moment of payment, immediately before creating the booking —
         // the slot list the customer looked at a moment ago may already be stale if someone else
         // grabbed it in the meantime. If it's gone, we never charge and never create a duplicate.
@@ -4549,8 +4650,13 @@ function App() {
             providerId: bookingTarget.id, bookingType: bkType, durationMinutes: selectedService.durationMin,
             guests: selectedService.requiresGuests ? bookingGuests : null,
             date: label, day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), time: minutesToTimeLabel(selTime), timeRange: formatTimeRange(selTime, selectedService.durationMin), total, status: 'confirmed',
-            address: serviceLocation === 'customer' ? customerAddressTrimmed : (bookingTarget.location || 'Address shared after booking'), duration: formatDuration(selectedService.durationMin), logoText: initials,
-            serviceLocation, customerAddress: serviceLocation === 'customer' ? customerAddressTrimmed : null, travelFee,
+            // `address` stays the single display string every existing card/detail view already
+            // reads; `serviceAddress` carries the full structured form (street/unit/city/state/
+            // zip/notes/distance) for the richer Service Location sections. This is the customer's
+            // own entered location, saved exactly as it was at confirmation time — never the
+            // business's address, and never touched again by later service-area settings changes.
+            address: serviceLocation === 'customer' ? serviceAddress.full : (bookingTarget.location || 'Address shared after booking'), duration: formatDuration(selectedService.durationMin), logoText: initials,
+            serviceLocation, serviceAddress, travelFee,
             confirmationNumber, paymentMethod, staffId: selectedStaff ? selectedStaff.id : null, staffName: selectedStaff ? selectedStaff.name : null,
             bookingCreatedAt, originalPrice, finalPrice,
             discountAmount: promo ? promo.discountAmount : 0,
@@ -4603,6 +4709,40 @@ function App() {
     function openCancelStatus(b) {
         setBookingDetail(null);
         setCancelStatusTarget(b.id);
+    }
+    function openEditAddress(b) {
+        setBookingDetail(null);
+        setEditAddressForm({ ...b.serviceAddress });
+        setEditAddressStep('form');
+        setEditAddressTarget(b.id);
+    }
+    function closeEditAddress() {
+        setEditAddressTarget(null);
+        setEditAddressStep('form');
+    }
+    // Revalidates and recalculates the fee against the CURRENT service-area settings — the
+    // business may have changed its radius/fee since this booking was made, and an address
+    // edit is the one moment that's supposed to pick up the latest rules (unlike the booking
+    // itself, which never changes retroactively just because settings changed).
+    function confirmEditAddress() {
+        const id = editAddressTarget;
+        const b = bookings.find((bk) => bk.id === id);
+        if (!b || !serviceAddressIsComplete(editAddressForm))
+            return;
+        const business = feed.find((f) => f.id === b.providerId) || { id: b.providerId, locationMode: 'I travel to customers' };
+        const travelInfo = getBusinessTravelInfo(business);
+        const fullAddress = formatServiceAddress(editAddressForm);
+        const distanceMi = estimateAddressDistanceMi(fullAddress);
+        const calc = computeTravelFee(travelInfo, distanceMi);
+        if (calc.tier === 'outside') {
+            flashToast("This provider doesn't currently travel to this location.");
+            return;
+        }
+        const newServiceAddress = { ...editAddressForm, full: fullAddress, distanceMi };
+        const newTotal = Math.round((b.total - (b.travelFee || 0) + calc.fee) * 100) / 100;
+        setBookings((prev) => prev.map((bk) => bk.id !== id ? bk : { ...bk, serviceAddress: newServiceAddress, address: fullAddress, travelFee: calc.fee, total: newTotal }));
+        flashToast('Service address updated');
+        closeEditAddress();
     }
     function findStaffForBooking(b) {
         if (!b.staffId)
@@ -8069,10 +8209,13 @@ function App() {
             // the customer's chosen service location must be validated against before checkout.
             const travelInfo = getBusinessTravelInfo(bookingTarget);
             const travelRadiusMi = serviceAreaDistanceMi(travelInfo);
-            const travelFeeAmt = serviceAreaFeeAmount(travelInfo);
-            const customerAddressTrimmed = customerServiceAddress.trim();
-            const estimatedDistanceMi = customerServiceLocation === 'customer' && customerAddressTrimmed ? estimateAddressDistanceMi(customerAddressTrimmed) : null;
-            const outOfServiceArea = customerServiceLocation === 'customer' && estimatedDistanceMi != null && estimatedDistanceMi > travelRadiusMi;
+            const travelMaxMi = serviceAreaMaxDistanceMi(travelInfo);
+            const addressComplete = serviceAddressIsComplete(customerAddressForm);
+            const fullServiceAddress = formatServiceAddress(customerAddressForm);
+            const estimatedDistanceMi = customerServiceLocation === 'customer' && addressComplete ? estimateAddressDistanceMi(fullServiceAddress) : null;
+            const travelCalc = estimatedDistanceMi != null ? computeTravelFee(travelInfo, estimatedDistanceMi) : null;
+            const outOfServiceArea = customerServiceLocation === 'customer' && travelCalc != null && travelCalc.tier === 'outside';
+            const travelFeeAmt = travelCalc ? travelCalc.fee : 0;
             const travelFeeApplies = customerServiceLocation === 'customer' && !outOfServiceArea && travelFeeAmt > 0;
             const total = selectedService && !isQuoteBooking ? Math.round((priceBeforeTax + tax + (travelFeeApplies ? travelFeeAmt : 0)) * 100) / 100 : 0;
             const initials2 = bookingTarget.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
@@ -8081,10 +8224,10 @@ function App() {
             const STEP_TITLES = {
                 service: 'Book', staff: 'Choose Your Barber', guests: 'Number of Guests',
                 rentalReturn: 'Return Date', venueDetails: 'Event Details', variableOptions: 'Service Details',
-                date: 'Choose Date', time: 'Choose Time', info: 'Your Information',
+                date: 'Choose Date', time: 'Choose Time', serviceLocation: 'Service Location', info: 'Your Information',
                 review: isQuoteBooking ? 'Review Request' : 'Review Booking', paymentPicker: 'Payment Method', success: '',
             };
-            const STEP_ORDER = selectedService ? computeBookingStepOrder(selectedService, staffOptions) : ['service'];
+            const STEP_ORDER = selectedService ? computeBookingStepOrder(selectedService, staffOptions, travelInfo.enabled) : ['service'];
             function goBack() {
                 if (bookingStep === 'paymentPicker') { setBookingStep('review'); return; }
                 const idx = STEP_ORDER.indexOf(bookingStep);
@@ -8253,27 +8396,79 @@ function App() {
                         React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: BF.text } }, "Estimated Price"),
                         React.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: THEME.coral } }, money(variableTotal))));
             }
+            else if (bookingStep === 'serviceLocation') {
+                // Pure "I travel to customers" businesses have no valid "come to us" option, so
+                // skip the chooser entirely and go straight to collecting the address — exactly
+                // what a mobile-only provider like a traveling DJ or groomer needs.
+                const pureMobile = bookingTarget.locationMode === 'I travel to customers';
+                const chooser = !pureMobile && React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 } },
+                    [
+                        { id: 'business', title: 'At their location', sub: bookingTarget.location || 'Business address' },
+                        { id: 'customer', title: 'They come to you', sub: `Up to ${travelRadiusMi} mi` },
+                    ].map((opt) => {
+                        const active = customerServiceLocation === opt.id;
+                        return React.createElement("button", { key: opt.id, onClick: () => setCustomerServiceLocation(opt.id), style: { display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: '12px 14px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${BF.border}`, background: active ? 'rgba(151,196,0,0.07)' : 'transparent' } },
+                            React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', border: active ? `5px solid ${THEME.coral}` : `1.5px solid ${BF.sub}`, flexShrink: 0 } }),
+                            React.createElement("div", { style: { flex: 1 } },
+                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: BF.text, margin: 0 } }, opt.title),
+                                React.createElement("p", { style: { fontSize: 11, color: BF.sub, margin: '2px 0 0' } }, opt.sub)));
+                    }));
+                const entryModes = React.createElement("div", { style: { display: 'flex', gap: 8, marginBottom: 16 } },
+                    [
+                        { id: 'current', icon: 'compass', label: 'Current Location' },
+                        { id: 'search', icon: 'search', label: 'Search Address' },
+                        { id: 'manual', icon: 'pencil', label: 'Enter Manually' },
+                    ].map((m) => React.createElement("button", {
+                        key: m.id,
+                        onClick: () => {
+                            setAddressEntryMode(m.id);
+                            if (m.id === 'current') {
+                                if (!navigator.geolocation) { flashToast("Location services aren't available — please enter your address below."); return; }
+                                navigator.geolocation.getCurrentPosition(
+                                    () => flashToast('Location detected — please confirm your address below.'),
+                                    () => flashToast("Couldn't access your location — please enter your address below."),
+                                    { timeout: 5000 });
+                            }
+                        },
+                        style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, padding: '11px 6px', borderRadius: 14, border: `1.5px solid ${addressEntryMode === m.id ? THEME.coral : BF.border}`, background: addressEntryMode === m.id ? 'rgba(151,196,0,0.07)' : 'transparent' },
+                    },
+                        React.createElement(Icon, { name: m.icon, size: 16, color: addressEntryMode === m.id ? THEME.coral : BF.text }),
+                        React.createElement("span", { style: { fontSize: 10.5, fontWeight: 600, color: addressEntryMode === m.id ? THEME.coral : BF.text, textAlign: 'center' } }, m.label))));
+                const searchRow = addressEntryMode === 'search' && fieldWrap2("Search for an address", React.createElement("div", { style: { display: 'flex', gap: 8 } },
+                    React.createElement("input", { value: addressSearchText, onChange: (e) => setAddressSearchText(e.target.value), placeholder: "123 Main St, Hoboken, NJ 07030", style: { ...inputStyle2, flex: 1 } }),
+                    React.createElement("button", { onClick: () => { const parsed = parseAddressSearchText(addressSearchText); if (parsed) setCustomerAddressForm((f) => ({ ...f, ...parsed })); }, style: { padding: '0 16px', borderRadius: 12, background: THEME.coral, color: '#fff', fontSize: 12.5, fontWeight: 700 } }, "Find")));
+                const distanceBanner = customerServiceLocation === 'customer' && travelCalc && (
+                    travelCalc.tier === 'outside'
+                        ? React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4, padding: 12, borderRadius: 12, background: 'rgba(224,72,60,0.1)' } },
+                            React.createElement(Icon, { name: "warningtriangle", size: 14, color: "#E0483C" }),
+                            React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "#E0483C", lineHeight: 1.4 } }, "This provider doesn't currently travel to this location."))
+                        : travelCalc.tier === 'extended'
+                            ? React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4, padding: 12, borderRadius: 12, background: 'rgba(245,166,35,0.12)' } },
+                                React.createElement(Icon, { name: "info", size: 14, color: "#B5790C" }),
+                                React.createElement("div", null,
+                                    React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: "#B5790C", margin: 0 } }, "Outside primary service area"),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: "#B5790C", margin: '2px 0 0' } }, `${estimatedDistanceMi.toFixed(1)} miles away`),
+                                    travelCalc.fee > 0 && React.createElement("p", { style: { fontSize: 11.5, color: "#B5790C", margin: '2px 0 0' } }, `Additional travel fee: ${money(travelCalc.fee)}`)))
+                            : React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, padding: 12, borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                                React.createElement(Icon, { name: "check", size: 14, color: THEME.coral }),
+                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "You're in our service area")));
+                const addressFields = customerServiceLocation === 'customer' && React.createElement(React.Fragment, null,
+                    entryModes, searchRow,
+                    fieldWrap2("Street Address", React.createElement("input", { value: customerAddressForm.street, onChange: (e) => setCustomerAddressForm((f) => ({ ...f, street: e.target.value })), placeholder: "123 Main Street", style: inputStyle2 })),
+                    fieldWrap2("Apt / Unit / Suite (optional)", React.createElement("input", { value: customerAddressForm.unit, onChange: (e) => setCustomerAddressForm((f) => ({ ...f, unit: e.target.value })), placeholder: "Apt 4B", style: inputStyle2 })),
+                    React.createElement("div", { style: { display: 'flex', gap: 10 } },
+                        React.createElement("div", { style: { flex: 2 } }, fieldWrap2("City", React.createElement("input", { value: customerAddressForm.city, onChange: (e) => setCustomerAddressForm((f) => ({ ...f, city: e.target.value })), placeholder: "Hoboken", style: inputStyle2 }))),
+                        React.createElement("div", { style: { flex: 1 } }, fieldWrap2("State", React.createElement("input", { value: customerAddressForm.state, onChange: (e) => setCustomerAddressForm((f) => ({ ...f, state: e.target.value.slice(0, 2).toUpperCase() })), placeholder: "NJ", style: inputStyle2 }))),
+                        React.createElement("div", { style: { flex: 1 } }, fieldWrap2("ZIP", React.createElement("input", { value: customerAddressForm.zip, onChange: (e) => setCustomerAddressForm((f) => ({ ...f, zip: e.target.value.replace(/[^0-9]/g, '').slice(0, 5) })), placeholder: "07030", inputMode: "numeric", style: inputStyle2 })))),
+                    fieldWrap2("Service location notes (optional)", React.createElement("textarea", { value: customerAddressForm.notes, maxLength: 200, rows: 2, onChange: (e) => setCustomerAddressForm((f) => ({ ...f, notes: e.target.value })), placeholder: "Gate code, parking instructions, etc.", style: { ...inputStyle2, resize: 'none' } })),
+                    distanceBanner);
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
+                    React.createElement("p", { style: { fontSize: pureMobile ? 15 : 12.5, fontWeight: pureMobile ? 700 : 700, color: BF.text, margin: '0 0 14px' } }, pureMobile ? `Where should ${bookingTarget.name} come?` : "Where should this happen?"),
+                    chooser, addressFields);
+            }
             else if (bookingStep === 'info') {
-                const locationChoice = travelInfo.enabled && React.createElement(React.Fragment, null,
-                    sectionLabel("Service Location"),
-                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 } },
-                        [
-                            { id: 'business', title: 'At their location', sub: bookingTarget.location || 'Business address' },
-                            { id: 'customer', title: 'They come to you', sub: `Up to ${travelRadiusMi} mi${travelFeeAmt > 0 ? ` · $${travelFeeAmt} travel fee` : ''}` },
-                        ].map((opt) => {
-                            const active = customerServiceLocation === opt.id;
-                            return React.createElement("button", { key: opt.id, onClick: () => setCustomerServiceLocation(opt.id), style: { display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: '12px 14px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${BF.border}`, background: active ? 'rgba(151,196,0,0.07)' : 'transparent' } },
-                                React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', border: active ? `5px solid ${THEME.coral}` : `1.5px solid ${BF.sub}`, flexShrink: 0 } }),
-                                React.createElement("div", { style: { flex: 1 } },
-                                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: BF.text, margin: 0 } }, opt.title),
-                                    React.createElement("p", { style: { fontSize: 11, color: BF.sub, margin: '2px 0 0' } }, opt.sub)));
-                        })),
-                    customerServiceLocation === 'customer' && fieldWrap2("Your Address", React.createElement(React.Fragment, null,
-                        React.createElement("input", { value: customerServiceAddress, onChange: (e) => setCustomerServiceAddress(e.target.value), placeholder: "Street address", style: inputStyle2 }),
-                        outOfServiceArea && React.createElement("p", { style: { fontSize: 11.5, color: '#E0483C', marginTop: 6, fontWeight: 600 } }, "This location is outside this business's service area."))));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
                     React.createElement("p", { style: { fontSize: 12, color: BF.sub, marginBottom: 18, marginTop: -4 } }, "We'll contact you about your booking."),
-                    locationChoice,
                     fieldWrap2("Full Name", React.createElement("input", { value: customerInfo.fullName, onChange: (e) => setCustomerInfo((f) => ({ ...f, fullName: e.target.value })), placeholder: "Your full name", style: inputStyle2 })),
                     fieldWrap2("Phone Number", React.createElement("input", { value: customerInfo.phone, onChange: (e) => setCustomerInfo((f) => ({ ...f, phone: e.target.value })), placeholder: "(555) 555-0100", style: inputStyle2 })),
                     fieldWrap2("Add a note (optional)", React.createElement(React.Fragment, null,
@@ -8335,7 +8530,10 @@ function App() {
                             ...(selectedService && selectedService.requiresGuests ? [summaryRow('Guests', String(bookingGuests))] : []),
                             ...(staffOptions.length > 0 ? [summaryRow('Barber', selectedStaff ? selectedStaff.name : 'Any Available')] : []),
                         ]),
-                        ...(travelInfo.enabled && bkType !== 'RENTAL' && bkType !== 'VENUE' ? [summaryRow('Location', customerServiceLocation === 'customer' ? 'They come to you' : 'At their location')] : []),
+                        ...(travelInfo.enabled && bkType !== 'RENTAL' && bkType !== 'VENUE' ? [summaryRow('Service Location', customerServiceLocation === 'customer' ? fullServiceAddress : (bookingTarget.location || 'At their location'))] : []),
+                        // Every mobile booking gets an explicit Service/Travel Fee/Tax breakdown so
+                        // the travel charge is never a surprise buried inside one lump Total.
+                        ...(travelInfo.enabled && bkType !== 'RENTAL' && bkType !== 'VENUE' && !isQuoteBooking ? [summaryRow('Service', money(priceBeforeTax)), summaryRow('Tax', money(tax))] : []),
                         ...(travelFeeApplies ? [summaryRow('Travel Fee', money(travelFeeAmt))] : []),
                         ...(promoPreview ? [summaryRow('Original Price', money(promoPreview.originalPrice))] : []),
                         ...(promoPreview ? [summaryRow(promoPreview.promotionLabel, '-' + money(promoPreview.discountAmount))] : []),
@@ -8377,7 +8575,8 @@ function App() {
                             bIsRental && React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, `${b.rentalDays} day${b.rentalDays === 1 ? '' : 's'}`),
                             bIsVenue && React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, `${b.venueHours} hour${b.venueHours === 1 ? '' : 's'} · ${b.guests} guest${b.guests === 1 ? '' : 's'}`),
                             !bIsVenue && b.guests != null && React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, `${b.guests} guest${b.guests === 1 ? '' : 's'}`),
-                            b.serviceLocation === 'customer' && React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, `They come to you · ${b.customerAddress || ''}`),
+                            b.serviceLocation === 'customer' && React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, `They come to you · ${b.serviceAddress ? b.serviceAddress.full : ''}`),
+                            b.travelFee > 0 && React.createElement("span", { style: { fontSize: 12.5, color: BF.text } }, `Travel fee: ${money(b.travelFee)}`),
                             bIsQuote
                                 ? React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: BF.sub, marginTop: 2 } }, "Pricing provided after review")
                                 : React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: THEME.coral, marginTop: 2 } }, money(b.total)))),
@@ -8407,9 +8606,15 @@ function App() {
                 footer = footerWrap(React.createElement("button", { disabled: venueStartMin == null || venueEndMin == null, onClick: goNext, style: ctaStyle(venueStartMin != null && venueEndMin != null) }, "Continue"));
             else if (bookingStep === 'variableOptions')
                 footer = footerWrap(React.createElement("button", { disabled: !variableServiceReady(selectedService, variableSelections), onClick: goNext, style: ctaStyle(variableServiceReady(selectedService, variableSelections)) }, "Continue"));
+            else if (bookingStep === 'serviceLocation') {
+                // Never let the booking continue without a valid, in-range service address —
+                // this is the one gate that actually prevents a mobile booking from confirming
+                // without a real customer location.
+                const ready = customerServiceLocation === 'business' || (addressComplete && !outOfServiceArea);
+                footer = footerWrap(React.createElement("button", { disabled: !ready, onClick: goNext, style: ctaStyle(ready) }, "Continue"));
+            }
             else if (bookingStep === 'info') {
-                const locationReady = customerServiceLocation === 'business' || (customerAddressTrimmed && !outOfServiceArea);
-                const ready = customerInfo.fullName.trim() && customerInfo.phone.trim() && locationReady;
+                const ready = customerInfo.fullName.trim() && customerInfo.phone.trim();
                 footer = footerWrap(React.createElement("button", { disabled: !ready, onClick: goNext, style: ctaStyle(ready) }, "Continue"));
             }
             else if (bookingStep === 'review')
@@ -9236,9 +9441,20 @@ function App() {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
             const draft = serviceAreaDraft;
             const dist = draft.isCustom ? (Number(draft.customDistanceMi) || 0) : draft.distanceMi;
+            const maxDist = Math.max(dist, draft.isCustomMax ? (Number(draft.customMaxDistanceMi) || 0) : draft.maxDistanceMi);
+            const chipRow = (value, setValue, options, activeCheck) => React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 } },
+                options.map((mi) => {
+                    const active = activeCheck(mi);
+                    return React.createElement("button", { key: mi, onClick: () => setValue(mi), style: { padding: '9px 16px', borderRadius: 16, background: active ? THEME.coral : T.surfaceSecondary, border: `1px solid ${active ? THEME.coral : PD.border}` } },
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: active ? '#fff' : PD.text } }, mi + " mi"));
+                }));
+            const dollarInput = (value, onChange, placeholder) => React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px' } },
+                React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: PD.text } }, "$"),
+                React.createElement("input", { value, onChange: (e) => onChange(e.target.value.replace(/[^0-9.]/g, '')), inputMode: "decimal", placeholder: placeholder || "0", style: { flex: 1, border: 'none', outline: 'none', fontSize: 14, color: PD.text } }));
             const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: `calc(env(safe-area-inset-top) + 8px) 18px 8px`, borderBottom: `1px solid ${PD.border}` } },
                 React.createElement("button", { onClick: closeServiceAreaSettings }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "Service Area"));
+            const FEE_TYPES = [['none', 'No Fee'], ['flat', 'Flat Fee'], ['perMile', 'Per-Mile Fee'], ['freeThenPerMile', 'Free + Per-Mile Beyond']];
             const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px calc(env(safe-area-inset-bottom) + 100px)' } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
                     React.createElement("div", { style: { flex: 1, paddingRight: 14 } },
@@ -9246,34 +9462,60 @@ function App() {
                         React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 3 } }, "Show customers that you can come to their location.")),
                     React.createElement(ToggleSwitch, { on: draft.enabled, onChange: () => setServiceAreaDraft((d) => ({ ...d, enabled: !d.enabled })) })),
                 draft.enabled && React.createElement(React.Fragment, null,
-                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: PD.sub, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 24 } }, "How far will you travel?"),
-                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 } },
-                        [5, 10, 15, 25, 50].map((mi) => {
-                            const active = !draft.isCustom && draft.distanceMi === mi;
-                            return React.createElement("button", { key: mi, onClick: () => setServiceAreaDraft((d) => ({ ...d, distanceMi: mi, isCustom: false })), style: { padding: '9px 16px', borderRadius: 16, background: active ? THEME.coral : T.surfaceSecondary, border: `1px solid ${active ? THEME.coral : PD.border}` } },
-                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: active ? '#fff' : PD.text } }, mi + " mi"));
-                        }),
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: PD.sub, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 24 } }, "Starting Location"),
+                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "Travel distance is calculated from here."),
+                    React.createElement("input", { value: draft.startingAddress, onChange: (e) => setServiceAreaDraft((d) => ({ ...d, startingAddress: e.target.value })), placeholder: "Your starting address", style: { marginTop: 10, width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none', background: T.inputBackground } }),
+
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: PD.sub, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 24 } }, "Normal Service Radius"),
+                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "Your standard travel distance, no extra fee beyond your travel fee below."),
+                    chipRow(null, (mi) => setServiceAreaDraft((d) => ({ ...d, distanceMi: mi, isCustom: false })), [5, 10, 15, 25, 50], (mi) => !draft.isCustom && draft.distanceMi === mi),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 } },
                         React.createElement("button", { onClick: () => setServiceAreaDraft((d) => ({ ...d, isCustom: true })), style: { display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 16, background: draft.isCustom ? THEME.coral : T.surfaceSecondary, border: `1px solid ${draft.isCustom ? THEME.coral : PD.border}` } },
                             React.createElement(Icon, { name: "pencil", size: 12, color: draft.isCustom ? '#fff' : PD.text }),
                             React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: draft.isCustom ? '#fff' : PD.text } }, "Custom"))),
-                    draft.isCustom && React.createElement("input", { value: draft.customDistanceMi, onChange: (e) => setServiceAreaDraft((d) => ({ ...d, customDistanceMi: e.target.value.replace(/[^0-9]/g, '') })), inputMode: "numeric", placeholder: "Max miles", style: { marginTop: 10, width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none' } }),
+                    draft.isCustom && React.createElement("input", { value: draft.customDistanceMi, onChange: (e) => setServiceAreaDraft((d) => ({ ...d, customDistanceMi: e.target.value.replace(/[^0-9]/g, '') })), inputMode: "numeric", placeholder: "Miles", style: { marginTop: 10, width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none' } }),
+
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: PD.sub, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 24 } }, "Maximum Travel Distance"),
+                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "Bookings beyond this distance can't be made at all."),
+                    chipRow(null, (mi) => setServiceAreaDraft((d) => ({ ...d, maxDistanceMi: mi, isCustomMax: false })), [10, 25, 50, 75, 100], (mi) => !draft.isCustomMax && draft.maxDistanceMi === mi),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 } },
+                        React.createElement("button", { onClick: () => setServiceAreaDraft((d) => ({ ...d, isCustomMax: true })), style: { display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 16, background: draft.isCustomMax ? THEME.coral : T.surfaceSecondary, border: `1px solid ${draft.isCustomMax ? THEME.coral : PD.border}` } },
+                            React.createElement(Icon, { name: "pencil", size: 12, color: draft.isCustomMax ? '#fff' : PD.text }),
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: draft.isCustomMax ? '#fff' : PD.text } }, "Custom"))),
+                    draft.isCustomMax && React.createElement("input", { value: draft.customMaxDistanceMi, onChange: (e) => setServiceAreaDraft((d) => ({ ...d, customMaxDistanceMi: e.target.value.replace(/[^0-9]/g, '') })), inputMode: "numeric", placeholder: "Miles", style: { marginTop: 10, width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none' } }),
+                    maxDist < dist && React.createElement("p", { style: { fontSize: 11, color: '#E0483C', marginTop: 8, fontWeight: 600 } }, "Maximum distance can't be smaller than your normal radius — it'll be treated as equal to it."),
+
                     React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: PD.text, marginTop: 24 } }, "Travel Fee"),
-                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "Charge customers a fee for traveling"),
-                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 10 } },
-                        [['free', 'Free'], ['custom', 'Custom Fee']].map(([id, label]) => {
+                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "Charge customers for traveling within your normal radius."),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 } },
+                        FEE_TYPES.map(([id, label]) => {
                             const active = draft.feeType === id;
                             return React.createElement("button", { key: id, onClick: () => setServiceAreaDraft((d) => ({ ...d, feeType: id })), style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 14, border: `1.5px solid ${active ? THEME.coral : PD.border}` } },
                                 React.createElement("div", { style: { width: 16, height: 16, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement("div", { style: { width: 6, height: 6, borderRadius: '50%', background: '#fff' } })),
                                 React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: PD.text } }, label));
                         })),
-                    draft.feeType === 'custom' && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px' } },
-                        React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: PD.text } }, "$"),
-                        React.createElement("input", { value: draft.customFee, onChange: (e) => setServiceAreaDraft((d) => ({ ...d, customFee: e.target.value.replace(/[^0-9.]/g, '') })), inputMode: "decimal", placeholder: "0", style: { flex: 1, border: 'none', outline: 'none', fontSize: 14, color: PD.text } })),
+                    draft.feeType === 'flat' && dollarInput(draft.flatFee, (v) => setServiceAreaDraft((d) => ({ ...d, flatFee: v })), "Flat fee amount"),
+                    draft.feeType === 'perMile' && dollarInput(draft.perMileRate, (v) => setServiceAreaDraft((d) => ({ ...d, perMileRate: v })), "Rate per mile"),
+                    draft.feeType === 'freeThenPerMile' && React.createElement(React.Fragment, null,
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px' } },
+                            React.createElement("input", { value: draft.freeMi, onChange: (e) => setServiceAreaDraft((d) => ({ ...d, freeMi: e.target.value.replace(/[^0-9.]/g, '') })), inputMode: "decimal", placeholder: "Free miles", style: { flex: 1, border: 'none', outline: 'none', fontSize: 14, color: PD.text } }),
+                            React.createElement("span", { style: { fontSize: 12.5, color: PD.sub } }, "mi free, then")),
+                        dollarInput(draft.perMileRate, (v) => setServiceAreaDraft((d) => ({ ...d, perMileRate: v })), "Rate per mile after")),
+
+                    maxDist > dist && React.createElement(React.Fragment, null,
+                        React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: PD.text, marginTop: 24 } }, "Extended-Range Fee"),
+                        React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, `Extra charge added on top for customers between ${dist} and ${maxDist} mi away.`),
+                        dollarInput(draft.extendedFee, (v) => setServiceAreaDraft((d) => ({ ...d, extendedFee: v })), "Additional fee")),
+
                     React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: PD.sub, textTransform: 'uppercase', letterSpacing: 0.4, marginTop: 24 } }, "Service Area Preview"),
-                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "This is the area where you'll travel to customers."),
-                    React.createElement("div", { style: { position: 'relative', height: 180, borderRadius: 18, overflow: 'hidden', marginTop: 10, background: '#EAF0E4', backgroundImage: 'linear-gradient(0deg, rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px)', backgroundSize: '18px 18px' } },
-                        React.createElement("div", { style: { position: 'absolute', top: '50%', left: '50%', width: Math.min(220, 40 + dist * 3), height: Math.min(220, 40 + dist * 3), transform: 'translate(-50%, -50%)', borderRadius: '50%', background: 'rgba(151,196,0,0.18)', border: `1.5px solid ${THEME.coral}` } }),
-                        React.createElement("div", { style: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -100%)' } }, React.createElement(Icon, { name: "mappin", size: 26, color: THEME.coral, fill: THEME.coral })))));
+                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "Solid ring: normal radius. Dashed ring: maximum distance."),
+                    React.createElement("div", { style: { position: 'relative', height: 200, borderRadius: 18, overflow: 'hidden', marginTop: 10, background: '#EAF0E4', backgroundImage: 'linear-gradient(0deg, rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px)', backgroundSize: '18px 18px' } },
+                        maxDist > dist && React.createElement("div", { style: { position: 'absolute', top: '50%', left: '50%', width: Math.min(240, 30 + maxDist * 2), height: Math.min(240, 30 + maxDist * 2), transform: 'translate(-50%, -50%)', borderRadius: '50%', background: 'rgba(245,166,35,0.10)', border: `1.5px dashed #C98A1A` } }),
+                        React.createElement("div", { style: { position: 'absolute', top: '50%', left: '50%', width: Math.min(200, 30 + dist * 2), height: Math.min(200, 30 + dist * 2), transform: 'translate(-50%, -50%)', borderRadius: '50%', background: 'rgba(151,196,0,0.18)', border: `1.5px solid ${THEME.coral}` } }),
+                        React.createElement("div", { style: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -100%)' } }, React.createElement(Icon, { name: "mappin", size: 26, color: THEME.coral, fill: THEME.coral }))),
+                    React.createElement("div", { style: { display: 'flex', gap: 16, marginTop: 10 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } }, React.createElement("div", { style: { width: 10, height: 10, borderRadius: '50%', border: `1.5px solid ${THEME.coral}` } }), React.createElement("span", { style: { fontSize: 11, color: PD.sub } }, `${dist} mi normal`)),
+                        maxDist > dist && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } }, React.createElement("div", { style: { width: 10, height: 10, borderRadius: '50%', border: '1.5px dashed #C98A1A' } }), React.createElement("span", { style: { fontSize: 11, color: PD.sub } }, `${maxDist} mi max`)))));
             return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 6, background: T.background, display: 'flex', flexDirection: 'column' } }, header, body,
                 React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 'calc(env(safe-area-inset-bottom) + 16px)' } },
                     React.createElement("button", { onClick: saveServiceArea, style: { width: '100%', height: 52, borderRadius: 26, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Save Changes")));
@@ -10151,6 +10393,8 @@ function App() {
             const managementRows = [];
             if (b.status === 'confirmed' || b.status === 'pending') {
                 managementRows.push({ icon: 'clock', label: 'Reschedule', onClick: () => openReschedule(b) });
+                if (b.serviceAddress)
+                    managementRows.push({ icon: 'mappin', label: 'Edit Service Address', sub: 'Update where this service happens.', onClick: () => openEditAddress(b) });
                 if (!b.cancellationRequest || b.cancellationRequest.status === 'denied')
                     managementRows.push({ icon: 'calendar', label: 'Request to Cancel', sub: "We'll ask the business to review and respond.", onClick: () => openCancelRequest(b) });
                 if (b.cancellationRequest)
@@ -10200,6 +10444,13 @@ function App() {
                 b.promotionApplied && React.createElement("div", { style: { marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
                     React.createElement(Icon, { name: "lock", size: 12, color: THEME.coral }),
                     React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: THEME.coral } }, "This discount is locked to your booking, even if the deal ends.")),
+                b.serviceAddress && React.createElement("div", { style: { marginTop: 10, background: T.surfaceSecondary, borderRadius: 14, padding: 14 } },
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: T.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, margin: 0 } }, "Service at your location"),
+                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary, margin: '6px 0 0' } }, b.serviceAddress.full),
+                    b.travelFee > 0 && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: T.textSecondary } }, "Travel Fee"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary } }, money(b.travelFee))),
+                    b.serviceAddress.notes && React.createElement("div", { style: { marginTop: 8, paddingTop: 8, borderTop: `1px solid ${T.border}` } },
+                        React.createElement("p", { style: { fontSize: 11, color: T.textSecondary, margin: 0 } }, "Notes"),
+                        React.createElement("p", { style: { fontSize: 12.5, color: T.textPrimary, margin: '2px 0 0' } }, b.serviceAddress.notes))),
                 React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, plainActions.map(flatRow)),
                 managementGroup,
                 React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, trailingActions.map(flatRow)));
@@ -10208,6 +10459,10 @@ function App() {
             const b = businessBookingDetail;
             const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
             const actions = [{ icon: 'message', label: 'Message Customer', onClick: () => flashToast('Messaging ' + b.customerName) }];
+            // Directions always go to wherever the service actually happens — the customer's own
+            // service address for a mobile booking, never the business's own location.
+            if (b.serviceAddress)
+                actions.push({ icon: 'send', label: 'Get Directions', onClick: () => flashToast('Opening directions to ' + b.serviceAddress.full) });
             if (b.status === 'confirmed' || b.status === 'pending') {
                 actions.push({ icon: 'clock', label: 'Reschedule', onClick: () => flashToast('Reschedule — coming soon') });
                 actions.push({ icon: 'check', label: 'Mark Complete', onClick: () => updateBusinessBookingStatus(b.id, 'completed') });
@@ -10232,6 +10487,14 @@ function App() {
                 b.promotionApplied && React.createElement("div", { style: { marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
                     React.createElement(Icon, { name: "lock", size: 12, color: THEME.coral }),
                     React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: THEME.coral } }, "This discount is locked to this booking and won't change.")),
+                b.serviceAddress && React.createElement("div", { style: { marginTop: 10, background: T.surfaceSecondary, borderRadius: 14, padding: 14 } },
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: T.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, margin: 0 } }, "Service Location"),
+                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary, margin: '6px 0 0' } }, b.serviceAddress.full),
+                    b.serviceAddress.distanceMi != null && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: T.textSecondary } }, "Distance"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary } }, `${b.serviceAddress.distanceMi.toFixed(1)} mi`)),
+                    b.travelFee > 0 && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: T.textSecondary } }, "Travel Fee"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary } }, money(b.travelFee))),
+                    b.serviceAddress.notes && React.createElement("div", { style: { marginTop: 8, paddingTop: 8, borderTop: `1px solid ${T.border}` } },
+                        React.createElement("p", { style: { fontSize: 11, color: T.textSecondary, margin: 0 } }, "Customer Notes"),
+                        React.createElement("p", { style: { fontSize: 12.5, color: T.textPrimary, margin: '2px 0 0' } }, b.serviceAddress.notes))),
                 React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, actions.map((a, i) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px 4px', borderBottom: i < actions.length - 1 ? `1px solid ${T.border}` : 'none' } },
                     React.createElement(Icon, { name: a.icon, size: 16, color: a.danger ? '#D0304A' : T.textPrimary }),
                     React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: a.danger ? '#D0304A' : T.textPrimary } }, a.label)))));
@@ -11039,6 +11302,77 @@ function App() {
                     React.createElement("div", { style: { width: '100%', maxWidth: 320, marginTop: 18, display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'left' } }, timeline),
                     extraCard),
                 React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${CS.border}` } }, cta));
+        })(),
+        editAddressTarget && (() => {
+            const b = bookings.find((bk) => bk.id === editAddressTarget);
+            if (!b) return null;
+            const EA = { text: T.textPrimary, sub: T.textSecondary, border: T.border, alt: T.surfaceSecondary };
+            const inputStyleEA = { width: '100%', border: `1px solid ${EA.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: EA.text, outline: 'none', background: T.inputBackground, fontFamily: 'inherit' };
+            const fieldEA = (label, node) => React.createElement("div", { key: label, style: { marginBottom: 16 } },
+                React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: EA.sub, marginBottom: 6 } }, label), node);
+            const business = feed.find((f) => f.id === b.providerId) || { id: b.providerId, locationMode: 'I travel to customers' };
+            const travelInfo = getBusinessTravelInfo(business);
+            const addressComplete = serviceAddressIsComplete(editAddressForm);
+            const fullAddress = formatServiceAddress(editAddressForm);
+            const distanceMi = addressComplete ? estimateAddressDistanceMi(fullAddress) : null;
+            const calc = distanceMi != null ? computeTravelFee(travelInfo, distanceMi) : null;
+            const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 16px) 18px 14px`, borderBottom: `1px solid ${EA.border}` } },
+                React.createElement("button", { onClick: () => editAddressStep === 'review' ? setEditAddressStep('form') : closeEditAddress(), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: editAddressStep === 'review' ? 'arrowleft' : 'x', size: editAddressStep === 'review' ? 17 : 18, color: EA.text })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16.5, color: EA.text, margin: 0 } }, editAddressStep === 'review' ? 'Review Change' : 'Edit Service Address'),
+                React.createElement("div", { style: { width: 30 } }));
+            let body, footer;
+            if (editAddressStep === 'form') {
+                const distanceBanner = calc && (
+                    calc.tier === 'outside'
+                        ? React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4, padding: 12, borderRadius: 12, background: 'rgba(224,72,60,0.1)' } },
+                            React.createElement(Icon, { name: "warningtriangle", size: 14, color: "#E0483C" }),
+                            React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: "#E0483C", lineHeight: 1.4 } }, "This provider doesn't currently travel to this location."))
+                        : calc.tier === 'extended'
+                            ? React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4, padding: 12, borderRadius: 12, background: 'rgba(245,166,35,0.12)' } },
+                                React.createElement(Icon, { name: "info", size: 14, color: "#B5790C" }),
+                                React.createElement("div", null,
+                                    React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: "#B5790C", margin: 0 } }, "Outside primary service area"),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: "#B5790C", margin: '2px 0 0' } }, `${distanceMi.toFixed(1)} miles away`),
+                                    calc.fee > 0 && React.createElement("p", { style: { fontSize: 11.5, color: "#B5790C", margin: '2px 0 0' } }, `Additional travel fee: ${money(calc.fee)}`)))
+                            : React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, padding: 12, borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                                React.createElement(Icon, { name: "check", size: 14, color: THEME.coral }),
+                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "You're in our service area")));
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
+                    fieldEA("Street Address", React.createElement("input", { value: editAddressForm.street, onChange: (e) => setEditAddressForm((f) => ({ ...f, street: e.target.value })), placeholder: "123 Main Street", style: inputStyleEA })),
+                    fieldEA("Apt / Unit / Suite (optional)", React.createElement("input", { value: editAddressForm.unit, onChange: (e) => setEditAddressForm((f) => ({ ...f, unit: e.target.value })), placeholder: "Apt 4B", style: inputStyleEA })),
+                    React.createElement("div", { style: { display: 'flex', gap: 10 } },
+                        React.createElement("div", { style: { flex: 2 } }, fieldEA("City", React.createElement("input", { value: editAddressForm.city, onChange: (e) => setEditAddressForm((f) => ({ ...f, city: e.target.value })), placeholder: "Hoboken", style: inputStyleEA }))),
+                        React.createElement("div", { style: { flex: 1 } }, fieldEA("State", React.createElement("input", { value: editAddressForm.state, onChange: (e) => setEditAddressForm((f) => ({ ...f, state: e.target.value.slice(0, 2).toUpperCase() })), placeholder: "NJ", style: inputStyleEA }))),
+                        React.createElement("div", { style: { flex: 1 } }, fieldEA("ZIP", React.createElement("input", { value: editAddressForm.zip, onChange: (e) => setEditAddressForm((f) => ({ ...f, zip: e.target.value.replace(/[^0-9]/g, '').slice(0, 5) })), placeholder: "07030", inputMode: "numeric", style: inputStyleEA })))),
+                    fieldEA("Service location notes (optional)", React.createElement("textarea", { value: editAddressForm.notes, maxLength: 200, rows: 2, onChange: (e) => setEditAddressForm((f) => ({ ...f, notes: e.target.value })), placeholder: "Gate code, parking instructions, etc.", style: { ...inputStyleEA, resize: 'none' } })),
+                    distanceBanner);
+                const ready = addressComplete && calc && calc.tier !== 'outside';
+                footer = React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${EA.border}` } },
+                    React.createElement("button", { disabled: !ready, onClick: () => setEditAddressStep('review'), style: { width: '100%', height: 52, borderRadius: 26, background: ready ? THEME.coral : '#EDEDED', color: ready ? '#fff' : '#B5B5B8', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "Continue"));
+            }
+            else {
+                const newFee = calc ? calc.fee : 0;
+                const newTotal = Math.round((b.total - (b.travelFee || 0) + newFee) * 100) / 100;
+                const diff = Math.round((newTotal - b.total) * 100) / 100;
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
+                    React.createElement("div", { style: { padding: 16, borderRadius: 16, border: `1px solid ${EA.border}` } },
+                        React.createElement("p", { style: { fontSize: 10.5, color: EA.sub, margin: 0 } }, "Current Address"),
+                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: EA.text, margin: '3px 0 14px' } }, b.serviceAddress ? b.serviceAddress.full : '—'),
+                        React.createElement("p", { style: { fontSize: 10.5, color: EA.sub, margin: 0 } }, "New Address"),
+                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: THEME.coral, margin: '3px 0 0' } }, fullAddress)),
+                    React.createElement("div", { style: { marginTop: 14, padding: 14, borderRadius: 16, background: EA.alt } },
+                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0' } }, React.createElement("span", { style: { fontSize: 12, color: EA.sub } }, "Current Travel Fee"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: EA.text } }, money(b.travelFee || 0))),
+                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: `1px solid ${T.border}` } }, React.createElement("span", { style: { fontSize: 12, color: EA.sub } }, "New Travel Fee"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, money(newFee))),
+                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: `1px solid ${T.border}` } }, React.createElement("span", { style: { fontSize: 12, color: EA.sub } }, "Current Total"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: EA.text } }, money(b.total))),
+                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: `1px solid ${T.border}` } }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: EA.text } }, "New Total"), React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: THEME.coral } }, money(newTotal)))),
+                    React.createElement("div", { style: { marginTop: 14, display: 'flex', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, background: diff === 0 ? EA.alt : 'rgba(151,196,0,0.08)' } },
+                        React.createElement(Icon, { name: "info", size: 13, color: diff === 0 ? EA.sub : THEME.coral }),
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: diff === 0 ? EA.sub : THEME.coral } }, diff === 0 ? "No price change." : `Your total will ${diff > 0 ? 'increase' : 'decrease'} by ${money(Math.abs(diff))}.`)));
+                footer = React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${EA.border}` } },
+                    React.createElement("button", { onClick: confirmEditAddress, style: { width: '100%', height: 52, borderRadius: 26, background: THEME.coral, color: '#fff', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "Save Changes"));
+            }
+            return React.createElement("div", { key: "editAddress", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 15, display: 'flex', flexDirection: 'column' } }, header, body, footer);
         })(),
         toast && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }, toast))));
 }
