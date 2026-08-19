@@ -204,6 +204,16 @@ function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
             React.createElement("circle", { cx: "8", cy: "14.5", r: "1", ...solid }),
             React.createElement("circle", { cx: "12", cy: "14.5", r: "1", ...solid }),
             React.createElement("circle", { cx: "16", cy: "14.5", r: "1", ...solid })),
+        coffee: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M18 8h1a4 4 0 0 1 0 8h-1" }),
+            React.createElement("path", { d: "M2.5 8h15.5v9a4 4 0 0 1-4 4h-7.5a4 4 0 0 1-4-4V8z" }),
+            React.createElement("path", { d: "M6.5 1.5v3M10.5 1.5v3M14.5 1.5v3" })),
+        ban: React.createElement(React.Fragment, null,
+            React.createElement("circle", { cx: "12", cy: "12", r: "9" }),
+            React.createElement("path", { d: "M5.5 5.5l13 13" })),
+        briefcase: React.createElement(React.Fragment, null,
+            React.createElement("rect", { x: "2.5", y: "7.5", width: "19", height: "13", rx: "2" }),
+            React.createElement("path", { d: "M15.5 21V5.5a2 2 0 0 0-2-2h-3a2 2 0 0 0-2 2V21" })),
         search: React.createElement(React.Fragment, null,
             React.createElement("circle", { cx: "11", cy: "11", r: "7" }),
             React.createElement("path", { d: "M20 20l-4-4" })),
@@ -1260,7 +1270,7 @@ function dateKey(d) {
 }
 const MY_PROVIDER_ID = 'me-business';
 const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const DEFAULT_WEEKLY_HOURS = { 0: null, 1: { start: '09:00', end: '17:00' }, 2: { start: '09:00', end: '17:00' }, 3: { start: '09:00', end: '17:00' }, 4: { start: '09:00', end: '17:00' }, 5: { start: '09:00', end: '17:00' }, 6: null };
+const DEFAULT_WEEKLY_HOURS = { 0: null, 1: [{ start: '09:00', end: '17:00' }], 2: [{ start: '09:00', end: '17:00' }], 3: [{ start: '09:00', end: '17:00' }], 4: [{ start: '09:00', end: '17:00' }], 5: [{ start: '09:00', end: '17:00' }], 6: null };
 
 const RESTAURANT_ID = 'bella-vista-demo';
 const RESTAURANT_AREA_ICONS = { indoor: 'house', outdoor: 'globe', bar: 'store', patio: 'sparkles', rooftop: 'building', private: 'lock' };
@@ -1482,7 +1492,7 @@ function validateReservationCriteria(restaurant, partySize, dateStr) {
         return { field: 'date', message: 'Select a date that is not in the past.' };
     return null;
 }
-const GENERIC_PROVIDER_HOURS = { start: '09:00', end: '19:00' };
+const GENERIC_PROVIDER_HOURS = [{ start: '09:00', end: '19:00' }];
 const DEFAULT_MY_SERVICES = [
     { id: 'ps1', name: 'Haircut', durationMinutes: 30, price: 25 },
     { id: 'ps2', name: 'Beard Trim', durationMinutes: 15, price: 10 },
@@ -3979,9 +3989,15 @@ function App() {
     const [breakDraft, setBreakDraft] = useState(null);
     const [unavailableDraft, setUnavailableDraft] = useState(null);
     const [timeOffDraft, setTimeOffDraft] = useState(null);
+    const [copyHoursOpen, setCopyHoursOpen] = useState(false);
+    const [copyHoursTargetDays, setCopyHoursTargetDays] = useState([]);
+    const [scheduleCalMonth, setScheduleCalMonth] = useState(() => new Date());
+    const [scheduleCalDay, setScheduleCalDay] = useState(null);
+    const [scheduleDeleteConfirm, setScheduleDeleteConfirm] = useState(null);
+    const [scheduleConflictPrompt, setScheduleConflictPrompt] = useState(null);
     const [providerDashboardOpen, setProviderDashboardOpen] = useState(false);
     const [providerDashboardTab, setProviderDashboardTab] = useState('overview');
-    useEffect(() => { if (providerDashboardTab !== 'hours') setScheduleView('menu'); }, [providerDashboardTab]);
+    useEffect(() => { if (providerDashboardTab !== 'hours') { setScheduleView('menu'); setCopyHoursOpen(false); setCopyHoursTargetDays([]); setScheduleCalDay(null); setScheduleDeleteConfirm(null); setScheduleConflictPrompt(null); } }, [providerDashboardTab]);
     useEffect(() => { if (!providerDashboardOpen) { setEarningsInsightsOpen(false); setEarningsTab('overview'); setEarningsChartSelectedIdx(null); setEarningsSelectedDay(null); setSelectedServiceDetail(null); setSelectedCustomerDetail(null); setEarningsSelectedTime(null); setAllServicesOpen(false); setAllCustomersOpen(false); setPromotionDrillDownOpen(false); setRetentionListOpen(false); setInsightsMoreOpen(false); } }, [providerDashboardOpen]);
     const [serviceFormDraft, setServiceFormDraft] = useState(null);
     const [hoursOverrideDraft, setHoursOverrideDraft] = useState(null);
@@ -4931,7 +4947,7 @@ function App() {
             return null;
         const key = dateKey(dateObj);
         if (Object.prototype.hasOwnProperty.call(providerDateOverrides, key))
-            return providerDateOverrides[key];
+            return providerDateOverrides[key] ? [providerDateOverrides[key]] : null;
         return providerWeeklyHours[dateObj.getDay()] || null;
     }
     function getBusyIntervalsForDate(providerId, dateObj, staff, excludeBookingId) {
@@ -4956,11 +4972,9 @@ function App() {
         return intervals.sort((a, b) => a.start - b.start);
     }
     function generateAvailableSlots(providerId, dateObj, durationMinutes, staff, excludeBookingId) {
-        const hours = (staff && staff.customHours) ? (staff.customHours[dateObj.getDay()] || null) : getProviderHoursForDate(providerId, dateObj);
-        if (!hours || !durationMinutes)
+        const rawHours = (staff && staff.customHours) ? (staff.customHours[dateObj.getDay()] ? [staff.customHours[dateObj.getDay()]] : null) : getProviderHoursForDate(providerId, dateObj);
+        if (!rawHours || !rawHours.length || !durationMinutes)
             return [];
-        const dayStart = timeStrToMinutes(hours.start);
-        const dayEnd = timeStrToMinutes(hours.end);
         const busy = getBusyIntervalsForDate(providerId, dateObj, staff, excludeBookingId);
         const merged = [];
         busy.forEach((iv) => {
@@ -4971,23 +4985,28 @@ function App() {
                 merged.push({ ...iv });
         });
         const STEP = 30;
+        const seen = new Set();
         const slots = [];
-        for (let t = dayStart; t + durationMinutes <= dayEnd; t += STEP) {
-            const conflict = merged.some((iv) => t < iv.end && t + durationMinutes > iv.start);
-            if (!conflict)
-                slots.push(t);
-        }
+        rawHours.forEach((range) => {
+            const dayStart = timeStrToMinutes(range.start);
+            const dayEnd = timeStrToMinutes(range.end);
+            for (let t = dayStart; t + durationMinutes <= dayEnd; t += STEP) {
+                if (seen.has(t))
+                    continue;
+                const conflict = merged.some((iv) => t < iv.end && t + durationMinutes > iv.start);
+                if (!conflict) { seen.add(t); slots.push(t); }
+            }
+        });
+        slots.sort((a, b) => a - b);
         return slots.map((m) => ({ minutes: m, label: minutesToTimeLabel(m) }));
     }
     // Same walk as generateAvailableSlots, but returns every slot in business hours — booked/
     // conflicting ones included and flagged unavailable — so the picker can show them crossed out
     // instead of silently omitting them.
     function generateDaySlots(providerId, dateObj, durationMinutes, staff, excludeBookingId) {
-        const hours = (staff && staff.customHours) ? (staff.customHours[dateObj.getDay()] || null) : getProviderHoursForDate(providerId, dateObj);
-        if (!hours || !durationMinutes)
+        const rawHours = (staff && staff.customHours) ? (staff.customHours[dateObj.getDay()] ? [staff.customHours[dateObj.getDay()]] : null) : getProviderHoursForDate(providerId, dateObj);
+        if (!rawHours || !rawHours.length || !durationMinutes)
             return [];
-        const dayStart = timeStrToMinutes(hours.start);
-        const dayEnd = timeStrToMinutes(hours.end);
         const busy = getBusyIntervalsForDate(providerId, dateObj, staff, excludeBookingId);
         const merged = [];
         busy.forEach((iv) => {
@@ -4998,12 +5017,148 @@ function App() {
                 merged.push({ ...iv });
         });
         const STEP = 30;
-        const slots = [];
-        for (let t = dayStart; t + durationMinutes <= dayEnd; t += STEP) {
-            const conflict = merged.some((iv) => t < iv.end && t + durationMinutes > iv.start);
-            slots.push({ minutes: t, label: minutesToTimeLabel(t), available: !conflict });
+        const byMinute = new Map();
+        rawHours.forEach((range) => {
+            const dayStart = timeStrToMinutes(range.start);
+            const dayEnd = timeStrToMinutes(range.end);
+            for (let t = dayStart; t + durationMinutes <= dayEnd; t += STEP) {
+                const conflict = merged.some((iv) => t < iv.end && t + durationMinutes > iv.start);
+                if (!byMinute.has(t) || !conflict)
+                    byMinute.set(t, !conflict);
+            }
+        });
+        return Array.from(byMinute.entries()).sort((a, b) => a[0] - b[0]).map(([t, available]) => ({ minutes: t, label: minutesToTimeLabel(t), available }));
+    }
+    // Schedule conflict detection — finds real existing bookings a schedule change
+    // would affect, so we can warn ("This change affects N booking(s)") before
+    // saving instead of silently invalidating a customer's appointment.
+    function myActiveBookings() {
+        return bookings.filter((b) => b.providerId === MY_PROVIDER_ID && (b.status === 'confirmed' || b.status === 'pending'));
+    }
+    function bookingsOverlappingOnDate(dateObj, startMin, endMin) {
+        return myActiveBookings().filter((b) => {
+            if (b.day !== dateObj.getDate() || b.month !== dateObj.getMonth() || b.year !== dateObj.getFullYear())
+                return false;
+            const s = timeLabelToMinutes(b.time);
+            const e = s + (b.durationMinutes || 30);
+            return s < endMin && e > startMin;
+        });
+    }
+    function bookingsOverlappingRecurring(dayIndices, startMin, endMin) {
+        return myActiveBookings().filter((b) => {
+            const d = new Date(b.year, b.month, b.day);
+            if (!dayIndices.includes(d.getDay()))
+                return false;
+            const s = timeLabelToMinutes(b.time);
+            const e = s + (b.durationMinutes || 30);
+            return s < endMin && e > startMin;
+        });
+    }
+    function bookingsOutsideRangesOnDayOfWeek(dayIdx, ranges) {
+        return myActiveBookings().filter((b) => {
+            const d = new Date(b.year, b.month, b.day);
+            if (d.getDay() !== dayIdx)
+                return false;
+            const s = timeLabelToMinutes(b.time);
+            const e = s + (b.durationMinutes || 30);
+            return !(ranges || []).some((r) => s >= timeStrToMinutes(r.start) && e <= timeStrToMinutes(r.end));
+        });
+    }
+    function bookingsInDateRange(startDate, endDate) {
+        return myActiveBookings().filter((b) => {
+            const key = dateKey(new Date(b.year, b.month, b.day));
+            return key >= startDate && key <= endDate;
+        });
+    }
+    function buildDayTimeline(dateObj) {
+        const dow = dateObj.getDay();
+        if (isProviderOnTimeOff(MY_PROVIDER_ID, dateObj))
+            return [{ type: 'timeoff', label: 'Time Off — Not Working' }];
+        const hours = getProviderHoursForDate(MY_PROVIDER_ID, dateObj);
+        if (!hours || !hours.length)
+            return [{ type: 'closed', label: 'Closed All Day' }];
+        const key = dateKey(dateObj);
+        const events = [];
+        myActiveBookings().forEach((b) => {
+            if (b.day === dateObj.getDate() && b.month === dateObj.getMonth() && b.year === dateObj.getFullYear()) {
+                const start = timeLabelToMinutes(b.time);
+                events.push({ start, end: start + (b.durationMinutes || 30), type: 'booking', label: `Booking — ${b.service}` });
+            }
+        });
+        providerBreaks.forEach((br) => {
+            if (br.days.includes(dow))
+                events.push({ start: timeStrToMinutes(br.start), end: timeStrToMinutes(br.end), type: 'break', label: `Break — ${br.name}` });
+        });
+        providerUnavailable.forEach((u) => {
+            const matches = u.repeat === 'daily' ? key >= u.date
+                : u.repeat === 'weekly' ? (key >= u.date && dow === new Date(u.date + 'T00:00:00').getDay())
+                    : key === u.date;
+            if (matches)
+                events.push({ start: timeStrToMinutes(u.start), end: timeStrToMinutes(u.end), type: 'blocked', label: u.reason ? `Blocked — ${u.reason}` : 'Blocked' });
+        });
+        events.sort((a, b) => a.start - b.start);
+        const segments = [];
+        hours.forEach((range) => {
+            let cursor = timeStrToMinutes(range.start);
+            const rangeEnd = timeStrToMinutes(range.end);
+            events.filter((e) => e.start < rangeEnd && e.end > cursor).forEach((e) => {
+                if (e.start > cursor)
+                    segments.push({ type: 'open', label: `${minutesToTimeLabel(cursor)} / Available` });
+                const segStart = Math.max(e.start, cursor);
+                const segEnd = Math.min(e.end, rangeEnd);
+                segments.push({ type: e.type, label: `${minutesToTimeLabel(segStart)}${segEnd > segStart + 1 ? '–' + minutesToTimeLabel(segEnd) : ''} / ${e.label}` });
+                cursor = Math.max(cursor, segEnd);
+            });
+            if (cursor < rangeEnd)
+                segments.push({ type: 'open', label: `${minutesToTimeLabel(cursor)} / Available` });
+            segments.push({ type: 'closed', label: `${minutesToTimeLabel(rangeEnd)} / Closed` });
+        });
+        return segments;
+    }
+    function getNextOpening() {
+        const now = new Date();
+        for (let i = 0; i < 21; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+            const hours = getProviderHoursForDate(MY_PROVIDER_ID, d);
+            if (!hours || !hours.length)
+                continue;
+            for (const range of hours) {
+                const startMin = timeStrToMinutes(range.start);
+                const endMin = timeStrToMinutes(range.end);
+                if (i === 0) {
+                    const nowMin = now.getHours() * 60 + now.getMinutes();
+                    if (nowMin >= endMin)
+                        continue;
+                    if (nowMin >= startMin)
+                        return { day: 'Today', time: 'Open now' };
+                    return { day: 'Today', time: hhmmToLabel(range.start) };
+                }
+                return { day: i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }), time: hhmmToLabel(range.start) };
+            }
         }
-        return slots;
+        return null;
+    }
+    function getNextBreak() {
+        const now = new Date();
+        for (let i = 0; i < 21; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+            const dow = d.getDay();
+            const todaysBreaks = providerBreaks.filter((br) => br.days.includes(dow)).map((br) => ({ ...br, startMin: timeStrToMinutes(br.start) })).sort((a, b) => a.startMin - b.startMin);
+            for (const br of todaysBreaks) {
+                if (i === 0 && br.startMin <= (now.getHours() * 60 + now.getMinutes()))
+                    continue;
+                return { day: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-US', { weekday: 'short' }), range: `${hhmmToLabel(br.start)}–${hhmmToLabel(br.end)}` };
+            }
+        }
+        return null;
+    }
+    function getNextDayOff() {
+        const key = dateKey(new Date());
+        const upcoming = providerTimeOff.filter((t) => t.endDate >= key).sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
+        if (!upcoming)
+            return null;
+        const d = new Date(upcoming.startDate + 'T00:00:00');
+        return { label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) };
     }
     function getStaffForTarget(item) {
         if (!item)
@@ -5036,52 +5191,65 @@ function App() {
     function deleteService(id) {
         setProviderServices((prev) => prev.filter((s) => s.id !== id));
     }
-    function setWeeklyDay(dayIdx, hoursOrNull) {
+    function setWeeklyDay(dayIdx, hoursOrNull, silent) {
         setProviderWeeklyHours((prev) => ({ ...prev, [dayIdx]: hoursOrNull }));
+        if (!silent)
+            flashToast('Weekly hours updated');
     }
     function saveDateOverride(key, hoursOrNull) {
         setProviderDateOverrides((prev) => ({ ...prev, [key]: hoursOrNull }));
         setHoursOverrideDraft(null);
+        flashToast('Special hours saved');
     }
     function removeDateOverride(key) {
         setProviderDateOverrides((prev) => { const next = { ...prev }; delete next[key]; return next; });
         setHoursOverrideDraft(null);
+        flashToast('Special hours removed');
     }
     function saveBreak(draft) {
+        const isEdit = !!draft.id;
         setProviderBreaks((prev) => draft.id
             ? prev.map((b) => b.id === draft.id ? { ...draft } : b)
             : [...prev, { ...draft, id: 'brk' + Date.now() }]);
         setBreakDraft(null);
         setScheduleView('breaks');
+        flashToast(isEdit ? 'Break updated' : 'Break added');
     }
     function deleteBreak(id) {
         setProviderBreaks((prev) => prev.filter((b) => b.id !== id));
         setBreakDraft(null);
         setScheduleView('breaks');
+        flashToast('Break deleted');
     }
     function saveUnavailable(draft) {
+        const isEdit = !!draft.id;
         setProviderUnavailable((prev) => draft.id
             ? prev.map((u) => u.id === draft.id ? { ...draft } : u)
             : [...prev, { ...draft, id: 'unv' + Date.now() }]);
         setUnavailableDraft(null);
         setScheduleView('unavailable');
+        flashToast(isEdit ? 'Block time updated' : 'Time blocked');
     }
     function deleteUnavailable(id) {
         setProviderUnavailable((prev) => prev.filter((u) => u.id !== id));
         setUnavailableDraft(null);
         setScheduleView('unavailable');
+        flashToast('Block time removed');
     }
     function saveTimeOff(draft) {
+        const isEdit = !!draft.id;
         setProviderTimeOff((prev) => draft.id
             ? prev.map((t) => t.id === draft.id ? { ...draft } : t)
             : [...prev, { ...draft, id: 'off' + Date.now() }]);
         setTimeOffDraft(null);
         setScheduleView('timeOff');
+        flashToast(isEdit ? 'Time off updated' : 'Time off added');
     }
     function deleteTimeOff(id) {
         setProviderTimeOff((prev) => prev.filter((t) => t.id !== id));
         setTimeOffDraft(null);
         setScheduleView('timeOff');
+        flashToast('Time off deleted');
     }
     function openBooking(item, preselectedService) {
         setPostViewer(null);
@@ -8942,8 +9110,8 @@ function App() {
             }
             else if (bookingStep === 'venueDetails') {
                 const hours = getProviderHoursForDate(bookingTarget.id, selectedDateObj) || GENERIC_PROVIDER_HOURS;
-                const dayStartMin = timeStrToMinutes(hours.start);
-                const dayEndMin = timeStrToMinutes(hours.end);
+                const dayStartMin = timeStrToMinutes(hours[0].start);
+                const dayEndMin = timeStrToMinutes(hours[hours.length - 1].end);
                 const timeOptions = [];
                 for (let t = dayStartMin; t <= dayEndMin; t += 30)
                     timeOptions.push(t);
@@ -9347,14 +9515,16 @@ function App() {
         providerDashboardOpen && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
             const inputStyle3 = { width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none', background: T.inputBackground, fontFamily: 'inherit' };
-            const SCHEDULE_TITLES = { menu: 'Schedule', weekly: 'Weekly Hours', editDay: editDayIdx != null ? WEEKDAY_LABELS[editDayIdx] : 'Edit Day', breaks: 'Breaks', addBreak: breakDraft && breakDraft.id ? 'Edit Break' : 'Add Break', unavailable: 'Unavailable Time', addUnavailable: unavailableDraft && unavailableDraft.id ? 'Edit Unavailable Time' : 'Add Unavailable Time', timeOff: 'Time Off', addTimeOff: timeOffDraft && timeOffDraft.id ? 'Edit Time Off' : 'Add Time Off', specialHours: 'Special Hours' };
+            const SCHEDULE_TITLES = { menu: 'Schedule', weekly: 'Weekly Hours', editDay: editDayIdx != null ? WEEKDAY_LABELS[editDayIdx] : 'Edit Day', breaks: 'Breaks', addBreak: breakDraft && breakDraft.id ? 'Edit Break' : 'Add Break', unavailable: 'Block Time', addUnavailable: unavailableDraft && unavailableDraft.id ? 'Edit Block Time' : 'Add Block Time', timeOff: 'Time Off', addTimeOff: timeOffDraft && timeOffDraft.id ? 'Edit Time Off' : 'Add Time Off', specialHours: 'Special Hours', calendar: 'Calendar View' };
             const scheduleBack = () => {
                 if (scheduleView === 'menu')
                     setProviderDashboardTab('overview');
-                else if (scheduleView === 'editDay') { setScheduleView('weekly'); setEditDayIdx(null); }
+                else if (scheduleView === 'editDay') { setScheduleView('weekly'); setEditDayIdx(null); setCopyHoursOpen(false); setCopyHoursTargetDays([]); }
                 else if (scheduleView === 'addBreak') { setScheduleView('breaks'); setBreakDraft(null); }
                 else if (scheduleView === 'addUnavailable') { setScheduleView('unavailable'); setUnavailableDraft(null); }
                 else if (scheduleView === 'addTimeOff') { setScheduleView('timeOff'); setTimeOffDraft(null); }
+                else if (scheduleView === 'calendar' && scheduleCalDay != null)
+                    setScheduleCalDay(null);
                 else
                     setScheduleView('menu');
             };
@@ -9368,11 +9538,11 @@ function App() {
                     React.createElement("button", { onClick: () => flashToast('No new notifications') }, React.createElement(Icon, { name: "bell", size: 19, color: PD.text })))
                 : React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${PD.border}` } },
                     React.createElement("button", { onClick: providerDashboardTab === 'hours' ? scheduleBack : () => setProviderDashboardTab('overview') }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, providerDashboardTab === 'hours' ? SCHEDULE_TITLES[scheduleView] : providerDashboardTab === 'bookings' ? 'Bookings' : (bizOnboarding.businessName.trim() || 'My Business')),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, providerDashboardTab === 'hours' ? (scheduleView === 'calendar' && scheduleCalDay != null ? new Date(scheduleCalMonth.getFullYear(), scheduleCalMonth.getMonth(), scheduleCalDay).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : SCHEDULE_TITLES[scheduleView]) : providerDashboardTab === 'bookings' ? 'Bookings' : (bizOnboarding.businessName.trim() || 'My Business')),
                     providerDashboardTab === 'hours'
                         ? (scheduleView === 'breaks' ? React.createElement("button", { onClick: () => { setBreakDraft({ id: null, name: '', start: '12:00', end: '13:00', days: [1, 2, 3, 4, 5] }); setScheduleView('addBreak'); }, style: { fontSize: 13.5, fontWeight: 700, color: THEME.coral } }, "Add")
                             : scheduleView === 'unavailable' ? React.createElement("button", { onClick: () => { setUnavailableDraft({ id: null, date: dateKey(new Date()), start: '09:00', end: '10:00', repeat: 'none', reason: '' }); setScheduleView('addUnavailable'); }, style: { fontSize: 13.5, fontWeight: 700, color: THEME.coral } }, "Add")
-                                : scheduleView === 'timeOff' ? React.createElement("button", { onClick: () => { setTimeOffDraft({ id: null, allDay: true, startDate: dateKey(new Date()), endDate: dateKey(new Date()), reason: '' }); setScheduleView('addTimeOff'); }, style: { fontSize: 13.5, fontWeight: 700, color: THEME.coral } }, "Add")
+                                : scheduleView === 'timeOff' ? React.createElement("button", { onClick: () => { setTimeOffDraft({ id: null, startDate: dateKey(new Date()), endDate: dateKey(new Date()), reason: '' }); setScheduleView('addTimeOff'); }, style: { fontSize: 13.5, fontWeight: 700, color: THEME.coral } }, "Add")
                                     : scheduleView === 'specialHours' ? React.createElement("button", { onClick: () => setHoursOverrideDraft({ date: dateKey(new Date()), closed: false, start: '10:00', end: '18:00', reason: '' }), style: { fontSize: 13.5, fontWeight: 700, color: THEME.coral } }, "Add")
                                         : React.createElement("div", { style: { width: 17 } }))
                         : providerDashboardTab === 'bookings'
@@ -9671,65 +9841,99 @@ function App() {
             else if (scheduleView === 'weekly') {
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `12px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
                     React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: '0 0 2px' } }, "Set your weekly hours"),
-                    React.createElement("p", { style: { fontSize: 12, color: PD.sub, marginBottom: 14 } }, "Tap a day to edit hours"),
+                    React.createElement("p", { style: { fontSize: 12, color: PD.sub, marginBottom: 14 } }, "Tap a day to edit hours — add split shifts if you need them."),
                     WEEKDAY_LABELS.map((label, dayIdx) => {
-                        const hours = providerWeeklyHours[dayIdx];
-                        return React.createElement("button", { key: dayIdx, onClick: () => { setEditDayIdx(dayIdx); setScheduleView('editDay'); }, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: `1px solid ${PD.border}`, textAlign: 'left' } },
-                            React.createElement("div", null,
+                        const ranges = providerWeeklyHours[dayIdx];
+                        const isOpen = !!(ranges && ranges.length);
+                        return React.createElement("button", { key: dayIdx, onClick: () => { setEditDayIdx(dayIdx); setScheduleView('editDay'); setCopyHoursOpen(false); setCopyHoursTargetDays([]); }, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderBottom: `1px solid ${PD.border}`, textAlign: 'left' } },
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                 React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: PD.text, margin: 0 } }, label),
-                                React.createElement("p", { style: { fontSize: 12, color: PD.sub, marginTop: 2 } }, hours ? `${hhmmToLabel(hours.start)} – ${hhmmToLabel(hours.end)}` : 'Closed')),
+                                React.createElement("p", { style: { fontSize: 12, color: PD.sub, marginTop: 2 } }, isOpen ? ranges.map((r) => `${hhmmToLabel(r.start)} – ${hhmmToLabel(r.end)}`).join(', ') : 'Closed')),
                             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12 } },
-                                React.createElement("div", { onClick: (e) => { e.stopPropagation(); setWeeklyDay(dayIdx, hours ? null : { start: '09:00', end: '17:00' }); }, style: { width: 44, height: 26, borderRadius: 13, background: hours ? THEME.coral : '#E5E5EA', position: 'relative', flexShrink: 0 } },
-                                    React.createElement("div", { style: { position: 'absolute', top: 2, left: hours ? 20 : 2, width: 22, height: 22, borderRadius: 11, background: '#fff', transition: 'left 0.15s' } })),
+                                React.createElement(ToggleSwitch, { on: isOpen, onChange: (e) => { e.stopPropagation(); setWeeklyDay(dayIdx, isOpen ? null : [{ start: '09:00', end: '17:00' }]); } }),
                                 React.createElement(Icon, { name: "chevronright", size: 15, color: '#C7C7CC' })));
                     }));
             }
             else if (scheduleView === 'editDay') {
                 const dayIdx = editDayIdx;
                 const label = WEEKDAY_LABELS[dayIdx];
-                const hours = providerWeeklyHours[dayIdx];
-                const closed = !hours;
+                const ranges = providerWeeklyHours[dayIdx] || [];
+                const closed = ranges.length === 0;
+                const updateRange = (idx, field, value) => setWeeklyDay(dayIdx, ranges.map((r, i) => i === idx ? { ...r, [field]: value } : r), true);
+                const removeRange = (idx) => { const next = ranges.filter((_, i) => i !== idx); setWeeklyDay(dayIdx, next.length ? next : null, true); };
+                const addRange = () => { const last = ranges[ranges.length - 1]; setWeeklyDay(dayIdx, [...ranges, { start: last ? last.end : '09:00', end: '17:00' }], true); };
+                const commitSave = () => {
+                    const conflicts = bookingsOutsideRangesOnDayOfWeek(dayIdx, closed ? [] : ranges);
+                    setScheduleView('weekly'); setEditDayIdx(null); setCopyHoursOpen(false); setCopyHoursTargetDays([]);
+                    flashToast('Weekly hours updated');
+                    if (conflicts.length > 0)
+                        setScheduleConflictPrompt({ count: conflicts.length, sample: conflicts[0] });
+                };
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `16px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
                     React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, marginBottom: 18 } }, `Set hours for ${label}`),
-                    !closed && React.createElement("div", { style: { display: 'flex', gap: 10, marginBottom: 20 } },
-                        React.createElement("div", { style: { flex: 1 } },
-                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Open"),
-                            React.createElement("input", { type: "time", value: hours.start, onChange: (e) => setWeeklyDay(dayIdx, { ...hours, start: e.target.value }), style: inputStyle3 })),
-                        React.createElement("div", { style: { flex: 1 } },
-                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Close"),
-                            React.createElement("input", { type: "time", value: hours.end, onChange: (e) => setWeeklyDay(dayIdx, { ...hours, end: e.target.value }), style: inputStyle3 }))),
+                    !closed && React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 } }, ranges.map((r, idx) =>
+                        React.createElement("div", { key: idx, style: { display: 'flex', alignItems: 'flex-end', gap: 10 } },
+                            React.createElement("div", { style: { flex: 1 } },
+                                React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Open"),
+                                React.createElement("input", { type: "time", value: r.start, onChange: (e) => updateRange(idx, 'start', e.target.value), style: inputStyle3 })),
+                            React.createElement("div", { style: { flex: 1 } },
+                                React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Close"),
+                                React.createElement("input", { type: "time", value: r.end, onChange: (e) => updateRange(idx, 'end', e.target.value), style: inputStyle3 })),
+                            ranges.length > 1 && React.createElement("button", { onClick: () => removeRange(idx), style: { width: 38, height: 38, borderRadius: 12, border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "x", size: 14, color: '#D0304A' }))))),
+                    !closed && React.createElement("button", { onClick: addRange, style: { width: '100%', padding: '11px 0', borderRadius: 14, border: `1.5px dashed ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13, marginBottom: 20 } }, "+ Add another time range"),
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 0', borderTop: `1px solid ${PD.border}`, borderBottom: `1px solid ${PD.border}`, marginBottom: 20 } },
                         React.createElement("div", null,
                             React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: PD.text, margin: 0 } }, "Closed"),
                             React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "Turn on if you're closed all day")),
-                        React.createElement("button", { onClick: () => setWeeklyDay(dayIdx, closed ? { start: '09:00', end: '17:00' } : null), style: { width: 44, height: 26, borderRadius: 13, background: closed ? THEME.coral : '#E5E5EA', position: 'relative', flexShrink: 0 } },
-                            React.createElement("div", { style: { position: 'absolute', top: 2, left: closed ? 20 : 2, width: 22, height: 22, borderRadius: 11, background: '#fff', transition: 'left 0.15s' } }))),
-                    !closed && React.createElement("button", { onClick: () => { WEEKDAY_LABELS.forEach((_, i) => { if (i !== dayIdx) setWeeklyDay(i, { ...hours }); }); flashToast(`Copied ${label}'s hours to other days`); }, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '14px 0', borderBottom: `1px solid ${PD.border}`, marginBottom: 24, textAlign: 'left' } },
-                        React.createElement("span", { style: { fontSize: 13.5, color: PD.text } }, "Copy to other days"),
-                        React.createElement(Icon, { name: "chevronright", size: 15, color: '#C7C7CC' })),
-                    React.createElement("button", { onClick: () => { setWeeklyDay(dayIdx, null); setScheduleView('weekly'); setEditDayIdx(null); }, style: { width: '100%', padding: '13px 0', borderRadius: 24, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 13.5 } }, `Delete ${label}`));
+                        React.createElement(ToggleSwitch, { on: closed, onChange: () => setWeeklyDay(dayIdx, closed ? [{ start: '09:00', end: '17:00' }] : null, true) })),
+                    !closed && React.createElement("div", { style: { marginBottom: 24 } },
+                        React.createElement("button", { onClick: () => setCopyHoursOpen((v) => !v), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '14px 0', borderBottom: copyHoursOpen ? 'none' : `1px solid ${PD.border}`, textAlign: 'left' } },
+                            React.createElement("span", { style: { fontSize: 13.5, color: PD.text } }, "Copy to other days"),
+                            React.createElement(Icon, { name: copyHoursOpen ? "chevrondown" : "chevronright", size: 15, color: '#C7C7CC' })),
+                        copyHoursOpen && React.createElement("div", { style: { padding: '4px 0 16px', borderBottom: `1px solid ${PD.border}` } },
+                            React.createElement("div", { style: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 } },
+                                WEEKDAY_LABELS.map((l, i) => {
+                                    if (i === dayIdx)
+                                        return null;
+                                    const active = copyHoursTargetDays.includes(i);
+                                    return React.createElement("button", { key: i, onClick: () => setCopyHoursTargetDays((prev) => active ? prev.filter((x) => x !== i) : [...prev, i]), style: { width: 40, height: 36, borderRadius: 10, border: `1.5px solid ${active ? THEME.coral : PD.border}`, background: active ? THEME.coral : T.surface, color: active ? '#fff' : PD.text, fontSize: 12, fontWeight: 700 } }, l.slice(0, 3));
+                                })),
+                            React.createElement("button", { disabled: copyHoursTargetDays.length === 0, onClick: () => { copyHoursTargetDays.forEach((i) => setWeeklyDay(i, ranges.map((r) => ({ ...r })), true)); flashToast(`Copied ${label}'s hours to ${copyHoursTargetDays.length} day${copyHoursTargetDays.length === 1 ? '' : 's'}`); setCopyHoursOpen(false); setCopyHoursTargetDays([]); }, style: { width: '100%', padding: '11px 0', borderRadius: 14, background: copyHoursTargetDays.length ? THEME.coral : '#EDEDED', color: copyHoursTargetDays.length ? '#fff' : '#B5B5B8', fontWeight: 700, fontSize: 13 } }, "Copy Hours"))),
+                    React.createElement("button", { onClick: commitSave, style: { width: '100%', padding: '13px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: 12 } }, "Save Hours"),
+                    React.createElement("button", { onClick: () => setScheduleDeleteConfirm({ type: 'weeklyDay', dayIdx, title: `Close ${label}?`, message: "Customers won't be able to book on this day. You can turn it back on anytime." }), style: { width: '100%', padding: '13px 0', borderRadius: 24, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 13.5 } }, `Delete ${label}`));
             }
             else if (scheduleView === 'breaks') {
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `12px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: '0 0 2px' } }, "Add breaks"),
-                    React.createElement("p", { style: { fontSize: 12, color: PD.sub, marginBottom: 16 } }, "Add lunch breaks or short breaks during the day."),
                     providerBreaks.length === 0
-                        ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, padding: '20px 0', textAlign: 'center' } }, "No breaks yet.")
-                        : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 } }, providerBreaks.map((br) => {
-                            const dayLabel = br.days.length === 7 ? 'Every day' : br.days.slice().sort().map((d) => WEEKDAY_LABELS[d].slice(0, 3)).join(', ');
-                            return React.createElement("button", { key: br.id, onClick: () => { setBreakDraft({ ...br }); setScheduleView('addBreak'); }, style: { width: '100%', textAlign: 'left', padding: 14, borderRadius: 16, border: `1px solid ${PD.border}` } },
-                                React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: PD.text, margin: 0 } }, br.name),
-                                React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, marginTop: 3 } }, `${hhmmToLabel(br.start)} – ${hhmmToLabel(br.end)}`),
-                                React.createElement("p", { style: { fontSize: 11.5, color: THEME.coral, marginTop: 3, fontWeight: 600 } }, dayLabel));
-                        })),
-                    React.createElement("button", { onClick: () => { setBreakDraft({ id: null, name: '', start: '12:00', end: '13:00', days: [1, 2, 3, 4, 5] }); setScheduleView('addBreak'); }, style: { width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px dashed ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13 } }, "+ Add Another Break"));
+                        ? React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 18px 24px', textAlign: 'center' } },
+                            React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 } }, React.createElement(Icon, { name: "coffee", size: 28, color: '#C7C7CC' })),
+                            React.createElement("p", { style: { fontSize: 15, fontWeight: 700, color: PD.text, margin: 0 } }, "No breaks yet"),
+                            React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, marginTop: 6, lineHeight: 1.45, maxWidth: 260 } }, "Add recurring lunch or short breaks to prevent bookings during those times."),
+                            React.createElement("button", { onClick: () => { setBreakDraft({ id: null, name: '', start: '12:00', end: '13:00', days: [1, 2, 3, 4, 5] }); setScheduleView('addBreak'); }, style: { marginTop: 20, padding: '13px 28px', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 13.5 } }, "Add Break"))
+                        : React.createElement(React.Fragment, null,
+                            React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 } }, providerBreaks.map((br) => {
+                                const dayLabel = br.days.length === 7 ? 'Every day' : br.days.slice().sort().map((d) => WEEKDAY_LABELS[d].slice(0, 3)).join(', ');
+                                return React.createElement("button", { key: br.id, onClick: () => { setBreakDraft({ ...br }); setScheduleView('addBreak'); }, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', padding: 14, borderRadius: 16, border: `1px solid ${PD.border}` } },
+                                    React.createElement(Icon, { name: "coffee", size: 18, color: THEME.coral }),
+                                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                        React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: PD.text, margin: 0 } }, br.name),
+                                        React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, marginTop: 3 } }, `${hhmmToLabel(br.start)} – ${hhmmToLabel(br.end)}`),
+                                        React.createElement("p", { style: { fontSize: 11.5, color: THEME.coral, marginTop: 3, fontWeight: 600 } }, dayLabel)));
+                            })),
+                            React.createElement("button", { onClick: () => { setBreakDraft({ id: null, name: '', start: '12:00', end: '13:00', days: [1, 2, 3, 4, 5] }); setScheduleView('addBreak'); }, style: { width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px dashed ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13 } }, "+ Add Another Break")));
             }
             else if (scheduleView === 'addBreak') {
                 const d = breakDraft;
+                const commitSave = () => {
+                    const conflicts = bookingsOverlappingRecurring(d.days, timeStrToMinutes(d.start), timeStrToMinutes(d.end));
+                    saveBreak({ ...d, name: d.name.trim() });
+                    if (conflicts.length > 0)
+                        setScheduleConflictPrompt({ count: conflicts.length, sample: conflicts[0] });
+                };
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `16px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
                     React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Break Name"),
                     React.createElement("input", { value: d.name, onChange: (e) => setBreakDraft({ ...d, name: e.target.value }), placeholder: "e.g. Lunch Break", style: { ...inputStyle3, marginBottom: 18 } }),
-                    React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 8 } }, "Repeats on"),
+                    React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 8 } }, "Days"),
                     React.createElement("div", { style: { display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' } },
                         WEEKDAY_LABELS.map((label, i) => {
                             const active = d.days.includes(i);
@@ -9737,73 +9941,96 @@ function App() {
                         })),
                     React.createElement("div", { style: { display: 'flex', gap: 10, marginBottom: 26 } },
                         React.createElement("div", { style: { flex: 1 } },
-                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "From"),
+                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Start Time"),
                             React.createElement("input", { type: "time", value: d.start, onChange: (e) => setBreakDraft({ ...d, start: e.target.value }), style: inputStyle3 })),
                         React.createElement("div", { style: { flex: 1 } },
-                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "To"),
+                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "End Time"),
                             React.createElement("input", { type: "time", value: d.end, onChange: (e) => setBreakDraft({ ...d, end: e.target.value }), style: inputStyle3 }))),
-                    React.createElement("button", { disabled: !d.name.trim() || d.days.length === 0, onClick: () => saveBreak({ ...d, name: d.name.trim() }), style: { width: '100%', padding: '13px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14, opacity: (!d.name.trim() || d.days.length === 0) ? 0.5 : 1, marginBottom: d.id ? 12 : 0 } }, "Save"),
-                    d.id && React.createElement("button", { onClick: () => deleteBreak(d.id), style: { width: '100%', padding: '13px 0', borderRadius: 24, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 14 } }, "Delete Break"));
+                    React.createElement("button", { disabled: !d.name.trim() || d.days.length === 0, onClick: commitSave, style: { width: '100%', padding: '13px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14, opacity: (!d.name.trim() || d.days.length === 0) ? 0.5 : 1, marginBottom: d.id ? 12 : 0 } }, "Save Break"),
+                    d.id && React.createElement("button", { onClick: () => setScheduleDeleteConfirm({ type: 'break', id: d.id, title: 'Delete this break?', message: 'Customers will be able to book during this time again.' }), style: { width: '100%', padding: '13px 0', borderRadius: 24, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 14 } }, "Delete Break"));
             }
             else if (scheduleView === 'unavailable') {
                 const sorted = providerUnavailable.slice().sort((a, b) => a.date.localeCompare(b.date));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `12px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    React.createElement("p", { style: { fontSize: 12, color: PD.sub, marginBottom: 16 } }, "Block off times you're not available"),
                     sorted.length === 0
-                        ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, padding: '20px 0', textAlign: 'center' } }, "No unavailable times set.")
+                        ? React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 18px 24px', textAlign: 'center' } },
+                            React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 } }, React.createElement(Icon, { name: "ban", size: 28, color: '#C7C7CC' })),
+                            React.createElement("p", { style: { fontSize: 15, fontWeight: 700, color: PD.text, margin: 0 } }, "Nothing blocked"),
+                            React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, marginTop: 6, lineHeight: 1.45, maxWidth: 260 } }, "Need a few hours unavailable? Block them here without changing your regular schedule."),
+                            React.createElement("button", { onClick: () => { setUnavailableDraft({ id: null, date: dateKey(new Date()), start: '09:00', end: '10:00', repeat: 'none', reason: '' }); setScheduleView('addUnavailable'); }, style: { marginTop: 20, padding: '13px 28px', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 13.5 } }, "Block Time"))
                         : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, sorted.map((u) => {
                             const repeatLabel = u.repeat === 'daily' ? 'Repeats daily' : u.repeat === 'weekly' ? `Repeats every ${WEEKDAY_LABELS[new Date(u.date + 'T00:00:00').getDay()]}` : 'Does not repeat';
-                            return React.createElement("button", { key: u.id, onClick: () => { setUnavailableDraft({ ...u }); setScheduleView('addUnavailable'); }, style: { width: '100%', textAlign: 'left', padding: 14, borderRadius: 16, border: `1px solid ${PD.border}` } },
-                                React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: PD.text, margin: 0 } }, u.date),
-                                React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, marginTop: 3 } }, `${hhmmToLabel(u.start)} – ${hhmmToLabel(u.end)}`),
-                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 3 } }, repeatLabel));
+                            return React.createElement("button", { key: u.id, onClick: () => { setUnavailableDraft({ ...u }); setScheduleView('addUnavailable'); }, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', padding: 14, borderRadius: 16, border: `1px solid ${PD.border}` } },
+                                React.createElement(Icon, { name: "ban", size: 18, color: THEME.coral }),
+                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: PD.text, margin: 0 } }, u.date),
+                                    React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, marginTop: 3 } }, `${hhmmToLabel(u.start)} – ${hhmmToLabel(u.end)}`),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 3 } }, repeatLabel)));
                         })));
             }
             else if (scheduleView === 'addUnavailable') {
                 const d = unavailableDraft;
+                const commitSave = () => {
+                    const dObj = new Date(d.date + 'T00:00:00');
+                    const conflicts = bookingsOverlappingOnDate(dObj, timeStrToMinutes(d.start), timeStrToMinutes(d.end));
+                    saveUnavailable(d);
+                    if (conflicts.length > 0)
+                        setScheduleConflictPrompt({ count: conflicts.length, sample: conflicts[0] });
+                };
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `16px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
                     React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Date"),
                     React.createElement("input", { type: "date", value: d.date, onChange: (e) => setUnavailableDraft({ ...d, date: e.target.value }), style: { ...inputStyle3, marginBottom: 18 } }),
                     React.createElement("div", { style: { display: 'flex', gap: 10, marginBottom: 18 } },
                         React.createElement("div", { style: { flex: 1 } },
-                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "From"),
+                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Start Time"),
                             React.createElement("input", { type: "time", value: d.start, onChange: (e) => setUnavailableDraft({ ...d, start: e.target.value }), style: inputStyle3 })),
                         React.createElement("div", { style: { flex: 1 } },
-                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "To"),
+                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "End Time"),
                             React.createElement("input", { type: "time", value: d.end, onChange: (e) => setUnavailableDraft({ ...d, end: e.target.value }), style: inputStyle3 }))),
                     React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 8 } }, "Repeat"),
                     React.createElement("div", { style: { display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' } },
                         [['none', 'Does not repeat'], ['daily', 'Daily'], ['weekly', 'Weekly']].map(([id, label]) => React.createElement("button", { key: id, onClick: () => setUnavailableDraft({ ...d, repeat: id }), style: { padding: '9px 14px', borderRadius: 16, fontSize: 12.5, fontWeight: 600, border: `1.5px solid ${d.repeat === id ? THEME.coral : PD.border}`, color: d.repeat === id ? THEME.coral : PD.text, background: T.surface } }, label))),
-                    React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Reason (optional)"),
-                    React.createElement("input", { value: d.reason, onChange: (e) => setUnavailableDraft({ ...d, reason: e.target.value }), placeholder: "Personal", style: { ...inputStyle3, marginBottom: 26 } }),
-                    React.createElement("button", { onClick: () => saveUnavailable(d), style: { width: '100%', padding: '13px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: d.id ? 12 : 0 } }, "Save"),
-                    d.id && React.createElement("button", { onClick: () => deleteUnavailable(d.id), style: { width: '100%', padding: '13px 0', borderRadius: 24, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 14 } }, "Delete"));
+                    React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Note (optional)"),
+                    React.createElement("input", { value: d.reason, onChange: (e) => setUnavailableDraft({ ...d, reason: e.target.value }), placeholder: "Doctor's appointment", style: { ...inputStyle3, marginBottom: 26 } }),
+                    React.createElement("button", { onClick: commitSave, style: { width: '100%', padding: '13px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: d.id ? 12 : 0 } }, "Block Time"),
+                    d.id && React.createElement("button", { onClick: () => setScheduleDeleteConfirm({ type: 'unavailable', id: d.id, title: 'Remove this block?', message: 'Customers will be able to book during this time again.' }), style: { width: '100%', padding: '13px 0', borderRadius: 24, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 14 } }, "Delete"));
             }
             else if (scheduleView === 'timeOff') {
                 const sorted = providerTimeOff.slice().sort((a, b) => a.startDate.localeCompare(b.startDate));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `12px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    React.createElement("p", { style: { fontSize: 12, color: PD.sub, marginBottom: 16 } }, "Add days you'll be unavailable"),
                     sorted.length === 0
-                        ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, padding: '20px 0', textAlign: 'center' } }, "No time off scheduled.")
-                        : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, sorted.map((t) => React.createElement("button", { key: t.id, onClick: () => { setTimeOffDraft({ ...t }); setScheduleView('addTimeOff'); }, style: { width: '100%', textAlign: 'left', padding: 14, borderRadius: 16, border: `1px solid ${PD.border}` } },
-                            React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: PD.text, margin: 0 } }, t.startDate === t.endDate ? t.startDate : `${t.startDate} – ${t.endDate}`),
-                            t.reason && React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, marginTop: 3 } }, t.reason)))));
+                        ? React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 18px 24px', textAlign: 'center' } },
+                            React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 } }, React.createElement(Icon, { name: "briefcase", size: 28, color: '#C7C7CC' })),
+                            React.createElement("p", { style: { fontSize: 15, fontWeight: 700, color: PD.text, margin: 0 } }, "No upcoming time off"),
+                            React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, marginTop: 6, lineHeight: 1.45, maxWidth: 260 } }, "Taking a day off or vacation? Add it here."),
+                            React.createElement("button", { onClick: () => { setTimeOffDraft({ id: null, startDate: dateKey(new Date()), endDate: dateKey(new Date()), reason: '' }); setScheduleView('addTimeOff'); }, style: { marginTop: 20, padding: '13px 28px', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 13.5 } }, "Add Time Off"))
+                        : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, sorted.map((t) => {
+                            const dCount = Math.round((new Date(t.endDate + 'T00:00:00') - new Date(t.startDate + 'T00:00:00')) / 86400000) + 1;
+                            return React.createElement("button", { key: t.id, onClick: () => { setTimeOffDraft({ ...t }); setScheduleView('addTimeOff'); }, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', padding: 14, borderRadius: 16, border: `1px solid ${PD.border}` } },
+                                React.createElement(Icon, { name: "briefcase", size: 18, color: THEME.coral }),
+                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: PD.text, margin: 0 } }, t.startDate === t.endDate ? t.startDate : `${t.startDate} – ${t.endDate}`),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: THEME.coral, marginTop: 3, fontWeight: 600 } }, `${dCount} day${dCount === 1 ? '' : 's'}`),
+                                    t.reason && React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, marginTop: 3 } }, t.reason)));
+                        })));
             }
             else if (scheduleView === 'addTimeOff') {
                 const d = timeOffDraft;
+                const commitSave = () => {
+                    const conflicts = bookingsInDateRange(d.startDate, d.endDate);
+                    saveTimeOff(d);
+                    if (conflicts.length > 0)
+                        setScheduleConflictPrompt({ count: conflicts.length, sample: conflicts[0] });
+                };
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `16px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0 18px' } },
-                        React.createElement("span", { style: { fontSize: 13.5, fontWeight: 600, color: PD.text } }, "All Day"),
-                        React.createElement("button", { onClick: () => setTimeOffDraft({ ...d, allDay: !d.allDay }), style: { width: 44, height: 26, borderRadius: 13, background: d.allDay ? THEME.coral : '#E5E5EA', position: 'relative' } },
-                            React.createElement("div", { style: { position: 'absolute', top: 2, left: d.allDay ? 20 : 2, width: 22, height: 22, borderRadius: 11, background: '#fff', transition: 'left 0.15s' } }))),
                     React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Start Date"),
                     React.createElement("input", { type: "date", value: d.startDate, onChange: (e) => setTimeOffDraft({ ...d, startDate: e.target.value, endDate: e.target.value > d.endDate ? e.target.value : d.endDate }), style: { ...inputStyle3, marginBottom: 18 } }),
                     React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "End Date"),
                     React.createElement("input", { type: "date", value: d.endDate, min: d.startDate, onChange: (e) => setTimeOffDraft({ ...d, endDate: e.target.value }), style: { ...inputStyle3, marginBottom: 18 } }),
                     React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Reason (optional)"),
                     React.createElement("input", { value: d.reason, onChange: (e) => setTimeOffDraft({ ...d, reason: e.target.value }), placeholder: "Vacation", style: { ...inputStyle3, marginBottom: 26 } }),
-                    React.createElement("button", { onClick: () => saveTimeOff(d), style: { width: '100%', padding: '13px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: d.id ? 12 : 0 } }, "Save"),
-                    d.id && React.createElement("button", { onClick: () => deleteTimeOff(d.id), style: { width: '100%', padding: '13px 0', borderRadius: 24, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 14 } }, "Delete"));
+                    React.createElement("button", { onClick: commitSave, style: { width: '100%', padding: '13px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: d.id ? 12 : 0 } }, "Save Time Off"),
+                    d.id && React.createElement("button", { onClick: () => setScheduleDeleteConfirm({ type: 'timeOff', id: d.id, title: 'Delete this time off?', message: "Customers will be able to book on these days again." }), style: { width: '100%', padding: '13px 0', borderRadius: 24, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 14 } }, "Delete"));
             }
             else if (scheduleView === 'specialHours') {
                 const overrideKeys = Object.keys(providerDateOverrides).sort();
@@ -9820,23 +10047,113 @@ function App() {
                                 React.createElement(Icon, { name: "chevronright", size: 15, color: '#C7C7CC' }));
                         })));
             }
+            else if (scheduleView === 'calendar') {
+                const y = scheduleCalMonth.getFullYear(), m = scheduleCalMonth.getMonth();
+                if (scheduleCalDay == null) {
+                    const firstWeekday = new Date(y, m, 1).getDay();
+                    const daysInMonth = new Date(y, m + 1, 0).getDate();
+                    const cells = [...Array(firstWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+                    const today = new Date();
+                    body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `12px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 } },
+                            React.createElement("button", { onClick: () => setScheduleCalMonth(new Date(y, m - 1, 1)), style: { width: 30, height: 30, borderRadius: '50%', border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 13, color: PD.text })),
+                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14.5, color: PD.text, margin: 0 } }, scheduleCalMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })),
+                            React.createElement("button", { onClick: () => setScheduleCalMonth(new Date(y, m + 1, 1)), style: { width: 30, height: 30, borderRadius: '50%', border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement("span", { style: { display: 'flex', transform: 'rotate(180deg)' } }, React.createElement(Icon, { name: "arrowleft", size: 13, color: PD.text })))),
+                        React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 6 } },
+                            ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => React.createElement("p", { key: i, style: { fontSize: 10.5, fontWeight: 700, color: PD.sub, textAlign: 'center', margin: 0 } }, d))),
+                        React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', rowGap: 8 } },
+                            cells.map((day, i) => {
+                                if (day === null)
+                                    return React.createElement("div", { key: 'e' + i });
+                                const dObj = new Date(y, m, day);
+                                const hours = getProviderHoursForDate(MY_PROVIDER_ID, dObj);
+                                const isTimeOff = isProviderOnTimeOff(MY_PROVIDER_ID, dObj);
+                                const closed = !hours;
+                                const isOverride = Object.prototype.hasOwnProperty.call(providerDateOverrides, dateKey(dObj));
+                                const dayBookingsCount = myActiveBookings().filter((b) => b.day === day && b.month === m && b.year === y).length;
+                                const isToday = today.getFullYear() === y && today.getMonth() === m && today.getDate() === day;
+                                return React.createElement("button", { key: day, onClick: () => setScheduleCalDay(day), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '4px 0' } },
+                                    React.createElement("span", { style: { width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, color: closed ? '#C7C7CC' : PD.text, border: isToday ? `1.5px solid ${THEME.coral}` : 'none', opacity: closed ? 0.55 : 1 } }, day),
+                                    React.createElement("div", { style: { display: 'flex', gap: 2, height: 4 } },
+                                        dayBookingsCount > 0 && React.createElement("span", { style: { width: 4, height: 4, borderRadius: 2, background: THEME.coral } }),
+                                        isOverride && React.createElement("span", { style: { width: 4, height: 4, borderRadius: 2, background: THEME.gold } }),
+                                        isTimeOff && React.createElement("span", { style: { width: 4, height: 4, borderRadius: 2, background: '#D0304A' } })));
+                            })),
+                        React.createElement("div", { style: { display: 'flex', gap: 14, marginTop: 20, flexWrap: 'wrap' } },
+                            [['Bookings', THEME.coral], ['Special hours', THEME.gold], ['Time off', '#D0304A']].map(([l, c]) => React.createElement("div", { key: l, style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                                React.createElement("span", { style: { width: 6, height: 6, borderRadius: 3, background: c } }),
+                                React.createElement("span", { style: { fontSize: 11, color: PD.sub } }, l)))));
+                }
+                else {
+                    const dObj = new Date(y, m, scheduleCalDay);
+                    const segments = buildDayTimeline(dObj);
+                    const typeColor = { open: PD.sub, booking: THEME.coral, break: THEME.gold, blocked: '#D0304A', closed: PD.sub, timeoff: '#D0304A' };
+                    body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `12px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 2 } },
+                            segments.map((seg, i) => React.createElement("div", { key: i, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: i < segments.length - 1 ? `1px solid ${PD.border}` : 'none' } },
+                                React.createElement("span", { style: { width: 8, height: 8, borderRadius: 4, background: typeColor[seg.type] || PD.sub, flexShrink: 0 } }),
+                                React.createElement("span", { style: { fontSize: 13, fontWeight: (seg.type === 'open' || seg.type === 'closed') ? 500 : 700, color: (seg.type === 'open' || seg.type === 'closed') ? PD.sub : PD.text } }, seg.label)))));
+                }
+            }
             else {
+                const weeklyOpenCount = WEEKDAY_LABELS.filter((_, i) => providerWeeklyHours[i] && providerWeeklyHours[i].length).length;
+                const todayKey = dateKey(new Date());
+                const upcomingTimeOff = providerTimeOff.filter((t) => t.endDate >= todayKey).length;
+                const upcomingSpecial = Object.keys(providerDateOverrides).filter((k) => k >= todayKey).length;
                 const SCHEDULE_MENU_ITEMS = [
-                    { id: 'weekly', title: 'Weekly Hours', sub: 'Set your regular open hours' },
-                    { id: 'breaks', title: 'Breaks', sub: 'Add lunch breaks or short breaks' },
-                    { id: 'unavailable', title: 'Unavailable Time', sub: "Block off times you're not available" },
-                    { id: 'timeOff', title: 'Time Off', sub: "Add days you'll be unavailable" },
-                    { id: 'specialHours', title: 'Special Hours', sub: 'Set different hours for specific days' },
-                    { id: 'calendar', title: 'Calendar View', sub: 'See your full schedule' },
+                    { id: 'weekly', icon: 'clock', title: 'Weekly Hours', sub: 'Set your regular working hours', status: `${weeklyOpenCount} day${weeklyOpenCount === 1 ? '' : 's'} open` },
+                    { id: 'breaks', icon: 'coffee', title: 'Breaks', sub: 'Add repeating lunch or short breaks', status: providerBreaks.length === 0 ? 'None set' : `${providerBreaks.length} active` },
+                    { id: 'unavailable', icon: 'ban', title: 'Block Time', sub: "Block a few hours you're unavailable", status: providerUnavailable.length === 0 ? 'Nothing blocked' : `${providerUnavailable.length} block${providerUnavailable.length === 1 ? '' : 's'}` },
+                    { id: 'timeOff', icon: 'briefcase', title: 'Time Off', sub: 'Take full days or multiple days off', status: upcomingTimeOff === 0 ? 'None scheduled' : `${upcomingTimeOff} upcoming` },
+                    { id: 'specialHours', icon: 'star', title: 'Special Hours', sub: 'Change your hours for a specific date', status: upcomingSpecial === 0 ? 'None set' : `${upcomingSpecial} upcoming` },
+                    { id: 'calendar', icon: 'calendar', title: 'Calendar View', sub: 'See your complete schedule', status: null },
                 ];
+                const nextOpening = getNextOpening();
+                const nextBreak = getNextBreak();
+                const nextDayOff = getNextDayOff();
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `4px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    SCHEDULE_MENU_ITEMS.map((m) => React.createElement("button", { key: m.id, onClick: () => m.id === 'calendar' ? setProviderDashboardTab('calendar') : setScheduleView(m.id), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: `1px solid ${PD.border}`, textAlign: 'left' } },
-                        React.createElement("div", null,
+                    SCHEDULE_MENU_ITEMS.map((m) => React.createElement("button", { key: m.id, onClick: () => { setScheduleView(m.id); if (m.id === 'calendar') { setScheduleCalMonth(new Date()); setScheduleCalDay(null); } }, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '15px 0', borderBottom: `1px solid ${PD.border}`, textAlign: 'left' } },
+                        React.createElement("div", { style: { width: 40, height: 40, borderRadius: 12, background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: m.icon, size: 18, color: THEME.coral })),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                             React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: PD.text, margin: 0 } }, m.title),
                             React.createElement("p", { style: { fontSize: 12, color: PD.sub, marginTop: 3 } }, m.sub)),
-                        React.createElement(Icon, { name: "chevronright", size: 16, color: '#C7C7CC' }))));
+                        m.status && React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: PD.sub, flexShrink: 0, marginRight: 2 } }, m.status),
+                        React.createElement(Icon, { name: "chevronright", size: 16, color: '#C7C7CC' }))),
+                    React.createElement("div", { style: { marginTop: 22, marginBottom: 8, border: `1px solid ${PD.border}`, borderRadius: 18, overflow: 'hidden' } },
+                        React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, textTransform: 'uppercase', margin: 0, padding: '12px 14px 0' } }, "Schedule Summary"),
+                        React.createElement("div", { style: { display: 'flex' } },
+                            [
+                                { label: 'Next Opening', value: nextOpening ? `${nextOpening.day} at ${nextOpening.time}` : 'Fully closed' },
+                                { label: 'Next Break', value: nextBreak ? `${nextBreak.day}, ${nextBreak.range}` : 'None scheduled' },
+                                { label: 'Next Day Off', value: nextDayOff ? nextDayOff.label : 'None planned' },
+                            ].map((s, i) => React.createElement("div", { key: s.label, style: { flex: 1, padding: '10px 14px 14px', borderLeft: i > 0 ? `1px solid ${PD.border}` : 'none' } },
+                                React.createElement("p", { style: { fontSize: 9.5, fontWeight: 700, color: PD.sub, letterSpacing: 0.3, margin: 0, textTransform: 'uppercase' } }, s.label),
+                                React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: PD.text, marginTop: 4, lineHeight: 1.3 } }, s.value))))));
             }
-            return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 2, background: T.background, display: 'flex', flexDirection: 'column' } }, header, providerDashboardTab !== 'overview' && tabsRow, body);
+            const scheduleDeleteConfirmModal = providerDashboardTab === 'hours' && scheduleDeleteConfirm && React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, padding: '0 32px' } },
+                React.createElement("div", { style: { width: '100%', maxWidth: 320, background: T.surface, borderRadius: 20, padding: 22, textAlign: 'center' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, margin: 0 } }, scheduleDeleteConfirm.title),
+                    React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 8, lineHeight: 1.45 } }, scheduleDeleteConfirm.message),
+                    React.createElement("button", {
+                        onClick: () => {
+                            const c = scheduleDeleteConfirm;
+                            if (c.type === 'weeklyDay') { setWeeklyDay(c.dayIdx, null); setScheduleView('weekly'); setEditDayIdx(null); setCopyHoursOpen(false); setCopyHoursTargetDays([]); }
+                            else if (c.type === 'break') deleteBreak(c.id);
+                            else if (c.type === 'unavailable') deleteUnavailable(c.id);
+                            else if (c.type === 'timeOff') deleteTimeOff(c.id);
+                            else if (c.type === 'override') removeDateOverride(c.key);
+                            setScheduleDeleteConfirm(null);
+                        }, style: { width: '100%', marginTop: 18, padding: '13px 0', borderRadius: 24, background: '#D0304A', color: '#fff', fontWeight: 700, fontSize: 14 },
+                    }, "Delete"),
+                    React.createElement("button", { onClick: () => setScheduleDeleteConfirm(null), style: { width: '100%', marginTop: 10, padding: '13px 0', borderRadius: 24, background: T.surfaceSecondary, color: T.textPrimary, fontWeight: 700, fontSize: 14 } }, "Cancel")));
+            const scheduleConflictModal = providerDashboardTab === 'hours' && scheduleConflictPrompt && React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 20, padding: '0 32px' } },
+                React.createElement("div", { style: { width: '100%', maxWidth: 320, background: T.surface, borderRadius: 20, padding: 22, textAlign: 'center' } },
+                    React.createElement("div", { style: { width: 52, height: 52, borderRadius: 26, background: 'rgba(245,166,35,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' } }, React.createElement(Icon, { name: "warningtriangle", size: 22, color: THEME.gold })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, margin: 0 } }, `This change affects ${scheduleConflictPrompt.count} existing booking${scheduleConflictPrompt.count === 1 ? '' : 's'}`),
+                    React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 8, lineHeight: 1.45 } }, "Existing bookings won't be canceled automatically. Review them and reach out to the customer if needed."),
+                    React.createElement("button", { onClick: () => { setBusinessBookingDetail(scheduleConflictPrompt.sample); setScheduleConflictPrompt(null); }, style: { width: '100%', marginTop: 18, padding: '13px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14 } }, "Review Booking"),
+                    React.createElement("button", { onClick: () => setScheduleConflictPrompt(null), style: { width: '100%', marginTop: 10, padding: '13px 0', borderRadius: 24, background: T.surfaceSecondary, color: T.textPrimary, fontWeight: 700, fontSize: 14 } }, "OK")));
+            return React.createElement("div", { key: providerDashboardTab === 'hours' ? 'schedule-' + scheduleView : undefined, className: providerDashboardTab === 'hours' ? 'avio-settings-fwd' : undefined, style: { position: 'absolute', inset: 0, zIndex: 2, background: T.background, display: 'flex', flexDirection: 'column' } }, header, providerDashboardTab !== 'overview' && tabsRow, body, scheduleDeleteConfirmModal, scheduleConflictModal);
         })(),
         providerDashboardOpen && locationDetailsOpen && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
@@ -10546,24 +10863,35 @@ function App() {
         providerDashboardOpen && hoursOverrideDraft && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
             const inputStyle3 = { width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none', background: T.inputBackground, fontFamily: 'inherit' };
+            const commitSave = () => {
+                const dObj = new Date(hoursOverrideDraft.date + 'T00:00:00');
+                const allOnDate = bookingsOverlappingOnDate(dObj, 0, 1440);
+                const conflicts = hoursOverrideDraft.closed ? allOnDate : allOnDate.filter((b) => {
+                    const s = timeLabelToMinutes(b.time);
+                    const e = s + (b.durationMinutes || 30);
+                    return !(s >= timeStrToMinutes(hoursOverrideDraft.start) && e <= timeStrToMinutes(hoursOverrideDraft.end));
+                });
+                saveDateOverride(hoursOverrideDraft.date, hoursOverrideDraft.closed ? null : { start: hoursOverrideDraft.start, end: hoursOverrideDraft.end, reason: hoursOverrideDraft.reason || '' });
+                if (conflicts.length > 0)
+                    setScheduleConflictPrompt({ count: conflicts.length, sample: conflicts[0] });
+            };
             return React.createElement("div", { onClick: () => setHoursOverrideDraft(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 11 } },
                     React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
-                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, "Date Override"),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, "Special Hours"),
                         React.createElement("div", { style: { marginBottom: 14 } },
                             React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Date"),
                             React.createElement("input", { type: "date", value: hoursOverrideDraft.date, onChange: (e) => setHoursOverrideDraft({ ...hoursOverrideDraft, date: e.target.value }), style: inputStyle3 })),
                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 } },
-                            React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: PD.text } }, "Closed this day"),
-                            React.createElement("button", { onClick: () => setHoursOverrideDraft({ ...hoursOverrideDraft, closed: !hoursOverrideDraft.closed }), style: { width: 44, height: 26, borderRadius: 13, background: hoursOverrideDraft.closed ? THEME.coral : '#E5E5EA', position: 'relative' } },
-                                React.createElement("div", { style: { position: 'absolute', top: 2, left: hoursOverrideDraft.closed ? 20 : 2, width: 22, height: 22, borderRadius: 11, background: '#fff', transition: 'left 0.15s' } }))),
+                            React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: PD.text } }, "Closed All Day"),
+                            React.createElement(ToggleSwitch, { on: hoursOverrideDraft.closed, onChange: () => setHoursOverrideDraft({ ...hoursOverrideDraft, closed: !hoursOverrideDraft.closed }) })),
                         !hoursOverrideDraft.closed && React.createElement("div", { style: { display: 'flex', gap: 10, marginBottom: 20 } },
                             React.createElement("input", { type: "time", value: hoursOverrideDraft.start, onChange: (e) => setHoursOverrideDraft({ ...hoursOverrideDraft, start: e.target.value }), style: { ...inputStyle3, flex: 1 } }),
                             React.createElement("input", { type: "time", value: hoursOverrideDraft.end, onChange: (e) => setHoursOverrideDraft({ ...hoursOverrideDraft, end: e.target.value }), style: { ...inputStyle3, flex: 1 } })),
                         React.createElement("div", { style: { marginBottom: 20 } },
                             React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Reason (optional)"),
                             React.createElement("input", { value: hoursOverrideDraft.reason || '', onChange: (e) => setHoursOverrideDraft({ ...hoursOverrideDraft, reason: e.target.value }), placeholder: "Holiday hours", style: inputStyle3 })),
-                        React.createElement("button", { onClick: () => saveDateOverride(hoursOverrideDraft.date, hoursOverrideDraft.closed ? null : { start: hoursOverrideDraft.start, end: hoursOverrideDraft.end, reason: hoursOverrideDraft.reason || '' }), style: { width: '100%', height: 50, borderRadius: 25, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, marginBottom: Object.prototype.hasOwnProperty.call(providerDateOverrides, hoursOverrideDraft.date) ? 12 : 0 } }, "Save Override"),
-                        Object.prototype.hasOwnProperty.call(providerDateOverrides, hoursOverrideDraft.date) && React.createElement("button", { onClick: () => removeDateOverride(hoursOverrideDraft.date), style: { width: '100%', height: 50, borderRadius: 25, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 14.5 } }, "Delete Special Hours")));
+                        React.createElement("button", { onClick: commitSave, style: { width: '100%', height: 50, borderRadius: 25, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, marginBottom: Object.prototype.hasOwnProperty.call(providerDateOverrides, hoursOverrideDraft.date) ? 12 : 0 } }, "Save Special Hours"),
+                        Object.prototype.hasOwnProperty.call(providerDateOverrides, hoursOverrideDraft.date) && React.createElement("button", { onClick: () => { const key = hoursOverrideDraft.date; setHoursOverrideDraft(null); setScheduleDeleteConfirm({ type: 'override', key, title: 'Delete these special hours?', message: 'This date will follow your normal Weekly Hours again.' }); }, style: { width: '100%', height: 50, borderRadius: 25, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 14.5 } }, "Delete Special Hours")));
         })(),
         providerDashboardOpen && staffFormDraft && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
@@ -10582,7 +10910,7 @@ function App() {
                             React.createElement("div", null,
                                 React.createElement("p", { style: { fontSize: 13, fontWeight: 600, color: PD.text, margin: 0 } }, "Custom hours"),
                                 React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "Off uses your shop's hours")),
-                            React.createElement("button", { onClick: () => setStaffFormDraft((prev) => ({ ...prev, customHours: prev.customHours ? null : { ...providerWeeklyHours } })), style: { width: 44, height: 26, borderRadius: 13, background: hasCustom ? THEME.coral : '#E5E5EA', position: 'relative' } },
+                            React.createElement("button", { onClick: () => setStaffFormDraft((prev) => ({ ...prev, customHours: prev.customHours ? null : Object.fromEntries(WEEKDAY_LABELS.map((_, i) => [i, providerWeeklyHours[i] ? { ...providerWeeklyHours[i][0] } : null])) })), style: { width: 44, height: 26, borderRadius: 13, background: hasCustom ? THEME.coral : '#E5E5EA', position: 'relative' } },
                                 React.createElement("div", { style: { position: 'absolute', top: 2, left: hasCustom ? 20 : 2, width: 22, height: 22, borderRadius: 11, background: '#fff', transition: 'left 0.15s' } }))),
                         hasCustom && React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 } }, WEEKDAY_LABELS.map((label, dayIdx) => {
                             const hours = staffFormDraft.customHours[dayIdx];
