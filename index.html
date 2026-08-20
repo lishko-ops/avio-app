@@ -8115,9 +8115,9 @@ function App() {
                 }));
                 const managementButtons = bookingsSubTab === 'upcoming' && shownBookings.length > 0 && React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '18px 18px 0' } },
                     React.createElement("button", { onClick: openCustomerCancelFlow, style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 13.5 } },
-                        React.createElement(Icon, { name: "x", size: 15, color: "#D0304A" }), "Cancel Bookings"),
+                        React.createElement(Icon, { name: "x", size: 15, color: "#D0304A" }), "Cancel Bookings/Tickets"),
                     React.createElement("button", { onClick: openCustomerRescheduleFlow, style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px solid ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } },
-                        React.createElement(Icon, { name: "clock", size: 15, color: THEME.coral }), "Reschedule Bookings"),
+                        React.createElement(Icon, { name: "clock", size: 15, color: THEME.coral }), "Reschedule Bookings/Tickets"),
                     React.createElement("button", { onClick: () => setCheckCancellationsOpen(true), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px solid ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } },
                         React.createElement(Icon, { name: "check", size: 15, color: THEME.coral }), "Check on Cancellations"));
                 body = React.createElement(React.Fragment, null, cards, managementButtons);
