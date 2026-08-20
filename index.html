@@ -8135,8 +8135,11 @@ function App() {
         })())),
         React.createElement("div", { key: "safeAreaBacking", style: { position: 'fixed', left: 0, right: 0, bottom: 0, height: 'calc(env(safe-area-inset-bottom) + 4px)', background: '#000', zIndex: 3, pointerEvents: 'none' } }),
         !(tab === 'connect' && activeConversationId) && (() => {
-            const navDark = showDarkChrome;
-            const navMuted = navDark ? THEME.muted : T.textSecondary;
+            // The nav bar always follows the global Light/Dark theme (T), on Home
+            // included — it must never force dark chrome on its own just because the
+            // feed behind it is a full-bleed video (that's showDarkChrome's job, and
+            // it stays scoped to the video canvas, not the nav).
+            const navMuted = T.textSecondary;
             // Single source of truth for which top-level nav section is active — every
             // nested/child screen within a section (Business → Schedule → Add Break,
             // Profile → Edit Profile, Bookings → Tickets & Passes, etc.) must keep that
@@ -8145,7 +8148,7 @@ function App() {
             const activeSection = accountType === 'business'
                 ? ((businessProfileTarget && businessProfileTarget.id === MY_PROVIDER_ID) || editBusinessProfileOpen ? 'profile' : providerDashboardOpen ? 'business' : tab)
                 : (customerProfileOpen ? 'budget' : tab);
-            return React.createElement("div", { style: { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 4, background: navDark ? '#000' : T.navigationBackground, borderTop: navDark ? '1px solid rgba(255,255,255,0.08)' : `1px solid ${T.navigationBorder}`, display: 'flex', flexDirection: 'column' } },
+            return React.createElement("div", { style: { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 4, background: T.navigationBackground, borderTop: `1px solid ${T.navigationBorder}`, display: 'flex', flexDirection: 'column' } },
             React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', paddingTop: 2, paddingLeft: 12, paddingRight: 12 } },
                 (accountType === 'business'
                     ? [{ id: 'discover', icon: 'house', label: 'Home' }, { id: 'connect', icon: 'message', label: 'Connect' }, null, { id: 'business', icon: 'grid', label: 'Business' }, { id: 'profile', icon: 'user', label: 'Profile' }]
