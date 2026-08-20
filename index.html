@@ -11276,6 +11276,12 @@ function App() {
                 onTouchCancel: endCommentPress,
                 onContextMenu: (e) => { if (isOwnComment(c)) e.preventDefault(); },
             });
+            // On touch devices, holding a finger on plain text starts the browser's own
+            // selection/callout gesture (magnifier, "Copy" bubble), which wins the race
+            // against our long-press timer and swallows the touch before it fires. Only
+            // matters on your own content, since that's the only place press-and-hold
+            // does anything.
+            const noSelectStyle = (c) => isOwnComment(c) ? { WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' } : {};
             const editingBlock = (c, textSize) => React.createElement("div", { style: { marginTop: 4 } },
                 React.createElement("textarea", { value: editingDraft, onChange: (e) => setEditingDraft(e.target.value), autoFocus: true, rows: 2, style: { width: '100%', background: 'rgba(255,255,255,0.08)', border: `1px solid ${THEME.coral}`, borderRadius: 12, padding: '8px 10px', color: CT.text, fontSize: textSize, outline: 'none', resize: 'none', fontFamily: 'inherit' } }),
                 React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 6 } },
@@ -11290,7 +11296,7 @@ function App() {
             // Replies never nest past one visual level — a reply-to-a-reply stays inside
             // the same parent thread and just carries an @mention back to whichever
             // reply it answers, instead of growing a third indentation level.
-            const replyRow = (r, rootId) => React.createElement("div", { key: r.id, ...pressProps(r), style: { display: 'flex', gap: 8, margin: '0 -8px', padding: '10px 8px', borderBottom: `1px solid ${CT.border}`, borderRadius: 10, background: pressedCommentId === r.id ? 'rgba(255,255,255,0.06)' : 'transparent', transition: 'background 0.15s ease' } },
+            const replyRow = (r, rootId) => React.createElement("div", { key: r.id, ...pressProps(r), style: { display: 'flex', gap: 8, margin: '0 -8px', padding: '10px 8px', borderBottom: `1px solid ${CT.border}`, borderRadius: 10, background: pressedCommentId === r.id ? 'rgba(255,255,255,0.06)' : 'transparent', transition: 'background 0.15s ease', ...noSelectStyle(r) } },
                 React.createElement("div", { style: { width: 26, height: 26, borderRadius: '50%', background: r.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 10.5, fontWeight: 700 } }, r.name[0]),
                 editingCommentId === r.id
                     ? React.createElement("div", { style: { flex: 1, minWidth: 0 } }, nameRow(r, 12.5), editingBlock(r, 12.5))
@@ -11304,7 +11310,7 @@ function App() {
                 const replies = repliesFor(c.id);
                 const expanded = expandedReplyThreads.has(c.id);
                 return React.createElement("div", { key: c.id, style: { borderBottom: `1px solid ${CT.border}` } },
-                    React.createElement("div", { ...pressProps(c), style: { display: 'flex', gap: 10, margin: '0 -8px', padding: '14px 8px 6px', borderRadius: 12, background: pressedCommentId === c.id ? 'rgba(255,255,255,0.06)' : 'transparent', transition: 'background 0.15s ease' } },
+                    React.createElement("div", { ...pressProps(c), style: { display: 'flex', gap: 10, margin: '0 -8px', padding: '14px 8px 6px', borderRadius: 12, background: pressedCommentId === c.id ? 'rgba(255,255,255,0.06)' : 'transparent', transition: 'background 0.15s ease', ...noSelectStyle(c) } },
                         React.createElement("div", { style: { width: 32, height: 32, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 12, fontWeight: 700 } }, c.name[0]),
                         c.deleted
                             ? React.createElement("div", { style: { flex: 1, minWidth: 0 } }, nameRow(c, 13), React.createElement("p", { style: { margin: '4px 0 0', fontSize: 13, color: CT.sub, fontStyle: 'italic' } }, "Comment deleted"))
