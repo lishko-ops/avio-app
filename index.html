@@ -439,7 +439,7 @@ const BOOKING_TYPES = ['APPOINTMENT', 'HOURLY_SESSION', 'DURATION_PACKAGE', 'REN
 // `travelEnabled` inserts the Service Location step right after date/time — only for the
 // booking types where "the provider travels to you" is a meaningful concept (a fixed venue
 // rental or a hired-out space isn't something a provider "brings" to a customer's address).
-function computeBookingStepOrder(service, staffOptions, travelEnabled) {
+function computeBookingStepOrder(service, staffOptions, travelEnabled, isHealthcare) {
     if (!service)
         return ['service'];
     const bt = service.bookingType || 'APPOINTMENT';
@@ -459,6 +459,8 @@ function computeBookingStepOrder(service, staffOptions, travelEnabled) {
     steps.push('date', 'time');
     if (travelEnabled)
         steps.push('serviceLocation');
+    if (isHealthcare)
+        steps.push('insurance');
     steps.push('info', 'review');
     return steps;
 }
@@ -1551,6 +1553,22 @@ const FEED = [
             { id: 'act-walkon', name: 'Walk-On Session (2hr)', description: 'Open play with rental gear and unlimited CO2 for two hours on the field.', durationMin: 120, minAge: 10, minPartySize: 1, maxPartySize: 24, whatsIncluded: ['Marker & mask rental', 'Coveralls', '500 paintballs'], pricingModel: 'perPerson', price: 35, bufferMin: 15, spaceIds: ['space-field'], addOns: [], sessionsByDay: dailySessions(['11:00', '14:00', '16:30'], 'space-field') },
             { id: 'act-privategroup', name: 'Private Group Package', description: 'Book the whole field for your group — up to 24 players, three hours of play.', durationMin: 180, minAge: 10, minPartySize: 8, maxPartySize: 24, whatsIncluded: ['Exclusive field access', 'Marker & mask rental for all players', '1000 paintballs per player'], pricingModel: 'flatGroup', price: 280, bufferMin: 30, spaceIds: ['space-field'], addOns: [], sessionsByDay: dailySessions(['18:00'], 'space-field') },
         ],
+    },
+    { id: 't-serenitytherapy', category: 'Healthcare / Medical', name: 'Serenity Therapy', location: 'Newark, NJ', rating: 4.9, price: 120, likes: '412', comments: 22, saves: '340', blurb: 'A calm space to work through what matters.', verified: true, distance: '1.2 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#therapy', '#newark', '#mentalhealth'], friendsBooked: 6, avatarColor: '#6C4CFC', locationMode: 'At my business location', image: 'assets/shorts/thumbs/pilates-2.jpg', video: 'assets/shorts/biz/pilates-2',
+        address: '210 Broad St, Newark, NJ 07102',
+        staff: [{ id: 't-serenitytherapy-alexr', name: 'Dr. Alex Rivera, LCSW', customHours: null }],
+        services: [
+            { id: 't-serenitytherapy-svc0', name: 'Individual Therapy', durationMin: 50, price: 150, popular: true },
+            { id: 't-serenitytherapy-svc1', name: 'Couples / Family Therapy', durationMin: 60, price: 190 },
+            { id: 't-serenitytherapy-svc2', name: 'Psychiatric Evaluation', durationMin: 75, price: 250 },
+            { id: 't-serenitytherapy-svc3', name: 'Telehealth Visit', durationMin: 45, price: 120 },
+        ],
+        acceptedInsurance: {
+            paymentAcceptance: 'insurance_and_selfpay',
+            acceptedCarrierIds: ['aetna', 'cigna', 'bcbs'],
+            acceptedGovProgramIds: ['medicare-original'],
+            medicaidByState: { 'New Jersey': ['NJ FamilyCare (Fee-for-Service)', 'Horizon NJ Health (Medicaid MCO)'] },
+        },
     },
     { id: 't-coreandflow', category: 'Educational', name: 'Core & Flow Studio', location: 'Los Angeles, CA', rating: 4.7, price: 32, likes: '560', comments: 10, saves: '569', blurb: 'Small movements, big burn.', verified: false, distance: '0.5 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#pilates', '#losangeles', '#coreworkout'], friendsBooked: 8, avatarColor: '#97C400', locationMode: 'At my business location', image: 'assets/shorts/thumbs/pilates-1.jpg', video: 'assets/shorts/biz/pilates-1',
         services: [
@@ -4826,6 +4844,88 @@ function App() {
     }, [T.background]);
     const [customerProfileView, setCustomerProfileView] = useState('main');
     const [customerProfileDraft, setCustomerProfileDraft] = useState(null);
+    // --- Healthcare: Patient Insurance Wallet ---
+    const [customerInsuranceWallet, setCustomerInsuranceWallet] = useState(() => loadLS('avio_customer_insurance_wallet', { primary: null, secondary: null }));
+    useEffect(() => { saveLS('avio_customer_insurance_wallet', customerInsuranceWallet); }, [customerInsuranceWallet]);
+    const [addInsuranceOpen, setAddInsuranceOpen] = useState(false);
+    const [addInsuranceSlot, setAddInsuranceSlot] = useState('primary'); // 'primary' | 'secondary'
+    const [addInsuranceMode, setAddInsuranceMode] = useState('choose'); // choose | scanFront | scanBack | reviewScan | manual
+    const [addInsuranceDraft, setAddInsuranceDraft] = useState(null);
+    const [addInsuranceScanFrontImg, setAddInsuranceScanFrontImg] = useState(null);
+    const [addInsuranceScanBackImg, setAddInsuranceScanBackImg] = useState(null);
+    const [addInsuranceReturnToBooking, setAddInsuranceReturnToBooking] = useState(false);
+    const addInsuranceFrontInputRef = useRef(null);
+    const addInsuranceBackInputRef = useRef(null);
+    function openAddInsurance(slot, returnToBooking) {
+        setAddInsuranceSlot(slot || 'primary');
+        setAddInsuranceMode('choose');
+        setAddInsuranceDraft({ carrierId: '', carrierName: '', planName: '', memberId: '', groupNumber: '', subscriberName: customerProfile.fullName || '', subscriberDob: '', relationship: 'self', coverageType: 'medical' });
+        setAddInsuranceScanFrontImg(null);
+        setAddInsuranceScanBackImg(null);
+        setAddInsuranceReturnToBooking(!!returnToBooking);
+        setAddInsuranceOpen(true);
+    }
+    function closeAddInsurance() {
+        setAddInsuranceOpen(false); setAddInsuranceDraft(null); setAddInsuranceMode('choose');
+        setAddInsuranceScanFrontImg(null); setAddInsuranceScanBackImg(null); setAddInsuranceReturnToBooking(false);
+    }
+    // Simulated OCR — no real card-scanning service is wired up. The patient always
+    // reviews and can correct every extracted field before saving; nothing scanned
+    // is trusted blindly, matching the "never assume OCR results are correct" rule.
+    function handleInsuranceScanFile(side, e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file)
+            return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            if (side === 'front') {
+                setAddInsuranceScanFrontImg(reader.result);
+                setAddInsuranceDraft((d) => ({
+                    ...d,
+                    carrierId: d.carrierId || 'bcbs', carrierName: d.carrierName || 'Blue Cross Blue Shield',
+                    planName: d.planName || 'PPO 500', memberId: d.memberId || ('XJR' + Math.floor(100000000 + Math.random() * 899999999)),
+                    groupNumber: d.groupNumber || String(Math.floor(10000 + Math.random() * 89999)),
+                }));
+                setAddInsuranceMode('scanBack');
+            }
+            else {
+                setAddInsuranceScanBackImg(reader.result);
+                setAddInsuranceMode('reviewScan');
+            }
+        };
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    }
+    function saveAddInsurance() {
+        if (!addInsuranceDraft || !addInsuranceDraft.carrierName.trim() || !addInsuranceDraft.memberId.trim())
+            return;
+        const card = { ...addInsuranceDraft, id: 'ins-' + Date.now() };
+        setCustomerInsuranceWallet((w) => ({ ...w, [addInsuranceSlot]: card }));
+        flashToast(addInsuranceSlot === 'primary' ? 'Primary insurance saved' : 'Secondary insurance saved');
+        const returnToBooking = addInsuranceReturnToBooking;
+        closeAddInsurance();
+        if (returnToBooking)
+            setBookingStep('insurance');
+    }
+    function removeWalletInsurance(slot) {
+        setCustomerInsuranceWallet((w) => ({ ...w, [slot]: null }));
+        flashToast('Insurance removed');
+    }
+    function editWalletInsurance(slot) {
+        const card = customerInsuranceWallet[slot];
+        if (!card) { openAddInsurance(slot); return; }
+        setAddInsuranceSlot(slot);
+        setAddInsuranceDraft({ ...card });
+        setAddInsuranceMode('manual');
+        setAddInsuranceReturnToBooking(false);
+        setAddInsuranceOpen(true);
+    }
+    function maskMemberId(id) {
+        if (!id)
+            return '';
+        const s = String(id);
+        return s.length <= 4 ? '••••' : ('•••• ' + s.slice(-4));
+    }
     const customerProfilePhotoInputRef = useRef(null);
     function handleCustomerProfilePhotoFile(e) {
         const file = e.target.files && e.target.files[0];
@@ -4839,6 +4939,8 @@ function App() {
     const [customerProfileTab, setCustomerProfileTab] = useState('thrillz');
     const [customerFollowSearch, setCustomerFollowSearch] = useState('');
     const [paymentMethod, setPaymentMethod] = useState(null);
+    const [bookingUseInsurance, setBookingUseInsurance] = useState(null); // null | 'insurance' | 'selfpay'
+    const [bookingInsuranceSlot, setBookingInsuranceSlot] = useState('primary'); // which wallet card this booking uses
     const [confirmedBooking, setConfirmedBooking] = useState(null);
     const [activityBookingTarget, setActivityBookingTarget] = useState(null);
     const [activityBookingStep, setActivityBookingStep] = useState('activity');
@@ -5420,7 +5522,7 @@ function App() {
         setProfileDrag(null);
         setBookingTarget(item);
         const staffOptions = getStaffForTarget(item);
-        const order = computeBookingStepOrder(preselectedService, staffOptions, getBusinessTravelInfo(item).enabled);
+        const order = computeBookingStepOrder(preselectedService, staffOptions, getBusinessTravelInfo(item).enabled, item.category === HEALTHCARE_CATEGORY);
         setBookingStep(preselectedService ? order[1] : 'service');
         setSelectedService(preselectedService || null);
         setSelectedStaff(null);
@@ -5429,6 +5531,8 @@ function App() {
         setSelTime(null);
         setCustomerInfo({ fullName: '', phone: isPhoneLikeIdentifier(authDraft.identifier || '') ? authDraft.identifier : '', notes: '' });
         setPaymentMethod('saved');
+        setBookingUseInsurance(null);
+        setBookingInsuranceSlot('primary');
         setConfirmedBooking(null);
         // Pure "I travel to customers" businesses have no valid "at their location" option at
         // all, so default straight to collecting the customer's address instead of defaulting
@@ -6818,6 +6922,8 @@ function App() {
                     React.createElement(SettingsDivider, null),
                     React.createElement(SettingsRow, { icon: 'card', label: 'Payment Methods', onClick: () => pushSettings('paymentMethods') }),
                     React.createElement(SettingsDivider, null),
+                    React.createElement(SettingsRow, { icon: 'shield', label: 'Insurance', onClick: () => pushSettings('insurance') }),
+                    React.createElement(SettingsDivider, null),
                     React.createElement(SettingsRow, { icon: 'helpcircle', label: 'Help Center', onClick: () => { setSForm({ helpSearch: '' }); pushSettings('helpCenter'); } }),
                     React.createElement(SettingsDivider, null),
                     React.createElement(SettingsRow, { icon: 'flag', label: 'Report a Problem', onClick: () => { setSForm({ reportIssue: null, reportMessage: '', attachment: null }); pushSettings('reportProblem'); } }),
@@ -7105,6 +7211,31 @@ function App() {
                 React.createElement("button", { className: "avio-settings-tap", onClick: () => { setSForm({ cardNumber: '', cardName: '', cardExp: '', cardCvv: '' }); pushSettings('addPaymentMethod'); }, style: { display: 'flex', alignItems: 'center', gap: 8, margin: '20px 18px 0', padding: '4px 0' } },
                     React.createElement(Icon, { name: "plus", size: 16, color: accentColor }),
                     React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: accentColor } }, "Add Payment Method")));
+        }
+        else if (view === 'insurance') {
+            title = 'Insurance';
+            const walletRow = (slot, label) => {
+                const card = customerInsuranceWallet[slot];
+                return React.createElement(SettingsGroup, { key: slot },
+                    card
+                        ? React.createElement("button", { className: "avio-settings-row", onClick: () => editWalletInsurance(slot), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 18px', textAlign: 'left', background: 'transparent' } },
+                            React.createElement("div", { style: { width: 36, height: 36, borderRadius: 10, background: slot === 'secondary' ? ST.card : accentColor, border: slot === 'secondary' ? `1px solid ${ST.border}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "shield", size: 16, color: slot === 'secondary' ? ST.text : '#fff' })),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: ST.text, margin: 0 } }, card.carrierName),
+                                React.createElement("p", { style: { fontSize: 11.5, color: ST.sub, margin: '2px 0 0' } }, `${card.planName ? card.planName + ' · ' : ''}Member ID ${maskMemberId(card.memberId)}`)),
+                            React.createElement(Icon, { name: "chevronright", size: 16, color: ST.sub }))
+                        : React.createElement(SettingsRow, { icon: 'plus', label: `Add ${label}`, onClick: () => openAddInsurance(slot) }));
+            };
+            body = scroll(
+                gap(6), pad(React.createElement("p", { style: { fontSize: 12.5, color: ST.sub, lineHeight: 1.5, marginBottom: 4 } }, "Add the insurance you'd like to use when booking with healthcare providers on Bookvado.")),
+                React.createElement("div", { style: { marginTop: 14 } }, React.createElement(SettingsSectionLabel, { text: 'Primary Insurance' }), walletRow('primary', 'Primary Insurance')),
+                customerInsuranceWallet.primary && React.createElement("div", { style: { marginTop: 18 } }, React.createElement(SettingsSectionLabel, { text: 'Secondary Insurance' }), walletRow('secondary', 'Secondary Insurance')),
+                (customerInsuranceWallet.primary || customerInsuranceWallet.secondary) && pad(React.createElement("button", { onClick: () => setSForm({ confirmRemoveInsuranceSlot: customerInsuranceWallet.secondary ? 'secondary' : 'primary' }), style: { marginTop: 20, fontSize: 12.5, fontWeight: 700, color: '#D0304A' } }, `Remove ${customerInsuranceWallet.secondary ? 'Secondary' : 'Primary'} Insurance`)),
+                settingsForm.confirmRemoveInsuranceSlot && pad(React.createElement("div", { style: { marginTop: 14 } },
+                    React.createElement("p", { style: { fontSize: 12.5, color: ST.sub, marginBottom: 12 } }, "Remove this insurance from your wallet? This can't be undone."),
+                    React.createElement("div", { style: { display: 'flex', gap: 10 } },
+                        React.createElement("div", { style: { flex: 1 } }, React.createElement(SettingsSecondaryButton, { label: 'Cancel', onClick: () => setSForm({ confirmRemoveInsuranceSlot: null }) })),
+                        React.createElement("div", { style: { flex: 1 } }, React.createElement(SettingsPrimaryButton, { label: 'Remove', danger: true, onClick: () => { removeWalletInsurance(settingsForm.confirmRemoveInsuranceSlot); setSForm({ confirmRemoveInsuranceSlot: null }); } }))))));
         }
         else if (view === 'cardDetails') {
             const pm = settingsPrefs.paymentMethods.find((x) => x.id === params.id);
@@ -9344,9 +9475,10 @@ function App() {
                 service: 'Book', staff: 'Choose Your Barber', guests: 'Number of Guests',
                 rentalReturn: 'Return Date', venueDetails: 'Event Details', variableOptions: 'Service Details',
                 date: 'Choose Date', time: 'Choose Time', serviceLocation: 'Service Location', info: 'Your Information',
+                insurance: 'Coverage', addInsurance: 'Add Your Insurance',
                 review: isQuoteBooking ? 'Review Request' : 'Review Booking', paymentPicker: 'Payment Method', success: '',
             };
-            const STEP_ORDER = selectedService ? computeBookingStepOrder(selectedService, staffOptions, travelInfo.enabled) : ['service'];
+            const STEP_ORDER = selectedService ? computeBookingStepOrder(selectedService, staffOptions, travelInfo.enabled, bookingTarget.category === HEALTHCARE_CATEGORY) : ['service'];
             function goBack() {
                 if (bookingStep === 'paymentPicker') { setBookingStep('review'); return; }
                 const idx = STEP_ORDER.indexOf(bookingStep);
@@ -9585,6 +9717,32 @@ function App() {
                     React.createElement("p", { style: { fontSize: pureMobile ? 15 : 12.5, fontWeight: pureMobile ? 700 : 700, color: BF.text, margin: '0 0 14px' } }, pureMobile ? `Where should ${bookingTarget.name} come?` : "Where should this happen?"),
                     chooser, addressFields);
             }
+            else if (bookingStep === 'insurance') {
+                const optionCard = (id, title, sub) => {
+                    const active = bookingUseInsurance === id;
+                    return React.createElement("button", { key: id, onClick: () => setBookingUseInsurance(id), style: { display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '14px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${BF.border}`, textAlign: 'left', marginBottom: 8 } },
+                        React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement("div", { style: { width: 7, height: 7, borderRadius: '50%', background: '#fff' } })),
+                        React.createElement("div", { style: { flex: 1 } },
+                            React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: BF.text, margin: 0 } }, title),
+                            React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 2 } }, sub)));
+                };
+                const walletCard = customerInsuranceWallet[bookingInsuranceSlot];
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
+                    React.createElement("p", { style: { fontSize: 12, color: BF.sub, marginBottom: 14 } }, "How will you pay for this visit?"),
+                    optionCard('insurance', 'Use Insurance', "Bill your health plan for this visit"),
+                    optionCard('selfpay', 'Self Pay', "I'll pay out of pocket"),
+                    bookingUseInsurance === 'insurance' && React.createElement("div", { style: { marginTop: 18 } },
+                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: BF.sub, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 10 } }, "Your Insurance"),
+                        walletCard
+                            ? React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, border: `1px solid ${BF.border}` } },
+                                React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "shield", size: 18, color: "#fff" })),
+                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                    React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BF.text, margin: 0 } }, walletCard.carrierName),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 2 } }, `${walletCard.planName ? walletCard.planName + ' · ' : ''}Member ID ${maskMemberId(walletCard.memberId)}`)),
+                                React.createElement("button", { onClick: () => openAddInsurance(bookingInsuranceSlot, true), style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral, flexShrink: 0 } }, "Change"))
+                            : React.createElement("button", { onClick: () => openAddInsurance('primary', true), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 0', borderRadius: 14, border: `1.5px dashed ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } },
+                                React.createElement(Icon, { name: "plus", size: 15, color: THEME.coral }), "Add Your Insurance")));
+            }
             else if (bookingStep === 'info') {
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
                     React.createElement("p", { style: { fontSize: 12, color: BF.sub, marginBottom: 18, marginTop: -4 } }, "We'll contact you about your booking."),
@@ -9730,6 +9888,10 @@ function App() {
                 // this is the one gate that actually prevents a mobile booking from confirming
                 // without a real customer location.
                 const ready = customerServiceLocation === 'business' || (addressComplete && !outOfServiceArea);
+                footer = footerWrap(React.createElement("button", { disabled: !ready, onClick: goNext, style: ctaStyle(ready) }, "Continue"));
+            }
+            else if (bookingStep === 'insurance') {
+                const ready = bookingUseInsurance === 'selfpay' || (bookingUseInsurance === 'insurance' && !!customerInsuranceWallet[bookingInsuranceSlot]);
                 footer = footerWrap(React.createElement("button", { disabled: !ready, onClick: goNext, style: ctaStyle(ready) }, "Continue"));
             }
             else if (bookingStep === 'info') {
@@ -10840,6 +11002,83 @@ function App() {
                             US_STATES.map((s) => React.createElement("button", { key: s, onClick: () => { setInsuranceMedicaidState(s); setInsuranceStatePickerOpen(false); }, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '12px 4px', borderBottom: `1px solid ${T.border}`, textAlign: 'left' } },
                                 React.createElement("span", { style: { fontSize: 14, color: T.textPrimary, fontWeight: s === insuranceMedicaidState ? 700 : 400 } }, s),
                                 s === insuranceMedicaidState && React.createElement(Icon, { name: "check", size: 15, color: THEME.coral })))))));
+        })(),
+        addInsuranceOpen && addInsuranceDraft && (() => {
+            const IC = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const RELATIONSHIPS = [['self', 'Self'], ['spouse', 'Spouse'], ['child', 'Child'], ['other', 'Other']];
+            const COVERAGE_TYPES = [['medical', 'Medical'], ['dental', 'Dental'], ['vision', 'Vision'], ['behavioral', 'Behavioral Health']];
+            const back = () => {
+                if (addInsuranceMode === 'choose') closeAddInsurance();
+                else if (addInsuranceMode === 'scanBack') setAddInsuranceMode('scanFront');
+                else if (addInsuranceMode === 'reviewScan') setAddInsuranceMode('scanBack');
+                else setAddInsuranceMode('choose');
+            };
+            const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${IC.border}` } },
+                React.createElement("button", { onClick: back, style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 17, color: IC.text })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: IC.text, margin: 0 } }, addInsuranceSlot === 'secondary' ? 'Add Secondary Insurance' : 'Add Your Insurance'));
+            const fieldWrap3 = (label, node) => React.createElement("div", { style: { marginBottom: 14 } },
+                React.createElement("label", { style: { fontSize: 11, fontWeight: 700, color: IC.sub, textTransform: 'uppercase', letterSpacing: 0.4, display: 'block', marginBottom: 6 } }, label), node);
+            const inputStyle3 = { width: '100%', border: `1px solid ${IC.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 13.5, color: IC.text, outline: 'none', background: T.inputBackground, fontFamily: 'inherit' };
+            const chipGroup = (options, value, onChange) => React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
+                options.map(([id, label]) => React.createElement("button", { key: id, onClick: () => onChange(id), style: { padding: '9px 14px', borderRadius: 16, background: value === id ? THEME.coral : T.surfaceSecondary, border: `1px solid ${value === id ? THEME.coral : IC.border}` } },
+                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: value === id ? '#fff' : IC.text } }, label))));
+            let body, footer;
+            if (addInsuranceMode === 'choose') {
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '20px 18px' } },
+                    React.createElement("p", { style: { fontSize: 12.5, color: IC.sub, marginBottom: 16 } }, "Add your insurance card so we can check your coverage before your visit."),
+                    React.createElement("button", { onClick: () => setAddInsuranceMode('scanFront'), style: { width: '100%', border: `1.5px solid ${IC.border}`, borderRadius: 18, padding: '20px 16px', display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12, textAlign: 'left' } },
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: 'rgba(151,196,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "camera", size: 20, color: THEME.coral })),
+                        React.createElement("div", { style: { flex: 1 } },
+                            React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: IC.text, margin: 0 } }, "Scan Insurance Card"),
+                            React.createElement("p", { style: { fontSize: 11.5, color: IC.sub, marginTop: 2 } }, "Take a photo of the front and back")),
+                        React.createElement(Icon, { name: "chevronright", size: 14, color: IC.sub })),
+                    React.createElement("button", { onClick: () => setAddInsuranceMode('manual'), style: { width: '100%', border: `1.5px solid ${IC.border}`, borderRadius: 18, padding: '20px 16px', display: 'flex', alignItems: 'center', gap: 14, textAlign: 'left' } },
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "pencil", size: 18, color: IC.text })),
+                        React.createElement("div", { style: { flex: 1 } },
+                            React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: IC.text, margin: 0 } }, "Enter Manually"),
+                            React.createElement("p", { style: { fontSize: 11.5, color: IC.sub, marginTop: 2 } }, "Type in your insurance details")),
+                        React.createElement(Icon, { name: "chevronright", size: 14, color: IC.sub })),
+                    React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 22, padding: 12, borderRadius: 12, background: T.surfaceSecondary } },
+                        React.createElement(Icon, { name: "lock", size: 14, color: IC.sub }),
+                        React.createElement("p", { style: { fontSize: 11, color: IC.sub, lineHeight: 1.4, flex: 1 } }, "Your insurance information is kept private and only shared with your provider when needed for your care.")));
+            }
+            else if (addInsuranceMode === 'scanFront' || addInsuranceMode === 'scanBack') {
+                const side = addInsuranceMode === 'scanFront' ? 'front' : 'back';
+                const img = side === 'front' ? addInsuranceScanFrontImg : addInsuranceScanBackImg;
+                const inputRef = side === 'front' ? addInsuranceFrontInputRef : addInsuranceBackInputRef;
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '20px 18px', display: 'flex', flexDirection: 'column', alignItems: 'center' } },
+                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: IC.text, margin: '0 0 6px' } }, `Scan the ${side} of your card`),
+                    React.createElement("p", { style: { fontSize: 12, color: IC.sub, marginBottom: 18, textAlign: 'center' } }, "Make sure all four corners are visible and the text is easy to read."),
+                    React.createElement("button", { onClick: () => inputRef.current && inputRef.current.click(), style: { width: '100%', maxWidth: 280, aspectRatio: '1.6', borderRadius: 18, border: `2px dashed ${THEME.coral}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, background: img ? `center/cover url(${img})` : T.surfaceSecondary, overflow: 'hidden' } },
+                        !img && React.createElement(React.Fragment, null,
+                            React.createElement(Icon, { name: "camera", size: 26, color: THEME.coral }),
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, `Scan ${side === 'front' ? 'Front' : 'Back'}`))),
+                    React.createElement("input", { ref: inputRef, type: "file", accept: "image/*", capture: "environment", style: { display: 'none' }, onChange: (e) => handleInsuranceScanFile(side, e) }));
+                footer = React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)' } },
+                    React.createElement("button", { onClick: () => inputRef.current && inputRef.current.click(), style: { width: '100%', height: 52, borderRadius: 26, background: T.textPrimary, color: T.background, fontWeight: 700, fontSize: 14.5 } }, `Scan ${side === 'front' ? 'Front' : 'Back'}`));
+            }
+            else {
+                const isReview = addInsuranceMode === 'reviewScan';
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
+                    isReview && React.createElement("div", { style: { display: 'flex', gap: 8, marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(46,155,255,0.08)' } },
+                        React.createElement(Icon, { name: "info", size: 15, color: THEME.blue }),
+                        React.createElement("p", { style: { fontSize: 11.5, color: IC.sub, lineHeight: 1.4, flex: 1 } }, "We filled this in from your card. Please review and correct anything that's wrong before saving.")),
+                    React.createElement("div", { style: { display: 'inline-block', padding: '4px 10px', borderRadius: 10, background: addInsuranceSlot === 'secondary' ? T.surfaceSecondary : 'rgba(151,196,0,0.12)', marginBottom: 14 } },
+                        React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: addInsuranceSlot === 'secondary' ? IC.text : THEME.coral } }, addInsuranceSlot === 'secondary' ? 'Secondary Insurance' : 'Primary Insurance')),
+                    fieldWrap3("Insurance Carrier", React.createElement("input", { value: addInsuranceDraft.carrierName, onChange: (e) => setAddInsuranceDraft((d) => ({ ...d, carrierName: e.target.value })), placeholder: "e.g. Aetna, Blue Cross Blue Shield", style: inputStyle3 })),
+                    fieldWrap3("Plan (optional)", React.createElement("input", { value: addInsuranceDraft.planName, onChange: (e) => setAddInsuranceDraft((d) => ({ ...d, planName: e.target.value })), placeholder: "e.g. PPO 500", style: inputStyle3 })),
+                    React.createElement("div", { style: { display: 'flex', gap: 10 } },
+                        React.createElement("div", { style: { flex: 1 } }, fieldWrap3("Member ID", React.createElement("input", { value: addInsuranceDraft.memberId, onChange: (e) => setAddInsuranceDraft((d) => ({ ...d, memberId: e.target.value })), placeholder: "Member ID", style: inputStyle3 }))),
+                        React.createElement("div", { style: { flex: 1 } }, fieldWrap3("Group Number", React.createElement("input", { value: addInsuranceDraft.groupNumber, onChange: (e) => setAddInsuranceDraft((d) => ({ ...d, groupNumber: e.target.value })), placeholder: "Group #", style: inputStyle3 })))),
+                    fieldWrap3("Subscriber Name", React.createElement("input", { value: addInsuranceDraft.subscriberName, onChange: (e) => setAddInsuranceDraft((d) => ({ ...d, subscriberName: e.target.value })), placeholder: "Full name on the policy", style: inputStyle3 })),
+                    fieldWrap3("Subscriber Date of Birth", React.createElement("input", { type: "date", value: addInsuranceDraft.subscriberDob, onChange: (e) => setAddInsuranceDraft((d) => ({ ...d, subscriberDob: e.target.value })), style: inputStyle3 })),
+                    fieldWrap3("Patient Relationship to Subscriber", chipGroup(RELATIONSHIPS, addInsuranceDraft.relationship, (v) => setAddInsuranceDraft((d) => ({ ...d, relationship: v })))),
+                    fieldWrap3("Coverage Type", chipGroup(COVERAGE_TYPES, addInsuranceDraft.coverageType, (v) => setAddInsuranceDraft((d) => ({ ...d, coverageType: v })))));
+                const ready = addInsuranceDraft.carrierName.trim() && addInsuranceDraft.memberId.trim() && addInsuranceDraft.subscriberName.trim();
+                footer = React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${IC.border}` } },
+                    React.createElement("button", { disabled: !ready, onClick: saveAddInsurance, style: { width: '100%', height: 52, borderRadius: 26, background: ready ? THEME.coral : '#EDEDED', color: ready ? '#fff' : '#B5B5B8', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Save Insurance"));
+            }
+            return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 20, background: T.background, display: 'flex', flexDirection: 'column' } }, header, body, footer);
         })(),
         providerDashboardOpen && earningsInsightsOpen && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
