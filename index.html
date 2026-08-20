@@ -10174,7 +10174,7 @@ function App() {
                     React.createElement("button", { onClick: () => flashToast('No new notifications') }, React.createElement(Icon, { name: "bell", size: 19, color: PD.text })))
                 : React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${PD.border}` } },
                     React.createElement("button", { onClick: providerDashboardTab === 'hours' ? scheduleBack : () => setProviderDashboardTab('overview') }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, providerDashboardTab === 'hours' ? (scheduleView === 'calendar' && scheduleCalDay != null ? new Date(scheduleCalMonth.getFullYear(), scheduleCalMonth.getMonth(), scheduleCalDay).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : SCHEDULE_TITLES[scheduleView]) : providerDashboardTab === 'bookings' ? 'Bookings' : (bizOnboarding.businessName.trim() || 'My Business')),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, providerDashboardTab === 'hours' ? (scheduleView === 'calendar' && scheduleCalDay != null ? new Date(scheduleCalMonth.getFullYear(), scheduleCalMonth.getMonth(), scheduleCalDay).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : SCHEDULE_TITLES[scheduleView]) : ({ bookings: 'Bookings', services: 'Services', team: 'Team', calendar: 'Calendar', customerPosts: 'Customer Posts' }[providerDashboardTab] || bizOnboarding.businessName.trim() || 'My Business')),
                     providerDashboardTab === 'hours'
                         ? (scheduleView === 'breaks' ? React.createElement("button", { onClick: () => { setBreakDraft({ id: null, name: '', start: '12:00', end: '13:00', days: [1, 2, 3, 4, 5] }); setScheduleView('addBreak'); }, style: { fontSize: 13.5, fontWeight: 700, color: THEME.coral } }, "Add")
                             : scheduleView === 'unavailable' ? React.createElement("button", { onClick: () => { setUnavailableDraft({ id: null, date: dateKey(new Date()), start: '09:00', end: '10:00', repeat: 'none', reason: '' }); setScheduleView('addUnavailable'); }, style: { fontSize: 13.5, fontWeight: 700, color: THEME.coral } }, "Add")
@@ -10184,12 +10184,6 @@ function App() {
                         : providerDashboardTab === 'bookings'
                             ? React.createElement("button", { onClick: () => setProviderDashboardTab('calendar') }, React.createElement(Icon, { name: "calendar", size: 18, color: PD.text }))
                             : React.createElement("button", { onClick: () => openSettings() }, React.createElement(Icon, { name: "sliders", size: 17, color: PD.text })));
-            const tabsRow = React.createElement("div", { className: "avio-scroll", style: { flexShrink: 0, display: 'flex', gap: 20, padding: '14px 18px 0', borderBottom: `1px solid ${PD.border}`, overflowX: 'auto' } }, [{ id: 'overview', label: 'Overview' }, { id: 'bookings', label: 'Bookings' }, { id: 'services', label: 'Services' }, { id: 'hours', label: 'Schedule' }, { id: 'team', label: 'Team' }, { id: 'calendar', label: 'Calendar' }, { id: 'customerPosts', label: 'Customer Posts' }].map((t) => {
-                const active = providerDashboardTab === t.id;
-                return React.createElement("button", { key: t.id, onClick: () => { setProviderDashboardTab(t.id); if (t.id === 'hours') setScheduleView('menu'); }, style: { flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
-                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? PD.text : PD.sub, whiteSpace: 'nowrap' } }, t.label),
-                    React.createElement("div", { style: { width: active ? 22 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
-            }));
             let body;
             if (providerDashboardTab === 'overview') {
                 const totalBookings = businessBookings.length;
@@ -10234,6 +10228,24 @@ function App() {
                     [{ value: totalBookings, label: 'New Bookings' }, { value: money(totalRevenue), label: 'Earnings' }, { value: profileViews, label: 'Profile Views' }].map((s) => React.createElement("div", { key: s.label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 10px', textAlign: 'center' } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: PD.text, margin: 0 } }, s.value),
                         React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: '3px 0 0' } }, s.label))));
+                const manageSection = React.createElement("div", { style: { marginTop: 26 } },
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: '0 0 10px', textTransform: 'uppercase' } }, "Manage Your Business"),
+                    React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 18, overflow: 'hidden' } },
+                        [
+                            { id: 'bookings', icon: 'calendar', title: 'Bookings', sub: 'Manage your bookings' },
+                            { id: 'services', icon: 'grid', title: 'Services', sub: 'Manage your services' },
+                            { id: 'hours', icon: 'clock', title: 'Schedule', sub: 'Manage your availability', onClick: () => { setProviderDashboardTab('hours'); setScheduleView('menu'); } },
+                            { id: 'team', icon: 'users', title: 'Team', sub: 'Manage your team members' },
+                            { id: 'calendar', icon: 'compass', title: 'Calendar', sub: 'View your calendar' },
+                            { id: 'customerPosts', icon: 'camera', title: 'Customer Posts', sub: 'See customer posts' },
+                        ].map((s, i) => React.createElement(React.Fragment, { key: s.id },
+                            i > 0 && React.createElement("div", { style: { height: 1, background: PD.border, marginLeft: 43 } }),
+                            React.createElement("button", { onClick: s.onClick || (() => setProviderDashboardTab(s.id)), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
+                                React.createElement(Icon, { name: s.icon, size: 17, color: THEME.coral }),
+                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, s.title),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, s.sub)),
+                                React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }))))));
                 const locationServiceAreaRow = React.createElement("div", { style: { marginTop: 14, border: `1.5px solid ${THEME.coral}`, borderRadius: 18, overflow: 'hidden' } },
                     React.createElement("button", { onClick: () => setLocationDetailsOpen(true), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
                         React.createElement(Icon, { name: "mappin", size: 17, color: THEME.coral }),
@@ -10339,7 +10351,7 @@ function App() {
                                     ins.verificationStatus !== 'verified' && React.createElement("button", { onClick: (e) => { e.stopPropagation(); verifyBusinessBookingInsurance(b.id); }, style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral } }, "Verify")));
                         })));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `0 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    earningsCard, statsRow, locationServiceAreaRow, quickActionsBar, insuranceSection, ticketingSection, cancellationRequestsSection, upcomingBookingsSection);
+                    earningsCard, statsRow, manageSection, locationServiceAreaRow, quickActionsBar, insuranceSection, ticketingSection, cancellationRequestsSection, upcomingBookingsSection);
             }
             else if (providerDashboardTab === 'bookings') {
                 const BIZ_BOOKING_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'pending', label: 'Pending' }, { id: 'past', label: 'Past' }, { id: 'cancelled', label: 'Canceled' }];
@@ -10815,7 +10827,7 @@ function App() {
                     React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 8, lineHeight: 1.45 } }, "Existing bookings won't be canceled automatically. Review them and reach out to the customer if needed."),
                     React.createElement("button", { onClick: () => { setBusinessBookingDetail(scheduleConflictPrompt.sample); setScheduleConflictPrompt(null); }, style: { width: '100%', marginTop: 18, padding: '13px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14 } }, "Review Booking"),
                     React.createElement("button", { onClick: () => setScheduleConflictPrompt(null), style: { width: '100%', marginTop: 10, padding: '13px 0', borderRadius: 24, background: T.surfaceSecondary, color: T.textPrimary, fontWeight: 700, fontSize: 14 } }, "OK")));
-            return React.createElement("div", { key: providerDashboardTab === 'hours' ? 'schedule-' + scheduleView : undefined, className: providerDashboardTab === 'hours' ? 'avio-settings-fwd' : undefined, style: { position: 'absolute', inset: 0, zIndex: 2, background: T.background, display: 'flex', flexDirection: 'column' } }, header, providerDashboardTab !== 'overview' && tabsRow, body, scheduleDeleteConfirmModal, scheduleConflictModal);
+            return React.createElement("div", { key: providerDashboardTab === 'hours' ? 'schedule-' + scheduleView : undefined, className: providerDashboardTab === 'hours' ? 'avio-settings-fwd' : undefined, style: { position: 'absolute', inset: 0, zIndex: 2, background: T.background, display: 'flex', flexDirection: 'column' } }, header, body, scheduleDeleteConfirmModal, scheduleConflictModal);
         })(),
         (providerDashboardOpen || editBusinessProfileOpen) && locationDetailsOpen && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
