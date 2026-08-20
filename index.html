@@ -4316,10 +4316,6 @@ function App() {
         setHomeSearchOpen(false);
         setHomeSearchQuery('');
     }
-    function closeAllSearch() {
-        closeAiSearch();
-        setHomeSearchOpen(false);
-    }
     function openAiSearchFromHome(query) {
         setAiSearchStage('home');
         setExploreSearchOpen(true);
@@ -7517,9 +7513,7 @@ function App() {
                 React.createElement("button", { onClick: closeAiSearch, style: { position: 'absolute', left: 16, top: 'calc(env(safe-area-inset-top) + 12px)', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                     React.createElement(Icon, { name: "arrowleft", size: 20, color: "#161616" })),
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: T.textPrimary, margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 } }, "AI Search", React.createElement("span", null, "✨")),
-                stage === 'home' && React.createElement("p", { style: { fontSize: 12, color: T.textSecondary, marginTop: 4 } }, "Find anything. We'll find the best for you."),
-                React.createElement("button", { onClick: closeAllSearch, style: { position: 'absolute', right: 16, top: 'calc(env(safe-area-inset-top) + 12px)', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement(Icon, { name: "x", size: 20, color: "#161616" })));
+                stage === 'home' && React.createElement("p", { style: { fontSize: 12, color: T.textSecondary, marginTop: 4 } }, "Find anything. We'll find the best for you."));
             const dateLabel = { null: 'Any time', today: 'Today', tomorrow: 'Tomorrow', weekend: 'This weekend' }[aiSearchFilters.date];
             const priceLabel = aiSearchFilters.maxPrice ? `Under $${aiSearchFilters.maxPrice}` : 'Any price';
             const locationLabel = aiSearchFilters.location ? (aiSearchFilters.location === 'current' ? 'Near me' : aiCapitalize(aiSearchFilters.location)) : 'Add location';
@@ -7747,9 +7741,10 @@ function App() {
             const runHomeQuery = (text) => setHomeSearchQuery(text);
             const titleBar = React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 16px) 18px 0` } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 800, fontSize: 24, color: QS.text, margin: 0 } }, "Search"),
                     React.createElement("button", { onClick: closeHomeSearch, style: { display: 'flex', width: 30, height: 30, alignItems: 'center', justifyContent: 'center' } },
-                        React.createElement(Icon, { name: "x", size: 22, color: QS.text }))));
+                        React.createElement(Icon, { name: "arrowleft", size: 22, color: QS.text })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 800, fontSize: 24, color: QS.text, margin: 0 } }, "Search"),
+                    React.createElement("div", { style: { width: 30 } })));
             const searchFieldRow = React.createElement("div", { style: { flexShrink: 0, padding: '14px 18px 0' } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: QS.chip, border: `1.5px solid ${QS.border}`, borderRadius: 18, height: 50, padding: '0 14px' } },
                     React.createElement(Icon, { name: "search", size: 17, color: QS.sub }),
@@ -8738,8 +8733,8 @@ function App() {
             catch (err) {
                 console.error('Reservation flow render error:', err);
                 return React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 12, display: 'flex', flexDirection: 'column' } },
-                    React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, display: 'flex', justifyContent: 'flex-end' } },
-                        React.createElement("button", { onClick: closeReservationFlow }, React.createElement(Icon, { name: "x", size: 20, color: RF.text }))),
+                    React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, display: 'flex', justifyContent: 'flex-start' } },
+                        React.createElement("button", { onClick: closeReservationFlow }, React.createElement(Icon, { name: "arrowleft", size: 20, color: RF.text }))),
                     React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 28px', textAlign: 'center' } },
                         React.createElement("div", { style: { width: 56, height: 56, borderRadius: '50%', background: 'rgba(208,48,74,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                             React.createElement(Icon, { name: "warningtriangle", size: 24, color: "#D0304A" })),
@@ -9551,7 +9546,7 @@ function App() {
                 const successTitle = bIsQuote ? 'Request Sent!' : "You're All Set!";
                 const successSubtitle = bIsQuote ? "The business will follow up with a personalized quote." : bIsRental ? 'Your rental is confirmed.' : bIsVenue ? 'Your venue is booked.' : 'Your booking is confirmed.';
                 body = b && React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 24px calc(env(safe-area-inset-bottom) + 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' } },
-                    React.createElement("button", { onClick: closeBookingFlow, style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', right: 0, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 18, color: BF.sub })),
+                    React.createElement("button", { onClick: closeBookingFlow, style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 0, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 18, color: BF.sub })),
                     React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', border: '2.5px solid #22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'calc(env(safe-area-inset-top) + 44px)' } }, React.createElement(Icon, { name: "check", size: 28, color: "#22C55E" })),
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: BF.text, marginTop: 20 } }, successTitle),
                     React.createElement("p", { style: { fontSize: 13, color: BF.sub, marginTop: 6 } }, successSubtitle),
@@ -9724,7 +9719,7 @@ function App() {
             else {
                 const b = confirmedActivityBooking;
                 body = b && React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 24px calc(env(safe-area-inset-bottom) + 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' } },
-                    React.createElement("button", { onClick: closeActivityBookingFlow, style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', right: 0, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 18, color: AF.sub })),
+                    React.createElement("button", { onClick: closeActivityBookingFlow, style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 0, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 18, color: AF.sub })),
                     React.createElement("div", { style: { width: 72, height: 72, borderRadius: '50%', border: '2.5px solid #22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'calc(env(safe-area-inset-top) + 44px)' } }, React.createElement(Icon, { name: "check", size: 28, color: "#22C55E" })),
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: AF.text, marginTop: 20 } }, "You're All Set!"),
                     React.createElement("p", { style: { fontSize: 13, color: AF.sub, marginTop: 6 } }, b.tickets && b.tickets.length ? (b.tickets.some((t) => t.status === 'preparing') ? "We're preparing your tickets." : "Your tickets are ready.") : "Your booking is confirmed."),
@@ -12165,7 +12160,7 @@ function App() {
             }
             return React.createElement("div", { key: "ticketDetail", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: TD.bg, zIndex: 16, display: 'flex', flexDirection: 'column' } },
                 React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 16px) 18px 10px` } },
-                    React.createElement("button", { onClick: () => setTicketDetail(null), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 20, color: TD.text })),
+                    React.createElement("button", { onClick: () => setTicketDetail(null), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: TD.text })),
                     React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: TD.sub } }, `Ticket ${idx + 1} of ${tickets.length}`),
                     React.createElement("div", { style: { width: 30 } })),
                 React.createElement("div", {
@@ -12216,9 +12211,9 @@ function App() {
             const remaining = ticket.admissionQuantity - ticket.admissionsRedeemed;
             const close = () => setTapModeTicket(null);
             return React.createElement("div", { key: "readyToTap", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 30%, #241645 0%, #150C29 55%, #0A0616 100%)', zIndex: 18, display: 'flex', flexDirection: 'column', color: '#fff' } },
-                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: `calc(env(safe-area-inset-top) + 16px) 18px 0` } },
+                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: `calc(env(safe-area-inset-top) + 16px) 18px 0` } },
                     React.createElement("button", { onClick: close, style: { width: 32, height: 32, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                        React.createElement(Icon, { name: "x", size: 17, color: "#fff" }))),
+                        React.createElement(Icon, { name: "arrowleft", size: 17, color: "#fff" }))),
                 React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px 28px calc(env(safe-area-inset-bottom) + 30px)', textAlign: 'center' } },
                     !tapJustEntered
                         ? React.createElement(React.Fragment, null,
