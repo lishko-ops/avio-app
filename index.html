@@ -1074,6 +1074,11 @@ const COMMENT_POOL = [
     { name: 'Riley', text: 'How far in advance should I book?', time: '9h', color: '#3FA6BF', likes: 1 },
     { name: 'Morgan', text: 'Followed! Can’t wait to try this.', time: '1d', color: '#F5134F', likes: 3 },
 ];
+// Demo replies attached (by commenter name) to any seeded top-level comment —
+// gives the reply system something real to expand/collapse out of the box.
+const COMMENT_REPLY_SEED = {
+    Jordan: [{ name: 'Avery', text: 'Had the same experience. 10/10!', time: '1h', color: '#2FA6A0', likes: 0 }],
+};
 function seedComments(index) {
     return [COMMENT_POOL[index % COMMENT_POOL.length], COMMENT_POOL[(index + 1) % COMMENT_POOL.length]];
 }
@@ -3809,6 +3814,9 @@ function App() {
     const [commentDraft, setCommentDraft] = useState('');
     const [commentTab, setCommentTab] = useState('community');
     const [likedCommentIds, setLikedCommentIds] = useState(() => new Set());
+    const [commentReplyTarget, setCommentReplyTarget] = useState(null); // { parentId, id, name }
+    const [expandedReplyThreads, setExpandedReplyThreads] = useState(() => new Set());
+    const commentInputRef = useRef(null);
     const [exploreCategory, setExploreCategory] = useState(null);
     const [exploreTab, setExploreTab] = useState('forYou');
     const [exploreQuickFilter, setExploreQuickFilter] = useState('forYou');
@@ -6187,9 +6195,25 @@ function App() {
             return next;
         });
     }
-    function openComments(item) { setCommentItem(item); setCommentDraft(''); setCommentTab('community'); }
+    function openComments(item) { setCommentItem(item); setCommentDraft(''); setCommentTab('community'); setCommentReplyTarget(null); setExpandedReplyThreads(new Set()); }
     function hasBookedBusiness(businessId) {
         return bookings.some((b) => b.providerId === businessId && b.status !== 'cancelled');
+    }
+    // Puts the composer into reply mode against `target` (a top-level comment or an
+    // existing reply). `parentId` is always the top-level comment's id — replies never
+    // nest beyond one visual level, so a reply-to-a-reply still attaches to the same
+    // parent thread and just carries an @mention back to whichever reply it answers.
+    function startCommentReply(parentId, target) {
+        setCommentReplyTarget({ parentId, id: target.id, name: target.name });
+        requestAnimationFrame(() => commentInputRef.current && commentInputRef.current.focus());
+    }
+    function cancelCommentReply() { setCommentReplyTarget(null); }
+    function toggleReplyThread(id) {
+        setExpandedReplyThreads((prev) => {
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
+        });
     }
     function postComment() {
         const text = commentDraft.trim();
@@ -6198,8 +6222,15 @@ function App() {
         const verified = commentTab === 'verified';
         if (verified && !hasBookedBusiness(commentItem.id))
             return;
-        setCommentsByItem((prev) => ({ ...prev, [commentItem.id]: [...(prev[commentItem.id] || []), { id: `you-${Date.now()}`, name: 'You', text, time: 'now', color: THEME.coral, likes: 0, verified }] }));
+        const replyTarget = commentReplyTarget;
+        const parentId = replyTarget ? replyTarget.parentId : null;
+        const replyToName = replyTarget && replyTarget.id !== replyTarget.parentId ? replyTarget.name : null;
+        const isBusinessReply = commentItem.mine && accountType === 'business';
+        setCommentsByItem((prev) => ({ ...prev, [commentItem.id]: [...(prev[commentItem.id] || []), { id: `you-${Date.now()}`, name: 'You', text, time: 'now', color: THEME.coral, likes: 0, verified, parentId, replyToName, isBusiness: isBusinessReply }] }));
+        if (parentId)
+            setExpandedReplyThreads((prev) => new Set(prev).add(parentId));
         setCommentDraft('');
+        setCommentReplyTarget(null);
     }
     function toggleCommentLike(key) {
         setLikedCommentIds((prev) => {
@@ -11118,11 +11149,18 @@ function App() {
         commentItem && (React.createElement("div", { onClick: () => setCommentItem(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } }, (() => {
             const idx = Math.max(0, feed.findIndex((f) => f.id === commentItem.id));
             const added = commentsByItem[commentItem.id] || [];
-            const seededCommunity = seedComments(idx).map((c, i) => ({ ...c, id: `seed-c-${commentItem.id}-${i}`, verified: false }));
-            const seededVerified = seedVerifiedComments(idx).map((c, i) => ({ ...c, id: `seed-v-${commentItem.id}-${i}`, verified: true }));
+            const withSeedReplies = (seeded) => seeded.flatMap((c) => {
+                const replySeed = COMMENT_REPLY_SEED[c.name] || [];
+                const replies = replySeed.map((r, ri) => ({ ...r, id: `${c.id}-r${ri}`, verified: c.verified, parentId: c.id, replyToName: null }));
+                return [{ ...c, parentId: null, replyToName: null }, ...replies];
+            });
+            const seededCommunity = withSeedReplies(seedComments(idx).map((c, i) => ({ ...c, id: `seed-c-${commentItem.id}-${i}`, verified: false })));
+            const seededVerified = withSeedReplies(seedVerifiedComments(idx).map((c, i) => ({ ...c, id: `seed-v-${commentItem.id}-${i}`, verified: true })));
             const communityComments = [...seededCommunity, ...added.filter((c) => !c.verified)];
             const verifiedComments = [...seededVerified, ...added.filter((c) => c.verified)];
             const activeComments = commentTab === 'verified' ? verifiedComments : communityComments;
+            const topLevelComments = activeComments.filter((c) => !c.parentId);
+            const repliesFor = (rootId) => activeComments.filter((c) => c.parentId === rootId);
             const canWriteVerified = hasBookedBusiness(commentItem.id);
             const inputLocked = commentTab === 'verified' && !canWriteVerified;
             const CT = { bg: '#141416', border: 'rgba(255,255,255,0.09)', text: '#fff', sub: 'rgba(255,255,255,0.45)' };
@@ -11137,38 +11175,65 @@ function App() {
                         React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: active ? CT.text : CT.sub } }, t.label),
                         React.createElement("span", { style: { fontSize: 10.5, color: CT.sub } }, t.sub));
                 }));
-            const commentRow = (c) => {
+            const nameRow = (c, size) => React.createElement("div", { style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 } },
+                React.createElement("span", { style: { fontWeight: 700, fontSize: size, color: CT.text } }, c.name),
+                c.isBusiness && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral, background: 'rgba(151,196,0,0.14)', borderRadius: 8, padding: '1px 6px' } }, "Business"),
+                c.verified && React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 700, color: THEME.coral } }, React.createElement(Icon, { name: "check", size: 9, color: THEME.coral }), "Verified"),
+                React.createElement("span", { style: { fontSize: 11, color: CT.sub } }, c.time));
+            const likeButton = (c, size) => {
                 const liked = likedCommentIds.has(c.id);
-                return React.createElement("div", { key: c.id, style: { display: 'flex', gap: 10, padding: '14px 0', borderBottom: `1px solid ${CT.border}` } },
-                    React.createElement("div", { style: { width: 32, height: 32, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 12, fontWeight: 700 } }, c.name[0]),
-                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 } },
-                            React.createElement("span", { style: { fontWeight: 700, fontSize: 13, color: CT.text } }, c.name),
-                            c.verified && React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 700, color: THEME.coral } }, React.createElement(Icon, { name: "check", size: 9, color: THEME.coral }), "Verified"),
-                            React.createElement("span", { style: { fontSize: 11, color: CT.sub } }, c.time)),
-                        React.createElement("p", { style: { margin: '4px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 } }, c.text),
-                        React.createElement("button", { onClick: () => flashToast('Reply — coming soon'), style: { marginTop: 6, fontSize: 11.5, fontWeight: 600, color: CT.sub } }, "Reply")),
-                    React.createElement("button", { onClick: () => toggleCommentLike(c.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 } },
-                        React.createElement(Icon, { name: "heart", size: 15, color: liked ? THEME.coral : CT.sub, fill: liked ? THEME.coral : 'none' }),
-                        React.createElement("span", { style: { fontSize: 10.5, color: CT.sub } }, (c.likes || 0) + (liked ? 1 : 0))));
+                return React.createElement("button", { onClick: () => toggleCommentLike(c.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 } },
+                    React.createElement(Icon, { name: "heart", size: size, color: liked ? THEME.coral : CT.sub, fill: liked ? THEME.coral : 'none' }),
+                    React.createElement("span", { style: { fontSize: 10.5, color: CT.sub } }, (c.likes || 0) + (liked ? 1 : 0)));
             };
+            // Replies never nest past one visual level — a reply-to-a-reply stays inside
+            // the same parent thread and just carries an @mention back to whichever
+            // reply it answers, instead of growing a third indentation level.
+            const replyRow = (r, rootId) => React.createElement("div", { key: r.id, style: { display: 'flex', gap: 8, padding: '10px 0', borderBottom: `1px solid ${CT.border}` } },
+                React.createElement("div", { style: { width: 26, height: 26, borderRadius: '50%', background: r.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 10.5, fontWeight: 700 } }, r.name[0]),
+                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                    nameRow(r, 12.5),
+                    React.createElement("p", { style: { margin: '3px 0 0', fontSize: 12.5, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 } },
+                        r.replyToName && React.createElement("span", { style: { color: THEME.coral, fontWeight: 600 } }, `@${r.replyToName} `), r.text),
+                    React.createElement("button", { onClick: () => startCommentReply(rootId, r), style: { marginTop: 5, fontSize: 11, fontWeight: 600, color: CT.sub } }, "Reply")),
+                likeButton(r, 13));
+            const commentThread = (c) => {
+                const replies = repliesFor(c.id);
+                const expanded = expandedReplyThreads.has(c.id);
+                return React.createElement("div", { key: c.id, style: { borderBottom: `1px solid ${CT.border}` } },
+                    React.createElement("div", { style: { display: 'flex', gap: 10, padding: '14px 0 6px' } },
+                        React.createElement("div", { style: { width: 32, height: 32, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 12, fontWeight: 700 } }, c.name[0]),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            nameRow(c, 13),
+                            React.createElement("p", { style: { margin: '4px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 } }, c.text),
+                            React.createElement("button", { onClick: () => startCommentReply(c.id, c), style: { marginTop: 6, fontSize: 11.5, fontWeight: 600, color: CT.sub } }, "Reply")),
+                        likeButton(c, 15)),
+                    replies.length > 0 && React.createElement("button", { onClick: () => toggleReplyThread(c.id), style: { display: 'flex', alignItems: 'center', gap: 4, margin: '0 0 10px 42px', padding: '2px 0', fontSize: 12, fontWeight: 700, color: THEME.coral } },
+                        React.createElement("span", { style: { display: 'flex', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.18s ease' } }, React.createElement(Icon, { name: "chevrondown", size: 12, color: THEME.coral })),
+                        expanded ? "Hide replies" : (replies.length === 1 ? "1 reply" : `Open ${replies.length} replies`)),
+                    expanded && React.createElement("div", { className: "avio-filter-section", style: { paddingLeft: 20 } }, replies.map((r) => replyRow(r, c.id))));
+            };
+            const replyingTo = commentReplyTarget && React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 2px 0' } },
+                React.createElement("span", { style: { fontSize: 11.5, color: CT.sub } }, `Replying to ${commentReplyTarget.name}`),
+                React.createElement("button", { onClick: cancelCommentReply, style: { width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 12, color: CT.sub })));
             return React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: CT.bg, borderRadius: '22px 22px 0 0', padding: `10px 18px calc(env(safe-area-inset-bottom) + 14px)`, maxHeight: '72%', display: 'flex', flexDirection: 'column' } },
                 React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.25)', margin: '0 auto 12px' } }),
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: CT.text, margin: 0, textAlign: 'center' } }, "Comments"),
                 tabsRow,
                 React.createElement("div", { className: "avio-scroll", style: { overflowY: 'auto', marginTop: 4, flex: 1, display: 'flex', flexDirection: 'column' } },
-                    activeComments.length === 0
+                    topLevelComments.length === 0
                         ? React.createElement("p", { style: { fontSize: 12.5, color: CT.sub, textAlign: 'center', padding: '24px 0' } }, commentTab === 'verified' ? "No verified guest comments yet." : "No comments yet.")
-                        : activeComments.map(commentRow)),
+                        : topLevelComments.map(commentThread)),
+                replyingTo,
                 inputLocked
                     ? React.createElement("div", { style: { marginTop: 14, paddingTop: 12, borderTop: `1px solid ${CT.border}`, textAlign: 'center' } },
                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 } },
                             React.createElement(Icon, { name: "lock", size: 12, color: CT.sub }),
                             React.createElement("span", { style: { fontSize: 12, color: CT.sub } }, "Book this place to leave a verified comment.")),
                         React.createElement("div", { style: { width: '100%', background: 'rgba(255,255,255,0.06)', border: `1px solid ${CT.border}`, borderRadius: 20, padding: '11px 14px', color: CT.sub, fontSize: 13, textAlign: 'left' } }, "Add a comment..."))
-                    : React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, paddingTop: 12, borderTop: `1px solid ${CT.border}` } },
+                    : React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: commentReplyTarget ? 6 : 14, paddingTop: 12, borderTop: `1px solid ${CT.border}` } },
                         React.createElement("div", { style: { width: 28, height: 28, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 11, fontWeight: 700 } }, "Y"),
-                        React.createElement("input", { value: commentDraft, onChange: (e) => setCommentDraft(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') postComment(); }, placeholder: "Add a comment...", style: { flex: 1, background: 'rgba(255,255,255,0.08)', border: `1px solid ${CT.border}`, borderRadius: 20, padding: '9px 14px', color: CT.text, fontSize: 13, outline: 'none', minWidth: 0 } }),
+                        React.createElement("input", { ref: commentInputRef, value: commentDraft, onChange: (e) => setCommentDraft(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') postComment(); }, placeholder: commentReplyTarget ? `Reply to ${commentReplyTarget.name}…` : "Add a comment...", style: { flex: 1, background: 'rgba(255,255,255,0.08)', border: `1px solid ${CT.border}`, borderRadius: 20, padding: '9px 14px', color: CT.text, fontSize: 13, outline: 'none', minWidth: 0 } }),
                         React.createElement("button", { onClick: postComment, style: { width: 32, height: 32, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                             React.createElement(Icon, { name: "send", size: 14, color: "#fff" }))));
         })())),
