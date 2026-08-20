@@ -4704,12 +4704,12 @@ function App() {
         if (feedCoveredByOverlay)
             Object.values(shortVideoRefs.current).forEach((v) => { if (v) v.pause(); });
     }, [feedCoveredByOverlay]);
-    // The Thrillz feed keeps its always-dark, video-first chrome; every other screen (including
-    // this same tab once an overlay covers the video) follows the user's light/dark preference.
-    const showDarkChrome = session && !showSplash && tab === 'discover' && !feedCoveredByOverlay;
+    // The page background always follows the user's Light/Dark preference, Thrillz
+    // feed included — the video canvas itself paints its own black behind the
+    // video, so the body doesn't need to force dark chrome to keep it looking right.
     useEffect(() => {
-        document.body.style.background = showDarkChrome ? '#000' : T.background;
-    }, [showDarkChrome, T.background]);
+        document.body.style.background = T.background;
+    }, [T.background]);
     const [customerProfileView, setCustomerProfileView] = useState('main');
     const [customerProfileDraft, setCustomerProfileDraft] = useState(null);
     const [customerProfileTab, setCustomerProfileTab] = useState('thrillz');
@@ -8133,12 +8133,12 @@ function App() {
                 header, tabsRow, body);
             return scrollContent;
         })())),
-        React.createElement("div", { key: "safeAreaBacking", style: { position: 'fixed', left: 0, right: 0, bottom: 0, height: 'calc(env(safe-area-inset-bottom) + 4px)', background: '#000', zIndex: 3, pointerEvents: 'none' } }),
+        React.createElement("div", { key: "safeAreaBacking", style: { position: 'fixed', left: 0, right: 0, bottom: 0, height: 'calc(env(safe-area-inset-bottom) + 4px)', background: T.background, zIndex: 3, pointerEvents: 'none' } }),
         !(tab === 'connect' && activeConversationId) && (() => {
             // The nav bar always follows the global Light/Dark theme (T), on Home
             // included — it must never force dark chrome on its own just because the
-            // feed behind it is a full-bleed video (that's showDarkChrome's job, and
-            // it stays scoped to the video canvas, not the nav).
+            // feed behind it is a full-bleed video (the video canvas paints its own
+            // black background directly, so nothing else needs to fake it).
             const navMuted = T.textSecondary;
             // Single source of truth for which top-level nav section is active — every
             // nested/child screen within a section (Business → Schedule → Add Break,
