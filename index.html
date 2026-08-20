@@ -7975,8 +7975,7 @@ function App() {
             const searchRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, padding: '0 18px', marginTop: 14 } },
                 React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: T.surfaceSecondary, borderRadius: 16, height: 40, padding: '0 12px' } },
                     React.createElement(Icon, { name: "search", size: 15, color: CN.sub }),
-                    React.createElement("input", { value: connectSearch, onChange: (e) => setConnectSearch(e.target.value), placeholder: "Search conversations", style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: CN.text } })),
-                React.createElement("button", { onClick: () => flashToast('Filter conversations — coming soon'), style: { width: 40, height: 40, borderRadius: 16, background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "sliders", size: 15, color: CN.text })));
+                    React.createElement("input", { value: connectSearch, onChange: (e) => setConnectSearch(e.target.value), placeholder: "Search conversations", style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: CN.text } })));
             const avatarRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 16, overflowX: 'auto', padding: '16px 18px 0' } },
                 React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 } },
                     React.createElement("div", { style: { position: 'relative', width: 46, height: 46 } },
