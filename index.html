@@ -7985,7 +7985,7 @@ function App() {
                 React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: T.surfaceSecondary, borderRadius: 16, height: 40, padding: '0 12px' } },
                     React.createElement(Icon, { name: "search", size: 15, color: CN.sub }),
                     React.createElement("input", { value: connectSearch, onChange: (e) => setConnectSearch(e.target.value), placeholder: "Search conversations", style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: CN.text } })));
-            const filters = [{ id: 'all', label: 'All' }, { id: 'unread', label: 'Unread' }, { id: 'bookings', label: 'Bookings' }, { id: 'active', label: 'Active' }, { id: 'requests', label: 'Requests' }];
+            const filters = [{ id: 'all', label: 'All' }, { id: 'unread', label: 'Unread' }];
             const filterRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 18px 0' } }, filters.map((f) => {
                 const active = connectFilter === f.id;
                 return React.createElement("button", { key: f.id, onClick: () => setConnectFilter(f.id), style: { flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 16, background: active ? THEME.coral : T.surfaceSecondary, color: active ? '#fff' : CN.text } }, f.label);
