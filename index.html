@@ -1274,6 +1274,7 @@ function dateKey(d) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 const MY_PROVIDER_ID = 'me-business';
+const MY_USER_ID = 'me-customer';
 const WEEKDAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DEFAULT_WEEKLY_HOURS = { 0: null, 1: [{ start: '09:00', end: '17:00' }], 2: [{ start: '09:00', end: '17:00' }], 3: [{ start: '09:00', end: '17:00' }], 4: [{ start: '09:00', end: '17:00' }], 5: [{ start: '09:00', end: '17:00' }], 6: null };
 
@@ -3817,6 +3818,30 @@ function App() {
     const [commentReplyTarget, setCommentReplyTarget] = useState(null); // { parentId, id, name }
     const [expandedReplyThreads, setExpandedReplyThreads] = useState(() => new Set());
     const commentInputRef = useRef(null);
+    const [pressedCommentId, setPressedCommentId] = useState(null);
+    const [commentActionTarget, setCommentActionTarget] = useState(null); // id of comment/reply with action sheet open
+    const [editingCommentId, setEditingCommentId] = useState(null);
+    const [editingDraft, setEditingDraft] = useState('');
+    const [commentDeleteConfirmId, setCommentDeleteConfirmId] = useState(null);
+    const commentPressTimerRef = useRef(null);
+    // The action sheet mounts directly under the finger/cursor at the moment the
+    // long-press timer fires, so the mouseup/touchend that follows can land on it
+    // (or land wherever it used to be, after it unmounts on a synchronous state
+    // change) and synthesize a stray click into whatever's now underneath —
+    // closing the sheet, or the whole Comments modal, the instant it opens. Swallow
+    // exactly one click right after a long press fires to prevent that ghost click.
+    const suppressNextClickRef = useRef(false);
+    useEffect(() => {
+        const handler = (e) => {
+            if (suppressNextClickRef.current) {
+                suppressNextClickRef.current = false;
+                e.stopPropagation();
+                e.preventDefault();
+            }
+        };
+        window.addEventListener('click', handler, true);
+        return () => window.removeEventListener('click', handler, true);
+    }, []);
     const [exploreCategory, setExploreCategory] = useState(null);
     const [exploreTab, setExploreTab] = useState('forYou');
     const [exploreQuickFilter, setExploreQuickFilter] = useState('forYou');
@@ -6195,7 +6220,7 @@ function App() {
             return next;
         });
     }
-    function openComments(item) { setCommentItem(item); setCommentDraft(''); setCommentTab('community'); setCommentReplyTarget(null); setExpandedReplyThreads(new Set()); }
+    function openComments(item) { setCommentItem(item); setCommentDraft(''); setCommentTab('community'); setCommentReplyTarget(null); setExpandedReplyThreads(new Set()); setCommentActionTarget(null); setEditingCommentId(null); setCommentDeleteConfirmId(null); }
     function hasBookedBusiness(businessId) {
         return bookings.some((b) => b.providerId === businessId && b.status !== 'cancelled');
     }
@@ -6226,9 +6251,69 @@ function App() {
         const parentId = replyTarget ? replyTarget.parentId : null;
         const replyToName = replyTarget && replyTarget.id !== replyTarget.parentId ? replyTarget.name : null;
         const isBusinessReply = commentItem.mine && accountType === 'business';
-        setCommentsByItem((prev) => ({ ...prev, [commentItem.id]: [...(prev[commentItem.id] || []), { id: `you-${Date.now()}`, name: 'You', text, time: 'now', color: THEME.coral, likes: 0, verified, parentId, replyToName, isBusiness: isBusinessReply }] }));
+        setCommentsByItem((prev) => ({ ...prev, [commentItem.id]: [...(prev[commentItem.id] || []), { id: `you-${Date.now()}`, authorId: MY_USER_ID, name: 'You', text, time: 'now', color: THEME.coral, likes: 0, verified, parentId, replyToName, isBusiness: isBusinessReply }] }));
         setCommentDraft('');
         setCommentReplyTarget(null);
+    }
+    // Ownership is decided by authorId only — never by display name, "You" text,
+    // or list position — so a malicious rename/reorder can't grant edit/delete access.
+    function isOwnComment(c) { return !!c && c.authorId === MY_USER_ID; }
+    function startCommentPress(c) {
+        if (!isOwnComment(c) || c.deleted || editingCommentId)
+            return;
+        setPressedCommentId(c.id);
+        commentPressTimerRef.current = setTimeout(() => {
+            if (navigator.vibrate)
+                navigator.vibrate(10);
+            suppressNextClickRef.current = true;
+            setCommentActionTarget(c.id);
+            setPressedCommentId(null);
+            commentPressTimerRef.current = null;
+        }, 500);
+    }
+    function endCommentPress() {
+        if (commentPressTimerRef.current) {
+            clearTimeout(commentPressTimerRef.current);
+            commentPressTimerRef.current = null;
+        }
+        setPressedCommentId(null);
+    }
+    function closeCommentActionSheet() { setCommentActionTarget(null); }
+    function startEditComment(c) {
+        setEditingCommentId(c.id);
+        setEditingDraft(c.text);
+        setCommentActionTarget(null);
+    }
+    function cancelEditComment() { setEditingCommentId(null); setEditingDraft(''); }
+    function saveEditComment() {
+        const text = editingDraft.trim();
+        if (!text || !commentItem || !editingCommentId)
+            return;
+        setCommentsByItem((prev) => ({
+            ...prev,
+            [commentItem.id]: (prev[commentItem.id] || []).map((c) => c.id === editingCommentId && isOwnComment(c) ? { ...c, text, edited: true } : c),
+        }));
+        setEditingCommentId(null);
+        setEditingDraft('');
+    }
+    function requestDeleteComment(id) { setCommentDeleteConfirmId(id); setCommentActionTarget(null); }
+    function cancelDeleteComment() { setCommentDeleteConfirmId(null); }
+    function confirmDeleteComment() {
+        const id = commentDeleteConfirmId;
+        if (!commentItem || !id)
+            return;
+        setCommentsByItem((prev) => {
+            const list = prev[commentItem.id] || [];
+            const target = list.find((c) => c.id === id);
+            if (!target || !isOwnComment(target))
+                return prev;
+            const hasReplies = list.some((c) => c.parentId === id);
+            const nextList = target.parentId == null && hasReplies
+                ? list.map((c) => c.id === id ? { ...c, deleted: true, text: '', edited: false } : c)
+                : list.filter((c) => c.id !== id);
+            return { ...prev, [commentItem.id]: nextList };
+        });
+        setCommentDeleteConfirmId(null);
     }
     function toggleCommentLike(key) {
         setLikedCommentIds((prev) => {
@@ -11177,7 +11262,25 @@ function App() {
                 React.createElement("span", { style: { fontWeight: 700, fontSize: size, color: CT.text } }, c.name),
                 c.isBusiness && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral, background: 'rgba(151,196,0,0.14)', borderRadius: 8, padding: '1px 6px' } }, "Business"),
                 c.verified && React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 700, color: THEME.coral } }, React.createElement(Icon, { name: "check", size: 9, color: THEME.coral }), "Verified"),
-                React.createElement("span", { style: { fontSize: 11, color: CT.sub } }, c.time));
+                React.createElement("span", { style: { fontSize: 11, color: CT.sub } }, c.time),
+                c.edited && React.createElement("span", { style: { fontSize: 11, color: CT.sub } }, "· Edited"));
+            // Long-press (mouse + touch) on your own comment/reply opens the Edit/Delete
+            // action sheet; a no-op on anyone else's content, so ownership is enforced
+            // by isOwnComment(authorId) rather than by which handler got attached.
+            const pressProps = (c) => ({
+                onMouseDown: () => startCommentPress(c),
+                onMouseUp: endCommentPress,
+                onMouseLeave: endCommentPress,
+                onTouchStart: () => startCommentPress(c),
+                onTouchEnd: endCommentPress,
+                onTouchCancel: endCommentPress,
+                onContextMenu: (e) => { if (isOwnComment(c)) e.preventDefault(); },
+            });
+            const editingBlock = (c, textSize) => React.createElement("div", { style: { marginTop: 4 } },
+                React.createElement("textarea", { value: editingDraft, onChange: (e) => setEditingDraft(e.target.value), autoFocus: true, rows: 2, style: { width: '100%', background: 'rgba(255,255,255,0.08)', border: `1px solid ${THEME.coral}`, borderRadius: 12, padding: '8px 10px', color: CT.text, fontSize: textSize, outline: 'none', resize: 'none', fontFamily: 'inherit' } }),
+                React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 6 } },
+                    React.createElement("button", { onClick: cancelEditComment, style: { fontSize: 12, fontWeight: 600, color: CT.sub } }, "Cancel"),
+                    React.createElement("button", { onClick: saveEditComment, disabled: !editingDraft.trim(), style: { fontSize: 12, fontWeight: 700, color: editingDraft.trim() ? THEME.coral : CT.sub } }, "Save")));
             const likeButton = (c, size) => {
                 const liked = likedCommentIds.has(c.id);
                 return React.createElement("button", { onClick: () => toggleCommentLike(c.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0 } },
@@ -11187,34 +11290,42 @@ function App() {
             // Replies never nest past one visual level — a reply-to-a-reply stays inside
             // the same parent thread and just carries an @mention back to whichever
             // reply it answers, instead of growing a third indentation level.
-            const replyRow = (r, rootId) => React.createElement("div", { key: r.id, style: { display: 'flex', gap: 8, padding: '10px 0', borderBottom: `1px solid ${CT.border}` } },
+            const replyRow = (r, rootId) => React.createElement("div", { key: r.id, ...pressProps(r), style: { display: 'flex', gap: 8, margin: '0 -8px', padding: '10px 8px', borderBottom: `1px solid ${CT.border}`, borderRadius: 10, background: pressedCommentId === r.id ? 'rgba(255,255,255,0.06)' : 'transparent', transition: 'background 0.15s ease' } },
                 React.createElement("div", { style: { width: 26, height: 26, borderRadius: '50%', background: r.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 10.5, fontWeight: 700 } }, r.name[0]),
-                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                    nameRow(r, 12.5),
-                    React.createElement("p", { style: { margin: '3px 0 0', fontSize: 12.5, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 } },
-                        r.replyToName && React.createElement("span", { style: { color: THEME.coral, fontWeight: 600 } }, `@${r.replyToName} `), r.text),
-                    React.createElement("button", { onClick: () => startCommentReply(rootId, r), style: { marginTop: 5, fontSize: 11, fontWeight: 600, color: CT.sub } }, "Reply")),
-                likeButton(r, 13));
+                editingCommentId === r.id
+                    ? React.createElement("div", { style: { flex: 1, minWidth: 0 } }, nameRow(r, 12.5), editingBlock(r, 12.5))
+                    : React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        nameRow(r, 12.5),
+                        React.createElement("p", { style: { margin: '3px 0 0', fontSize: 12.5, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 } },
+                            r.replyToName && React.createElement("span", { style: { color: THEME.coral, fontWeight: 600 } }, `@${r.replyToName} `), r.text),
+                        React.createElement("button", { onClick: () => startCommentReply(rootId, r), style: { marginTop: 5, fontSize: 11, fontWeight: 600, color: CT.sub } }, "Reply")),
+                editingCommentId !== r.id && likeButton(r, 13));
             const commentThread = (c) => {
                 const replies = repliesFor(c.id);
                 const expanded = expandedReplyThreads.has(c.id);
                 return React.createElement("div", { key: c.id, style: { borderBottom: `1px solid ${CT.border}` } },
-                    React.createElement("div", { style: { display: 'flex', gap: 10, padding: '14px 0 6px' } },
+                    React.createElement("div", { ...pressProps(c), style: { display: 'flex', gap: 10, margin: '0 -8px', padding: '14px 8px 6px', borderRadius: 12, background: pressedCommentId === c.id ? 'rgba(255,255,255,0.06)' : 'transparent', transition: 'background 0.15s ease' } },
                         React.createElement("div", { style: { width: 32, height: 32, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 12, fontWeight: 700 } }, c.name[0]),
-                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                            nameRow(c, 13),
-                            React.createElement("p", { style: { margin: '4px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 } }, c.text),
-                            React.createElement("button", { onClick: () => startCommentReply(c.id, c), style: { marginTop: 6, fontSize: 11.5, fontWeight: 600, color: CT.sub } }, "Reply")),
-                        likeButton(c, 15)),
+                        c.deleted
+                            ? React.createElement("div", { style: { flex: 1, minWidth: 0 } }, nameRow(c, 13), React.createElement("p", { style: { margin: '4px 0 0', fontSize: 13, color: CT.sub, fontStyle: 'italic' } }, "Comment deleted"))
+                            : editingCommentId === c.id
+                                ? React.createElement("div", { style: { flex: 1, minWidth: 0 } }, nameRow(c, 13), editingBlock(c, 13))
+                                : React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                    nameRow(c, 13),
+                                    React.createElement("p", { style: { margin: '4px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 } }, c.text),
+                                    React.createElement("button", { onClick: () => startCommentReply(c.id, c), style: { marginTop: 6, fontSize: 11.5, fontWeight: 600, color: CT.sub } }, "Reply")),
+                        !c.deleted && editingCommentId !== c.id && likeButton(c, 15)),
                     replies.length > 0 && React.createElement("button", { onClick: () => toggleReplyThread(c.id), style: { display: 'flex', alignItems: 'center', gap: 4, margin: '0 0 10px 42px', padding: '2px 0', fontSize: 12, fontWeight: 700, color: THEME.coral } },
                         React.createElement("span", { style: { display: 'flex', transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.18s ease' } }, React.createElement(Icon, { name: "chevrondown", size: 12, color: THEME.coral })),
                         expanded ? "Hide replies" : (replies.length === 1 ? "1 reply" : `Open ${replies.length} replies`)),
                     expanded && React.createElement("div", { className: "avio-filter-section", style: { paddingLeft: 20 } }, replies.map((r) => replyRow(r, c.id))));
             };
+            const actionTarget = commentActionTarget ? activeComments.find((c) => c.id === commentActionTarget) : null;
+            const deleteTarget = commentDeleteConfirmId ? activeComments.find((c) => c.id === commentDeleteConfirmId) : null;
             const replyingTo = commentReplyTarget && React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 2px 0' } },
                 React.createElement("span", { style: { fontSize: 11.5, color: CT.sub } }, `Replying to ${commentReplyTarget.name}`),
                 React.createElement("button", { onClick: cancelCommentReply, style: { width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 12, color: CT.sub })));
-            return React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: CT.bg, borderRadius: '22px 22px 0 0', padding: `10px 18px calc(env(safe-area-inset-bottom) + 14px)`, maxHeight: '72%', display: 'flex', flexDirection: 'column' } },
+            const sheet = React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: CT.bg, borderRadius: '22px 22px 0 0', padding: `10px 18px calc(env(safe-area-inset-bottom) + 14px)`, maxHeight: '72%', display: 'flex', flexDirection: 'column' } },
                 React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.25)', margin: '0 auto 12px' } }),
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: CT.text, margin: 0, textAlign: 'center' } }, "Comments"),
                 tabsRow,
@@ -11234,6 +11345,24 @@ function App() {
                         React.createElement("input", { ref: commentInputRef, value: commentDraft, onChange: (e) => setCommentDraft(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') postComment(); }, placeholder: commentReplyTarget ? `Reply to ${commentReplyTarget.name}…` : "Add a comment...", style: { flex: 1, background: 'rgba(255,255,255,0.08)', border: `1px solid ${CT.border}`, borderRadius: 20, padding: '9px 14px', color: CT.text, fontSize: 13, outline: 'none', minWidth: 0 } }),
                         React.createElement("button", { onClick: postComment, style: { width: 32, height: 32, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                             React.createElement(Icon, { name: "send", size: 14, color: "#fff" }))));
+            const actionSheetOverlay = actionTarget && React.createElement("div", { onClick: closeCommentActionSheet, style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 20, padding: '0 12px calc(env(safe-area-inset-bottom) + 12px)' } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%' } },
+                    React.createElement("div", { style: { background: '#1C1C1F', borderRadius: 16, overflow: 'hidden', marginBottom: 8 } },
+                        React.createElement("button", { onClick: () => startEditComment(actionTarget), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '15px 16px', borderBottom: `1px solid ${CT.border}` } },
+                            React.createElement(Icon, { name: "pencil", size: 17, color: THEME.coral }),
+                            React.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: THEME.coral } }, "Edit Comment")),
+                        React.createElement("button", { onClick: () => requestDeleteComment(actionTarget.id), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '15px 16px' } },
+                            React.createElement(Icon, { name: "trash", size: 17, color: "#D0304A" }),
+                            React.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: '#D0304A' } }, "Delete Comment"))),
+                    React.createElement("button", { onClick: closeCommentActionSheet, style: { width: '100%', background: '#1C1C1F', borderRadius: 16, padding: '15px 16px', textAlign: 'center', fontSize: 15, fontWeight: 700, color: CT.text } }, "Cancel")));
+            const deleteConfirmOverlay = deleteTarget && React.createElement("div", { onClick: cancelDeleteComment, style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 21, padding: '0 32px' } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxWidth: 300, background: '#1C1C1F', borderRadius: 18, padding: '22px 20px', textAlign: 'center' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: CT.text, margin: 0 } }, "Delete comment?"),
+                    React.createElement("p", { style: { fontSize: 12.5, color: CT.sub, marginTop: 8, lineHeight: 1.45 } }, "This action cannot be undone."),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 18 } },
+                        React.createElement("button", { onClick: cancelDeleteComment, style: { flex: 1, padding: '12px 0', borderRadius: 22, background: 'rgba(255,255,255,0.08)', color: CT.text, fontWeight: 700, fontSize: 14 } }, "Cancel"),
+                        React.createElement("button", { onClick: confirmDeleteComment, style: { flex: 1, padding: '12px 0', borderRadius: 22, background: '#D0304A', color: '#fff', fontWeight: 700, fontSize: 14 } }, "Delete"))));
+            return React.createElement(React.Fragment, null, sheet, actionSheetOverlay, deleteConfirmOverlay);
         })())),
         filterSheetOpen && (React.createElement("div", { className: "avio-filter-backdrop", onClick: () => setFilterSheetOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 12, display: 'flex', alignItems: 'flex-end' } }, (() => {
             const FC = { bg: '#FFFFFF', card: '#FFFFFF', chip: '#FAFAFA', text: '#161616', sub: '#8A8A8E', border: '#E6E6EA' };
