@@ -4712,6 +4712,16 @@ function App() {
     }, [T.background]);
     const [customerProfileView, setCustomerProfileView] = useState('main');
     const [customerProfileDraft, setCustomerProfileDraft] = useState(null);
+    const customerProfilePhotoInputRef = useRef(null);
+    function handleCustomerProfilePhotoFile(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file)
+            return;
+        const reader = new FileReader();
+        reader.onload = () => setCustomerProfileDraft((d) => ({ ...d, avatarPhoto: reader.result }));
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    }
     const [customerProfileTab, setCustomerProfileTab] = useState('thrillz');
     const [customerFollowSearch, setCustomerFollowSearch] = useState('');
     const [paymentMethod, setPaymentMethod] = useState(null);
@@ -8230,8 +8240,11 @@ function App() {
                     React.createElement("input", { value: d[key], onChange: (e) => setCustomerProfileDraft({ ...d, [key]: e.target.value }), placeholder: placeholder, style: { width: '100%', border: `1px solid ${CP.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 14, color: CP.text, outline: 'none', fontFamily: 'inherit' } }));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 90px)' } },
                     React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 22 } },
-                        React.createElement("div", { style: { width: 84, height: 84, borderRadius: '50%', background: THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 28, color: '#fff' } }, initial),
-                        React.createElement("button", { onClick: () => flashToast('Change photo — coming soon'), style: { marginTop: 10, fontSize: 13, fontWeight: 700, color: THEME.coral } }, "Change Photo")),
+                        d.avatarPhoto
+                            ? React.createElement("div", { style: { width: 84, height: 84, borderRadius: '50%', backgroundImage: `url(${d.avatarPhoto})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
+                            : React.createElement("div", { style: { width: 84, height: 84, borderRadius: '50%', background: THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 28, color: '#fff' } }, initial),
+                        React.createElement("button", { onClick: () => customerProfilePhotoInputRef.current && customerProfilePhotoInputRef.current.click(), style: { marginTop: 10, fontSize: 13, fontWeight: 700, color: THEME.coral } }, "Change Photo"),
+                        React.createElement("input", { ref: customerProfilePhotoInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleCustomerProfilePhotoFile })),
                     field("Full Name", 'fullName', "Your full name"),
                     field("Username", 'username', "username"),
                     field("Bio", 'bio', "Tell people about yourself"),
@@ -8268,7 +8281,9 @@ function App() {
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 90px)' } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14, marginTop: 4 } },
                         React.createElement("div", { style: { position: 'relative', flexShrink: 0 } },
-                            React.createElement("div", { style: { width: 84, height: 84, borderRadius: '50%', background: THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: '#fff' } }, initial),
+                            customerProfile.avatarPhoto
+                                ? React.createElement("div", { style: { width: 84, height: 84, borderRadius: '50%', backgroundImage: `url(${customerProfile.avatarPhoto})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
+                                : React.createElement("div", { style: { width: 84, height: 84, borderRadius: '50%', background: THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: '#fff' } }, initial),
                             React.createElement("div", { style: { position: 'absolute', bottom: 2, right: 2, width: 16, height: 16, borderRadius: '50%', background: THEME.coral, border: '2.5px solid #fff' } })),
                         React.createElement("div", { style: { minWidth: 0 } },
                             React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: CP.text, margin: 0 } }, displayName),
