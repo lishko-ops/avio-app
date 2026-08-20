@@ -6227,8 +6227,6 @@ function App() {
         const replyToName = replyTarget && replyTarget.id !== replyTarget.parentId ? replyTarget.name : null;
         const isBusinessReply = commentItem.mine && accountType === 'business';
         setCommentsByItem((prev) => ({ ...prev, [commentItem.id]: [...(prev[commentItem.id] || []), { id: `you-${Date.now()}`, name: 'You', text, time: 'now', color: THEME.coral, likes: 0, verified, parentId, replyToName, isBusiness: isBusinessReply }] }));
-        if (parentId)
-            setExpandedReplyThreads((prev) => new Set(prev).add(parentId));
         setCommentDraft('');
         setCommentReplyTarget(null);
     }
