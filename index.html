@@ -178,6 +178,11 @@ function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
             React.createElement("path", { d: "M8.5 17L6 20.5V17z", ...solid })),
         share: React.createElement("path", { d: "M3 11.2 20.3 3.6c.9-.4 1.8.5 1.4 1.4l-6.7 16.7c-.4.9-1.7.8-1.9-.2l-1.6-6.6-6.6-1.6c-1-.2-1.1-1.5-.2-1.9z", ...solid }),
         bookmark: React.createElement("path", { d: "M6.5 3h11a1 1 0 0 1 1 1v16.2a.7.7 0 0 1-1.1.6L12 17.3l-5.4 3.5a.7.7 0 0 1-1.1-.6V4a1 1 0 0 1 1-1z" }),
+        bolt: React.createElement("path", { d: "M13 2 4 14h6l-1 8 9-12h-6l1-8z", ...solid }),
+        filepen: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" }),
+            React.createElement("path", { d: "M15 3v5h5" }),
+            React.createElement("path", { d: "M14.4 13.4l3 3-5.4 5.4H9v-3z", ...solid })),
         diamond: React.createElement(React.Fragment, null,
             React.createElement("path", { d: "M4 9L12 2l8 7-8 13-8-13z" }),
             React.createElement("path", { d: "M4 9h16M9 9l3-6.5L15 9M9 9l3 11 3-11" })),
@@ -8584,7 +8589,7 @@ function App() {
                     grid(custThrillz, "No Thrillz yet", openThrill(custThrillz)));
             }
             else {
-                const TABS = [{ id: 'thrillz', label: 'Thrillz' }, { id: 'saved', label: 'Saved' }, { id: 'liked', label: 'Liked' }];
+                const TABS = [{ id: 'thrillz', label: 'Thrillz', icon: 'bolt' }, { id: 'saved', label: 'Saved', icon: 'bookmark' }, { id: 'liked', label: 'Liked', icon: 'filepen' }];
                 const activeTab = customerProfileTab;
                 const setActiveTab = setCustomerProfileTab;
                 const activeGrid = activeTab === 'thrillz' ? grid(custThrillz, "No Thrillz yet", openThrill(custThrillz))
@@ -8615,8 +8620,8 @@ function App() {
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', marginTop: 22, borderBottom: `1px solid ${CP.border}` } },
                         TABS.map((t) => {
                             const active = activeTab === t.id;
-                            return React.createElement("button", { key: t.id, onClick: () => setActiveTab(t.id), style: { flex: 1, textAlign: 'center', padding: '10px 0', borderBottom: active ? `2px solid ${THEME.coral}` : '2px solid transparent' } },
-                                React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: active ? THEME.coral : CP.sub } }, t.label));
+                            return React.createElement("button", { key: t.id, "aria-label": t.label, onClick: () => setActiveTab(t.id), style: { flex: 1, display: 'flex', justifyContent: 'center', padding: '10px 0', borderBottom: active ? `2px solid ${THEME.coral}` : '2px solid transparent' } },
+                                React.createElement(Icon, { name: t.icon, size: 20, color: active ? THEME.coral : CP.sub }));
                         })),
                     activeTab === 'thrillz' && React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '14px 0 4px' } },
                         React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: CP.text } }, `My Thrillz (${custThrillz.length})`),
