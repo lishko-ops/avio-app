@@ -961,10 +961,15 @@ const BUSINESS_INCOMING_BOOKINGS = [
     // "Get Directions" (to the customer's address, never the business's own) are demonstrable
     // as soon as a business turns on "I travel to customers" — matches what a real mobile
     // booking's businessBookingDetail would carry once customer/business bookings are unified.
+    // ib1/ib3 also carry a mock `insurance` record so the Insurance & Coverage
+    // "before the appointment" attention list (healthcare businesses only) has
+    // something real to show — the same shape runMockEligibilityCheck() produces.
     { id: 'ib1', customerName: 'Michael R.', initials: 'MR', service: "Men's Fade", price: 45, time: '10:00 AM', status: 'confirmed', avatarColor: '#000000', dateGroup: 'today',
-        serviceAddress: { street: '88 Bedford Ave', unit: 'Apt 3', city: 'Brooklyn', state: 'NY', zip: '11249', notes: 'Buzzer is broken — please call on arrival.', full: '88 Bedford Ave, Apt 3, Brooklyn, NY 11249', distanceMi: 6.2 }, travelFee: 10 },
+        serviceAddress: { street: '88 Bedford Ave', unit: 'Apt 3', city: 'Brooklyn', state: 'NY', zip: '11249', notes: 'Buzzer is broken — please call on arrival.', full: '88 Bedford Ave, Apt 3, Brooklyn, NY 11249', distanceMi: 6.2 }, travelFee: 10,
+        insurance: { verificationStatus: 'verified', active: true, carrierName: 'Aetna', planName: 'Choice POS II', memberId: 'W998877234', copay: 30, deductible: 1000, deductibleRemaining: 400, coinsurance: 20, oopMax: 3000, oopRemaining: 1200, referralRequired: false, priorAuthRequired: false } },
     { id: 'ib2', customerName: 'Sarah M.', initials: 'SM', service: 'Balayage', price: 180, time: '11:30 AM', status: 'confirmed', avatarColor: '#97C400', dateGroup: 'today' },
-    { id: 'ib3', customerName: 'Jessica T.', initials: 'JT', service: 'Hair Color', price: 120, time: '1:00 PM', status: 'pending', avatarColor: '#FFFFFF', dateGroup: 'today' },
+    { id: 'ib3', customerName: 'Jessica T.', initials: 'JT', service: 'Hair Color', price: 120, time: '1:00 PM', status: 'pending', avatarColor: '#FFFFFF', dateGroup: 'today',
+        insurance: { verificationStatus: 'needsReview', active: false, carrierName: 'Horizon NJ Health (Medicaid MCO)', planName: null, memberId: 'M445566', copay: null, deductible: null, deductibleRemaining: null, coinsurance: null, oopMax: null, oopRemaining: null, referralRequired: false, priorAuthRequired: false } },
     { id: 'ib4', customerName: 'David L.', initials: 'DL', service: 'Beard Trim', price: 30, time: '3:30 PM', status: 'confirmed', avatarColor: '#000000', dateGroup: 'today' },
     { id: 'ib5', customerName: 'Jessica W.', initials: 'JW', service: 'Highlights', price: 150, time: '12:00 PM', status: 'confirmed', avatarColor: '#97C400', dateGroup: 'tomorrow' },
     { id: 'ib6', customerName: 'Anthony M.', initials: 'AM', service: 'Haircut', price: 35, time: '2:00 PM', status: 'confirmed', avatarColor: '#FFFFFF', dateGroup: 'tomorrow' },
@@ -5781,11 +5786,56 @@ function App() {
             promotionType: promo ? promo.promotionType : null,
             promotionValue: promo ? promo.promotionValue : null,
             promotionAppliedAt: promo ? promo.promotionAppliedAt : null,
+            insurance: buildBookingInsuranceRecord(),
         };
         setBookings((prev) => [booking, ...prev]);
         setBalance((b) => Math.max(0, b - total));
         setConfirmedBooking(booking);
         setBookingStep('success');
+    }
+    // ---------- Healthcare: mock eligibility / benefits layer ----------
+    // Deterministic, offline simulation — there is no real payer or clearinghouse connection.
+    // A real integration would send an eligibility request here (e.g. a 270/271 EDI
+    // transaction through a clearinghouse) and parse the response into this same shape.
+    function runMockEligibilityCheck(card) {
+        const seed = (card.memberId || card.carrierName || '').split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0) || 1;
+        const outcomes = ['verified', 'verified', 'verified', 'pending', 'needsReview', 'couldNotVerify'];
+        const status = outcomes[seed % outcomes.length];
+        const copayOptions = [20, 25, 30, 40, 50];
+        const deductibleOptions = [500, 750, 1000, 1500, 2000];
+        const deductible = deductibleOptions[(seed >> 2) % deductibleOptions.length];
+        const deductibleMetFrac = 0.2 + (seed % 5) * 0.15;
+        const known = status !== 'couldNotVerify';
+        return {
+            verificationStatus: status, checkedAt: Date.now(), active: known,
+            effectiveDate: '01/01/2026', plan: card.planName || 'Standard Plan', network: 'In-Network',
+            copay: known ? copayOptions[seed % copayOptions.length] : null,
+            deductible: known ? deductible : null,
+            deductibleRemaining: known ? Math.max(0, Math.round(deductible * (1 - deductibleMetFrac))) : null,
+            coinsurance: known ? [10, 20, 30][seed % 3] : null,
+            oopMax: known ? deductible * 3 : null,
+            oopRemaining: known ? Math.max(0, Math.round(deductible * 3 * (1 - deductibleMetFrac))) : null,
+            referralRequired: known && seed % 4 === 0,
+            priorAuthRequired: known && seed % 7 === 0,
+        };
+    }
+    function buildBookingInsuranceRecord() {
+        if (bookingTarget.category !== HEALTHCARE_CATEGORY || bookingUseInsurance !== 'insurance')
+            return null;
+        const card = customerInsuranceWallet[bookingInsuranceSlot];
+        if (!card)
+            return null;
+        return { ...runMockEligibilityCheck(card), carrierName: card.carrierName, planName: card.planName, memberId: card.memberId };
+    }
+    function verifyBookingInsuranceManually(bookingId) {
+        setBookings((prev) => prev.map((b) => b.id === bookingId && b.insurance ? { ...b, insurance: { ...b.insurance, verificationStatus: 'verified', active: true } } : b));
+        flashToast('Insurance verified');
+    }
+    // Business-side "incoming bookings" is a separate seeded dataset from the customer's own
+    // `bookings` — verifying a patient's coverage from the practice dashboard updates that list.
+    function verifyBusinessBookingInsurance(bookingId) {
+        setBusinessBookings((prev) => prev.map((b) => b.id === bookingId && b.insurance ? { ...b, insurance: { ...b.insurance, verificationStatus: 'verified', active: true } } : b));
+        flashToast('Insurance verified');
     }
     function openEditAddress(b) {
         setBookingDetail(null);
@@ -10208,6 +10258,7 @@ function App() {
                             pendingCancellations.length > 0 && React.createElement("span", { style: { minWidth: 20, height: 20, borderRadius: 10, background: THEME.gold, color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' } }, pendingCancellations.length),
                             React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }))));
                 const upcomingPreview = businessBookings.filter((b) => b.status === 'confirmed' || b.status === 'pending').slice(0, 3);
+                const isHealthcareBiz = bizOnboarding.category === HEALTHCARE_CATEGORY;
                 const upcomingBookingsSection = React.createElement("div", { style: { marginTop: 26 } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
                         React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Upcoming Bookings"),
@@ -10216,14 +10267,24 @@ function App() {
                         ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub } }, "No upcoming bookings yet.")
                         : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, upcomingPreview.map((b) => {
                             const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
-                            return React.createElement("button", { key: b.id, onClick: () => setBusinessBookingDetail(b), style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, border: `1px solid ${PD.border}`, textAlign: 'left', width: '100%' } },
-                                React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(b.avatarColor), fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.initials),
-                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                    React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, b.customerName),
-                                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, `${b.dateGroup === 'tomorrow' ? 'Tomorrow' : 'Today'}, ${b.time} · ${b.service}`)),
-                                React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
-                                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, money(b.price)),
-                                    React.createElement("span", { style: { fontSize: 9.5, fontWeight: 700, padding: '3px 8px', borderRadius: 9, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize', display: 'inline-block', marginTop: 3 } }, b.status)));
+                            const ins = isHealthcareBiz ? b.insurance : null;
+                            const vs = ins && INSURANCE_VERIFICATION_STATUSES[ins.verificationStatus];
+                            return React.createElement("div", { key: b.id, style: { borderRadius: 16, border: `1px solid ${PD.border}` } },
+                                React.createElement("button", { onClick: () => setBusinessBookingDetail(b), style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, textAlign: 'left', width: '100%' } },
+                                    React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(b.avatarColor), fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.initials),
+                                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, b.customerName),
+                                        React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, `${b.dateGroup === 'tomorrow' ? 'Tomorrow' : 'Today'}, ${b.time} · ${b.service}`),
+                                        ins && React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, ins.carrierName)),
+                                    React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
+                                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, money(b.price)),
+                                        React.createElement("span", { style: { fontSize: 9.5, fontWeight: 700, padding: '3px 8px', borderRadius: 9, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize', display: 'inline-block', marginTop: 3 } }, b.status))),
+                                ins && React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px 12px', marginLeft: 52 } },
+                                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
+                                        React.createElement(Icon, { name: vs.icon, size: 12, color: vs.color }),
+                                        React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: vs.color } }, ins.verificationStatus === 'verified' ? 'Eligibility Verified' : vs.label),
+                                        ins.verificationStatus === 'verified' && ins.copay != null && React.createElement("span", { style: { fontSize: 11.5, color: PD.sub } }, `· Est. Copay $${ins.copay}`)),
+                                    ins.verificationStatus !== 'verified' && React.createElement("button", { onClick: (e) => { e.stopPropagation(); verifyBusinessBookingInsurance(b.id); }, style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral } }, "Verify")));
                         })));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `0 18px calc(env(safe-area-inset-bottom) + 100px)` } },
                     earningsCard, statsRow, locationServiceAreaRow, quickActionsBar, insuranceSection, ticketingSection, cancellationRequestsSection, upcomingBookingsSection);
@@ -12095,6 +12156,19 @@ function App() {
                     b.serviceAddress.notes && React.createElement("div", { style: { marginTop: 8, paddingTop: 8, borderTop: `1px solid ${T.border}` } },
                         React.createElement("p", { style: { fontSize: 11, color: T.textSecondary, margin: 0 } }, "Notes"),
                         React.createElement("p", { style: { fontSize: 12.5, color: T.textPrimary, margin: '2px 0 0' } }, b.serviceAddress.notes))),
+                b.insurance && (() => {
+                    const vs = INSURANCE_VERIFICATION_STATUSES[b.insurance.verificationStatus];
+                    return React.createElement("div", { style: { marginTop: 10, background: T.surfaceSecondary, borderRadius: 14, padding: 14 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                            React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: T.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, margin: 0 } }, "Insurance"),
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4 } }, React.createElement(Icon, { name: vs.icon, size: 11, color: vs.color }), React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: vs.color } }, vs.label))),
+                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: T.textPrimary, margin: '6px 0 0' } }, b.insurance.carrierName),
+                        b.insurance.planName && React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, marginTop: 2 } }, b.insurance.planName),
+                        b.insurance.verificationStatus === 'verified' && b.insurance.copay != null && React.createElement("div", { style: { marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` } },
+                            React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } }, React.createElement("span", { style: { fontSize: 12, color: T.textSecondary } }, "Estimated Copay"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary } }, money(b.insurance.copay))),
+                            b.insurance.deductibleRemaining != null && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 6 } }, React.createElement("span", { style: { fontSize: 12, color: T.textSecondary } }, "Deductible Remaining"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary } }, money(b.insurance.deductibleRemaining))),
+                            React.createElement("p", { style: { fontSize: 10.5, color: T.textSecondary, marginTop: 8, lineHeight: 1.4 } }, "These are estimates based on your benefits, not a guarantee of coverage or final cost.")));
+                })(),
                 React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, plainActions.map(flatRow)),
                 managementGroup,
                 React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, trailingActions.map(flatRow)));
