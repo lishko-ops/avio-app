@@ -2540,6 +2540,12 @@ const BIZ_PAYMENT_ACCEPTANCE_OPTIONS = [
     { id: 'insurance_only', title: 'Insurance Only', desc: "Patients must have coverage you accept" },
     { id: 'selfpay_only', title: 'Self Pay Only', desc: "You don't bill insurance" },
 ];
+const COPAY_TIMING_OPTIONS = [
+    { id: 'before_appointment', title: 'Before the appointment', desc: 'Collect copay when the visit is booked' },
+    { id: 'at_checkin', title: 'At check-in', desc: 'Collect copay when the patient arrives' },
+    { id: 'after_appointment', title: 'After the appointment', desc: 'Collect copay once the visit is complete' },
+    { id: 'bill_later', title: 'Bill patient balance later', desc: "Don't collect copay in the app — invoice separately" },
+];
 const US_STATES = ['Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming', 'District of Columbia'];
 const INSURANCE_CARRIERS = [
     { id: 'uhc', name: 'UnitedHealthcare' },
@@ -2601,6 +2607,7 @@ const DEFAULT_BUSINESS_INSURANCE_SETTINGS = {
     acceptedGovProgramIds: [], // ids from GOV_INSURANCE_PROGRAMS
     medicaidByState: {}, // { [state]: string[] of accepted plan names }
     verificationMethod: null, // 'electronic' | 'manual'
+    copayCollectionTiming: null, // 'before_appointment' | 'at_checkin' | 'after_appointment' | 'bill_later'
     setupComplete: false,
 };
 function bizStepDots(activeStep, allDone) {
@@ -9777,6 +9784,7 @@ function App() {
                             React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 2 } }, sub)));
                 };
                 const walletCard = customerInsuranceWallet[bookingInsuranceSlot];
+                const previewEligibility = walletCard ? runMockEligibilityCheck(walletCard) : null;
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
                     React.createElement("p", { style: { fontSize: 12, color: BF.sub, marginBottom: 14 } }, "How will you pay for this visit?"),
                     optionCard('insurance', 'Use Insurance', "Bill your health plan for this visit"),
@@ -9791,7 +9799,13 @@ function App() {
                                     React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 2 } }, `${walletCard.planName ? walletCard.planName + ' · ' : ''}Member ID ${maskMemberId(walletCard.memberId)}`)),
                                 React.createElement("button", { onClick: () => openAddInsurance(bookingInsuranceSlot, true), style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral, flexShrink: 0 } }, "Change"))
                             : React.createElement("button", { onClick: () => openAddInsurance('primary', true), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '13px 0', borderRadius: 14, border: `1.5px dashed ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } },
-                                React.createElement(Icon, { name: "plus", size: 15, color: THEME.coral }), "Add Your Insurance")));
+                                React.createElement(Icon, { name: "plus", size: 15, color: THEME.coral }), "Add Your Insurance"),
+                        previewEligibility && previewEligibility.verificationStatus === 'verified' && previewEligibility.copay != null && React.createElement("div", { style: { marginTop: 12, background: T.surfaceSecondary, borderRadius: 14, padding: 14 } },
+                            React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: BF.sub, textTransform: 'uppercase', letterSpacing: 0.4, margin: '0 0 6px' } }, "Estimated Patient Responsibility"),
+                            React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } }, React.createElement("span", { style: { fontSize: 12, color: BF.sub } }, "Copay"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: BF.text } }, money(previewEligibility.copay))),
+                            React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 6 } }, React.createElement("span", { style: { fontSize: 12, color: BF.sub } }, "Deductible Remaining"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: BF.text } }, money(previewEligibility.deductibleRemaining))),
+                            React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 6 } }, React.createElement("span", { style: { fontSize: 12, color: BF.sub } }, "Coinsurance"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: BF.text } }, `${previewEligibility.coinsurance}%`)),
+                            React.createElement("p", { style: { fontSize: 10.5, color: BF.sub, marginTop: 8, lineHeight: 1.4 } }, "This is an estimate based on your benefits, not a guarantee of coverage or final cost."))));
             }
             else if (bookingStep === 'info') {
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
@@ -11018,6 +11032,17 @@ function App() {
                                     React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: PD.text, margin: 0 } }, m.title),
                                     React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 3, lineHeight: 1.4 } }, m.desc)));
                         })),
+                    draft.paymentAcceptance !== 'selfpay_only' && React.createElement(React.Fragment, null,
+                        React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: PD.text, marginTop: 24 } }, "When do you collect copay?"),
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 } },
+                            COPAY_TIMING_OPTIONS.map((opt) => {
+                                const active = draft.copayCollectionTiming === opt.id;
+                                return React.createElement("button", { key: opt.id, onClick: () => setInsuranceSetupDraft((d) => ({ ...d, copayCollectionTiming: opt.id })), style: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${PD.border}`, textAlign: 'left' } },
+                                    React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement("div", { style: { width: 7, height: 7, borderRadius: '50%', background: '#fff' } })),
+                                    React.createElement("div", { style: { flex: 1 } },
+                                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: PD.text, margin: 0 } }, opt.title),
+                                        React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, opt.desc)));
+                            }))),
                     React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 20, padding: 12, borderRadius: 12, background: 'rgba(46,155,255,0.08)' } },
                         React.createElement(Icon, { name: "info", size: 15, color: THEME.blue }),
                         React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, lineHeight: 1.4, flex: 1 } }, "Eligibility and benefits information is not a guarantee of coverage or payment. Final responsibility is determined by the payer.")));
@@ -11035,6 +11060,8 @@ function App() {
                     draft.paymentAcceptance !== 'selfpay_only' && React.createElement(React.Fragment, null,
                         sectionLabel("Verification Method"),
                         React.createElement("p", { style: { fontSize: 13.5, color: PD.text, fontWeight: 600 } }, draft.verificationMethod === 'electronic' ? 'Electronic Verification' : draft.verificationMethod === 'manual' ? 'Manual Verification' : 'Not set'),
+                        sectionLabel("Copay Collection"),
+                        React.createElement("p", { style: { fontSize: 13.5, color: PD.text, fontWeight: 600 } }, (COPAY_TIMING_OPTIONS.find((o) => o.id === draft.copayCollectionTiming) || {}).title || 'Not set'),
                         draft.acceptedGovProgramIds.length > 0 && React.createElement(React.Fragment, null,
                             sectionLabel("Government Programs"),
                             draft.acceptedGovProgramIds.map((id) => React.createElement("p", { key: id, style: { fontSize: 12.5, color: PD.text, padding: '4px 0' } }, `✓ ${GOV_INSURANCE_PROGRAMS.find((p) => p.id === id).name}`))),
@@ -11048,7 +11075,7 @@ function App() {
                             draft.acceptedCarrierIds.map((id) => React.createElement("p", { key: id, style: { fontSize: 12.5, color: PD.text, padding: '4px 0' } }, `✓ ${INSURANCE_CARRIERS.find((c) => c.id === id).name}`)))));
             }
             const canContinue = insuranceSetupStep === 'coverage' ? !!draft.paymentAcceptance
-                : insuranceSetupStep === 'verification' ? (draft.paymentAcceptance === 'selfpay_only' || !!draft.verificationMethod)
+                : insuranceSetupStep === 'verification' ? (draft.paymentAcceptance === 'selfpay_only' || (!!draft.verificationMethod && !!draft.copayCollectionTiming))
                     : true;
             const isLast = insuranceSetupStep === 'review';
             return React.createElement(React.Fragment, null,
@@ -12165,8 +12192,10 @@ function App() {
                         React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: T.textPrimary, margin: '6px 0 0' } }, b.insurance.carrierName),
                         b.insurance.planName && React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, marginTop: 2 } }, b.insurance.planName),
                         b.insurance.verificationStatus === 'verified' && b.insurance.copay != null && React.createElement("div", { style: { marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.border}` } },
-                            React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } }, React.createElement("span", { style: { fontSize: 12, color: T.textSecondary } }, "Estimated Copay"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary } }, money(b.insurance.copay))),
+                            React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: T.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, margin: '0 0 6px' } }, "Estimated Patient Responsibility"),
+                            React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } }, React.createElement("span", { style: { fontSize: 12, color: T.textSecondary } }, "Copay"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary } }, money(b.insurance.copay))),
                             b.insurance.deductibleRemaining != null && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 6 } }, React.createElement("span", { style: { fontSize: 12, color: T.textSecondary } }, "Deductible Remaining"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary } }, money(b.insurance.deductibleRemaining))),
+                            b.insurance.coinsurance != null && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 6 } }, React.createElement("span", { style: { fontSize: 12, color: T.textSecondary } }, "Coinsurance"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary } }, `${b.insurance.coinsurance}%`)),
                             React.createElement("p", { style: { fontSize: 10.5, color: T.textSecondary, marginTop: 8, lineHeight: 1.4 } }, "These are estimates based on your benefits, not a guarantee of coverage or final cost.")));
                 })(),
                 React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, plainActions.map(flatRow)),
