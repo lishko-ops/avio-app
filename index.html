@@ -11890,7 +11890,7 @@ function App() {
             const repliesFor = (rootId) => activeComments.filter((c) => c.parentId === rootId);
             const canWriteVerified = hasBookedBusiness(commentItem.id);
             const inputLocked = commentTab === 'verified' && !canWriteVerified;
-            const CT = { bg: '#141416', border: 'rgba(255,255,255,0.09)', text: '#fff', sub: 'rgba(255,255,255,0.45)' };
+            const CT = { bg: '#FFFFFF', border: '#EEEEEF', text: '#161616', sub: '#8A8A8E' };
             const tabsRow = React.createElement("div", { style: { display: 'flex', marginTop: 16, borderBottom: `1px solid ${CT.border}` } },
                 [
                     { id: 'community', icon: 'messageoutline', label: 'Community', sub: 'Anyone can comment' },
@@ -11927,7 +11927,7 @@ function App() {
             // does anything.
             const noSelectStyle = (c) => isOwnComment(c) ? { WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' } : {};
             const editingBlock = (c, textSize) => React.createElement("div", { style: { marginTop: 4 } },
-                React.createElement("textarea", { value: editingDraft, onChange: (e) => setEditingDraft(e.target.value), autoFocus: true, rows: 2, style: { width: '100%', background: 'rgba(255,255,255,0.08)', border: `1px solid ${THEME.coral}`, borderRadius: 12, padding: '8px 10px', color: CT.text, fontSize: textSize, outline: 'none', resize: 'none', fontFamily: 'inherit' } }),
+                React.createElement("textarea", { value: editingDraft, onChange: (e) => setEditingDraft(e.target.value), autoFocus: true, rows: 2, style: { width: '100%', background: '#F7F7F8', border: `1px solid ${THEME.coral}`, borderRadius: 12, padding: '8px 10px', color: CT.text, fontSize: textSize, outline: 'none', resize: 'none', fontFamily: 'inherit' } }),
                 React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 6 } },
                     React.createElement("button", { onClick: cancelEditComment, style: { fontSize: 12, fontWeight: 600, color: CT.sub } }, "Cancel"),
                     React.createElement("button", { onClick: saveEditComment, disabled: !editingDraft.trim(), style: { fontSize: 12, fontWeight: 700, color: editingDraft.trim() ? THEME.coral : CT.sub } }, "Save")));
@@ -11940,13 +11940,13 @@ function App() {
             // Replies never nest past one visual level — a reply-to-a-reply stays inside
             // the same parent thread and just carries an @mention back to whichever
             // reply it answers, instead of growing a third indentation level.
-            const replyRow = (r, rootId) => React.createElement("div", { key: r.id, ...pressProps(r), style: { display: 'flex', gap: 8, margin: '0 -8px', padding: '10px 8px', borderBottom: `1px solid ${CT.border}`, borderRadius: 10, background: pressedCommentId === r.id ? 'rgba(255,255,255,0.06)' : 'transparent', transition: 'background 0.15s ease', ...noSelectStyle(r) } },
+            const replyRow = (r, rootId) => React.createElement("div", { key: r.id, ...pressProps(r), style: { display: 'flex', gap: 8, margin: '0 -8px', padding: '10px 8px', borderBottom: `1px solid ${CT.border}`, borderRadius: 10, background: pressedCommentId === r.id ? 'rgba(0,0,0,0.04)' : 'transparent', transition: 'background 0.15s ease', ...noSelectStyle(r) } },
                 React.createElement("div", { style: { width: 26, height: 26, borderRadius: '50%', background: r.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 10.5, fontWeight: 700 } }, r.name[0]),
                 editingCommentId === r.id
                     ? React.createElement("div", { style: { flex: 1, minWidth: 0 } }, nameRow(r, 12.5), editingBlock(r, 12.5))
                     : React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                         nameRow(r, 12.5),
-                        React.createElement("p", { style: { margin: '3px 0 0', fontSize: 12.5, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 } },
+                        React.createElement("p", { style: { margin: '3px 0 0', fontSize: 12.5, color: CT.text, lineHeight: 1.4 } },
                             r.replyToName && React.createElement("span", { style: { color: THEME.coral, fontWeight: 600 } }, `@${r.replyToName} `), r.text),
                         React.createElement("button", { onClick: () => startCommentReply(rootId, r), style: { marginTop: 5, fontSize: 11, fontWeight: 600, color: CT.sub } }, "Reply")),
                 editingCommentId !== r.id && likeButton(r, 13));
@@ -11954,7 +11954,7 @@ function App() {
                 const replies = repliesFor(c.id);
                 const expanded = expandedReplyThreads.has(c.id);
                 return React.createElement("div", { key: c.id, style: { borderBottom: `1px solid ${CT.border}` } },
-                    React.createElement("div", { ...pressProps(c), style: { display: 'flex', gap: 10, margin: '0 -8px', padding: '14px 8px 6px', borderRadius: 12, background: pressedCommentId === c.id ? 'rgba(255,255,255,0.06)' : 'transparent', transition: 'background 0.15s ease', ...noSelectStyle(c) } },
+                    React.createElement("div", { ...pressProps(c), style: { display: 'flex', gap: 10, margin: '0 -8px', padding: '14px 8px 6px', borderRadius: 12, background: pressedCommentId === c.id ? 'rgba(0,0,0,0.04)' : 'transparent', transition: 'background 0.15s ease', ...noSelectStyle(c) } },
                         React.createElement("div", { style: { width: 32, height: 32, borderRadius: '50%', background: c.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 12, fontWeight: 700 } }, c.name[0]),
                         c.deleted
                             ? React.createElement("div", { style: { flex: 1, minWidth: 0 } }, nameRow(c, 13), React.createElement("p", { style: { margin: '4px 0 0', fontSize: 13, color: CT.sub, fontStyle: 'italic' } }, "Comment deleted"))
@@ -11962,7 +11962,7 @@ function App() {
                                 ? React.createElement("div", { style: { flex: 1, minWidth: 0 } }, nameRow(c, 13), editingBlock(c, 13))
                                 : React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                     nameRow(c, 13),
-                                    React.createElement("p", { style: { margin: '4px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 } }, c.text),
+                                    React.createElement("p", { style: { margin: '4px 0 0', fontSize: 13, color: CT.text, lineHeight: 1.4 } }, c.text),
                                     React.createElement("button", { onClick: () => startCommentReply(c.id, c), style: { marginTop: 6, fontSize: 11.5, fontWeight: 600, color: CT.sub } }, "Reply")),
                         !c.deleted && editingCommentId !== c.id && likeButton(c, 15)),
                     replies.length > 0 && React.createElement("button", { onClick: () => toggleReplyThread(c.id), style: { display: 'flex', alignItems: 'center', gap: 4, margin: '0 0 10px 42px', padding: '2px 0', fontSize: 12, fontWeight: 700, color: THEME.coral } },
@@ -11975,42 +11975,48 @@ function App() {
             const replyingTo = commentReplyTarget && React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 2px 0' } },
                 React.createElement("span", { style: { fontSize: 11.5, color: CT.sub } }, `Replying to ${commentReplyTarget.name}`),
                 React.createElement("button", { onClick: cancelCommentReply, style: { width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 12, color: CT.sub })));
-            const sheet = React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: CT.bg, borderRadius: '22px 22px 0 0', padding: `10px 18px calc(env(safe-area-inset-bottom) + 14px)`, maxHeight: '72%', display: 'flex', flexDirection: 'column' } },
-                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.25)', margin: '0 auto 12px' } }),
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: CT.text, margin: 0, textAlign: 'center' } }, "Comments"),
-                tabsRow,
-                React.createElement("div", { className: "avio-scroll", style: { overflowY: 'auto', marginTop: 4, flex: 1, display: 'flex', flexDirection: 'column' } },
+            const sheet = React.createElement("div", { className: "avio-filter-sheet", onClick: (e) => e.stopPropagation(), style: { width: '100%', background: CT.bg, borderRadius: '22px 22px 0 0', padding: `10px 0 calc(env(safe-area-inset-bottom) + 14px)`, maxHeight: '56%', display: 'flex', flexDirection: 'column' } },
+                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#D1D1D6', margin: '0 auto 12px' } }),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', padding: '0 18px' } },
+                    React.createElement("div", { style: { width: 24, flexShrink: 0 } }),
+                    React.createElement("p", { style: { flex: 1, fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600, fontSize: 16.5, color: CT.text, margin: 0, textAlign: 'center' } }, "Comments"),
+                    React.createElement("button", { onClick: () => shareItem(commentItem), style: { width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement(Icon, { name: "send", size: 20, color: CT.text }))),
+                React.createElement("div", { style: { padding: '0 18px' } }, tabsRow),
+                React.createElement("div", { style: { height: 1, background: CT.border, margin: '0 0 4px' } }),
+                React.createElement("div", { className: "avio-scroll", style: { overflowY: 'auto', overscrollBehavior: 'contain', marginTop: 4, flex: 1, display: 'flex', flexDirection: 'column', padding: '0 18px' } },
                     topLevelComments.length === 0
                         ? React.createElement("p", { style: { fontSize: 12.5, color: CT.sub, textAlign: 'center', padding: '24px 0' } }, commentTab === 'verified' ? "No verified guest comments yet." : "No comments yet.")
                         : topLevelComments.map(commentThread)),
-                replyingTo,
-                inputLocked
-                    ? React.createElement("div", { style: { marginTop: 14, paddingTop: 12, borderTop: `1px solid ${CT.border}`, textAlign: 'center' } },
-                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 } },
-                            React.createElement(Icon, { name: "lock", size: 12, color: CT.sub }),
-                            React.createElement("span", { style: { fontSize: 12, color: CT.sub } }, "Book this place to leave a verified comment.")),
-                        React.createElement("div", { style: { width: '100%', background: 'rgba(255,255,255,0.06)', border: `1px solid ${CT.border}`, borderRadius: 20, padding: '11px 14px', color: CT.sub, fontSize: 13, textAlign: 'left' } }, "Add a comment..."))
-                    : React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: commentReplyTarget ? 6 : 14, paddingTop: 12, borderTop: `1px solid ${CT.border}` } },
-                        React.createElement("div", { style: { width: 28, height: 28, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 11, fontWeight: 700 } }, "Y"),
-                        React.createElement("input", { ref: commentInputRef, value: commentDraft, onChange: (e) => setCommentDraft(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') postComment(); }, placeholder: commentReplyTarget ? `Reply to ${commentReplyTarget.name}…` : "Add a comment...", style: { flex: 1, background: 'rgba(255,255,255,0.08)', border: `1px solid ${CT.border}`, borderRadius: 20, padding: '9px 14px', color: CT.text, fontSize: 13, outline: 'none', minWidth: 0 } }),
-                        React.createElement("button", { onClick: postComment, style: { width: 32, height: 32, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                            React.createElement(Icon, { name: "send", size: 14, color: "#fff" }))));
+                React.createElement("div", { style: { padding: '0 18px' } },
+                    replyingTo,
+                    inputLocked
+                        ? React.createElement("div", { style: { marginTop: 14, paddingTop: 12, borderTop: `1px solid ${CT.border}`, textAlign: 'center' } },
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 } },
+                                React.createElement(Icon, { name: "lock", size: 12, color: CT.sub }),
+                                React.createElement("span", { style: { fontSize: 12, color: CT.sub } }, "Book this place to leave a verified comment.")),
+                            React.createElement("div", { style: { width: '100%', background: '#F7F7F8', border: `1px solid ${CT.border}`, borderRadius: 20, padding: '11px 14px', color: CT.sub, fontSize: 13, textAlign: 'left' } }, "Add a comment..."))
+                        : React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: commentReplyTarget ? 6 : 14, paddingTop: 12, borderTop: `1px solid ${CT.border}` } },
+                            React.createElement("div", { style: { width: 28, height: 28, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 11, fontWeight: 700 } }, "Y"),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, height: 42, background: '#F7F7F8', border: `1px solid ${CT.border}`, borderRadius: 21, padding: '0 6px 0 14px' } },
+                                React.createElement("input", { ref: commentInputRef, value: commentDraft, onChange: (e) => setCommentDraft(e.target.value), onKeyDown: (e) => { if (e.key === 'Enter') postComment(); }, placeholder: commentReplyTarget ? `Reply to ${commentReplyTarget.name}…` : "Add a comment…", style: { flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none', color: CT.text, fontSize: 13.5 } }),
+                                React.createElement("button", { onClick: postComment, disabled: !commentDraft.trim(), style: { flexShrink: 0, padding: '0 8px', fontSize: 13.5, fontWeight: 700, color: commentDraft.trim() ? THEME.coral : '#C7C7CC' } }, "Post")))));
             const actionSheetOverlay = actionTarget && React.createElement("div", { onClick: closeCommentActionSheet, style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 20, padding: '0 12px calc(env(safe-area-inset-bottom) + 12px)' } },
                 React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%' } },
-                    React.createElement("div", { style: { background: '#1C1C1F', borderRadius: 16, overflow: 'hidden', marginBottom: 8 } },
+                    React.createElement("div", { style: { background: CT.bg, borderRadius: 16, overflow: 'hidden', marginBottom: 8 } },
                         React.createElement("button", { onClick: () => startEditComment(actionTarget), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '15px 16px', borderBottom: `1px solid ${CT.border}` } },
                             React.createElement(Icon, { name: "pencil", size: 17, color: THEME.coral }),
                             React.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: THEME.coral } }, "Edit Comment")),
                         React.createElement("button", { onClick: () => requestDeleteComment(actionTarget.id), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '15px 16px' } },
                             React.createElement(Icon, { name: "trash", size: 17, color: "#D0304A" }),
                             React.createElement("span", { style: { fontSize: 15, fontWeight: 600, color: '#D0304A' } }, "Delete Comment"))),
-                    React.createElement("button", { onClick: closeCommentActionSheet, style: { width: '100%', background: '#1C1C1F', borderRadius: 16, padding: '15px 16px', textAlign: 'center', fontSize: 15, fontWeight: 700, color: CT.text } }, "Cancel")));
+                    React.createElement("button", { onClick: closeCommentActionSheet, style: { width: '100%', background: CT.bg, borderRadius: 16, padding: '15px 16px', textAlign: 'center', fontSize: 15, fontWeight: 700, color: CT.text } }, "Cancel")));
             const deleteConfirmOverlay = deleteTarget && React.createElement("div", { onClick: cancelDeleteComment, style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 21, padding: '0 32px' } },
-                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxWidth: 300, background: '#1C1C1F', borderRadius: 18, padding: '22px 20px', textAlign: 'center' } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxWidth: 300, background: CT.bg, borderRadius: 18, padding: '22px 20px', textAlign: 'center' } },
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: CT.text, margin: 0 } }, "Delete comment?"),
                     React.createElement("p", { style: { fontSize: 12.5, color: CT.sub, marginTop: 8, lineHeight: 1.45 } }, "This action cannot be undone."),
                     React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 18 } },
-                        React.createElement("button", { onClick: cancelDeleteComment, style: { flex: 1, padding: '12px 0', borderRadius: 22, background: 'rgba(255,255,255,0.08)', color: CT.text, fontWeight: 700, fontSize: 14 } }, "Cancel"),
+                        React.createElement("button", { onClick: cancelDeleteComment, style: { flex: 1, padding: '12px 0', borderRadius: 22, background: '#F0F0F1', color: CT.text, fontWeight: 700, fontSize: 14 } }, "Cancel"),
                         React.createElement("button", { onClick: confirmDeleteComment, style: { flex: 1, padding: '12px 0', borderRadius: 22, background: '#D0304A', color: '#fff', fontWeight: 700, fontSize: 14 } }, "Delete"))));
             return React.createElement(React.Fragment, null, sheet, actionSheetOverlay, deleteConfirmOverlay);
         })())),
