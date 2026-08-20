@@ -2480,7 +2480,8 @@ const ACCOUNT_TYPE_CARDS = [
     { id: 'personal', title: "I'm a Customer", subtitle: 'Discover & book', desc: 'Scroll services, discover businesses and book what you love.', words: ['WATCH', 'BOOK', 'SHARE'], icon: 'user' },
     { id: 'business', title: "I'm a Business", subtitle: 'Showcase & grow', desc: 'Show your work and turn views into bookings.', words: ['POST', 'BOOK', 'GROW'], icon: 'grid' },
 ];
-const BIZ_CATEGORIES = ['Barber', 'Hair Salon / Hairstylist', 'Nails', 'Lashes', 'Makeup', 'Beauty', 'Tattoo / Piercing', 'Fitness / Personal Training', 'Photography / Videography', 'DJ / Events', 'Auto Services', 'Cleaning', 'Home Services', 'Real Estate', 'Rentals', 'Other'];
+const BIZ_CATEGORIES = ['Barber', 'Hair Salon / Hairstylist', 'Nails', 'Lashes', 'Makeup', 'Beauty', 'Tattoo / Piercing', 'Fitness / Personal Training', 'Healthcare / Medical', 'Photography / Videography', 'DJ / Events', 'Auto Services', 'Cleaning', 'Home Services', 'Real Estate', 'Rentals', 'Other'];
+const HEALTHCARE_CATEGORY = 'Healthcare / Medical';
 const BIZ_SERVICES_BY_CATEGORY = {
     'Barber': ['Haircut', 'Skin Fade', 'Beard Trim', 'Lineup', 'Kids Cut', 'Haircut + Beard', 'Other'],
     'Hair Salon / Hairstylist': ['Haircut', 'Blowout', 'Color', 'Balayage', 'Highlights', 'Extensions', 'Other'],
@@ -2490,6 +2491,7 @@ const BIZ_SERVICES_BY_CATEGORY = {
     'Beauty': ['Facial', 'Waxing', 'Brows', 'Skincare Treatment', 'Spray Tan', 'Other'],
     'Tattoo / Piercing': ['Small Tattoo', 'Large Tattoo', 'Cover-Up', 'Ear Piercing', 'Body Piercing', 'Other'],
     'Fitness / Personal Training': ['1-on-1 Training', 'Group Class', 'Nutrition Coaching', 'Virtual Session', 'Other'],
+    'Healthcare / Medical': ['Individual Therapy', 'Couples / Family Therapy', 'Psychiatric Evaluation', 'Medication Management', 'Physical Therapy Session', 'Primary Care Visit', 'Specialist Consultation', 'Telehealth Visit', 'Other'],
     'Photography / Videography': ['Portrait Session', 'Event Coverage', 'Product Shoot', 'Video Edit', 'Other'],
     'DJ / Events': ['Wedding DJ', 'Club Set', 'Private Party', 'MC Services', 'Other'],
     'Auto Services': ['Detailing', 'Oil Change', 'Tire Service', 'Car Wash', 'Other'],
@@ -2507,6 +2509,77 @@ const BIZ_PROOF_OPTIONS = [
     { id: 'license', icon: 'clipboard', title: 'License or Document', desc: 'Upload your business license or registration' },
     { id: 'photo', icon: 'store', title: 'Business Photo', desc: 'Add a photo of your storefront, workspace or tools' },
 ];
+// ---------- Healthcare Insurance & Billing: reference data ----------
+// Demo/mock payer directory. In a real deployment this would be sourced from a maintained
+// payer/eligibility service rather than shipped as static data in the client.
+const BIZ_PAYMENT_ACCEPTANCE_OPTIONS = [
+    { id: 'insurance_and_selfpay', title: 'Insurance + Self Pay', desc: 'Accept insurance and let patients pay out of pocket' },
+    { id: 'insurance_only', title: 'Insurance Only', desc: "Patients must have coverage you accept" },
+    { id: 'selfpay_only', title: 'Self Pay Only', desc: "You don't bill insurance" },
+];
+const US_STATES = ['Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming', 'District of Columbia'];
+const INSURANCE_CARRIERS = [
+    { id: 'uhc', name: 'UnitedHealthcare' },
+    { id: 'bcbs', name: 'Blue Cross Blue Shield' },
+    { id: 'aetna', name: 'Aetna' },
+    { id: 'cigna', name: 'Cigna' },
+    { id: 'humana', name: 'Humana' },
+    { id: 'kaiser', name: 'Kaiser Permanente' },
+    { id: 'molina', name: 'Molina Healthcare' },
+    { id: 'centene', name: 'Centene' },
+    { id: 'ambetter', name: 'Ambetter' },
+    { id: 'wellcare', name: 'Wellcare' },
+    { id: 'healthfirst', name: 'Healthfirst' },
+    { id: 'oscar', name: 'Oscar Health' },
+    { id: 'caresource', name: 'CareSource' },
+    { id: 'highmark', name: 'Highmark' },
+    { id: 'emblemhealth', name: 'EmblemHealth' },
+    { id: 'ibx', name: 'Independence Blue Cross' },
+    { id: 'upmc', name: 'UPMC Health Plan' },
+];
+const GOV_INSURANCE_PROGRAMS = [
+    { id: 'medicare-original', group: 'Medicare', name: 'Original Medicare (Part A & B)' },
+    { id: 'medicare-advantage', group: 'Medicare', name: 'Medicare Advantage Plans' },
+    { id: 'chip', group: 'Other', name: 'CHIP' },
+    { id: 'dual', group: 'Other', name: 'Dual Medicare + Medicaid' },
+    { id: 'tricare', group: 'Other', name: 'TRICARE' },
+];
+// State -> { program, plans[] }. A representative set of states ships with named managed-care
+// plans; every other state falls back to a generic FFS + managed-care placeholder set via
+// getMedicaidPlansForState() so the State -> Program -> MCO -> Plan flow always works.
+const MEDICAID_BY_STATE = {
+    'New Jersey': { program: 'NJ FamilyCare', plans: ['NJ FamilyCare (Fee-for-Service)', 'Horizon NJ Health (Medicaid MCO)', 'UnitedHealthcare Community Plan (NJ)', 'Wellpoint NJ (Amerigroup)', 'Aetna Better Health of NJ'] },
+    'New York': { program: 'NY Medicaid', plans: ['NY Medicaid (Fee-for-Service)', 'Healthfirst Medicaid Managed Care', 'Fidelis Care', 'UnitedHealthcare Community Plan (NY)', 'MetroPlusHealth', 'Affinity Health Plan'] },
+    'California': { program: 'Medi-Cal', plans: ['Medi-Cal (Fee-for-Service)', 'L.A. Care Health Plan', 'Health Net Medi-Cal', 'Molina Healthcare of California', 'Anthem Blue Cross Medi-Cal', 'Kaiser Permanente Medi-Cal'] },
+    'Texas': { program: 'Texas Medicaid (STAR)', plans: ['Texas Medicaid (Fee-for-Service)', 'Superior HealthPlan', 'Amerigroup Texas', 'Molina Healthcare of Texas', 'UnitedHealthcare Community Plan (TX)'] },
+    'Florida': { program: 'Florida Medicaid (SMMC)', plans: ['Florida Medicaid (Fee-for-Service)', 'Sunshine Health', 'Humana Medical Plan (Medicaid)', 'Molina Healthcare of Florida', 'Simply Healthcare Plans'] },
+    'Pennsylvania': { program: 'PA Medicaid (HealthChoices)', plans: ['PA Medicaid (Fee-for-Service)', 'Keystone First', 'UPMC for You', 'Highmark Wholecare', 'AmeriHealth Caritas PA'] },
+    'Illinois': { program: 'HealthChoice Illinois', plans: ['IL Medicaid (Fee-for-Service)', 'Molina Healthcare of Illinois', 'Meridian Health Plan', 'CountyCare Health Plan', 'Blue Cross Community Health Plans'] },
+    'Ohio': { program: 'Ohio Medicaid', plans: ['Ohio Medicaid (Fee-for-Service)', 'CareSource Ohio', 'Molina Healthcare of Ohio', 'UnitedHealthcare Community Plan (OH)', 'Buckeye Health Plan'] },
+    'Georgia': { program: 'Georgia Medicaid', plans: ['GA Medicaid (Fee-for-Service)', 'Amerigroup Georgia', 'CareSource Georgia', 'Peach State Health Plan'] },
+    'Michigan': { program: 'Michigan Medicaid', plans: ['MI Medicaid (Fee-for-Service)', 'Meridian Health Plan of Michigan', 'Molina Healthcare of Michigan', 'Priority Health Choice'] },
+    'Arizona': { program: 'AHCCCS', plans: ['AHCCCS (Fee-for-Service)', 'Mercy Care', 'Banner University Family Care', 'UnitedHealthcare Community Plan (AZ)'] },
+    'Washington': { program: 'Washington Apple Health', plans: ['Apple Health (Fee-for-Service)', 'Molina Healthcare of Washington', 'Community Health Plan of Washington', 'Amerigroup Washington'] },
+};
+function getMedicaidPlansForState(state) {
+    if (MEDICAID_BY_STATE[state])
+        return MEDICAID_BY_STATE[state];
+    return { program: `${state} Medicaid`, plans: [`${state} Medicaid (Fee-for-Service)`, `${state} Medicaid Managed Care Plan A`, `${state} Medicaid Managed Care Plan B`] };
+}
+const INSURANCE_VERIFICATION_STATUSES = {
+    verified: { label: 'Verified', color: '#22C55E', icon: 'check' },
+    pending: { label: 'Pending', color: THEME.gold, icon: 'clock' },
+    needsReview: { label: 'Needs Review', color: THEME.gold, icon: 'warningtriangle' },
+    couldNotVerify: { label: 'Could Not Verify', color: '#D0304A', icon: 'x' },
+};
+const DEFAULT_BUSINESS_INSURANCE_SETTINGS = {
+    paymentAcceptance: null, // 'insurance_and_selfpay' | 'insurance_only' | 'selfpay_only'
+    acceptedCarrierIds: [], // ids from INSURANCE_CARRIERS
+    acceptedGovProgramIds: [], // ids from GOV_INSURANCE_PROGRAMS
+    medicaidByState: {}, // { [state]: string[] of accepted plan names }
+    verificationMethod: null, // 'electronic' | 'manual'
+    setupComplete: false,
+};
 function bizStepDots(activeStep, allDone) {
     return React.createElement("div", { style: { display: 'flex', alignItems: 'center', marginBottom: 14 } },
         Array.from({ length: 8 }, (_, i) => i + 1).map((n, i) => {
@@ -2674,7 +2747,7 @@ function App() {
     const [showSplash, setShowSplash] = useState(true);
     const [authView, setAuthView] = useState('welcome');
     const [authDraft, setAuthDraft] = useState({ firstName: '', lastName: '', identifier: '', password: '', otp: ['', '', '', '', '', ''] });
-    const [bizOnboarding, setBizOnboarding] = useState(() => loadLS('avio_biz_onboarding', { businessName: '', category: '', subcategory: '', services: [], locationMode: '', address: '', serviceArea: '', description: '', phone: '', email: '', photo: null }));
+    const [bizOnboarding, setBizOnboarding] = useState(() => loadLS('avio_biz_onboarding', { businessName: '', category: '', subcategory: '', services: [], locationMode: '', address: '', serviceArea: '', description: '', phone: '', email: '', photo: null, paymentAcceptance: '' }));
     useEffect(() => { saveLS('avio_biz_onboarding', bizOnboarding); }, [bizOnboarding]);
     const [bizCategoryPickerOpen, setBizCategoryPickerOpen] = useState(false);
     const [bizCategorySearch, setBizCategorySearch] = useState('');
@@ -4077,6 +4150,51 @@ function App() {
         flashToast('Service area updated');
         closeServiceAreaSettings();
     }
+    // --- Healthcare: Insurance & Billing ---
+    const [businessInsuranceSettings, setBusinessInsuranceSettings] = useState(() => loadLS('avio_business_insurance', DEFAULT_BUSINESS_INSURANCE_SETTINGS));
+    useEffect(() => { saveLS('avio_business_insurance', businessInsuranceSettings); }, [businessInsuranceSettings]);
+    const [insuranceSetupOpen, setInsuranceSetupOpen] = useState(false);
+    const [insuranceSetupStep, setInsuranceSetupStep] = useState('coverage'); // coverage | plans | verification | review
+    const [insuranceSetupDraft, setInsuranceSetupDraft] = useState(null);
+    const [insurancePlansSearch, setInsurancePlansSearch] = useState('');
+    const [insuranceMedicaidState, setInsuranceMedicaidState] = useState('');
+    const [insuranceStatePickerOpen, setInsuranceStatePickerOpen] = useState(false);
+    function openInsuranceSetup() {
+        setInsuranceSetupDraft({ ...DEFAULT_BUSINESS_INSURANCE_SETTINGS, ...businessInsuranceSettings, acceptedCarrierIds: [...businessInsuranceSettings.acceptedCarrierIds], acceptedGovProgramIds: [...businessInsuranceSettings.acceptedGovProgramIds], medicaidByState: { ...businessInsuranceSettings.medicaidByState } });
+        setInsuranceSetupStep('coverage');
+        const firstState = Object.keys(businessInsuranceSettings.medicaidByState)[0];
+        setInsuranceMedicaidState(firstState || '');
+        setInsurancePlansSearch('');
+        setInsuranceSetupOpen(true);
+    }
+    function closeInsuranceSetup() { setInsuranceSetupOpen(false); setInsuranceSetupDraft(null); }
+    function saveInsuranceSetup() {
+        if (!insuranceSetupDraft)
+            return;
+        setBusinessInsuranceSettings({ ...insuranceSetupDraft, setupComplete: true });
+        flashToast('Insurance & billing setup saved');
+        closeInsuranceSetup();
+    }
+    function toggleInsuranceCarrier(id) {
+        setInsuranceSetupDraft((d) => ({ ...d, acceptedCarrierIds: d.acceptedCarrierIds.includes(id) ? d.acceptedCarrierIds.filter((x) => x !== id) : [...d.acceptedCarrierIds, id] }));
+    }
+    function toggleInsuranceGovProgram(id) {
+        setInsuranceSetupDraft((d) => ({ ...d, acceptedGovProgramIds: d.acceptedGovProgramIds.includes(id) ? d.acceptedGovProgramIds.filter((x) => x !== id) : [...d.acceptedGovProgramIds, id] }));
+    }
+    function toggleInsuranceMedicaidPlan(state, plan) {
+        setInsuranceSetupDraft((d) => {
+            const current = d.medicaidByState[state] || [];
+            const next = current.includes(plan) ? current.filter((p) => p !== plan) : [...current, plan];
+            const medicaidByState = { ...d.medicaidByState };
+            if (next.length) medicaidByState[state] = next; else delete medicaidByState[state];
+            return { ...d, medicaidByState };
+        });
+    }
+    function insuranceSetupTotalPlans(draft) {
+        if (!draft) return 0;
+        const medicaidCount = Object.values(draft.medicaidByState).reduce((sum, plans) => sum + plans.length, 0);
+        return draft.acceptedCarrierIds.length + draft.acceptedGovProgramIds.length + medicaidCount;
+    }
     // The "normal" radius — inside this, only the base fee (if any) applies.
     function serviceAreaDistanceMi(travel) {
         if (!travel || !travel.enabled)
@@ -4867,6 +4985,8 @@ function App() {
         }
         setBizVerify((v) => ({ ...v, submitting: true, error: '' }));
         setBusinessProfile({ ...bizOnboarding });
+        if (bizOnboarding.category === HEALTHCARE_CATEGORY && bizOnboarding.paymentAcceptance)
+            setBusinessInsuranceSettings((s) => ({ ...s, paymentAcceptance: bizOnboarding.paymentAcceptance }));
         const chosenServices = bizOnboarding.services.filter((s) => s !== 'Other');
         if (chosenServices.length > 0)
             setProviderServices(chosenServices.map((s, i) => ({ id: 'ps' + (i + 1), name: s, durationMinutes: 30, price: 35 })));
@@ -6510,8 +6630,21 @@ function App() {
                     React.createElement("label", { style: { ...authLabel, marginTop: 16 } }, "Short Description"),
                     React.createElement("textarea", { value: bizOnboarding.description, onChange: (e) => setBizOnboarding((d) => ({ ...d, description: e.target.value.slice(0, 120) })), maxLength: 120, rows: 3, placeholder: "Tell customers what you do...", style: { ...bizInputStyle, resize: 'none' } }),
                     React.createElement("p", { style: { fontSize: 10.5, color: '#B5B5B8', textAlign: 'right', marginTop: 4 } }, `${bizOnboarding.description.length}/120`));
+                const section2 = bizOnboarding.category === HEALTHCARE_CATEGORY && React.createElement("div", { style: bizCard },
+                    cardHeading('shield', '2. Insurance & Billing'),
+                    React.createElement("label", { style: authLabel }, "How does your practice accept payment?"),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+                        BIZ_PAYMENT_ACCEPTANCE_OPTIONS.map((opt) => {
+                            const active = bizOnboarding.paymentAcceptance === opt.id;
+                            return React.createElement("button", { key: opt.id, onClick: () => setBizOnboarding((d) => ({ ...d, paymentAcceptance: opt.id })), style: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${T.border}`, textAlign: 'left' } },
+                                React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement("div", { style: { width: 7, height: 7, borderRadius: '50%', background: T.surface } })),
+                                React.createElement("div", { style: { flex: 1 } },
+                                    React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: T.textPrimary, margin: 0 } }, opt.title),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, marginTop: 2 } }, opt.desc)));
+                        })),
+                    bizOnboarding.paymentAcceptance && bizOnboarding.paymentAcceptance !== 'selfpay_only' && React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, marginTop: 10, lineHeight: 1.4 } }, "You'll choose the specific insurance plans you accept from Insurance & Coverage in your dashboard after signup."));
                 const section3 = React.createElement("div", { style: bizCard },
-                    cardHeading('shield', '2. Show proof of your business'),
+                    cardHeading('shield', '3. Show proof of your business'),
                     React.createElement("p", { style: { fontSize: 12, color: T.textSecondary, margin: '-6px 0 12px' } }, "Complete all four ways to verify your business."),
                     React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } },
                         BIZ_PROOF_OPTIONS.map((opt) => {
@@ -6529,7 +6662,7 @@ function App() {
                             : React.createElement("button", { onClick: () => setBizVerify((v) => ({ ...v, proof: { ...v.proof, [v.proofActive]: true }, proofActive: null })), style: { width: '100%', padding: '11px 0', borderRadius: 12, border: `1.5px dashed ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 12.5 } },
                                 bizVerify.proofActive === 'social' ? "Connect Instagram" : bizVerify.proofActive === 'license' ? "Upload Document" : "Add Photo")));
                 const section4 = React.createElement("div", { style: bizCard },
-                    cardHeading('bank', '3. Payout information'),
+                    cardHeading('bank', '4. Payout information'),
                     React.createElement("p", { style: { fontSize: 12, color: T.textSecondary, margin: '-6px 0 12px' } }, "How would you like to receive payouts?"),
                     React.createElement("button", { onClick: () => setBizVerify((v) => ({ ...v, payoutPickerOpen: true })), style: { ...bizInputStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' } },
                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
@@ -6546,7 +6679,7 @@ function App() {
                     React.createElement(Icon, { name: "lock", size: 12, color: "#B5B5B8" }),
                     React.createElement("span", { style: { fontSize: 11, color: T.textSecondary } }, "Your information is encrypted and secure."));
                 return React.createElement("div", { className: "avio-auth-page", style: { flex: 1, display: 'flex', flexDirection: 'column', padding: `calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px)`, overflowY: 'auto' } },
-                    titleRow, section1, section3, section4, nextBox, lockLine,
+                    titleRow, section1, section2, section3, section4, nextBox, lockLine,
                     bizVerify.error && React.createElement("p", { style: { color: '#D0304A', fontSize: 12, textAlign: 'center', marginTop: 10 } }, bizVerify.error),
                     React.createElement("button", { className: "avio-press", disabled: bizVerify.submitting, onClick: submitBusinessVerification, style: { width: '100%', background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 15, padding: '15px 0', borderRadius: 26, marginTop: 16, opacity: bizVerify.submitting ? 0.7 : 1 } }, bizVerify.submitting ? "Verifying…" : "Submit"));
             })(),
@@ -9883,6 +10016,21 @@ function App() {
                                 React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Ticket Scanner"),
                                 React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, "Scan and validate Bookvado tickets")),
                             React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }))));
+                const insuranceTotalPlans = businessInsuranceSettings.acceptedCarrierIds.length + businessInsuranceSettings.acceptedGovProgramIds.length + Object.values(businessInsuranceSettings.medicaidByState).reduce((sum, plans) => sum + plans.length, 0);
+                const insuranceSummary = !businessInsuranceSettings.setupComplete
+                    ? 'Set up insurance & billing'
+                    : businessInsuranceSettings.paymentAcceptance === 'selfpay_only'
+                        ? 'Self Pay Only'
+                        : `${insuranceTotalPlans} plan${insuranceTotalPlans === 1 ? '' : 's'} accepted`;
+                const insuranceSection = bizOnboarding.category === HEALTHCARE_CATEGORY && React.createElement("div", { style: { marginTop: 26 } },
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: '0 0 10px', textTransform: 'uppercase' } }, "Insurance & Coverage"),
+                    React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 18, overflow: 'hidden' } },
+                        React.createElement("button", { onClick: openInsuranceSetup, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
+                            React.createElement(Icon, { name: "shield", size: 17, color: THEME.coral }),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Insurance & Billing Setup"),
+                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, insuranceSummary)),
+                            React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }))));
                 // Reads/writes the SAME `bookings` state the customer's Check on
                 // Cancellations screen does — there's one cancellation request
                 // record per booking, not a separate copy per side.
@@ -9916,7 +10064,7 @@ function App() {
                                     React.createElement("span", { style: { fontSize: 9.5, fontWeight: 700, padding: '3px 8px', borderRadius: 9, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize', display: 'inline-block', marginTop: 3 } }, b.status)));
                         })));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `0 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    earningsCard, statsRow, locationServiceAreaRow, quickActionsBar, ticketingSection, cancellationRequestsSection, upcomingBookingsSection);
+                    earningsCard, statsRow, locationServiceAreaRow, quickActionsBar, insuranceSection, ticketingSection, cancellationRequestsSection, upcomingBookingsSection);
             }
             else if (providerDashboardTab === 'bookings') {
                 const BIZ_BOOKING_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'pending', label: 'Pending' }, { id: 'past', label: 'Past' }, { id: 'cancelled', label: 'Canceled' }];
@@ -10522,6 +10670,176 @@ function App() {
             return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 6, background: T.background, display: 'flex', flexDirection: 'column' } }, header, body,
                 React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 'calc(env(safe-area-inset-bottom) + 16px)' } },
                     React.createElement("button", { onClick: saveServiceArea, style: { width: '100%', height: 52, borderRadius: 26, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Save Changes")));
+        })(),
+        providerDashboardOpen && insuranceSetupOpen && insuranceSetupDraft && (() => {
+            const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const draft = insuranceSetupDraft;
+            const STEPS = [['coverage', 'Choose Coverage'], ['plans', 'Select Plans'], ['verification', 'Verification Method'], ['review', 'Review & Confirm']];
+            const stepIdx = STEPS.findIndex(([id]) => id === insuranceSetupStep);
+            const totalPlans = insuranceSetupTotalPlans(draft);
+            const govCount = draft.acceptedGovProgramIds.length;
+            const commercialCount = draft.acceptedCarrierIds.length;
+            const medicaidCount = Object.values(draft.medicaidByState).reduce((sum, plans) => sum + plans.length, 0);
+            function goStep(dir) {
+                const next = stepIdx + dir;
+                if (next < 0) { closeInsuranceSetup(); return; }
+                if (next >= STEPS.length) return;
+                setInsuranceSetupStep(STEPS[next][0]);
+            }
+            const stepper = React.createElement("div", { style: { display: 'flex', alignItems: 'center', padding: '0 18px', marginTop: 14 } },
+                STEPS.map(([id, label], i) => React.createElement(React.Fragment, { key: id },
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 } },
+                        React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: i < stepIdx ? THEME.coral : i === stepIdx ? THEME.coral : T.surfaceSecondary, border: i === stepIdx ? `2px solid ${THEME.coral}` : 'none' } },
+                            i < stepIdx
+                                ? React.createElement(Icon, { name: "check", size: 12, color: "#fff" })
+                                : React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: i === stepIdx ? '#fff' : PD.sub } }, i + 1)),
+                        React.createElement("span", { style: { fontSize: 9.5, color: i === stepIdx ? PD.text : PD.sub, fontWeight: i === stepIdx ? 700 : 500, marginTop: 4, textAlign: 'center', maxWidth: 62 } }, label)),
+                    i < STEPS.length - 1 && React.createElement("div", { style: { flex: 1, height: 2, background: i < stepIdx ? THEME.coral : PD.border, margin: '0 4px 16px' } }))));
+            const header = React.createElement("div", { style: { flexShrink: 0, borderBottom: `1px solid ${PD.border}`, paddingBottom: 14 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, padding: `calc(env(safe-area-inset-top) + 8px) 18px 0` } },
+                    React.createElement("button", { onClick: () => goStep(-1) }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "Insurance & Billing Setup")),
+                stepper);
+            const sectionLabel = (text) => React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: PD.sub, textTransform: 'uppercase', letterSpacing: 0.4, margin: '22px 0 10px' } }, text);
+            const checkRow = (label, active, onClick, sub) => React.createElement("button", { key: label, onClick, style: { display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 0', borderBottom: `1px solid ${PD.border}`, textAlign: 'left' } },
+                React.createElement("div", { style: { width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" })),
+                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                    React.createElement("p", { style: { fontSize: 13.5, color: PD.text, margin: 0, fontWeight: 600 } }, label),
+                    sub && React.createElement("p", { style: { fontSize: 11, color: PD.sub, marginTop: 1 } }, sub)));
+            let body;
+            if (insuranceSetupStep === 'coverage') {
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 110px)' } },
+                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: PD.text, marginTop: 14 } }, "How does your practice accept payment?"),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 } },
+                        BIZ_PAYMENT_ACCEPTANCE_OPTIONS.map((opt) => {
+                            const active = draft.paymentAcceptance === opt.id;
+                            return React.createElement("button", { key: opt.id, onClick: () => setInsuranceSetupDraft((d) => ({ ...d, paymentAcceptance: opt.id })), style: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${PD.border}`, textAlign: 'left' } },
+                                React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement("div", { style: { width: 7, height: 7, borderRadius: '50%', background: '#fff' } })),
+                                React.createElement("div", { style: { flex: 1 } },
+                                    React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: PD.text, margin: 0 } }, opt.title),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, opt.desc)));
+                        })),
+                    draft.paymentAcceptance && draft.paymentAcceptance !== 'selfpay_only' && React.createElement(React.Fragment, null,
+                        sectionLabel("Which coverage types do you accept?"),
+                        React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 } },
+                            [
+                                { id: 'gov', icon: 'bank', title: 'Government Programs', sub: 'Medicare, Medicaid, CHIP, TRICARE & more' },
+                                { id: 'commercial', icon: 'briefcase', title: 'Commercial Insurance', sub: 'Aetna, Cigna, UnitedHealthcare & more' },
+                                { id: 'other', icon: 'heart', title: 'Other Programs', sub: 'Veterans, Dual Eligible, State Programs' },
+                            ].map((c) => {
+                                const active = (draft.coverageGroups || []).includes(c.id);
+                                return React.createElement("button", { key: c.id, onClick: () => setInsuranceSetupDraft((d) => ({ ...d, coverageGroups: (d.coverageGroups || []).includes(c.id) ? d.coverageGroups.filter((x) => x !== c.id) : [...(d.coverageGroups || []), c.id] })), style: { padding: '14px 10px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${PD.border}`, background: active ? 'rgba(151,196,0,0.06)' : T.surface, textAlign: 'left', position: 'relative' } },
+                                    active && React.createElement("div", { style: { position: 'absolute', top: 8, right: 8, width: 16, height: 16, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "check", size: 9, color: "#fff" })),
+                                    React.createElement(Icon, { name: c.icon, size: 18, color: PD.text }),
+                                    React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: PD.text, margin: '8px 0 2px' } }, c.title),
+                                    React.createElement("p", { style: { fontSize: 9.5, color: PD.sub, lineHeight: 1.3 } }, c.sub));
+                            }))));
+            }
+            else if (insuranceSetupStep === 'plans') {
+                const groups = draft.coverageGroups || [];
+                const showGov = groups.length === 0 || groups.includes('gov');
+                const showCommercial = groups.length === 0 || groups.includes('commercial');
+                const showOther = groups.length === 0 || groups.includes('other');
+                const q = insurancePlansSearch.trim().toLowerCase();
+                const filteredCarriers = INSURANCE_CARRIERS.filter((c) => !q || c.name.toLowerCase().includes(q));
+                const stateMedicaid = insuranceMedicaidState ? getMedicaidPlansForState(insuranceMedicaidState) : null;
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 110px)' } },
+                    React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, marginTop: 14 } }, "Select the specific insurance plans your practice accepts."),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px' } },
+                        React.createElement(Icon, { name: "search", size: 15, color: PD.sub }),
+                        React.createElement("input", { value: insurancePlansSearch, onChange: (e) => setInsurancePlansSearch(e.target.value), placeholder: "Search insurance company or plan", style: { flex: 1, border: 'none', outline: 'none', fontSize: 13, color: PD.text } })),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, padding: 14, borderRadius: 14, background: T.surfaceSecondary } },
+                        React.createElement("div", null,
+                            React.createElement("p", { style: { fontSize: 22, fontWeight: 800, color: PD.text, margin: 0, fontFamily: 'Space Grotesk, sans-serif' } }, totalPlans),
+                            React.createElement("p", { style: { fontSize: 11, color: PD.sub, marginTop: 2 } }, "Total Plans Selected")),
+                        React.createElement("div", { style: { textAlign: 'right' } },
+                            React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: 0 } }, `Government: ${govCount + medicaidCount}`),
+                            React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, `Commercial: ${commercialCount}`))),
+                    showGov && React.createElement(React.Fragment, null,
+                        sectionLabel("Medicare"),
+                        GOV_INSURANCE_PROGRAMS.filter((p) => p.group === 'Medicare').map((p) => checkRow(p.name, draft.acceptedGovProgramIds.includes(p.id), () => toggleInsuranceGovProgram(p.id))),
+                        sectionLabel("Medicaid (State-Specific)"),
+                        React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: -4, marginBottom: 10 } }, "Select the state(s) you accept Medicaid patients in."),
+                        React.createElement("button", { onClick: () => setInsuranceStatePickerOpen(true), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '11px 12px' } },
+                            React.createElement("span", { style: { fontSize: 13, color: insuranceMedicaidState ? PD.text : PD.sub } }, insuranceMedicaidState || 'Select a state'),
+                            React.createElement(Icon, { name: "chevrondown", size: 13, color: PD.sub })),
+                        stateMedicaid && React.createElement("div", { style: { marginTop: 10 } },
+                            React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: PD.text, margin: '0 0 4px' } }, `Select Medicaid program(s) and plans — ${stateMedicaid.program}`),
+                            stateMedicaid.plans.map((plan) => checkRow(plan, (draft.medicaidByState[insuranceMedicaidState] || []).includes(plan), () => toggleInsuranceMedicaidPlan(insuranceMedicaidState, plan)))),
+                        Object.keys(draft.medicaidByState).filter((s) => s !== insuranceMedicaidState).length > 0 && React.createElement("div", { style: { marginTop: 10 } },
+                            React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: PD.sub, margin: '0 0 6px' } }, "Other states configured"),
+                            Object.keys(draft.medicaidByState).filter((s) => s !== insuranceMedicaidState).map((s) => React.createElement("button", { key: s, onClick: () => setInsuranceMedicaidState(s), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '8px 0' } },
+                                React.createElement("span", { style: { fontSize: 12.5, color: PD.text } }, `${s} (${draft.medicaidByState[s].length} plans)`),
+                                React.createElement(Icon, { name: "chevronright", size: 13, color: PD.sub }))))),
+                    showOther && React.createElement(React.Fragment, null,
+                        sectionLabel("Other Government Programs"),
+                        GOV_INSURANCE_PROGRAMS.filter((p) => p.group === 'Other').map((p) => checkRow(p.name, draft.acceptedGovProgramIds.includes(p.id), () => toggleInsuranceGovProgram(p.id)))),
+                    showCommercial && React.createElement(React.Fragment, null,
+                        sectionLabel("Commercial Insurance"),
+                        filteredCarriers.map((c) => checkRow(c.name, draft.acceptedCarrierIds.includes(c.id), () => toggleInsuranceCarrier(c.id))),
+                        filteredCarriers.length === 0 && React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, padding: '8px 0' } }, "No matching insurance companies.")));
+            }
+            else if (insuranceSetupStep === 'verification') {
+                const METHODS = [
+                    { id: 'electronic', title: 'Electronic Verification (Recommended)', desc: "Bookvado checks eligibility and benefits automatically when a patient books, when supported by your accepted plans." },
+                    { id: 'manual', title: 'Manual Verification', desc: 'Your front-desk staff verify each patient’s coverage by phone or payer portal before their appointment.' },
+                ];
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 110px)' } },
+                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: PD.text, marginTop: 14 } }, "How should Bookvado verify patient eligibility?"),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 } },
+                        METHODS.map((m) => {
+                            const active = draft.verificationMethod === m.id;
+                            return React.createElement("button", { key: m.id, onClick: () => setInsuranceSetupDraft((d) => ({ ...d, verificationMethod: m.id })), style: { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '14px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${PD.border}`, textAlign: 'left' } },
+                                React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 } }, active && React.createElement("div", { style: { width: 7, height: 7, borderRadius: '50%', background: '#fff' } })),
+                                React.createElement("div", { style: { flex: 1 } },
+                                    React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: PD.text, margin: 0 } }, m.title),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 3, lineHeight: 1.4 } }, m.desc)));
+                        })),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 20, padding: 12, borderRadius: 12, background: 'rgba(46,155,255,0.08)' } },
+                        React.createElement(Icon, { name: "info", size: 15, color: THEME.blue }),
+                        React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, lineHeight: 1.4, flex: 1 } }, "Eligibility and benefits information is not a guarantee of coverage or payment. Final responsibility is determined by the payer.")));
+            }
+            else {
+                const stateSummaries = Object.entries(draft.medicaidByState);
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 110px)' } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, padding: 14, borderRadius: 14, background: T.surfaceSecondary } },
+                        React.createElement("div", null,
+                            React.createElement("p", { style: { fontSize: 22, fontWeight: 800, color: PD.text, margin: 0, fontFamily: 'Space Grotesk, sans-serif' } }, totalPlans),
+                            React.createElement("p", { style: { fontSize: 11, color: PD.sub, marginTop: 2 } }, "Total Plans Accepted")),
+                        React.createElement("div", { style: { width: 26, height: 26, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "check", size: 13, color: "#fff" }))),
+                    sectionLabel("Payment Acceptance"),
+                    React.createElement("p", { style: { fontSize: 13.5, color: PD.text, fontWeight: 600 } }, (BIZ_PAYMENT_ACCEPTANCE_OPTIONS.find((o) => o.id === draft.paymentAcceptance) || {}).title || 'Not set'),
+                    draft.paymentAcceptance !== 'selfpay_only' && React.createElement(React.Fragment, null,
+                        sectionLabel("Verification Method"),
+                        React.createElement("p", { style: { fontSize: 13.5, color: PD.text, fontWeight: 600 } }, draft.verificationMethod === 'electronic' ? 'Electronic Verification' : draft.verificationMethod === 'manual' ? 'Manual Verification' : 'Not set'),
+                        draft.acceptedGovProgramIds.length > 0 && React.createElement(React.Fragment, null,
+                            sectionLabel("Government Programs"),
+                            draft.acceptedGovProgramIds.map((id) => React.createElement("p", { key: id, style: { fontSize: 12.5, color: PD.text, padding: '4px 0' } }, `✓ ${GOV_INSURANCE_PROGRAMS.find((p) => p.id === id).name}`))),
+                        stateSummaries.length > 0 && React.createElement(React.Fragment, null,
+                            sectionLabel("Medicaid"),
+                            stateSummaries.map(([state, plans]) => React.createElement("div", { key: state, style: { marginBottom: 8 } },
+                                React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: PD.text, margin: 0 } }, state),
+                                plans.map((plan) => React.createElement("p", { key: plan, style: { fontSize: 12, color: PD.sub, padding: '2px 0 2px 10px' } }, `✓ ${plan}`))))),
+                        draft.acceptedCarrierIds.length > 0 && React.createElement(React.Fragment, null,
+                            sectionLabel("Commercial Insurance"),
+                            draft.acceptedCarrierIds.map((id) => React.createElement("p", { key: id, style: { fontSize: 12.5, color: PD.text, padding: '4px 0' } }, `✓ ${INSURANCE_CARRIERS.find((c) => c.id === id).name}`)))));
+            }
+            const canContinue = insuranceSetupStep === 'coverage' ? !!draft.paymentAcceptance
+                : insuranceSetupStep === 'verification' ? (draft.paymentAcceptance === 'selfpay_only' || !!draft.verificationMethod)
+                    : true;
+            const isLast = insuranceSetupStep === 'review';
+            return React.createElement(React.Fragment, null,
+                React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 6, background: T.background, display: 'flex', flexDirection: 'column' } }, header, body,
+                    React.createElement("div", { style: { position: 'absolute', left: 18, right: 18, bottom: 'calc(env(safe-area-inset-bottom) + 16px)' } },
+                        React.createElement("button", { disabled: !canContinue, onClick: () => isLast ? saveInsuranceSetup() : goStep(1), style: { width: '100%', height: 52, borderRadius: 26, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif', opacity: canContinue ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } }, isLast ? "Save & Finish" : "Continue", !isLast && React.createElement(Icon, { name: "arrowright", size: 15, color: "#fff" })))),
+                insuranceStatePickerOpen && React.createElement("div", { onClick: () => setInsuranceStatePickerOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 7 } },
+                    React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxHeight: '70%', display: 'flex', flexDirection: 'column', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `14px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                        React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: T.border, margin: '0 auto 12px' } }),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: T.textPrimary, marginBottom: 8 } }, "Select State"),
+                        React.createElement("div", { className: "avio-scroll", style: { overflowY: 'auto' } },
+                            US_STATES.map((s) => React.createElement("button", { key: s, onClick: () => { setInsuranceMedicaidState(s); setInsuranceStatePickerOpen(false); }, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '12px 4px', borderBottom: `1px solid ${T.border}`, textAlign: 'left' } },
+                                React.createElement("span", { style: { fontSize: 14, color: T.textPrimary, fontWeight: s === insuranceMedicaidState ? 700 : 400 } }, s),
+                                s === insuranceMedicaidState && React.createElement(Icon, { name: "check", size: 15, color: THEME.coral })))))));
         })(),
         providerDashboardOpen && earningsInsightsOpen && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
