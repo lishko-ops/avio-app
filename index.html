@@ -8368,6 +8368,34 @@ function App() {
                 })),
                 React.createElement("button", { onClick: () => setManageBookingsOpen(true), style: { flexShrink: 0, marginBottom: 10, padding: '7px 14px', borderRadius: 14, border: `1.5px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap' } }, "Manage"));
             let body;
+            // Shared premium booking-card row — one visual design reused by Upcoming,
+            // Past, and Tickets & Passes; only the data fed into it adapts per booking type.
+            const bookingCardImage = (b) => {
+                const biz = feed.find((f) => f.id === b.providerId);
+                return biz && biz.image ? biz.image : null;
+            };
+            const bookingCardRow = (b, i, opts) => {
+                const img = bookingCardImage(b);
+                const tile = opts.imageNode || (img
+                    ? React.createElement("div", { style: { width: 56, height: 56, borderRadius: 14, flexShrink: 0, backgroundImage: `url(${img})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
+                    : React.createElement("div", { style: { width: 56, height: 56, borderRadius: 14, flexShrink: 0, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 13, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.logoText || (opts.name || '').slice(0, 2).toUpperCase()));
+                return React.createElement("button", { key: b.id, className: "avio-card-in", onClick: opts.onClick, style: { animationDelay: `${i * 0.04}s`, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, background: T.surface, border: `1px solid ${BK.border}`, borderRadius: 18, padding: 12, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
+                    tile,
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: BK.text, margin: 0 } }, opts.name),
+                        React.createElement("p", { style: { fontSize: 12, color: BK.sub, margin: '2px 0 0' } }, opts.subtitle),
+                        opts.dateTimeLabel && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 5 } },
+                            React.createElement(Icon, { name: "calendar", size: 11, color: BK.sub }),
+                            React.createElement("span", { style: { fontSize: 11, color: BK.sub } }, opts.dateTimeLabel)),
+                        opts.addressLabel && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 3, minWidth: 0 } },
+                            React.createElement(Icon, { name: "mappin", size: 11, color: BK.sub }),
+                            React.createElement("span", { style: { fontSize: 11, color: BK.sub, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } }, opts.addressLabel))),
+                    React.createElement("div", { style: { textAlign: 'right', flexShrink: 0, marginLeft: 4 } },
+                        opts.statusLabel && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: opts.statusBg, color: opts.statusColor, border: opts.statusBorder, display: 'inline-block' } }, opts.statusLabel),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 3, marginTop: 5, justifyContent: 'flex-end' } },
+                            opts.priceLabel && React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: BK.text } }, opts.priceLabel),
+                            React.createElement(Icon, { name: "chevronright", size: 14, color: BK.text }))));
+            };
             if (bookingsSubTab === 'tickets') {
                 const TICKET_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'used', label: 'Used' }];
                 const subTabsRow = React.createElement("div", { style: { display: 'flex', gap: 8, padding: '14px 18px 0' } }, TICKET_TABS.map((t) => {
@@ -8390,26 +8418,34 @@ function App() {
                         : React.createElement(React.Fragment, null,
                             React.createElement("p", { style: { fontSize: 14, fontWeight: 600, color: BK.text, margin: 0 } }, "No used tickets yet"),
                             React.createElement("p", { style: { fontSize: 12.5, color: BK.sub, marginTop: 6, maxWidth: 260, lineHeight: 1.5 } }, "Tickets you've already used will appear here.")));
-                const ticketCards = shownTickets.length === 0 ? ticketEmptyState : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '16px 18px 0' } }, shownTickets.map((b) => {
+                const TICKET_STATUS_PILL = {
+                    ready: { bg: THEME.coral, color: '#fff', border: 'none' },
+                    preparing: { bg: '#EDEDED', color: '#6B6B6B', border: 'none' },
+                    used: { bg: '#EDEDED', color: '#6B6B6B', border: 'none' },
+                    expired: { bg: '#EDEDED', color: '#6B6B6B', border: 'none' },
+                    cancelled: { bg: '#fff', color: '#D0304A', border: '1px solid #D0304A' },
+                    refunded: { bg: '#fff', color: '#D0304A', border: '1px solid #D0304A' },
+                    failed: { bg: '#fff', color: '#D0304A', border: '1px solid #D0304A' },
+                };
+                const ticketCards = shownTickets.length === 0 ? ticketEmptyState : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '16px 18px 0' } }, shownTickets.map((b, i) => {
                     const gStatus = ticketGroupStatus(b);
                     const meta = TICKET_STATUS_META[gStatus];
+                    const pill = TICKET_STATUS_PILL[gStatus] || TICKET_STATUS_PILL.used;
                     const isMovie = b.tickets[0].kind === 'movie';
-                    const tile = isMovie
-                        ? React.createElement("div", { style: { width: 42, height: 56, borderRadius: 10, flexShrink: 0, background: `linear-gradient(160deg, ${THEME.violet}, #2A1E63)`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "video", size: 17, color: "#fff" }))
-                        : React.createElement("div", { style: { width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.logoText || b.business.slice(0, 2).toUpperCase());
-                    const thirdLine = isMovie
-                        ? `${b.date} · ${b.time} · ${b.tickets.length} Ticket${b.tickets.length === 1 ? '' : 's'}`
-                        : `${b.date} · ${b.tickets.length} Ticket${b.tickets.length === 1 ? '' : 's'}`;
-                    return React.createElement("div", { key: b.id, style: { border: `1px solid ${BK.border}`, borderRadius: 18, padding: 14 } },
-                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
-                            tile,
-                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: BK.text, margin: 0 } }, b.business),
-                                React.createElement("p", { style: { fontSize: 12, color: BK.sub, margin: '2px 0 0' } }, b.service),
-                                React.createElement("p", { style: { fontSize: 11.5, color: BK.sub, margin: '2px 0 0' } }, thirdLine))),
-                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 } },
-                            React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: meta.color } }, meta.label),
-                            React.createElement("button", { onClick: () => setTicketDetail({ bookingId: b.id, index: 0 }), style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, `${b.tickets.length === 1 ? 'View Ticket' : 'View Tickets'} →`)));
+                    const imageNode = isMovie && !bookingCardImage(b)
+                        ? React.createElement("div", { style: { width: 56, height: 56, borderRadius: 14, flexShrink: 0, background: `linear-gradient(160deg, ${THEME.violet}, #2A1E63)`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "video", size: 19, color: "#fff" }))
+                        : null;
+                    return bookingCardRow(b, i, {
+                        imageNode,
+                        name: b.business,
+                        subtitle: b.service,
+                        dateTimeLabel: b.time ? `${b.date} · ${b.time}` : b.date,
+                        addressLabel: b.address,
+                        statusLabel: meta.label,
+                        statusBg: pill.bg, statusColor: pill.color, statusBorder: pill.border,
+                        priceLabel: `${b.tickets.length} Ticket${b.tickets.length === 1 ? '' : 's'}`,
+                        onClick: () => setTicketDetail({ bookingId: b.id, index: 0 }),
+                    });
                 }));
                 body = React.createElement(React.Fragment, null, subTabsRow, ticketCards);
             }
@@ -8427,15 +8463,16 @@ function App() {
                     // A pending/in-flight cancellation request overrides the normal booking
                     // status pill so the customer always sees where it actually stands.
                     const cxl = b.cancellationRequest && b.cancellationRequest.status !== 'declined' ? CANCELLATION_STATUS_META[b.cancellationRequest.status] : null;
-                    return React.createElement("button", { key: b.id, className: "avio-card-in", onClick: () => setBookingDetail(b), style: { animationDelay: `${i * 0.04}s`, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, background: T.surface, border: `1px solid ${BK.border}`, borderRadius: 18, padding: 12, boxShadow: '0 2px 10px rgba(0,0,0,0.05)' } },
-                        React.createElement("div", { style: { width: 42, height: 42, borderRadius: 12, flexShrink: 0, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.logoText || (b.business || b.name).slice(0, 2).toUpperCase()),
-                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                            React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BK.text, margin: 0 } }, b.business || b.name),
-                            React.createElement("p", { style: { fontSize: 11.5, color: BK.sub, margin: '1px 0 0' } }, b.service),
-                            React.createElement("p", { style: { fontSize: 11, color: BK.sub, margin: '2px 0 0' } }, (b.timeRange || b.time) ? `${b.date} · ${b.timeRange || b.time}` : b.date)),
-                        React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
-                            React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: cxl ? cxl.bg : st.bg, color: cxl ? cxl.color : st.color, border: cxl ? 'none' : st.border, display: 'inline-block' } }, cxl ? cxl.label : (BOOKING_STATUS_LABEL[b.status] || b.status)),
-                            React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: BK.text, margin: '5px 0 0' } }, b.status === 'quote_requested' ? 'Awaiting quote' : money(b.total))));
+                    return bookingCardRow(b, i, {
+                        name: b.business || b.name,
+                        subtitle: b.service,
+                        dateTimeLabel: (b.timeRange || b.time) ? `${b.date} · ${b.timeRange || b.time}` : b.date,
+                        addressLabel: b.address,
+                        statusLabel: cxl ? cxl.label : (BOOKING_STATUS_LABEL[b.status] || b.status),
+                        statusBg: cxl ? cxl.bg : st.bg, statusColor: cxl ? cxl.color : st.color, statusBorder: cxl ? 'none' : st.border,
+                        priceLabel: b.status === 'quote_requested' ? 'Awaiting quote' : money(b.total),
+                        onClick: () => setBookingDetail(b),
+                    });
                 }));
                 body = cards;
             }
