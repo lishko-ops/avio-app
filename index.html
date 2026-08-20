@@ -3055,6 +3055,7 @@ function App() {
     const [cancelFlow, setCancelFlow] = useState(null); // { step, bookingId, reasonId, note, submitting }
     const [rescheduleFlow, setRescheduleFlow] = useState(null); // { step, bookingId, calMonth, newDay, newTimeMinutes, submitting }
     const [checkCancellationsOpen, setCheckCancellationsOpen] = useState(false);
+    const [manageBookingsOpen, setManageBookingsOpen] = useState(false);
     const [cancellationDetailBookingId, setCancellationDetailBookingId] = useState(null);
     const [businessCancellationRequestsOpen, setBusinessCancellationRequestsOpen] = useState(false);
     function openCustomerCancelFlow() { setCancelFlow({ step: 'select', bookingId: null, reasonId: null, note: '' }); }
@@ -8358,12 +8359,14 @@ function App() {
             const shownBookings = bookingsSubTab === 'past' ? pastBookings : upcomingBookings;
             const header = React.createElement("div", { style: { padding: '0 18px' } },
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: BK.text, margin: 0 } }, "Bookings"));
-            const tabsRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 20, padding: '18px 18px 0', borderBottom: `1px solid ${BK.border}`, overflowX: 'auto' } }, CUS_TABS.map((t) => {
-                const active = bookingsSubTab === t.id;
-                return React.createElement("button", { key: t.id, onClick: () => setBookingsSubTab(t.id), style: { flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
-                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? BK.text : BK.sub, whiteSpace: 'nowrap' } }, t.label),
-                    React.createElement("div", { style: { width: active ? 22 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
-            }));
+            const tabsRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '18px 18px 0', borderBottom: `1px solid ${BK.border}` } },
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 20, overflowX: 'auto' } }, CUS_TABS.map((t) => {
+                    const active = bookingsSubTab === t.id;
+                    return React.createElement("button", { key: t.id, onClick: () => setBookingsSubTab(t.id), style: { flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 10 } },
+                        React.createElement("span", { style: { fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? BK.text : BK.sub, whiteSpace: 'nowrap' } }, t.label),
+                        React.createElement("div", { style: { width: active ? 22 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
+                })),
+                React.createElement("button", { onClick: () => setManageBookingsOpen(true), style: { flexShrink: 0, marginBottom: 10, padding: '7px 14px', borderRadius: 14, border: `1.5px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap' } }, "Manage"));
             let body;
             if (bookingsSubTab === 'tickets') {
                 const TICKET_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'used', label: 'Used' }];
@@ -8434,14 +8437,7 @@ function App() {
                             React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: cxl ? cxl.bg : st.bg, color: cxl ? cxl.color : st.color, border: cxl ? 'none' : st.border, display: 'inline-block' } }, cxl ? cxl.label : (BOOKING_STATUS_LABEL[b.status] || b.status)),
                             React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: BK.text, margin: '5px 0 0' } }, b.status === 'quote_requested' ? 'Awaiting quote' : money(b.total))));
                 }));
-                const managementButtons = bookingsSubTab === 'upcoming' && shownBookings.length > 0 && React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '18px 18px 0' } },
-                    React.createElement("button", { onClick: openCustomerCancelFlow, style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: '1.5px solid #D0304A', color: '#D0304A', fontWeight: 700, fontSize: 13.5 } },
-                        React.createElement(Icon, { name: "x", size: 15, color: "#D0304A" }), "Cancel Bookings/Tickets"),
-                    React.createElement("button", { onClick: openCustomerRescheduleFlow, style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px solid ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } },
-                        React.createElement(Icon, { name: "clock", size: 15, color: THEME.coral }), "Reschedule Bookings/Tickets"),
-                    React.createElement("button", { onClick: () => setCheckCancellationsOpen(true), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', padding: '13px 0', borderRadius: 14, border: `1.5px solid ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } },
-                        React.createElement(Icon, { name: "check", size: 15, color: THEME.coral }), "Check on Cancellations"));
-                body = React.createElement(React.Fragment, null, cards, managementButtons);
+                body = cards;
             }
             const scrollContent = React.createElement("div", { className: "avio-scroll", style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 100px)` } },
                 header, tabsRow, body);
@@ -13239,6 +13235,24 @@ function App() {
             return null;
         })(),
         // ==================== Check on Cancellations ====================
+        manageBookingsOpen && (() => {
+            const MB = { bg: T.background, text: T.textPrimary, sub: T.textSecondary, border: T.border, surface: T.surface };
+            const cards = [
+                { icon: 'x', title: 'Cancel Booking / Tickets', onClick: () => { setManageBookingsOpen(false); openCustomerCancelFlow(); } },
+                { icon: 'clock', title: 'Reschedule Booking', onClick: () => { setManageBookingsOpen(false); openCustomerRescheduleFlow(); } },
+                { icon: 'check', title: 'Check on Cancellation', onClick: () => { setManageBookingsOpen(false); setCheckCancellationsOpen(true); } },
+            ];
+            return React.createElement("div", { key: "manageBookings", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: MB.bg, zIndex: 17, display: 'flex', flexDirection: 'column' } },
+                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${MB.border}` } },
+                    React.createElement("button", { onClick: () => setManageBookingsOpen(false), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: MB.text })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: MB.text, margin: 0 } }, "Manage Bookings")),
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '18px 18px calc(env(safe-area-inset-bottom) + 18px)', display: 'flex', flexDirection: 'column', gap: 14 } },
+                    cards.map((c) => React.createElement("button", { key: c.title, onClick: c.onClick, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 14, background: MB.surface, border: `1px solid ${MB.border}`, borderRadius: 18, padding: '18px 16px', textAlign: 'left', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' } },
+                        React.createElement("div", { style: { width: 40, height: 40, borderRadius: 12, background: 'rgba(151,196,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                            React.createElement(Icon, { name: c.icon, size: 19, color: THEME.coral })),
+                        React.createElement("span", { style: { flex: 1, fontSize: 15, fontWeight: 700, color: MB.text } }, c.title),
+                        React.createElement(Icon, { name: "chevronright", size: 16, color: MB.text })))));
+        })(),
         checkCancellationsOpen && (() => {
             const CC = { bg: T.background, alt: T.surfaceSecondary, sub: T.textSecondary, text: T.textPrimary, border: T.border };
             const requests = bookings.filter((b) => b.cancellationRequest).sort((a, b) => b.cancellationRequest.requestedAt - a.cancellationRequest.requestedAt);
