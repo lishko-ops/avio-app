@@ -8023,6 +8023,14 @@ function App() {
         !(tab === 'connect' && activeConversationId) && (() => {
             const navDark = showDarkChrome;
             const navMuted = navDark ? THEME.muted : T.textSecondary;
+            // Single source of truth for which top-level nav section is active — every
+            // nested/child screen within a section (Business → Schedule → Add Break,
+            // Profile → Edit Profile, Bookings → Tickets & Passes, etc.) must keep that
+            // section's icon lit, so this is checked most-specific-first rather than
+            // deriving each icon's state from its own independent overlay flag.
+            const activeSection = accountType === 'business'
+                ? ((businessProfileTarget && businessProfileTarget.id === MY_PROVIDER_ID) || editBusinessProfileOpen ? 'profile' : providerDashboardOpen ? 'business' : tab)
+                : (customerProfileOpen ? 'budget' : tab);
             return React.createElement("div", { style: { position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 4, background: navDark ? '#000' : T.navigationBackground, borderTop: navDark ? '1px solid rgba(255,255,255,0.08)' : `1px solid ${T.navigationBorder}`, display: 'flex', flexDirection: 'column' } },
             React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', paddingTop: 2, paddingLeft: 12, paddingRight: 12 } },
                 (accountType === 'business'
@@ -8036,8 +8044,8 @@ function App() {
                                     React.createElement("circle", { cx: 20, cy: 20, r: 18, fill: "none", stroke: THEME.coral, strokeWidth: 3.6, strokeDasharray: "2 3.2", strokeLinecap: "round" }))),
                             React.createElement("span", { style: { fontSize: 12, color: THEME.coral, fontWeight: 600, whiteSpace: 'nowrap' } }, "Create"));
                     }
-                    const active = t.id === 'business' ? providerDashboardOpen : t.id === 'profile' ? (businessProfileTarget != null && businessProfileTarget.id === MY_PROVIDER_ID) : t.id === 'budget' ? customerProfileOpen : tab === t.id;
-                    const onNavClick = t.id === 'business' ? () => { setCustomerProfileOpen(false); setProviderDashboardOpen(true); } : t.id === 'profile' ? () => { setCustomerProfileOpen(false); openMyBusinessProfile(); } : t.id === 'budget' ? openCustomerProfile : () => { setCustomerProfileOpen(false); setProviderDashboardOpen(false); setTab(t.id); setActiveCat(null); };
+                    const active = activeSection === t.id;
+                    const onNavClick = t.id === 'business' ? () => { setCustomerProfileOpen(false); setBusinessProfileTarget(null); setProviderDashboardOpen(true); } : t.id === 'profile' ? () => { setCustomerProfileOpen(false); openMyBusinessProfile(); } : t.id === 'budget' ? openCustomerProfile : () => { setCustomerProfileOpen(false); setProviderDashboardOpen(false); setBusinessProfileTarget(null); setEditBusinessProfileOpen(false); setEditProfileDraft(null); setEditProfileDiscardConfirm(false); setTab(t.id); setActiveCat(null); };
                     return React.createElement("button", { key: t.id, onClick: onNavClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, flexShrink: 0 } },
                         React.createElement(Icon, { name: t.icon, size: 24, color: active ? THEME.coral : navMuted, fill: active && (t.icon === 'house' || t.icon === 'message') ? THEME.coral : 'none' }),
                         React.createElement("span", { style: { fontSize: 12, color: active ? THEME.coral : navMuted, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' } }, t.label));
