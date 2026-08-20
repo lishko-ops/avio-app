@@ -7969,24 +7969,12 @@ function App() {
                     return false;
                 return true;
             }).sort((a, b) => (pinnedIds.has(b.id) ? 1 : 0) - (pinnedIds.has(a.id) ? 1 : 0));
-            const header = React.createElement("div", { style: { padding: '0 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: CN.text, margin: 0 } }, "Connect"),
-                React.createElement("button", { onClick: () => flashToast('New conversation — coming soon'), style: { width: 32, height: 32, borderRadius: '50%', border: `1.5px solid ${CN.text}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "plus", size: 15, color: CN.text })));
+            const header = React.createElement("div", { style: { padding: '0 18px' } },
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: CN.text, margin: 0 } }, "Connect"));
             const searchRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, padding: '0 18px', marginTop: 14 } },
                 React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: T.surfaceSecondary, borderRadius: 16, height: 40, padding: '0 12px' } },
                     React.createElement(Icon, { name: "search", size: 15, color: CN.sub }),
                     React.createElement("input", { value: connectSearch, onChange: (e) => setConnectSearch(e.target.value), placeholder: "Search conversations", style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: CN.text } })));
-            const avatarRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 16, overflowX: 'auto', padding: '16px 18px 0' } },
-                React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 } },
-                    React.createElement("div", { style: { position: 'relative', width: 46, height: 46 } },
-                        React.createElement("div", { style: { width: 46, height: 46, borderRadius: '50%', background: T.border, border: `1.5px dashed ${CN.sub}` } }),
-                        React.createElement("div", { style: { position: 'absolute', bottom: -2, right: -2, width: 16, height: 16, borderRadius: '50%', background: THEME.coral, border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "plus", size: 8, color: "#fff" }))),
-                    React.createElement("span", { style: { fontSize: 9.5, color: CN.sub } }, "Your notes")),
-                conversations.map((c) => React.createElement("button", { key: c.id, onClick: () => openConversation(c.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 } },
-                    React.createElement("div", { style: { position: 'relative', width: 46, height: 46 } },
-                        React.createElement("div", { style: { width: 46, height: 46, borderRadius: '50%', background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 13, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, c.initials),
-                        c.online && React.createElement("div", { style: { position: 'absolute', bottom: -1, right: -1, width: 13, height: 13, borderRadius: '50%', background: '#3FBF6A', border: '2px solid #fff' } })),
-                    React.createElement("span", { style: { fontSize: 9.5, color: CN.text, maxWidth: 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, c.name))));
             const filters = [{ id: 'all', label: 'All' }, { id: 'unread', label: 'Unread' }, { id: 'bookings', label: 'Bookings' }, { id: 'active', label: 'Active' }, { id: 'requests', label: 'Requests' }];
             const filterRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 18px 0' } }, filters.map((f) => {
                 const active = connectFilter === f.id;
@@ -8019,7 +8007,7 @@ function App() {
                                 c.unread > 0 && React.createElement("span", { style: { minWidth: 18, height: 18, borderRadius: 9, background: THEME.coral, color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' } }, c.unread))));
                 }));
             return React.createElement("div", { className: "avio-scroll", style: { height: '100%', overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 90px)` } },
-                header, searchRow, avatarRow, filterRow, list);
+                header, searchRow, filterRow, list);
         })())),
         tab === 'bookings' && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: T.background } }, (() => {
             const BK = { text: T.textPrimary, sub: T.textSecondary, border: T.border, alt: T.surfaceSecondary };
