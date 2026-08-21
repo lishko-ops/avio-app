@@ -8204,11 +8204,12 @@ function App() {
                         return false;
                     return true;
                 });
-                const header = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px' } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 28, color: CN.text, margin: 0 } }, "Messages"),
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 18 } },
-                        React.createElement("button", { onClick: () => flashToast('Search — coming soon') }, React.createElement(Icon, { name: "search", size: 20, color: CN.text })),
-                        React.createElement("button", { onClick: () => flashToast('Filter — coming soon') }, React.createElement(Icon, { name: "sliders", size: 20, color: CN.text }))));
+                const header = React.createElement("div", { style: { padding: '0 18px' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 28, color: CN.text, margin: 0 } }, "Messages"));
+                const searchRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, padding: '0 18px', marginTop: 14 } },
+                    React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: T.surfaceSecondary, borderRadius: 16, height: 40, padding: '0 12px' } },
+                        React.createElement(Icon, { name: "search", size: 15, color: CN.sub }),
+                        React.createElement("input", { value: connectSearch, onChange: (e) => setConnectSearch(e.target.value), placeholder: "Search conversations", style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: CN.text } })));
                 const filterRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', padding: '16px 18px 0' } }, BIZ_FILTERS.map((f) => {
                     const active = connectFilter === f.id;
                     const count = f.id === 'unread' ? unreadCount : 0;
@@ -8233,7 +8234,7 @@ function App() {
                             c.unread > 0 && React.createElement("span", { style: { minWidth: 22, height: 22, borderRadius: 11, background: '#3FBF6A', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px', flexShrink: 0 } }, c.unread));
                     }));
                 return React.createElement("div", { className: "avio-scroll", style: { height: '100%', overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 90px)` } },
-                    header, filterRow, list);
+                    header, searchRow, filterRow, list);
             }
             const activeConversation = conversations.find((c) => c.id === activeConversationId);
             if (activeConversation) {
