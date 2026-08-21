@@ -3465,6 +3465,38 @@ function App() {
         const setter = accountType === 'business' ? setBusinessConversations : setConversations;
         setter((prev) => prev.map((c) => c.id === id ? { ...c, unread: 0 } : c));
     }
+    // Entry point for the message button on a business profile — reuses the
+    // SAME conversations list Connect reads from (never a separate/fake
+    // chat), matching on providerId so re-opening the same business's
+    // profile always lands back on the one real conversation instead of
+    // minting a duplicate every time.
+    function openBusinessConversation(item) {
+        closeBusinessProfile();
+        setTab('connect');
+        const existing = conversations.find((c) => c.providerId === item.id);
+        if (existing) {
+            openConversation(existing.id);
+            return;
+        }
+        const initials = (item.name || '').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '??';
+        const newConversation = {
+            id: 'conv-' + item.id,
+            providerId: item.id,
+            name: item.name,
+            category: item.category || 'Business',
+            rating: item.rating || 0,
+            verified: !!item.verified,
+            online: true,
+            unread: 0,
+            initials,
+            avatarColor: item.avatarColor,
+            responseTime: '~15 min',
+            hasBookingThread: false,
+            messages: [],
+        };
+        setConversations((prev) => [newConversation, ...prev]);
+        setActiveConversationId(newConversation.id);
+    }
     function sendConnectMessage() {
         if (!connectDraft.trim() || !activeConversationId)
             return;
@@ -8949,7 +8981,7 @@ function App() {
                     ? React.createElement("button", { onClick: openEditBusinessProfile, style: { flex: 1, padding: '13px 0', borderRadius: 24, background: T.textPrimary, border: 'none', color: T.background, fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 } },
                         "Edit", React.createElement(Icon, { name: "pencil", size: 13, color: T.background }))
                     : React.createElement("button", { onClick: () => toggleFollow(item.id), style: { flex: 1, padding: '13px 0', borderRadius: 24, background: followed ? 'transparent' : T.textPrimary, border: followed ? '1px solid #E0E0E0' : 'none', color: followed ? T.textPrimary : T.background, fontWeight: 700, fontSize: 14 } }, followed ? "Following" : "Follow"),
-                React.createElement("button", { onClick: () => flashToast('Message — coming soon'), style: { width: 46, height: 46, borderRadius: 14, border: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                !isOwnProfile && React.createElement("button", { onClick: () => openBusinessConversation(item), style: { width: 46, height: 46, borderRadius: 14, border: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                     React.createElement(Icon, { name: "messageoutline", size: 18, color: "#161616" })));
             const activeProfileDealLabel = (item.mine || item.id === MY_PROVIDER_ID) ? (providerDeal.enabled ? providerDeal.label : null) : (item.deal && item.deal.enabled ? item.deal.label : null);
             const profileDealBadge = activeProfileDealLabel && React.createElement("div", { style: { margin: '16px 18px 0', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(151,196,0,0.12)', borderRadius: 18, padding: '6px 12px' } },
