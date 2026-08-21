@@ -10170,9 +10170,7 @@ function App() {
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
                         React.createElement("span", { style: { fontSize: 14, color: PD.sub } }, "Good morning,"),
                         React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: PD.text } }, bizOnboarding.businessName.trim() || 'My Business'),
-                        businessVerified && React.createElement("div", { style: { width: 14, height: 14, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" })),
-                        React.createElement(Icon, { name: "chevrondown", size: 13, color: PD.sub })),
-                    React.createElement("button", { onClick: () => flashToast('No new notifications') }, React.createElement(Icon, { name: "bell", size: 19, color: PD.text })))
+                        businessVerified && React.createElement("div", { style: { width: 14, height: 14, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" }))))
                 : React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${PD.border}` } },
                     React.createElement("button", { onClick: providerDashboardTab === 'hours' ? scheduleBack : () => setProviderDashboardTab('overview') }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, providerDashboardTab === 'hours' ? (scheduleView === 'calendar' && scheduleCalDay != null ? new Date(scheduleCalMonth.getFullYear(), scheduleCalMonth.getMonth(), scheduleCalDay).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : SCHEDULE_TITLES[scheduleView]) : ({ bookings: 'Bookings', services: 'Services', team: 'Team', calendar: 'Calendar', customerPosts: 'Customer Posts' }[providerDashboardTab] || bizOnboarding.businessName.trim() || 'My Business')),
@@ -10251,9 +10249,7 @@ function App() {
                     { id: 'cancelBookings', label: 'Cancel Bookings', onClick: openCancelFlow },
                 ];
                 const quickActionsBar = React.createElement("div", { style: { marginTop: 26 } },
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
-                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Quick Actions"),
-                        React.createElement("button", { onClick: () => flashToast('Reorder quick actions — coming soon'), style: { fontSize: 12, fontWeight: 600, color: THEME.coral } }, "Edit")),
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: '0 0 10px', textTransform: 'uppercase' } }, "Quick Actions"),
                     React.createElement("div", { style: { display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', background: T.surface, border: `1px solid ${PD.border}`, borderRadius: 18, padding: '4px 0' } },
                         QUICK_ACTIONS.map((a, i) => React.createElement(React.Fragment, { key: a.id },
                             i > 0 && React.createElement("div", { style: { width: 1, background: PD.border, margin: '10px 0' } }),
