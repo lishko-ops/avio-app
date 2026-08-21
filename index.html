@@ -19,6 +19,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="assets/vendor/qrcode-generator.js"></script>
+<script src="assets/vendor/jsQR.js"></script>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body, #root { height: 100%; margin: 0; overscroll-behavior: none; background: #fff; }
@@ -96,6 +98,8 @@
   .avio-nfc-glyph { animation: avioNfcGlyphPulse 1.6s ease-in-out infinite; }
   @keyframes avioTapEnterIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
   .avio-tap-enter-in { animation: avioTapEnterIn 0.32s cubic-bezier(0.22,1,0.36,1); }
+  @keyframes avioQrScanLine { 0% { top: 6%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 92%; opacity: 0; } }
+  .avio-qr-scan-line { animation: avioQrScanLine 2.1s cubic-bezier(0.45,0,0.55,1) infinite; }
 </style>
 </head>
 <body>
@@ -270,6 +274,13 @@ function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
         camera: React.createElement(React.Fragment, null,
             React.createElement("path", { d: "M4 8.5a2 2 0 0 1 2-2h1.6l1-1.7h6.8l1 1.7H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9z" }),
             React.createElement("circle", { cx: "12", cy: "13", r: "3.4" })),
+        flashlight: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M8 2h8l-1 7h2.5L10 22l1.2-9H8.5z", ...solid })),
+        refresh: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M4 12a8 8 0 0 1 13.66-5.66L20 8" }),
+            React.createElement("path", { d: "M20 4v4h-4" }),
+            React.createElement("path", { d: "M20 12a8 8 0 0 1-13.66 5.66L4 16" }),
+            React.createElement("path", { d: "M4 20v-4h4" })),
         image: React.createElement(React.Fragment, null,
             React.createElement("rect", { x: "3", y: "4.5", width: "18", height: "15", rx: "2.5" }),
             React.createElement("circle", { cx: "8.5", cy: "9.5", r: "1.6", ...solid }),
@@ -601,36 +612,55 @@ function ticketGroupStatus(b) {
         return 'expired';
     return 'ready';
 }
-// A deterministic, self-contained placeholder QR — no network/library needed.
-// Seeded off the ticket's own credential so the same ticket always renders
-// the same pattern; three finder squares in the corners for a real-QR feel.
-function ticketQrSvg(seed, size) {
+// A real, camera-scannable QR code — encodes `data` (a string; for Bookvado
+// tickets this is JSON.stringify(credential)) using the qrcode-generator
+// library loaded in <head>. Falls back to a deterministic placeholder
+// pattern only if that library failed to load, so the UI never crashes.
+function ticketQrSvg(data, size) {
     size = size || 176;
-    const cells = 21;
+    if (typeof qrcode !== 'function') {
+        // Placeholder fallback — visually QR-like but not decodable.
+        const cells = 21;
+        const cell = size / cells;
+        let h = 0;
+        for (let i = 0; i < data.length; i++) h = ((h << 5) - h + data.charCodeAt(i)) | 0;
+        function rand(i) { h = (h * 1103515245 + 12345 + i) | 0; return ((h >>> 8) & 0xff) / 255; }
+        const isFinder = (r, c) => (r < 7 && c < 7) || (r < 7 && c >= cells - 7) || (r >= cells - 7 && c < 7);
+        const squares = [];
+        let i = 0;
+        for (let r = 0; r < cells; r++) {
+            for (let c = 0; c < cells; c++) {
+                if (isFinder(r, c)) continue;
+                i++;
+                if (rand(i) > 0.56)
+                    squares.push(React.createElement("rect", { key: r + '-' + c, x: c * cell, y: r * cell, width: cell, height: cell, fill: "#000" }));
+            }
+        }
+        function finderSquare(r, c) {
+            return React.createElement(React.Fragment, { key: 'f' + r + '-' + c },
+                React.createElement("rect", { x: c * cell, y: r * cell, width: cell * 7, height: cell * 7, fill: "#000" }),
+                React.createElement("rect", { x: (c + 1) * cell, y: (r + 1) * cell, width: cell * 5, height: cell * 5, fill: "#fff" }),
+                React.createElement("rect", { x: (c + 2) * cell, y: (r + 2) * cell, width: cell * 3, height: cell * 3, fill: "#000" }));
+        }
+        return React.createElement("svg", { width: size, height: size, viewBox: `0 0 ${size} ${size}`, style: { display: 'block' } },
+            React.createElement("rect", { x: 0, y: 0, width: size, height: size, fill: "#fff" }),
+            squares, finderSquare(0, 0), finderSquare(0, cells - 7), finderSquare(cells - 7, 0));
+    }
+    const qr = qrcode(0, 'M');
+    qr.addData(data);
+    qr.make();
+    const cells = qr.getModuleCount();
     const cell = size / cells;
-    let h = 0;
-    for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
-    function rand(i) { h = (h * 1103515245 + 12345 + i) | 0; return ((h >>> 8) & 0xff) / 255; }
-    const isFinder = (r, c) => (r < 7 && c < 7) || (r < 7 && c >= cells - 7) || (r >= cells - 7 && c < 7);
     const squares = [];
-    let i = 0;
     for (let r = 0; r < cells; r++) {
         for (let c = 0; c < cells; c++) {
-            if (isFinder(r, c)) continue;
-            i++;
-            if (rand(i) > 0.56)
+            if (qr.isDark(r, c))
                 squares.push(React.createElement("rect", { key: r + '-' + c, x: c * cell, y: r * cell, width: cell, height: cell, fill: "#000" }));
         }
     }
-    function finderSquare(r, c) {
-        return React.createElement(React.Fragment, { key: 'f' + r + '-' + c },
-            React.createElement("rect", { x: c * cell, y: r * cell, width: cell * 7, height: cell * 7, fill: "#000" }),
-            React.createElement("rect", { x: (c + 1) * cell, y: (r + 1) * cell, width: cell * 5, height: cell * 5, fill: "#fff" }),
-            React.createElement("rect", { x: (c + 2) * cell, y: (r + 2) * cell, width: cell * 3, height: cell * 3, fill: "#000" }));
-    }
     return React.createElement("svg", { width: size, height: size, viewBox: `0 0 ${size} ${size}`, style: { display: 'block' } },
         React.createElement("rect", { x: 0, y: 0, width: size, height: size, fill: "#fff" }),
-        squares, finderSquare(0, 0), finderSquare(0, cells - 7), finderSquare(cells - 7, 0));
+        squares);
 }
 function formatDuration(min) {
     if (min < 60)
@@ -844,6 +874,7 @@ const REDEMPTION_RESULT_META = {
     CANCELLED: { label: 'CANCELLED', color: '#D0304A', icon: 'x' },
     REFUNDED: { label: 'REFUNDED', color: '#D0304A', icon: 'x' },
     INVALID_TICKET: { label: 'INVALID TICKET', color: '#D0304A', icon: 'warningtriangle' },
+    PARTNER_TICKET: { label: 'PARTNER TICKET', color: '#8A8A8E', icon: 'warningtriangle' },
 };
 // Booking date/time → the window a ticket is actually valid to redeem in.
 // Doors open GATE_OPEN_MS before the booked time and stay open through the
@@ -2910,6 +2941,22 @@ function App() {
     const [scannerOffline, setScannerOffline] = useState(false);
     const [redemptionAudit, setRedemptionAudit] = useState([]); // { id, ts, method, device, code, ticketLabel }
     const [partialRedeemQty, setPartialRedeemQty] = useState(1); // staff-chosen admissions to redeem this pass
+    // ---- Bookvado Scanner: real camera QR scanning ----
+    // 'idle' | 'requesting' | 'granted' | 'denied' | 'unavailable' | 'unsupported' | 'error'
+    const [qrCamStatus, setQrCamStatus] = useState('idle');
+    const [qrCamError, setQrCamError] = useState('');
+    const [qrTorchSupported, setQrTorchSupported] = useState(false);
+    const [qrTorchOn, setQrTorchOn] = useState(false);
+    const [qrMultiCamera, setQrMultiCamera] = useState(false);
+    const [qrFacingMode, setQrFacingMode] = useState('environment');
+    const [qrRetryToken, setQrRetryToken] = useState(0);
+    const qrVideoRef = useRef(null);
+    const qrCanvasRef = useRef(null);
+    const qrStreamRef = useRef(null);
+    const qrRafRef = useRef(null);
+    const qrScanLockRef = useRef(false);
+    const ticketScanResultRef = useRef(null);
+    useEffect(() => { ticketScanResultRef.current = ticketScanResult; }, [ticketScanResult]);
     // ref -> { ticketId, bookingId } — stands in for the server-side lookup
     // table a real backend would keep; see generateTapCredential's comment.
     const tapCredentialRegistryRef = useRef({});
@@ -3213,6 +3260,138 @@ function App() {
             if (tapListenStopRef.current) { tapListenStopRef.current(); tapListenStopRef.current = null; }
         };
     }, [ticketScannerOpen, scannerMode]);
+    // A detected QR payload is either a Bookvado credential (JSON matching
+    // the {ref, sig, ...} shape signCredential produces), a partner ticket's
+    // marker ({partner: true, ...} — never issued by this app today, but the
+    // decode path recognizes it so a real partner QR is never silently
+    // mistaken for a Bookvado one), or garbage/foreign QR content.
+    function handleQrDetected(raw) {
+        let payload = null;
+        try { payload = JSON.parse(raw); } catch (e) { payload = null; }
+        if (payload && payload.partner) {
+            pushAudit({ method: 'QR', device: SCANNER_DEVICE.id, code: 'PARTNER_TICKET' });
+            setTicketScanResult({ code: 'PARTNER_TICKET', ok: false, partner: true });
+            return;
+        }
+        if (!payload || !payload.ref || !payload.sig) {
+            pushAudit({ method: 'QR', device: SCANNER_DEVICE.id, code: 'INVALID_TICKET' });
+            setTicketScanResult({ code: 'INVALID_TICKET', ok: false });
+            return;
+        }
+        setTicketScanResult(validateBookvadoCredentialRef.current(payload, 'QR', SCANNER_DEVICE));
+    }
+    // Real camera QR scanning. One effect owns the whole stream lifecycle —
+    // start on open/switch to Scan QR, stop (and release the camera) on
+    // switch away or close. Detection itself pauses while a result is on
+    // screen (via ticketScanResultRef, so this effect doesn't need to
+    // restart — and therefore doesn't need to re-request permission —
+    // every time a scan resolves) and resumes the moment the result clears.
+    useEffect(() => {
+        if (!(ticketScannerOpen && scannerMode === 'qr')) {
+            if (qrRafRef.current) { cancelAnimationFrame(qrRafRef.current); qrRafRef.current = null; }
+            if (qrStreamRef.current) { qrStreamRef.current.getTracks().forEach((t) => t.stop()); qrStreamRef.current = null; }
+            setQrCamStatus('idle');
+            setQrTorchOn(false);
+            return;
+        }
+        if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+            setQrCamStatus('unsupported');
+            return;
+        }
+        if (!(location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+            setQrCamStatus('unsupported');
+            setQrCamError('Camera access requires a secure (HTTPS) connection.');
+            return;
+        }
+        let cancelled = false;
+        setQrCamStatus('requesting');
+        setQrCamError('');
+        qrScanLockRef.current = false;
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: qrFacingMode } }, audio: false })
+            .then((stream) => {
+                if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+                qrStreamRef.current = stream;
+                if (qrVideoRef.current) {
+                    qrVideoRef.current.srcObject = stream;
+                    qrVideoRef.current.play().catch(() => {});
+                }
+                const track = stream.getVideoTracks()[0];
+                const caps = track && track.getCapabilities ? track.getCapabilities() : {};
+                setQrTorchSupported(!!(caps && caps.torch));
+                navigator.mediaDevices.enumerateDevices().then((devices) => {
+                    if (!cancelled)
+                        setQrMultiCamera(devices.filter((d) => d.kind === 'videoinput').length > 1);
+                }).catch(() => {});
+                setQrCamStatus('granted');
+                function tick() {
+                    if (cancelled) return;
+                    const video = qrVideoRef.current;
+                    const canvas = qrCanvasRef.current;
+                    if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA && !qrScanLockRef.current && !ticketScanResultRef.current && typeof jsQR === 'function') {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
+                        if (code && code.data) {
+                            qrScanLockRef.current = true;
+                            handleQrDetected(code.data);
+                        }
+                    }
+                    qrRafRef.current = requestAnimationFrame(tick);
+                }
+                qrRafRef.current = requestAnimationFrame(tick);
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                const name = err && err.name;
+                if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError')
+                    setQrCamStatus('denied');
+                else if (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'DevicesNotFoundError')
+                    setQrCamStatus('unavailable');
+                else if (name === 'NotReadableError' || name === 'TrackStartError')
+                    setQrCamStatus('error');
+                else
+                    setQrCamStatus('error');
+                setQrCamError((err && err.message) || 'Camera couldn’t start.');
+            });
+        return () => {
+            cancelled = true;
+            if (qrRafRef.current) { cancelAnimationFrame(qrRafRef.current); qrRafRef.current = null; }
+            if (qrStreamRef.current) { qrStreamRef.current.getTracks().forEach((t) => t.stop()); qrStreamRef.current = null; }
+        };
+    }, [ticketScannerOpen, scannerMode, qrFacingMode, qrRetryToken]);
+    // Resets scan lock + reactivates detection whenever staff clear a result
+    // (Confirm Entry / Scan Another / the 1.8s auto-dismiss after a valid
+    // entry) so the next QR entering frame is picked up automatically —
+    // never requires re-opening the scanner or pressing a button.
+    useEffect(() => {
+        if (!ticketScanResult)
+            qrScanLockRef.current = false;
+    }, [ticketScanResult]);
+    function toggleQrTorch() {
+        const track = qrStreamRef.current && qrStreamRef.current.getVideoTracks()[0];
+        if (!track) return;
+        const next = !qrTorchOn;
+        track.applyConstraints({ advanced: [{ torch: next }] }).then(() => setQrTorchOn(next)).catch(() => flashToast('Flashlight unavailable on this device'));
+    }
+    function flipQrCamera() {
+        setQrFacingMode((m) => m === 'environment' ? 'user' : 'environment');
+    }
+    function retryQrCamera() {
+        setQrRetryToken((n) => n + 1);
+    }
+    // There is no web API that can script-open a device's OS/browser
+    // Settings screen — that's a deliberate browser security boundary, not
+    // an oversight here. This does the next best thing: re-requests
+    // permission (instant, no new prompt, if the browser now allows it —
+    // e.g. the user just flipped the toggle in Settings) and otherwise
+    // surfaces exactly where to go fix it.
+    function openCameraSettings() {
+        setQrRetryToken((n) => n + 1);
+        flashToast('If prompted, allow camera access. Already blocked? Enable it in your browser or device Settings → Privacy → Camera, then come back.');
+    }
     // Offline handling (spec §14): the scanner must never silently accept
     // tickets without validation just because connectivity dropped — it
     // still validates against the same in-memory ticket state (this
@@ -12919,7 +13098,7 @@ function App() {
                                     [0, 0.73, 1.46].map((d, i) => React.createElement("div", { key: i, className: "avio-nfc-ring", style: { animationDelay: `${d}s` } })),
                                     React.createElement("div", { className: "avio-nfc-glyph", style: { position: 'relative', width: 92, height: 92, borderRadius: '50%', background: THEME.bookGradient, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 0 1px rgba(255,255,255,0.15), 0 10px 30px ${THEME.violetSoft}` } },
                                         React.createElement(Icon, { name: "nfc", size: 38, color: "#fff" })))
-                                : React.createElement("div", { style: { padding: 16, background: '#fff', borderRadius: 20, marginBottom: 26 } }, ticketQrSvg(tapCredential ? tapCredential.ref : (ticket.credential || ticket.id), 188)),
+                                : React.createElement("div", { style: { padding: 16, background: '#fff', borderRadius: 20, marginBottom: 26 } }, ticketQrSvg(tapCredential ? JSON.stringify(tapCredential) : (ticket.credential || ticket.id), 188)),
                             React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 800, fontSize: 24, margin: 0 } }, tapSupported ? "Ready to Tap" : "Show QR to Enter"),
                             React.createElement("p", { style: { fontSize: 13.5, color: 'rgba(255,255,255,0.65)', marginTop: 8, maxWidth: 260, lineHeight: 1.5 } }, tapSupported ? "Hold the top of your phone near the reader" : "Tap isn't available on this device — show this code to staff instead"),
                             React.createElement("div", { style: { marginTop: 28, padding: '14px 18px', borderRadius: 18, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', width: '100%', maxWidth: 300 } },
@@ -13008,11 +13187,39 @@ function App() {
                                     React.createElement("div", { className: scannerListening ? "avio-nfc-glyph" : "", style: { width: 52, height: 52, borderRadius: '50%', background: THEME.bookGradient, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                                         React.createElement(Icon, { name: "nfc", size: 22, color: "#fff" }))),
                                 React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.75)', textAlign: 'center', padding: '0 20px' } }, scannerListening ? "Listening for Bookvado Tap…" : "Tap isn't available on this device — switch to Scan QR"))
-                            : React.createElement("div", { style: { width: '100%', maxWidth: 260, aspectRatio: '1 / 1', borderRadius: 24, background: '#000', border: `2px solid ${SC.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                                React.createElement("p", { style: { fontSize: 12.5, color: 'rgba(255,255,255,0.6)' } }, "Hold steady to scan")),
+                            : (() => {
+                                const corner = (top, left, right, bottom) => React.createElement("div", { style: { position: 'absolute', top, left, right, bottom, width: 26, height: 26, borderColor: '#fff', borderTopWidth: top != null ? 3 : 0, borderBottomWidth: bottom != null ? 3 : 0, borderLeftWidth: left != null ? 3 : 0, borderRightWidth: right != null ? 3 : 0, borderStyle: 'solid', borderRadius: 6, opacity: 0.9 } });
+                                const permissionOverlay = (icon, title, body, actions) => React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '0 22px', textAlign: 'center', background: 'radial-gradient(circle at 50% 45%, #241645 0%, #120A22 75%)' } },
+                                    React.createElement(Icon, { name: icon, size: 28, color: 'rgba(255,255,255,0.85)' }),
+                                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: '#fff', margin: 0 } }, title),
+                                    React.createElement("p", { style: { fontSize: 12, color: 'rgba(255,255,255,0.65)', margin: 0, lineHeight: 1.5 } }, body),
+                                    actions);
+                                return React.createElement("div", { style: { position: 'relative', width: '100%', maxWidth: 260, aspectRatio: '1 / 1', borderRadius: 24, background: '#000', overflow: 'hidden' } },
+                                    React.createElement("video", { ref: qrVideoRef, autoPlay: true, playsInline: true, muted: true, style: { width: '100%', height: '100%', objectFit: 'cover', display: qrCamStatus === 'granted' ? 'block' : 'none', transform: qrFacingMode === 'user' ? 'scaleX(-1)' : 'none' } }),
+                                    React.createElement("canvas", { ref: qrCanvasRef, style: { display: 'none' } }),
+                                    qrCamStatus === 'requesting' && React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'radial-gradient(circle at 50% 45%, #241645 0%, #120A22 75%)' } },
+                                        React.createElement("div", { className: "avio-spin", style: { width: 30, height: 30, borderRadius: '50%', border: '3px solid rgba(255,255,255,0.25)', borderTopColor: '#fff' } }),
+                                        React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.75)', textAlign: 'center', padding: '0 20px' } }, "Bookvado Would Like to Access the Camera"),
+                                        React.createElement("p", { style: { fontSize: 11.5, color: 'rgba(255,255,255,0.55)', textAlign: 'center', padding: '0 24px' } }, "Camera access is required to scan ticket QR codes.")),
+                                    qrCamStatus === 'denied' && permissionOverlay("camera", "Camera Access Required", "Bookvado needs camera access to scan QR tickets.",
+                                        React.createElement("button", { onClick: openCameraSettings, style: { marginTop: 6, padding: '10px 20px', borderRadius: 18, background: THEME.bookGradient, color: '#fff', fontWeight: 700, fontSize: 12.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Open Settings")),
+                                    qrCamStatus === 'unavailable' && permissionOverlay("camera", "No Camera Found", "This device doesn't have a usable camera for scanning.",
+                                        React.createElement("button", { onClick: retryQrCamera, style: { marginTop: 6, padding: '10px 20px', borderRadius: 18, background: THEME.bookGradient, color: '#fff', fontWeight: 700, fontSize: 12.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Try Again")),
+                                    qrCamStatus === 'unsupported' && permissionOverlay("warningtriangle", "Camera Not Supported", qrCamError || "This browser can't access the camera. Try Safari or Chrome over a secure (HTTPS) connection.", null),
+                                    qrCamStatus === 'error' && permissionOverlay("warningtriangle", "Camera Couldn’t Start", "Check your camera permissions and try again.",
+                                        React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 6 } },
+                                            React.createElement("button", { onClick: retryQrCamera, style: { padding: '10px 18px', borderRadius: 18, background: THEME.bookGradient, color: '#fff', fontWeight: 700, fontSize: 12.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Try Again"),
+                                            React.createElement("button", { onClick: openCameraSettings, style: { padding: '10px 18px', borderRadius: 18, border: '1px solid rgba(255,255,255,0.3)', color: '#fff', fontWeight: 700, fontSize: 12.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Open Settings"))),
+                                    qrCamStatus === 'granted' && React.createElement(React.Fragment, null,
+                                        corner(10, 10, null, null), corner(10, null, 10, null), corner(null, 10, null, 10), corner(null, null, 10, 10),
+                                        React.createElement("div", { className: "avio-qr-scan-line", style: { position: 'absolute', left: '8%', right: '8%', height: 2, background: 'linear-gradient(90deg, transparent, #fff, transparent)', boxShadow: '0 0 8px rgba(255,255,255,0.8)' } }),
+                                        React.createElement("p", { style: { position: 'absolute', left: 0, right: 0, bottom: 14, textAlign: 'center', fontSize: 11.5, fontWeight: 600, color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.6)', padding: '0 16px' } }, "Point the camera at the ticket QR code"),
+                                        qrTorchSupported && React.createElement("button", { onClick: toggleQrTorch, style: { position: 'absolute', right: 10, bottom: 10, width: 34, height: 34, borderRadius: '50%', background: qrTorchOn ? '#fff' : 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "flashlight", size: 16, color: qrTorchOn ? '#120A22' : '#fff' })),
+                                        qrMultiCamera && React.createElement("button", { onClick: flipQrCamera, style: { position: 'absolute', left: 10, bottom: 10, width: 34, height: 34, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "refresh", size: 15, color: "#fff" }))));
+                            })(),
                         React.createElement("p", { style: { fontSize: 11.5, color: SC.sub, marginTop: 14, textAlign: 'center' } }, "Recognizes Bookvado-issued tickets only. Partner tickets are validated by the venue's own system."),
-                        React.createElement("button", { onClick: scanReadyTicket, style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', maxWidth: 280, marginTop: 20, padding: '13px 0', borderRadius: 22, background: THEME.bookGradient, color: '#fff', fontWeight: 700, fontSize: 13.5, fontFamily: 'Space Grotesk, sans-serif' } },
-                            React.createElement(Icon, { name: scannerMode === 'tap' ? "nfc" : "camera", size: 16, color: "#fff" }), scannerMode === 'tap' ? "Simulate Incoming Tap" : "Scan Ready Ticket"),
+                        scannerMode === 'tap' && React.createElement("button", { onClick: scanReadyTicket, style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', maxWidth: 280, marginTop: 20, padding: '13px 0', borderRadius: 22, background: THEME.bookGradient, color: '#fff', fontWeight: 700, fontSize: 13.5, fontFamily: 'Space Grotesk, sans-serif' } },
+                            React.createElement(Icon, { name: "nfc", size: 16, color: "#fff" }), "Simulate Incoming Tap"),
                         redemptionAudit.length > 0 && React.createElement("div", { style: { width: '100%', maxWidth: 320, marginTop: 26 } },
                             React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: SC.sub, textTransform: 'uppercase', marginBottom: 8 } }, "Recent Activity"),
                             redemptionAudit.slice(0, 4).map((a) => React.createElement("div", { key: a.id, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${SC.border}` } },
@@ -13020,14 +13227,16 @@ function App() {
                                 React.createElement("span", { style: { fontSize: 10.5, color: (REDEMPTION_RESULT_META[a.code] || {}).color || SC.sub, fontWeight: 700 } }, `${a.method} · ${a.code === 'ENTRY_CONFIRMED' ? 'CONFIRMED' : a.code}`)))),
                         React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: SC.sub, textTransform: 'uppercase', marginTop: 26, alignSelf: 'flex-start' } }, "Preview other outcomes"),
                         React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 } },
-                            [['WRONG_EVENT', 'Wrong Event'], ['WRONG_VENUE', 'Wrong Venue'], ['TOO_EARLY', 'Too Early'], ['EXPIRED', 'Expired'], ['CANCELLED', 'Cancelled'], ['REFUNDED', 'Refunded'], ['INVALID_TICKET', 'Invalid Ticket']].map(([code, label]) =>
+                            [['WRONG_EVENT', 'Wrong Event'], ['WRONG_VENUE', 'Wrong Venue'], ['TOO_EARLY', 'Too Early'], ['EXPIRED', 'Expired'], ['CANCELLED', 'Cancelled'], ['REFUNDED', 'Refunded'], ['INVALID_TICKET', 'Invalid Ticket'], ['PARTNER_TICKET', 'Partner Ticket']].map(([code, label]) =>
                                 React.createElement("button", { key: code, onClick: () => previewOutcome(code), style: { padding: '9px 14px', borderRadius: 16, border: `1px solid ${SC.border}`, fontSize: 12.5, fontWeight: 600, color: SC.text } }, label)),
+                            scannerMode === 'qr' && nextReady && React.createElement("button", { onClick: scanReadyTicket, style: { padding: '9px 14px', borderRadius: 16, border: `1px solid ${SC.border}`, fontSize: 12.5, fontWeight: 600, color: SC.text } }, "Simulate Ready Ticket Scan"),
                             nextReady && React.createElement("button", { onClick: replayLastCredential, style: { padding: '9px 14px', borderRadius: 16, border: `1px solid ${SC.border}`, fontSize: 12.5, fontWeight: 600, color: SC.text } }, "Replay Last Credential")))
                     : React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 32px' } },
                         React.createElement("div", { className: "avio-check-pop avio-ring-pulse", style: { width: 68, height: 68, borderRadius: '50%', background: meta.color, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 } },
                             React.createElement(Icon, { name: meta.icon, size: 30, color: "#fff" })),
-                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 800, fontSize: 22, color: SC.text, margin: 0 } }, ticketScanResult.committed ? "VALID" : meta.label),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 800, fontSize: ticketScanResult.code === 'PARTNER_TICKET' ? 17 : 22, color: SC.text, margin: 0, textAlign: 'center' } }, ticketScanResult.committed ? "VALID" : ticketScanResult.code === 'PARTNER_TICKET' ? "Partner Ticket — Scan Using Venue System" : meta.label),
                         ticketScanResult.code === 'ALREADY_USED' && ticketScanResult.redeemedAt && React.createElement("p", { style: { fontSize: 12, color: SC.sub, marginTop: 6 } }, `Originally entered ${new Date(ticketScanResult.redeemedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`),
+                        ticketScanResult.code === 'PARTNER_TICKET' && React.createElement("p", { style: { fontSize: 13, color: SC.sub, marginTop: 8, maxWidth: 260, lineHeight: 1.5 } }, "This ticket was issued by the venue's own system, not Bookvado — scan it with the venue's scanner instead."),
                         ticketScanResult.ticket && React.createElement(React.Fragment, null,
                             React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: SC.text, marginTop: 10 } }, ticketScanResult.booking.service),
                             React.createElement("p", { style: { fontSize: 12, color: SC.sub, marginTop: 2 } }, `${ticketScanResult.ticket.type} · ${ticketScanResult.ticket.holder}`),
