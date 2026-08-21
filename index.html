@@ -12003,7 +12003,7 @@ function App() {
             const replyingTo = commentReplyTarget && React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 2px 0' } },
                 React.createElement("span", { style: { fontSize: 11.5, color: CT.sub } }, `Replying to ${commentReplyTarget.name}`),
                 React.createElement("button", { onClick: cancelCommentReply, style: { width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 12, color: CT.sub })));
-            const sheet = React.createElement("div", { className: "avio-filter-sheet", onClick: (e) => e.stopPropagation(), style: { width: '100%', background: CT.bg, borderRadius: '22px 22px 0 0', padding: `10px 0 calc(env(safe-area-inset-bottom) + 14px)`, maxHeight: '56%', display: 'flex', flexDirection: 'column' } },
+            const sheet = React.createElement("div", { className: "avio-filter-sheet", onClick: (e) => e.stopPropagation(), style: { width: '100%', background: CT.bg, borderRadius: '22px 22px 0 0', padding: `10px 0 calc(env(safe-area-inset-bottom) + 14px)`, height: '78%', maxHeight: '78%', display: 'flex', flexDirection: 'column' } },
                 React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: '#D1D1D6', margin: '0 auto 12px' } }),
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', padding: '0 18px' } },
                     React.createElement("div", { style: { width: 24, flexShrink: 0 } }),
