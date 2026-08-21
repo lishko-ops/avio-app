@@ -183,6 +183,9 @@ function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
             React.createElement("path", { d: "M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" }),
             React.createElement("path", { d: "M15 3v5h5" }),
             React.createElement("path", { d: "M14.4 13.4l3 3-5.4 5.4H9v-3z", ...solid })),
+        wings: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M12 13c-2-1-6-1-9-3 2 0 5-1 6-3-3 0-6-1-8-3 4 0 8 2 10 5 .5 1 1 2.5 1 4z" }),
+            React.createElement("path", { d: "M12 13c2-1 6-1 9-3-2 0-5-1-6-3 3 0 6-1 8-3-4 0-8 2-10 5-.5 1-1 2.5-1 4z" })),
         diamond: React.createElement(React.Fragment, null,
             React.createElement("path", { d: "M4 9L12 2l8 7-8 13-8-13z" }),
             React.createElement("path", { d: "M4 9h16M9 9l3-6.5L15 9M9 9l3 11 3-11" })),
@@ -8773,13 +8776,12 @@ function App() {
             const profileDealBadge = activeProfileDealLabel && React.createElement("div", { style: { margin: '16px 18px 0', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(151,196,0,0.12)', borderRadius: 18, padding: '6px 12px' } },
                 React.createElement("span", { style: { fontSize: 13 } }, "🎁"),
                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, activeProfileDealLabel));
-            const BIZ_TABS = [{ id: 'videos', label: 'Thrillz' }, { id: 'services', label: 'Services' }, { id: 'reviews', label: 'All Comments' }];
-            const tabsRow = React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', marginTop: 22, borderBottom: `1px solid ${T.border}`, padding: '0 18px' } },
+            const BIZ_TABS = [{ id: 'videos', label: 'Thrillz', icon: 'bolt' }, { id: 'services', label: 'Services', icon: 'wings' }, { id: 'reviews', label: 'All Comments', icon: 'filepen' }];
+            const tabsRow = React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', marginTop: 22, borderBottom: `1px solid ${T.border}` } },
                 BIZ_TABS.map((t) => {
                     const active = bizProfileTab === t.id;
-                    return React.createElement("button", { key: t.id, onClick: () => setBizProfileTab(t.id), style: { padding: '0 4px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 } },
-                        React.createElement("span", { style: { fontSize: 13.5, fontWeight: active ? 700 : 500, color: active ? T.textPrimary : '#8A8A8E' } }, t.label),
-                        React.createElement("span", { style: { width: active ? 22 : 0, height: 2, borderRadius: 1, background: THEME.coral } }));
+                    return React.createElement("button", { key: t.id, "aria-label": t.label, onClick: () => setBizProfileTab(t.id), style: { flex: 1, display: 'flex', justifyContent: 'center', padding: '10px 0', borderBottom: active ? `2px solid ${THEME.coral}` : '2px solid transparent' } },
+                        React.createElement(Icon, { name: t.icon, size: 20, color: active ? THEME.coral : T.textSecondary }));
                 }));
             const thrillzSection = React.createElement("div", { style: { padding: '18px 18px 0' } },
                 item.mine && React.createElement("button", { onClick: () => setBizDraftsOpen(true), style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 } },
