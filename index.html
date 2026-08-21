@@ -8955,7 +8955,7 @@ function App() {
             const profileDealBadge = activeProfileDealLabel && React.createElement("div", { style: { margin: '16px 18px 0', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(151,196,0,0.12)', borderRadius: 18, padding: '6px 12px' } },
                 React.createElement("span", { style: { fontSize: 13 } }, "🎁"),
                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, activeProfileDealLabel));
-            const BIZ_TABS = [{ id: 'videos', label: 'Thrillz', icon: 'bolt' }, { id: 'services', label: 'Services', icon: 'wings' }, { id: 'reviews', label: 'All Comments', icon: 'filepen' }];
+            const BIZ_TABS = [{ id: 'videos', label: 'Thrillz', icon: 'bolt' }, { id: 'services', label: 'Services', icon: 'wings' }, { id: 'reviews', label: 'All Comments', icon: 'message' }];
             const tabsRow = React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', marginTop: 22, borderBottom: `1px solid ${T.border}` } },
                 BIZ_TABS.map((t) => {
                     const active = bizProfileTab === t.id;
