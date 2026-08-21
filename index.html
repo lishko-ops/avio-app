@@ -10228,24 +10228,6 @@ function App() {
                     [{ value: totalBookings, label: 'New Bookings' }, { value: money(totalRevenue), label: 'Earnings' }, { value: profileViews, label: 'Profile Views' }].map((s) => React.createElement("div", { key: s.label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 10px', textAlign: 'center' } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: PD.text, margin: 0 } }, s.value),
                         React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: '3px 0 0' } }, s.label))));
-                const manageSection = React.createElement("div", { style: { marginTop: 26 } },
-                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: '0 0 10px', textTransform: 'uppercase' } }, "Manage Your Business"),
-                    React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 18, overflow: 'hidden' } },
-                        [
-                            { id: 'bookings', icon: 'calendar', title: 'Bookings', sub: 'Manage your bookings' },
-                            { id: 'services', icon: 'grid', title: 'Services', sub: 'Manage your services' },
-                            { id: 'hours', icon: 'clock', title: 'Schedule', sub: 'Manage your availability', onClick: () => { setProviderDashboardTab('hours'); setScheduleView('menu'); } },
-                            { id: 'team', icon: 'users', title: 'Team', sub: 'Manage your team members' },
-                            { id: 'calendar', icon: 'compass', title: 'Calendar', sub: 'View your calendar' },
-                            { id: 'customerPosts', icon: 'camera', title: 'Customer Posts', sub: 'See customer posts' },
-                        ].map((s, i) => React.createElement(React.Fragment, { key: s.id },
-                            i > 0 && React.createElement("div", { style: { height: 1, background: PD.border, marginLeft: 43 } }),
-                            React.createElement("button", { onClick: s.onClick || (() => setProviderDashboardTab(s.id)), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
-                                React.createElement(Icon, { name: s.icon, size: 17, color: THEME.coral }),
-                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, s.title),
-                                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, s.sub)),
-                                React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }))))));
                 const locationServiceAreaRow = React.createElement("div", { style: { marginTop: 14, border: `1.5px solid ${THEME.coral}`, borderRadius: 18, overflow: 'hidden' } },
                     React.createElement("button", { onClick: () => setLocationDetailsOpen(true), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
                         React.createElement(Icon, { name: "mappin", size: 17, color: THEME.coral }),
@@ -10351,7 +10333,7 @@ function App() {
                                     ins.verificationStatus !== 'verified' && React.createElement("button", { onClick: (e) => { e.stopPropagation(); verifyBusinessBookingInsurance(b.id); }, style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral } }, "Verify")));
                         })));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `0 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    earningsCard, statsRow, manageSection, locationServiceAreaRow, quickActionsBar, insuranceSection, ticketingSection, cancellationRequestsSection, upcomingBookingsSection);
+                    earningsCard, statsRow, locationServiceAreaRow, quickActionsBar, insuranceSection, ticketingSection, cancellationRequestsSection, upcomingBookingsSection);
             }
             else if (providerDashboardTab === 'bookings') {
                 const BIZ_BOOKING_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'pending', label: 'Pending' }, { id: 'past', label: 'Past' }, { id: 'cancelled', label: 'Canceled' }];
