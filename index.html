@@ -8192,7 +8192,7 @@ function App() {
                             React.createElement("span", { style: { fontSize: 9, color: CN.sub } }, a.label)))));
                     return React.createElement("div", { style: { height: '100%', display: 'flex', flexDirection: 'column' } }, chatHeader, bookingCard, bubbles, inputArea);
                 }
-                const BIZ_FILTERS = [{ id: 'all', label: 'All' }, { id: 'unread', label: 'Unread' }, { id: 'bookings', label: 'Bookings' }];
+                const BIZ_FILTERS = [{ id: 'all', label: 'All' }, { id: 'unread', label: 'Unread' }];
                 const unreadCount = businessConversations.filter((c) => c.unread > 0).length;
                 const bizFiltered = businessConversations.filter((c) => {
                     if (connectFilter === 'unread' && c.unread === 0)
