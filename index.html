@@ -1019,7 +1019,17 @@ const BUSINESS_INCOMING_BOOKINGS = [
     { id: 'ib11', customerName: 'Amanda W.', initials: 'AW', service: 'Highlights', price: 150, time: '11:00 AM', status: 'completed', avatarColor: '#A67C52', dateGroup: 'past', dateLabel: 'Aug 6' },
     { id: 'ib12', customerName: 'Taylor R.', initials: 'TR', service: 'Hair Color', price: 120, time: '2:30 PM', status: 'cancelled', avatarColor: '#FFFFFF', dateGroup: 'past', dateLabel: 'Aug 5' },
 ];
-const THRILLZ_TOPICS = ['Barber', 'Fade', 'Haircut', 'Beard', 'Hair Color', 'Nail Salon', 'Manicure', 'Lashes', 'Makeup', 'Photographer', 'Wedding', 'Jet Ski', 'Fitness', 'Personal Trainer', 'Massage', 'Cleaning', 'Restaurant', 'Events', 'Tattoo', 'Skincare'];
+// Historical after-service tip transactions tied to already-completed BUSINESS_INCOMING_BOOKINGS
+// records (ib8/ib9/ib11), so the Provider Earnings "Tips" category has real data on first load —
+// same convention as businessBookings' own seeded revenue history.
+const SEED_TIPS = [
+    { id: 'tip-ib8', idempotencyKey: 'seed-tip-ib8', bookingId: 'ib8', businessId: 'me-business', providerId: 'me-business', providerName: 'Alex', customerName: 'Kevin T.', service: 'Beard Trim', serviceAmount: 30, tipAmount: 8, paymentTransactionId: 'TIP-SEED-IB8', status: 'succeeded', refundStatus: 'none', createdAt: Date.parse('2026-08-09') },
+    { id: 'tip-ib9', idempotencyKey: 'seed-tip-ib9', bookingId: 'ib9', businessId: 'me-business', providerId: 'me-business', providerName: 'Alex', customerName: 'Luis M.', service: 'Haircut', serviceAmount: 35, tipAmount: 7, paymentTransactionId: 'TIP-SEED-IB9', status: 'succeeded', refundStatus: 'none', createdAt: Date.parse('2026-08-08') },
+    { id: 'tip-ib11', idempotencyKey: 'seed-tip-ib11', bookingId: 'ib11', businessId: 'me-business', providerId: 'me-business', providerName: 'Alex', customerName: 'Amanda W.', service: 'Highlights', serviceAmount: 150, tipAmount: 25, paymentTransactionId: 'TIP-SEED-IB11', status: 'succeeded', refundStatus: 'none', createdAt: Date.parse('2026-08-06') },
+];
+const TIP_PERCENT_OPTIONS = [0.15, 0.20, 0.25];
+function computeTipAmount(total, pct) { return Math.round((Number(total) || 0) * pct * 100) / 100; }
+const THRILLZ_TOPICS =['Barber', 'Fade', 'Haircut', 'Beard', 'Hair Color', 'Nail Salon', 'Manicure', 'Lashes', 'Makeup', 'Photographer', 'Wedding', 'Jet Ski', 'Fitness', 'Personal Trainer', 'Massage', 'Cleaning', 'Restaurant', 'Events', 'Tattoo', 'Skincare'];
 const THRILLZ_SOUND_LIBRARY = [
     { id: 'snd1', name: 'Golden Hour', artist: 'Bay Loops', duration: '0:32' },
     { id: 'snd2', name: 'Fresh Cut', artist: 'Nova Beats', duration: '0:28' },
@@ -2886,7 +2896,7 @@ function App() {
     const [businessTicketingMode, setBusinessTicketingMode] = useState(() => loadLS('avio_biz_ticketing_mode', 'bookvado'));
     useEffect(() => { saveLS('avio_biz_ticketing_mode', businessTicketingMode); }, [businessTicketingMode]);
     const [bookingTarget, setBookingTarget] = useState(null);
-    const [bookings, setBookings] = useState([
+    const [bookings, setBookings] = useState(() => [
         { id: 'b1', name: 'John Barber', service: 'Haircut', business: 'John Barber', category: 'Beauty', date: 'Aug 20', day: 20, month: 7, year: 2026, time: '9:00 AM', total: 45, status: 'confirmed', address: '123 Main St, New York, NY', duration: '45 min', durationMinutes: 45, logoText: 'JB' },
         { id: 'b2', name: 'Luxury Nails', service: 'Nails', business: 'Luxury Nails', category: 'Beauty', date: 'Aug 20', day: 20, month: 7, year: 2026, time: '11:30 AM', total: 65, status: 'confirmed', address: '456 Broadway, New York, NY', duration: '1h 15 min', durationMinutes: 75, logoText: 'LN' },
         { id: 'b3', name: 'DJ Alex', service: 'DJ Event', business: 'DJ Alex', category: 'Parties', date: 'Aug 20', day: 20, month: 7, year: 2026, time: '2:00 PM', total: 350, status: 'confirmed', address: '789 Park Ave, New York, NY', duration: '3h', durationMinutes: 180, logoText: 'DJ' },
@@ -2930,7 +2940,7 @@ function App() {
             total: 220, status: 'confirmed', address: 'Brooklyn, NY', duration: '5h', logoText: 'SMF',
             confirmationNumber: 'BVKSMF19Q', customerName: 'Alex Rivera', customerPhone: '', notes: '',
             tickets: buildTickets('cc-seed1', 1, 'bookvado', 'Group Admission', 'Alex Rivera', 'concert', [[{ label: 'Section', value: 'General Admission' }]], 4) },
-    ]);
+    ].map((b) => ({ tipStatus: 'none', tipAmount: 0, reviewRating: 0, reviewText: '', reviewPromptSeen: false, providerId: b.providerId || ('biz-' + bvHash(b.business || b.name)), ...b })));
     // ---- Bookvado Tap-to-Enter ----
     const [tapModeTicket, setTapModeTicket] = useState(null); // { bookingId, index } | null — Ready-to-Tap overlay
     const [tapCredential, setTapCredential] = useState(null); // this ticket's current ephemeral credential
@@ -4403,6 +4413,84 @@ function App() {
     // --- Healthcare: Insurance & Billing ---
     const [businessInsuranceSettings, setBusinessInsuranceSettings] = useState(() => loadLS('avio_business_insurance', DEFAULT_BUSINESS_INSURANCE_SETTINGS));
     useEffect(() => { saveLS('avio_business_insurance', businessInsuranceSettings); }, [businessInsuranceSettings]);
+    // ---- After-Service Tipping ----
+    const [businessTipsSettings, setBusinessTipsSettings] = useState(() => loadLS('avio_business_tips_settings', { enabled: true, availability: 'after', recipient: 'provider' }));
+    useEffect(() => { saveLS('avio_business_tips_settings', businessTipsSettings); }, [businessTipsSettings]);
+    const [tipsSettingsOpen, setTipsSettingsOpen] = useState(false);
+    const [tips, setTips] = useState(() => loadLS('avio_tips', SEED_TIPS));
+    useEffect(() => { saveLS('avio_tips', tips); }, [tips]);
+    // tipFlow shape: { bookingId, step: 'review'|'custom'|'processing'|'success', rating, reviewText, selectedPct, customAmount, tipAmount, error, submitting, idempotencyKey }
+    const [tipFlow, setTipFlow] = useState(null);
+    const [postServiceBanner, setPostServiceBanner] = useState(null);
+    useEffect(() => {
+        // Simulates the "one tasteful notification" after a completed appointment — surfaced
+        // once per app load for the first completed booking that hasn't been acknowledged yet.
+        const target = bookings.find((b) => b.status === 'completed' && !b.reviewPromptSeen);
+        if (target) {
+            setPostServiceBanner(target);
+            setBookings((prev) => prev.map((b) => b.id === target.id ? { ...b, reviewPromptSeen: true } : b));
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    function openTipFlow(booking, opts) {
+        if (!booking) return;
+        setPostServiceBanner((b) => b && b.id === booking.id ? null : b);
+        setBookings((prev) => prev.map((b) => b.id === booking.id ? { ...b, reviewPromptSeen: true } : b));
+        setTipFlow({
+            bookingId: booking.id, step: (opts && opts.step) || 'review',
+            rating: booking.reviewRating || 0, reviewText: booking.reviewText || '',
+            selectedPct: null, customAmount: '', tipAmount: 0, error: '', submitting: false, idempotencyKey: null,
+        });
+    }
+    function closeTipFlow() { setTipFlow(null); }
+    function getTipFlowBooking() { return tipFlow ? bookings.find((b) => b.id === tipFlow.bookingId) : null; }
+    // Single idempotent submission path shared by the full-screen flow and the inline
+    // "Add a Tip Anytime" card — creates exactly one tip transaction per idempotencyKey,
+    // guards against double taps/re-renders, and never touches the booking's original total.
+    function performTip(booking, amount, idempotencyKey, onSettled) {
+        setTips((prev) => {
+            if (prev.some((t) => t.idempotencyKey === idempotencyKey)) return prev;
+            const txId = 'TIP-' + bvNonce().toUpperCase();
+            const record = {
+                id: txId, idempotencyKey, bookingId: booking.id,
+                businessId: booking.providerId || 'me-business', providerId: booking.staffId || booking.providerId || 'me-business',
+                providerName: booking.staffName || booking.business || booking.name, customerName: 'You',
+                service: booking.service, serviceAmount: booking.total, tipAmount: amount,
+                paymentTransactionId: txId, status: 'succeeded', refundStatus: 'none', createdAt: Date.now(),
+            };
+            return [record, ...prev];
+        });
+        setBookings((prev) => prev.map((b) => b.id === booking.id ? { ...b, tipStatus: 'sent', tipAmount: amount } : b));
+        if (onSettled) onSettled();
+    }
+    function submitTipFlowAmount(amount) {
+        const booking = getTipFlowBooking();
+        if (!booking || !tipFlow || tipFlow.submitting || !(amount > 0)) return;
+        const idempotencyKey = tipFlow.idempotencyKey || bvNonce();
+        setTipFlow((f) => f ? { ...f, submitting: true, error: '', step: 'processing', tipAmount: amount, idempotencyKey } : f);
+        setBookings((prev) => prev.map((b) => b.id === booking.id ? { ...b, reviewRating: tipFlow.rating, reviewText: tipFlow.reviewText } : b));
+        setTimeout(() => {
+            performTip(booking, amount, idempotencyKey, () => {
+                setTipFlow((f) => f ? { ...f, step: 'success', submitting: false } : f);
+            });
+        }, 1100);
+    }
+    function finishTipFlowNoTip() {
+        const booking = getTipFlowBooking();
+        if (booking && (tipFlow.rating || tipFlow.reviewText.trim()))
+            setBookings((prev) => prev.map((b) => b.id === booking.id ? { ...b, reviewRating: tipFlow.rating, reviewText: tipFlow.reviewText } : b));
+        closeTipFlow();
+    }
+    function openBookingDetail(b) {
+        if (b.status === 'completed' && b.tipStatus !== 'sent' && !b.reviewPromptSeen) openTipFlow(b);
+        else setBookingDetail(b);
+    }
+    // Inline "Add a Tip Anytime" state — lives on the app so the compact tip picker inside
+    // the plain Booking Details sheet stays governed by the Rules of Hooks (that sheet's body
+    // is an IIFE that only runs while bookingDetail is set, so it can't hold its own useState).
+    const [inlineTipSubmitting, setInlineTipSubmitting] = useState(false);
+    const [inlineTipCustomOpen, setInlineTipCustomOpen] = useState(false);
+    const [inlineTipCustomValue, setInlineTipCustomValue] = useState('');
     const [insuranceSetupOpen, setInsuranceSetupOpen] = useState(false);
     const [insuranceSetupStep, setInsuranceSetupStep] = useState('coverage'); // coverage | plans | verification | review
     const [insuranceSetupDraft, setInsuranceSetupDraft] = useState(null);
@@ -8686,7 +8774,7 @@ function App() {
                         statusLabel: cxl ? cxl.label : (BOOKING_STATUS_LABEL[b.status] || b.status),
                         statusBg: cxl ? cxl.bg : st.bg, statusColor: cxl ? cxl.color : st.color, statusBorder: cxl ? 'none' : st.border,
                         priceLabel: b.status === 'quote_requested' ? 'Awaiting quote' : money(b.total),
-                        onClick: () => setBookingDetail(b),
+                        onClick: () => openBookingDetail(b),
                     });
                 }));
                 body = cards;
@@ -10400,7 +10488,10 @@ function App() {
             if (providerDashboardTab === 'overview') {
                 const totalBookings = businessBookings.length;
                 const stats = computeEarningsStats(businessBookings);
-                const totalRevenue = stats.totalEarnings;
+                const myTips = tips.filter((t) => t.businessId === 'me-business');
+                const tipsEarnedTotal = myTips.reduce((sum, t) => sum + t.tipAmount, 0);
+                const serviceRevenue = stats.totalEarnings;
+                const totalRevenue = serviceRevenue + tipsEarnedTotal;
                 const profileViews = 0;
                 const dayEarnings = stats.byDayOfWeek.map((d) => d.earnings);
                 const maxDayEarning = Math.max(...dayEarnings, 0);
@@ -10417,6 +10508,7 @@ function App() {
                             React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: THEME.coral } }, "View insights"),
                             React.createElement(Icon, { name: "chevronright", size: 12, color: THEME.coral }))),
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: PD.text, margin: '6px 0 0' } }, money(totalRevenue)),
+                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, `Service ${money(serviceRevenue)} · Tips ${money(tipsEarnedTotal)}`),
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, minHeight: 16 } },
                         selectedDashDay
                             ? React.createElement("span", { style: { fontSize: 12, color: PD.text } }, `${selectedDashDay.label}: `, React.createElement("strong", null, money(selectedDashDay.earnings)), ` · ${selectedDashDay.count} booking${selectedDashDay.count === 1 ? '' : 's'}`)
@@ -10484,7 +10576,16 @@ function App() {
                                 React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Ticket Scanner"),
                                 React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, "Scan and validate Bookvado tickets")),
                             React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }))));
-                const insuranceTotalPlans = businessInsuranceSettings.acceptedCarrierIds.length + businessInsuranceSettings.acceptedGovProgramIds.length + Object.values(businessInsuranceSettings.medicaidByState).reduce((sum, plans) => sum + plans.length, 0);
+                const tipsSection = React.createElement("div", { style: { marginTop: 26 } },
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: '0 0 10px', textTransform: 'uppercase' } }, "Tips"),
+                    React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 18, overflow: 'hidden' } },
+                        React.createElement("button", { onClick: () => setTipsSettingsOpen(true), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
+                            React.createElement(Icon, { name: "heart", size: 17, color: THEME.coral }),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Accept After-Service Tips"),
+                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, businessTipsSettings.enabled ? `On · ${money(tipsEarnedTotal)} earned` : 'Off')),
+                            React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }))));
+                const insuranceTotalPlans =businessInsuranceSettings.acceptedCarrierIds.length + businessInsuranceSettings.acceptedGovProgramIds.length + Object.values(businessInsuranceSettings.medicaidByState).reduce((sum, plans) => sum + plans.length, 0);
                 const insuranceSummary = !businessInsuranceSettings.setupComplete
                     ? 'Set up insurance & billing'
                     : businessInsuranceSettings.paymentAcceptance === 'selfpay_only'
@@ -10543,7 +10644,7 @@ function App() {
                                     ins.verificationStatus !== 'verified' && React.createElement("button", { onClick: (e) => { e.stopPropagation(); verifyBusinessBookingInsurance(b.id); }, style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral } }, "Verify")));
                         })));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `0 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    earningsCard, statsRow, locationServiceAreaRow, quickActionsBar, insuranceSection, ticketingSection, cancellationRequestsSection, upcomingBookingsSection);
+                    earningsCard, statsRow, locationServiceAreaRow, quickActionsBar, tipsSection, insuranceSection, ticketingSection, cancellationRequestsSection, upcomingBookingsSection);
             }
             else if (providerDashboardTab === 'bookings') {
                 const BIZ_BOOKING_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'pending', label: 'Pending' }, { id: 'past', label: 'Past' }, { id: 'cancelled', label: 'Canceled' }];
@@ -11067,6 +11168,51 @@ function App() {
                                 active && React.createElement(Icon, { name: "check", size: 15, color: THEME.coral }));
                         }))));
         })(),
+        (providerDashboardOpen || editBusinessProfileOpen) && tipsSettingsOpen && (() => {
+            const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            function toggleRow(label, sub, on, onChange) {
+                return React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 0', borderBottom: `1px solid ${PD.border}` } },
+                    React.createElement("div", { style: { flex: 1, paddingRight: 12 } },
+                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: PD.text, margin: 0 } }, label),
+                        sub && React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, sub)),
+                    React.createElement(ToggleSwitch, { on: on, onChange: onChange }));
+            }
+            const AVAILABILITY_OPTIONS = [
+                { id: 'after', label: 'After appointment (recommended)' },
+                { id: 'checkout', label: 'During checkout' },
+                { id: 'both', label: 'Both' },
+            ];
+            const RECIPIENT_OPTIONS = [
+                { id: 'provider', label: 'Provider who completed the booking' },
+                { id: 'business', label: 'Split evenly among staff' },
+            ];
+            const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: `calc(env(safe-area-inset-top) + 8px) 18px 8px`, borderBottom: `1px solid ${PD.border}` } },
+                React.createElement("button", { onClick: () => setTipsSettingsOpen(false) }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "Tips"));
+            const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px calc(env(safe-area-inset-bottom) + 20px)' } },
+                React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: PD.sub, textTransform: 'uppercase', letterSpacing: 0.4, margin: '0 0 4px' } }, "Accept After-Service Tips"),
+                toggleRow("Accept After-Service Tips", "Allow customers to leave tips after their appointments.", businessTipsSettings.enabled, () => setBusinessTipsSettings((s) => ({ ...s, enabled: !s.enabled }))),
+                React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: PD.sub, textTransform: 'uppercase', letterSpacing: 0.4, margin: '22px 0 4px' } }, "Tips Are Available"),
+                React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 16, overflow: 'hidden' } },
+                    AVAILABILITY_OPTIONS.map((o, i) => React.createElement("button", {
+                        key: o.id, disabled: !businessTipsSettings.enabled,
+                        onClick: () => setBusinessTipsSettings((s) => ({ ...s, availability: o.id })),
+                        style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', textAlign: 'left', opacity: businessTipsSettings.enabled ? 1 : 0.5, borderBottom: i < AVAILABILITY_OPTIONS.length - 1 ? `1px solid ${PD.border}` : 'none' },
+                    },
+                        React.createElement("span", { style: { fontSize: 13.5, color: PD.text, fontWeight: businessTipsSettings.availability === o.id ? 700 : 400 } }, o.label),
+                        businessTipsSettings.availability === o.id && React.createElement(Icon, { name: "check", size: 15, color: THEME.coral })))),
+                React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: '8px 2px 0', lineHeight: 1.45 } }, "Bookvado only ever surfaces tipping to a customer once their appointment is marked completed — never during booking or checkout."),
+                React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: PD.sub, textTransform: 'uppercase', letterSpacing: 0.4, margin: '22px 0 4px' } }, "Tip Recipient"),
+                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '0 0 10px' } }, "Who receives the tips for completed appointments?"),
+                React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 16, overflow: 'hidden' } },
+                    RECIPIENT_OPTIONS.map((o, i) => React.createElement("button", {
+                        key: o.id, onClick: () => setBusinessTipsSettings((s) => ({ ...s, recipient: o.id })),
+                        style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', textAlign: 'left', borderBottom: i < RECIPIENT_OPTIONS.length - 1 ? `1px solid ${PD.border}` : 'none' },
+                    },
+                        React.createElement("span", { style: { fontSize: 13.5, color: PD.text, fontWeight: businessTipsSettings.recipient === o.id ? 700 : 400 } }, o.label),
+                        businessTipsSettings.recipient === o.id && React.createElement(Icon, { name: "check", size: 15, color: THEME.coral })))));
+            return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 6, background: T.background, display: 'flex', flexDirection: 'column' } }, header, body);
+        })(),
         (providerDashboardOpen || editBusinessProfileOpen) && serviceAreaSettingsOpen && serviceAreaDraft && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
             const draft = serviceAreaDraft;
@@ -11536,7 +11682,23 @@ function App() {
                     React.createElement("p", { style: { flex: 1, fontSize: 12, color: PD.text, margin: 0, lineHeight: 1.35 } }, primaryInsight.text)),
                 React.createElement("button", { onClick: () => setInsightsMoreOpen(true), style: { marginTop: 8, fontSize: 10.5, fontWeight: 700, color: THEME.coral } }, "See Insights  ›"));
 
-            const overviewBody = React.createElement(React.Fragment, null, netEarningsHero, compactNumbersRow, highlightsSection, insightCardMain);
+            const periodTips = tips.filter((t) => t.businessId === 'me-business' && new Date(t.createdAt) >= earningsPeriodCutoff(earningsPeriod));
+            const periodTipsTotal = periodTips.reduce((sum, t) => sum + t.tipAmount, 0);
+            const tipsInsightsSection = React.createElement("div", { style: { marginTop: 14 } },
+                sectionLabel("Tips"),
+                React.createElement("div", { style: { marginTop: 8, border: `1px solid ${PD.border}`, borderRadius: 16, padding: 14 } },
+                    dotRow(THEME.violet, 'Service Revenue', money(stats.totalEarnings)),
+                    dotRow(THEME.coral, 'Tips Earned', money(periodTipsTotal)),
+                    React.createElement("div", { style: { height: 1, background: PD.border, margin: '8px 0' } }),
+                    dotRow(PD.text, 'Total Earnings', money(stats.totalEarnings + periodTipsTotal))),
+                periodTips.length > 0 && React.createElement("div", { style: { marginTop: 10 } },
+                    React.createElement("p", { style: { fontSize: 11.5, fontWeight: 700, color: PD.sub, margin: '0 0 8px' } }, "Recent Tip Transactions"),
+                    periodTips.slice(0, 6).map((t, i, arr) => React.createElement("div", { key: t.id, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: i < arr.length - 1 ? `1px solid ${PD.border}` : 'none' } },
+                        React.createElement("div", null,
+                            React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, t.customerName),
+                            React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: '2px 0 0' } }, `${t.service} · ${new Date(t.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`)),
+                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: THEME.coral, margin: 0 } }, `Tip: ${money(t.tipAmount)}`)))));
+            const overviewBody = React.createElement(React.Fragment, null, netEarningsHero, compactNumbersRow, tipsInsightsSection, highlightsSection, insightCardMain);
 
             const recentTransactions = [...filteredBookings].filter((b) => b.status !== 'cancelled').sort((a, b) => getBookingDate(b) - getBookingDate(a)).slice(0, 3);
             const moneyBreakdownCard = React.createElement("div", { style: { marginTop: 12, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 16px' } },
@@ -12382,7 +12544,7 @@ function App() {
                 managementRows.push({ icon: 'mappin', label: 'Edit Service Address', sub: 'Update where this service happens.', onClick: () => openEditAddress(b) });
             const trailingActions = [];
             if (b.status === 'completed') {
-                trailingActions.push({ icon: 'star', label: 'Leave Review', onClick: () => flashToast('Thanks! Review flow coming soon') });
+                trailingActions.push({ icon: 'star', label: b.reviewRating ? 'Edit Review' : 'Leave Review', onClick: () => openTipFlow(b, { step: 'review' }) });
                 trailingActions.push({ icon: 'repeat', label: 'Book Again', onClick: () => flashToast('Booking ' + (b.business || b.name) + ' again') });
             }
             trailingActions.push({ icon: 'share', label: 'Share Booking', onClick: () => flashToast('Share link copied') });
@@ -12400,6 +12562,47 @@ function App() {
                             React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: T.textPrimary, margin: 0 } }, r.label),
                             r.sub && React.createElement("p", { style: { fontSize: 11, color: T.textSecondary, margin: '2px 0 0', lineHeight: 1.3 } }, r.sub)),
                         React.createElement(Icon, { name: "chevronright", size: 14, color: T.textSecondary })))));
+            // "Completed Booking – Add Tip Anytime": lets the customer return later and tip
+            // without re-triggering the full post-service prompt. Once tipped, this collapses
+            // to a simple confirmation and never asks again.
+            const tipSection = b.status === 'completed' && React.createElement("div", { style: { marginTop: 12 } },
+                b.tipStatus === 'sent'
+                    ? React.createElement("div", { style: { padding: 14, borderRadius: 14, border: `1px solid ${THEME.coral}`, background: 'rgba(166,124,82,0.08)' } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                            React.createElement(Icon, { name: "check", size: 15, color: THEME.coral }),
+                            React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: THEME.coral } }, "Tip Sent")),
+                        React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, margin: '4px 0 0' } }, `${money(b.tipAmount)} sent to ${b.business || b.name}. Thank you!`))
+                    : React.createElement("div", { style: { padding: 14, borderRadius: 14, border: `1px solid ${T.border}` } },
+                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: T.textPrimary, margin: 0 } }, "Enjoyed your service?"),
+                        React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, margin: '2px 0 10px' } }, `Add a tip for ${b.business || b.name}. 100% goes to them.`),
+                        inlineTipCustomOpen
+                            ? React.createElement("div", { style: { display: 'flex', gap: 8 } },
+                                React.createElement("input", { value: inlineTipCustomValue, onChange: (e) => setInlineTipCustomValue(e.target.value.replace(/[^0-9.]/g, '')), placeholder: "0.00", inputMode: "decimal", autoFocus: true, style: { flex: 1, border: `1px solid ${T.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 14, color: T.textPrimary, outline: 'none', background: T.inputBackground } }),
+                                React.createElement("button", {
+                                    disabled: inlineTipSubmitting || !(Number(inlineTipCustomValue) > 0),
+                                    onClick: () => {
+                                        const amt = Math.round(Number(inlineTipCustomValue) * 100) / 100;
+                                        if (!(amt > 0)) return;
+                                        setInlineTipSubmitting(true);
+                                        setTimeout(() => performTip(b, amt, bvNonce(), () => { setInlineTipSubmitting(false); setInlineTipCustomOpen(false); setInlineTipCustomValue(''); }), 900);
+                                    }, style: { padding: '0 18px', borderRadius: 12, background: (Number(inlineTipCustomValue) > 0) ? THEME.coral : T.surfaceSecondary, color: (Number(inlineTipCustomValue) > 0) ? '#fff' : T.textSecondary, fontWeight: 700, fontSize: 13 },
+                                }, inlineTipSubmitting ? '…' : 'Send'),
+                                React.createElement("button", { disabled: inlineTipSubmitting, onClick: () => { setInlineTipCustomOpen(false); setInlineTipCustomValue(''); }, style: { padding: '0 12px', fontSize: 12.5, fontWeight: 600, color: T.textSecondary } }, "Cancel"))
+                            : React.createElement("div", { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
+                                TIP_PERCENT_OPTIONS.map((pct) => {
+                                    const amt = computeTipAmount(b.total, pct);
+                                    return React.createElement("button", {
+                                        key: pct, disabled: inlineTipSubmitting,
+                                        onClick: () => { setInlineTipSubmitting(true); setTimeout(() => performTip(b, amt, bvNonce(), () => setInlineTipSubmitting(false)), 900); },
+                                        style: { flex: '1 1 26%', padding: '10px 6px', borderRadius: 12, border: `1.5px solid ${T.border}`, background: T.surface, opacity: inlineTipSubmitting ? 0.6 : 1 },
+                                    },
+                                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: T.textPrimary, margin: 0 } }, `${Math.round(pct * 100)}%`),
+                                        React.createElement("p", { style: { fontSize: 10.5, color: T.textSecondary, margin: '1px 0 0' } }, money(amt)));
+                                }),
+                                React.createElement("button", { disabled: inlineTipSubmitting, onClick: () => setInlineTipCustomOpen(true), style: { flex: '1 1 26%', padding: '10px 6px', borderRadius: 12, border: `1.5px solid ${T.border}`, background: T.surface } },
+                                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: T.textPrimary, margin: 0 } }, "Custom")),
+                                React.createElement("button", { disabled: inlineTipSubmitting, onClick: () => flashToast('No problem — you can add a tip anytime.'), style: { flex: '1 1 100%', marginTop: 2, padding: '8px 6px', textAlign: 'center' } },
+                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: T.textSecondary } }, "No Tip")))));
             return React.createElement("div", { onClick: (e) => e.stopPropagation(), className: "avio-filter-sheet", style: { width: '100%', background: T.modalBackground, borderRadius: '24px 24px 0 0', padding: `14px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '85%', overflowY: 'auto' } },
                 React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: T.border, margin: '0 auto 14px' } }),
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12 } },
@@ -12448,6 +12651,7 @@ function App() {
                 })(),
                 React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, plainActions.map(flatRow)),
                 managementGroup,
+                tipSection,
                 React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, trailingActions.map(flatRow)));
         })())),
         businessBookingDetail && (React.createElement("div", { onClick: () => setBusinessBookingDetail(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } }, (() => {
@@ -13740,6 +13944,110 @@ function App() {
             }
             return React.createElement("div", { key: "editAddress", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 15, display: 'flex', flexDirection: 'column' } }, header, body, footer);
         })(),
+        tipFlow && (() => {
+            const b = getTipFlowBooking();
+            if (!b) return null;
+            const TF = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const providerLabel = b.staffName || b.business || b.name;
+            const closeBtn = React.createElement("button", { onClick: closeTipFlow, style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', right: 18, zIndex: 2, width: 32, height: 32, borderRadius: 16, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                React.createElement(Icon, { name: "x", size: 16, color: "#fff" }));
+            let body;
+            if (tipFlow.step === 'review') {
+                const stars = React.createElement("div", { style: { display: 'flex', gap: 8, justifyContent: 'center', marginTop: 14 } },
+                    [1, 2, 3, 4, 5].map((n) => React.createElement("button", { key: n, onClick: () => setTipFlow((f) => ({ ...f, rating: n })) },
+                        React.createElement(Icon, { name: "star", size: 30, color: THEME.coral, fill: n <= tipFlow.rating ? THEME.coral : 'none' }))));
+                const percentRow = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 12 } },
+                    TIP_PERCENT_OPTIONS.map((pct) => {
+                        const active = tipFlow.selectedPct === pct;
+                        const amt = computeTipAmount(b.total, pct);
+                        return React.createElement("button", { key: pct, onClick: () => setTipFlow((f) => ({ ...f, selectedPct: pct, customAmount: '', tipAmount: amt })), style: { flex: 1, padding: '14px 6px', borderRadius: 16, border: `1.5px solid ${active ? THEME.coral : TF.border}`, background: active ? 'rgba(166,124,82,0.1)' : T.surface, textAlign: 'center' } },
+                            React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: active ? THEME.coral : TF.text, margin: 0 } }, `${Math.round(pct * 100)}%`),
+                            React.createElement("p", { style: { fontSize: 11.5, color: TF.sub, margin: '2px 0 0' } }, money(amt)));
+                    }),
+                    React.createElement("button", { onClick: () => setTipFlow((f) => ({ ...f, step: 'custom' })), style: { flex: 1, padding: '14px 6px', borderRadius: 16, border: `1.5px solid ${TF.border}`, background: T.surface, textAlign: 'center' } },
+                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: TF.text, margin: 0 } }, "Custom")));
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 20px calc(env(safe-area-inset-bottom) + 16px)' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: TF.text, textAlign: 'center', margin: '18px 0 0' } }, "How was your appointment?"),
+                    React.createElement("p", { style: { fontSize: 13, color: TF.sub, textAlign: 'center', margin: '6px 0 0' } }, b.business || b.name),
+                    providerLabel && providerLabel !== (b.business || b.name) && React.createElement("p", { style: { fontSize: 13, color: TF.sub, textAlign: 'center', margin: '1px 0 0' } }, `with ${providerLabel}`),
+                    stars,
+                    React.createElement("textarea", {
+                        value: tipFlow.reviewText, maxLength: 500, rows: 3, placeholder: "Leave a review (optional)",
+                        onChange: (e) => setTipFlow((f) => ({ ...f, reviewText: e.target.value })),
+                        style: { width: '100%', marginTop: 16, border: `1px solid ${TF.border}`, borderRadius: 14, padding: 12, fontSize: 13, color: TF.text, background: T.inputBackground, outline: 'none', resize: 'none', fontFamily: 'inherit' },
+                    }),
+                    React.createElement("p", { style: { fontSize: 10.5, color: TF.sub, textAlign: 'right', margin: '2px 2px 0' } }, `${tipFlow.reviewText.length}/500`),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: TF.text, margin: '22px 0 0' } }, `Want to thank ${providerLabel}?`),
+                    React.createElement("p", { style: { fontSize: 12, color: TF.sub, margin: '3px 0 12px' } }, "100% of your tip goes to your service provider."),
+                    percentRow,
+                    tipFlow.selectedPct != null && React.createElement("div", { style: { marginTop: 14, textAlign: 'center' } },
+                        React.createElement("p", { style: { fontSize: 12, color: TF.sub, margin: 0 } }, "Tip Amount"),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: TF.text, margin: '2px 0 0' } }, money(tipFlow.tipAmount))),
+                    React.createElement("button", {
+                        disabled: tipFlow.selectedPct == null, onClick: () => submitTipFlowAmount(tipFlow.tipAmount),
+                        style: { width: '100%', marginTop: 18, height: 52, borderRadius: 26, background: tipFlow.selectedPct != null ? THEME.coral : T.surfaceSecondary, color: tipFlow.selectedPct != null ? '#fff' : TF.sub, fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' },
+                    }, tipFlow.selectedPct != null ? `Send ${money(tipFlow.tipAmount)} Tip` : 'Select a Tip Amount'),
+                    React.createElement("button", { onClick: finishTipFlowNoTip, style: { width: '100%', marginTop: 10, padding: '12px 0', textAlign: 'center' } },
+                        React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: TF.sub } }, "No Tip")));
+            }
+            else if (tipFlow.step === 'custom') {
+                const amt = Math.round((Number(tipFlow.customAmount) || 0) * 100) / 100;
+                const valid = amt > 0 && tipFlow.customAmount.trim() !== '';
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 20px calc(env(safe-area-inset-bottom) + 16px)' } },
+                    React.createElement("button", { onClick: () => setTipFlow((f) => ({ ...f, step: 'review' })), style: { marginTop: 18, display: 'flex', alignItems: 'center', gap: 6 } },
+                        React.createElement(Icon, { name: "arrowleft", size: 15, color: TF.sub }), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: TF.sub } }, "Back")),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: TF.text, textAlign: 'center', margin: '18px 0 0' } }, "Enter a custom tip"),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 22 } },
+                        React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: TF.text } }, "$"),
+                        React.createElement("input", {
+                            value: tipFlow.customAmount, autoFocus: true, inputMode: "decimal", placeholder: "0.00",
+                            onChange: (e) => setTipFlow((f) => ({ ...f, customAmount: e.target.value.replace(/[^0-9.]/g, '') })),
+                            style: { width: 140, border: 'none', outline: 'none', background: 'transparent', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: TF.text },
+                        })),
+                    React.createElement("button", {
+                        disabled: !valid, onClick: () => submitTipFlowAmount(amt),
+                        style: { width: '100%', marginTop: 28, height: 52, borderRadius: 26, background: valid ? THEME.coral : T.surfaceSecondary, color: valid ? '#fff' : TF.sub, fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' },
+                    }, "Send Tip"));
+            }
+            else if (tipFlow.step === 'processing') {
+                body = React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px' } },
+                    React.createElement("div", { className: "avio-ring-pulse", style: { width: 96, height: 96, borderRadius: '50%', border: `2px solid ${THEME.coral}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: "heart", size: 34, color: THEME.coral })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: TF.text, marginTop: 22, textAlign: 'center' } }, "Sending your tip…"),
+                    React.createElement("p", { style: { fontSize: 12.5, color: TF.sub, marginTop: 4, textAlign: 'center' } }, "Please wait while we process your payment."),
+                    React.createElement("p", { style: { fontSize: 12, color: TF.sub, marginTop: 26 } }, "Tip Amount"),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: TF.text, margin: '2px 0 0' } }, money(tipFlow.tipAmount)),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 16 } },
+                        React.createElement(Icon, { name: "lock", size: 12, color: TF.sub }),
+                        React.createElement("span", { style: { fontSize: 11.5, color: TF.sub } }, "Secure payment")));
+            }
+            else {
+                body = React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px' } },
+                    React.createElement("div", { className: "avio-check-pop", style: { width: 72, height: 72, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: "check", size: 30, color: "#fff" })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: TF.text, marginTop: 18, textAlign: 'center' } }, "Thank you!"),
+                    React.createElement("p", { style: { fontSize: 12.5, color: TF.sub, marginTop: 4, textAlign: 'center' } }, `Your tip has been sent to ${providerLabel}.`),
+                    React.createElement("p", { style: { fontSize: 12, color: TF.sub, marginTop: 22 } }, "Tip Amount"),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: TF.text, margin: '2px 0 0' } }, money(tipFlow.tipAmount)),
+                    React.createElement("button", { onClick: () => { setBookingDetail(b); closeTipFlow(); }, style: { width: '100%', marginTop: 26, height: 52, borderRadius: 26, background: THEME.coral, color: '#fff', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "View Booking"),
+                    React.createElement("button", { onClick: closeTipFlow, style: { width: '100%', marginTop: 10, padding: '12px 0', textAlign: 'center' } },
+                        React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: TF.sub } }, "Done")));
+            }
+            return React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 17, display: 'flex', flexDirection: 'column' } },
+                (tipFlow.step === 'review' || tipFlow.step === 'custom') && closeBtn, body);
+        })(),
+        postServiceBanner && accountType !== 'business' && React.createElement("button", {
+            onClick: () => openTipFlow(postServiceBanner),
+            style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, color: '#fff', fontSize: 12, padding: '12px 14px', borderRadius: 14, zIndex: 19, boxShadow: '0 8px 20px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' },
+        },
+            React.createElement(Icon, { name: "heart", size: 16, color: THEME.coral }),
+            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                React.createElement("p", { style: { fontWeight: 700, margin: 0 } }, `How was your appointment with ${postServiceBanner.business || postServiceBanner.name}?`),
+                React.createElement("p", { style: { color: 'rgba(255,255,255,0.7)', margin: '2px 0 0' } }, "Tap to leave a review or tip.")),
+            React.createElement("span", {
+                onClick: (e) => { e.stopPropagation(); setPostServiceBanner(null); },
+                style: { flexShrink: 0, padding: 4 },
+            }, React.createElement(Icon, { name: "x", size: 14, color: "rgba(255,255,255,0.7)" }))),
         toast && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }, toast))));
 }
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App, null));
