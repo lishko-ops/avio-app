@@ -2802,6 +2802,21 @@ function parseAddressSearchText(text) {
     }
     return result;
 }
+// Adapts the "Choose Your ___" staff-selection title (and its review-step summary
+// label) to what this business actually is, instead of hard-coding "Barber" — reuses
+// the same keyword-matching approach as QUICK_SEARCH_GROUPS elsewhere in the app.
+function getProviderRoleLabel(business) {
+    if (!business)
+        return 'Provider';
+    const text = [business.category, business.name, ...(business.hashtags || [])].join(' ').toLowerCase();
+    if (/massage|therapist|therapy/.test(text))
+        return 'Therapist';
+    if (/barber/.test(text))
+        return 'Barber';
+    if (/salon|stylist|\bhair\b/.test(text))
+        return 'Stylist';
+    return 'Provider';
+}
 function App() {
     var _a;
     const [themeMode, setThemeModeRaw] = useState(() => {
@@ -9868,8 +9883,9 @@ function App() {
             const initials2 = bookingTarget.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
             const paymentLabel = { apple: 'Apple Pay', card: 'Credit/Debit Card', google: 'Google Pay', saved: 'VISA •••• 4242', gift: 'Gift Card', promo: 'Promo Code' }[paymentMethod] || 'Choose a payment method';
             const staffOptions = getStaffForTarget(bookingTarget);
+            const providerRoleLabel = getProviderRoleLabel(bookingTarget);
             const STEP_TITLES = {
-                service: 'Book', staff: 'Choose Your Barber', guests: 'Number of Guests',
+                service: 'Book', staff: `Choose Your ${providerRoleLabel}`, guests: 'Number of Guests',
                 rentalReturn: 'Return Date', venueDetails: 'Event Details', variableOptions: 'Service Details',
                 date: 'Choose Date', time: 'Choose Time', serviceLocation: 'Service Location', info: 'Your Information',
                 insurance: 'Coverage', addInsurance: 'Add Your Insurance',
@@ -9923,18 +9939,35 @@ function App() {
                     })));
             }
             else if (bookingStep === 'staff') {
-                const staffChoices = [{ id: null, name: 'Any Available', subtitle: 'First open slot with any team member' }, ...staffOptions.map((s) => ({ id: s.id, name: s.name, subtitle: s.customHours ? 'Custom hours' : null }))];
+                // Subtitle is deliberately limited to real, already-entered data (custom hours vs.
+                // the shop's own hours) — no fabricated "available now" claims, since no date/time
+                // has been chosen yet at this point in the flow.
+                const staffChoices = [{ id: null, name: 'Any Available', subtitle: 'First open slot with any team member', isAny: true }, ...staffOptions.map((s) => ({ id: s.id, name: s.name, subtitle: s.customHours ? 'Custom hours' : "Uses shop's hours", photo: s.photo || null, isAny: false }))];
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
-                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: BF.text, marginBottom: 10 } }, "Who would you like to book with?"),
-                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, staffChoices.map((o) => {
+                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: BF.text, margin: 0 } }, "Who would you like to book with?"),
+                    React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, margin: '3px 0 16px' } }, "Choose a team member or select the first available."),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 12 } }, staffChoices.map((o) => {
                         const active = (selectedStaff ? selectedStaff.id : null) === o.id;
-                        const oInitials = o.id === null ? '★' : o.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
-                        return React.createElement("button", { key: o.id || 'any', onClick: () => setSelectedStaff(o.id === null ? null : staffOptions.find((s) => s.id === o.id)), style: { display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, border: `1.5px solid ${active ? T.textPrimary : BF.border}`, background: active ? T.surfaceSecondary : T.surface } },
-                            React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, flexShrink: 0 } }, oInitials),
-                            React.createElement("div", { style: { flex: 1, textAlign: 'left' } },
-                                React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BF.text, margin: 0 } }, o.name),
-                                o.subtitle && React.createElement("p", { style: { fontSize: 11.5, color: BF.sub, marginTop: 2 } }, o.subtitle)),
-                            React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${active ? T.textPrimary : '#D1D1D6'}`, background: active ? T.textPrimary : T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" })));
+                        const initials = o.isAny ? null : o.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+                        const avatar = o.photo
+                            ? React.createElement("img", { src: o.photo, style: { width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 } })
+                            : React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: o.isAny ? 'rgba(108,76,252,0.14)' : T.surfaceSecondary, border: `1px solid ${o.isAny ? THEME.violet : T.border}` } },
+                                o.isAny ? React.createElement(Icon, { name: "star", size: 20, color: THEME.violet, fill: THEME.violet }) : React.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: T.textPrimary, fontFamily: 'Space Grotesk, sans-serif' } }, initials));
+                        return React.createElement("button", {
+                            key: o.id || 'any', onClick: () => setSelectedStaff(o.id === null ? null : staffOptions.find((s) => s.id === o.id)),
+                            style: {
+                                display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', borderRadius: 18,
+                                border: `1.5px solid ${active ? THEME.violet : T.border}`,
+                                background: active ? 'rgba(108,76,252,0.08)' : T.surface,
+                                boxShadow: active ? '0 4px 14px rgba(108,76,252,0.22)' : 'none',
+                            },
+                        },
+                            avatar,
+                            React.createElement("div", { style: { flex: 1, textAlign: 'left', minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: T.textPrimary, margin: 0 } }, o.name),
+                                React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, marginTop: 2 } }, o.subtitle)),
+                            React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: active ? THEME.violet : 'transparent', border: active ? 'none' : `1.5px solid ${T.border}` } },
+                                active && React.createElement(Icon, { name: "check", size: 13, color: "#fff" })));
                     })));
             }
             else if (bookingStep === 'date') {
@@ -10209,7 +10242,7 @@ function App() {
                             summaryRow('Time', selTime != null ? minutesToTimeLabel(selTime) : '—'),
                             summaryRow('Duration', selectedService ? formatDuration(selectedService.durationMin) : '—'),
                             ...(selectedService && selectedService.requiresGuests ? [summaryRow('Guests', String(bookingGuests))] : []),
-                            ...(staffOptions.length > 0 ? [summaryRow('Barber', selectedStaff ? selectedStaff.name : 'Any Available')] : []),
+                            ...(staffOptions.length > 0 ? [summaryRow(providerRoleLabel, selectedStaff ? selectedStaff.name : 'Any Available')] : []),
                         ]),
                         ...(travelInfo.enabled && bkType !== 'RENTAL' && bkType !== 'VENUE' ? [summaryRow('Service Location', customerServiceLocation === 'customer' ? fullServiceAddress : (bookingTarget.location || 'At their location'))] : []),
                         // Every mobile booking gets an explicit Service/Travel Fee/Tax breakdown so
@@ -10274,7 +10307,11 @@ function App() {
             if (bookingStep === 'service')
                 footer = footerWrap(React.createElement("button", { disabled: !selectedService, onClick: goNext, style: ctaStyle(!!selectedService) }, "Continue"));
             else if (bookingStep === 'staff')
-                footer = footerWrap(React.createElement("button", { onClick: goNext, style: ctaStyle(true) }, "Continue"));
+                // A choice always exists here (Any Available is the default), so Continue is
+                // always active — styled with Bookvado's purple gradient rather than the plain
+                // white ctaStyle the other steps in this flow use.
+                footer = footerWrap(React.createElement("button", { onClick: goNext, style: { width: '100%', height: 52, borderRadius: 26, background: THEME.bookGradient, color: '#fff', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: `0 6px 18px ${THEME.violetSoft}` } },
+                    "Continue", React.createElement(Icon, { name: "arrowright", size: 15, color: "#fff" })));
             else if (bookingStep === 'guests')
                 footer = footerWrap(React.createElement("button", { onClick: goNext, style: ctaStyle(true) }, "Continue"));
             else if (bookingStep === 'date')
