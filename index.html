@@ -68,7 +68,7 @@
   .avio-auth-card { transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease; }
   @keyframes avioCheckPop { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
   .avio-check-pop { animation: avioCheckPop 0.36s cubic-bezier(0.22,1,0.36,1); }
-  @keyframes avioRingPulse { 0% { box-shadow: 0 0 0 0 rgba(151,196,0,0.28); } 100% { box-shadow: 0 0 0 14px rgba(151,196,0,0); } }
+  @keyframes avioRingPulse { 0% { box-shadow: 0 0 0 0 rgba(107,74,53,0.28); } 100% { box-shadow: 0 0 0 14px rgba(107,74,53,0); } }
   .avio-ring-pulse { animation: avioRingPulse 1.4s ease-out infinite; }
   @keyframes avioRecBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
   .avio-rec-dot { animation: avioRecBlink 1s ease-in-out infinite; }
@@ -127,12 +127,12 @@
 <script>
 "use strict";
 const { useState, useMemo, useEffect, useRef, useContext } = React;
-const SettingsThemeContext = React.createContext({ dark: false, ST: { bg: '#fff', text: '#161616', sub: '#8A8A8E', border: '#ECECEE', card: '#fff' }, accent: '#97C400', isRTL: false });
+const SettingsThemeContext = React.createContext({ dark: false, ST: { bg: '#fff', text: '#161616', sub: '#8A8A8E', border: '#ECECEE', card: '#fff' }, accent: '#6B4A35', isRTL: false });
 const THEME = {
     ink: '#000000', inkLine: 'rgba(255,255,255,0.10)',
     surface: '#211D2A',
     paper: '#fff', paperLine: 'rgba(255,255,255,0.10)',
-    coral: '#97C400', violet: '#6C4CFC', violetSoft: 'rgba(108,76,252,0.20)',
+    coral: '#6B4A35', violet: '#6C4CFC', violetSoft: 'rgba(108,76,252,0.20)',
     gold: '#F5A623', textDark: '#F8F4EC', textLight: '#F3EFFA',
     muted: '#93899A', mutedDark: '#B7AFC3',
     blue: '#2E9BFF', turquoise: '#2FD9C4', green: '#3FBF8A',
@@ -708,10 +708,10 @@ const CUSTOMER_CANCEL_REASONS = [
 const CANCELLATION_STATUS_META = {
     requested: { label: 'Cancellation Requested', color: THEME.gold, bg: 'rgba(245,166,35,0.14)' },
     under_review: { label: 'Under Review', color: THEME.gold, bg: 'rgba(245,166,35,0.14)' },
-    approved: { label: 'Cancellation Approved', color: THEME.coral, bg: 'rgba(151,196,0,0.14)' },
-    cancelled: { label: 'Cancelled', color: THEME.coral, bg: 'rgba(151,196,0,0.14)' },
-    refund_processing: { label: 'Refund Processing', color: THEME.coral, bg: 'rgba(151,196,0,0.14)' },
-    refunded: { label: 'Refunded', color: THEME.coral, bg: 'rgba(151,196,0,0.14)' },
+    approved: { label: 'Cancellation Approved', color: THEME.coral, bg: 'rgba(107,74,53,0.14)' },
+    cancelled: { label: 'Cancelled', color: THEME.coral, bg: 'rgba(107,74,53,0.14)' },
+    refund_processing: { label: 'Refund Processing', color: THEME.coral, bg: 'rgba(107,74,53,0.14)' },
+    refunded: { label: 'Refunded', color: THEME.coral, bg: 'rgba(107,74,53,0.14)' },
     declined: { label: 'Cancellation Declined', color: '#D0304A', bg: 'rgba(208,48,74,0.12)' },
 };
 // A booking's cancellation fee/refund math, computed the same way at every
@@ -1006,17 +1006,17 @@ const BUSINESS_INCOMING_BOOKINGS = [
     { id: 'ib1', customerName: 'Michael R.', initials: 'MR', service: "Men's Fade", price: 45, time: '10:00 AM', status: 'confirmed', avatarColor: '#000000', dateGroup: 'today',
         serviceAddress: { street: '88 Bedford Ave', unit: 'Apt 3', city: 'Brooklyn', state: 'NY', zip: '11249', notes: 'Buzzer is broken — please call on arrival.', full: '88 Bedford Ave, Apt 3, Brooklyn, NY 11249', distanceMi: 6.2 }, travelFee: 10,
         insurance: { verificationStatus: 'verified', active: true, carrierName: 'Aetna', planName: 'Choice POS II', memberId: 'W998877234', copay: 30, deductible: 1000, deductibleRemaining: 400, coinsurance: 20, oopMax: 3000, oopRemaining: 1200, referralRequired: false, priorAuthRequired: false } },
-    { id: 'ib2', customerName: 'Sarah M.', initials: 'SM', service: 'Balayage', price: 180, time: '11:30 AM', status: 'confirmed', avatarColor: '#97C400', dateGroup: 'today' },
+    { id: 'ib2', customerName: 'Sarah M.', initials: 'SM', service: 'Balayage', price: 180, time: '11:30 AM', status: 'confirmed', avatarColor: '#6B4A35', dateGroup: 'today' },
     { id: 'ib3', customerName: 'Jessica T.', initials: 'JT', service: 'Hair Color', price: 120, time: '1:00 PM', status: 'pending', avatarColor: '#FFFFFF', dateGroup: 'today',
         insurance: { verificationStatus: 'needsReview', active: false, carrierName: 'Horizon NJ Health (Medicaid MCO)', planName: null, memberId: 'M445566', copay: null, deductible: null, deductibleRemaining: null, coinsurance: null, oopMax: null, oopRemaining: null, referralRequired: false, priorAuthRequired: false } },
     { id: 'ib4', customerName: 'David L.', initials: 'DL', service: 'Beard Trim', price: 30, time: '3:30 PM', status: 'confirmed', avatarColor: '#000000', dateGroup: 'today' },
-    { id: 'ib5', customerName: 'Jessica W.', initials: 'JW', service: 'Highlights', price: 150, time: '12:00 PM', status: 'confirmed', avatarColor: '#97C400', dateGroup: 'tomorrow' },
+    { id: 'ib5', customerName: 'Jessica W.', initials: 'JW', service: 'Highlights', price: 150, time: '12:00 PM', status: 'confirmed', avatarColor: '#6B4A35', dateGroup: 'tomorrow' },
     { id: 'ib6', customerName: 'Anthony M.', initials: 'AM', service: 'Haircut', price: 35, time: '2:00 PM', status: 'confirmed', avatarColor: '#FFFFFF', dateGroup: 'tomorrow' },
     { id: 'ib7', customerName: 'Brian C.', initials: 'BC', service: "Men's Fade", price: 45, time: '4:00 PM', status: 'completed', avatarColor: '#000000', dateGroup: 'past', dateLabel: 'Aug 10' },
-    { id: 'ib8', customerName: 'Kevin T.', initials: 'KT', service: 'Beard Trim', price: 30, time: '1:30 PM', status: 'completed', avatarColor: '#97C400', dateGroup: 'past', dateLabel: 'Aug 9' },
+    { id: 'ib8', customerName: 'Kevin T.', initials: 'KT', service: 'Beard Trim', price: 30, time: '1:30 PM', status: 'completed', avatarColor: '#6B4A35', dateGroup: 'past', dateLabel: 'Aug 9' },
     { id: 'ib9', customerName: 'Luis M.', initials: 'LM', service: 'Haircut', price: 35, time: '12:00 PM', status: 'completed', avatarColor: '#FFFFFF', dateGroup: 'past', dateLabel: 'Aug 8' },
     { id: 'ib10', customerName: 'James S.', initials: 'JS', service: 'Balayage', price: 180, time: '3:00 PM', status: 'completed', avatarColor: '#000000', dateGroup: 'past', dateLabel: 'Aug 7' },
-    { id: 'ib11', customerName: 'Amanda W.', initials: 'AW', service: 'Highlights', price: 150, time: '11:00 AM', status: 'completed', avatarColor: '#97C400', dateGroup: 'past', dateLabel: 'Aug 6' },
+    { id: 'ib11', customerName: 'Amanda W.', initials: 'AW', service: 'Highlights', price: 150, time: '11:00 AM', status: 'completed', avatarColor: '#6B4A35', dateGroup: 'past', dateLabel: 'Aug 6' },
     { id: 'ib12', customerName: 'Taylor R.', initials: 'TR', service: 'Hair Color', price: 120, time: '2:30 PM', status: 'cancelled', avatarColor: '#FFFFFF', dateGroup: 'past', dateLabel: 'Aug 5' },
 ];
 const THRILLZ_TOPICS = ['Barber', 'Fade', 'Haircut', 'Beard', 'Hair Color', 'Nail Salon', 'Manicure', 'Lashes', 'Makeup', 'Photographer', 'Wedding', 'Jet Ski', 'Fitness', 'Personal Trainer', 'Massage', 'Cleaning', 'Restaurant', 'Events', 'Tattoo', 'Skincare'];
@@ -1154,7 +1154,7 @@ const SETTINGS_LANGUAGES = [
     { id: '中文', label: '中文 (Chinese)' },
 ];
 const SETTINGS_ACCENTS = [
-    { id: 'coral', color: '#97C400' }, { id: 'blue', color: '#2E9BFF' }, { id: 'purple', color: '#8B5CF6' },
+    { id: 'coral', color: '#6B4A35' }, { id: 'blue', color: '#2E9BFF' }, { id: 'purple', color: '#8B5CF6' },
     { id: 'pink', color: '#F5134F' }, { id: 'orange', color: '#F5A623' },
 ];
 const SETTINGS_LINKED_PROVIDERS = [
@@ -1192,7 +1192,7 @@ const SETTINGS_HELP_TOPICS = [
 const SETTINGS_REPORT_ISSUES = ['Booking Issue', 'Payment Issue', 'Technical Issue', 'Inappropriate Content', 'Other'];
 const PROFILE_REVIEWS = [
     { name: 'Jordan M.', rating: 5, text: 'Booked instantly, worth every penny! Communication was great the whole way through.', time: '2d', avatarColor: '#000000', likes: 12 },
-    { name: 'Casey R.', rating: 4, text: 'Great experience overall, would book again.', time: '1w', avatarColor: '#97C400', likes: 8 },
+    { name: 'Casey R.', rating: 4, text: 'Great experience overall, would book again.', time: '1w', avatarColor: '#6B4A35', likes: 8 },
     { name: 'Riley P.', rating: 5, text: 'Super professional, on time, and the results were amazing.', time: '2w', avatarColor: '#FFFFFF', likes: 5 },
 ];
 function loadLS(key, fallback) {
@@ -1614,7 +1614,7 @@ const FEED = [
             medicaidByState: { 'New Jersey': ['NJ FamilyCare (Fee-for-Service)', 'Horizon NJ Health (Medicaid MCO)'] },
         },
     },
-    { id: 't-coreandflow', category: 'Educational', name: 'Core & Flow Studio', location: 'Los Angeles, CA', rating: 4.7, price: 32, likes: '560', comments: 10, saves: '569', blurb: 'Small movements, big burn.', verified: false, distance: '0.5 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#pilates', '#losangeles', '#coreworkout'], friendsBooked: 8, avatarColor: '#97C400', locationMode: 'At my business location', image: 'assets/shorts/thumbs/pilates-1.jpg', video: 'assets/shorts/biz/pilates-1',
+    { id: 't-coreandflow', category: 'Educational', name: 'Core & Flow Studio', location: 'Los Angeles, CA', rating: 4.7, price: 32, likes: '560', comments: 10, saves: '569', blurb: 'Small movements, big burn.', verified: false, distance: '0.5 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#pilates', '#losangeles', '#coreworkout'], friendsBooked: 8, avatarColor: '#6B4A35', locationMode: 'At my business location', image: 'assets/shorts/thumbs/pilates-1.jpg', video: 'assets/shorts/biz/pilates-1',
         services: [
             { id: 't-coreandflow-svc0', name: 'Ring & Mobility Class', bookingType: 'HOURLY_SESSION', durationMin: 45, price: 28 },
             { id: 't-coreandflow-svc1', name: 'Group Pilates Class', bookingType: 'HOURLY_SESSION', durationMin: 50, price: 32, popular: true },
@@ -1699,14 +1699,14 @@ const FEED = [
             { id: 'act-cabana', name: 'Cabana Rental', description: 'A shaded private cabana for the day, right off the wave pool.', durationMin: 480, minAge: 0, minPartySize: 1, maxPartySize: 6, whatsIncluded: ['Private cabana for the day', 'Lounge seating', 'Mini fridge'], pricingModel: 'flatGroup', price: 150, bufferMin: 0, spaceIds: ['space-cabana'], addOns: [], sessionsByDay: dailySessions(['09:30'], 'space-cabana') },
         ],
     },
-    { id: 't-frameandfocus', category: 'Parties', name: 'Frame & Focus Films', location: 'Brooklyn, NY', rating: 4.9, price: 450, likes: '1.4K', comments: 47, saves: '897', blurb: 'Filming inside one of our favorite venues.', verified: true, distance: '2.6 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#videographer', '#brooklyn', '#weddingfilm'], friendsBooked: 25, avatarColor: '#97C400', locationMode: 'I travel to customers', image: 'assets/shorts/thumbs/video-1.jpg', video: 'assets/shorts/biz/video-1',
+    { id: 't-frameandfocus', category: 'Parties', name: 'Frame & Focus Films', location: 'Brooklyn, NY', rating: 4.9, price: 450, likes: '1.4K', comments: 47, saves: '897', blurb: 'Filming inside one of our favorite venues.', verified: true, distance: '2.6 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#videographer', '#brooklyn', '#weddingfilm'], friendsBooked: 25, avatarColor: '#6B4A35', locationMode: 'I travel to customers', image: 'assets/shorts/thumbs/video-1.jpg', video: 'assets/shorts/biz/video-1',
         services: [
             { id: 't-frameandfocus-svc0', name: 'Highlight Reel Add-on', bookingType: 'DURATION_PACKAGE', durationMin: 60, price: 150 },
             { id: 't-frameandfocus-svc1', name: 'Event Coverage (2hr)', bookingType: 'DURATION_PACKAGE', durationMin: 120, price: 450, popular: true },
             { id: 't-frameandfocus-svc2', name: 'Full Day Coverage', bookingType: 'DURATION_PACKAGE', durationMin: 480, price: 1200 },
         ]
     },
-    { id: 't-nonnarosas', category: 'Restaurants', name: 'Nonna Rosa\'s Kitchen', location: 'Austin, TX', rating: 4.6, price: 42, likes: '640', comments: 12, saves: '635', blurb: 'Stretching dough the old-fashioned way.', verified: false, distance: '1.4 mi', openStatus: 'Booking Fast · 5 slots left', hashtags: ['#pizza', '#austin', '#doughtherapy'], friendsBooked: 15, avatarColor: '#97C400', locationMode: 'At my business location', image: 'assets/shorts/thumbs/italian-1.jpg', video: 'assets/shorts/biz/italian-1',
+    { id: 't-nonnarosas', category: 'Restaurants', name: 'Nonna Rosa\'s Kitchen', location: 'Austin, TX', rating: 4.6, price: 42, likes: '640', comments: 12, saves: '635', blurb: 'Stretching dough the old-fashioned way.', verified: false, distance: '1.4 mi', openStatus: 'Booking Fast · 5 slots left', hashtags: ['#pizza', '#austin', '#doughtherapy'], friendsBooked: 15, avatarColor: '#6B4A35', locationMode: 'At my business location', image: 'assets/shorts/thumbs/italian-1.jpg', video: 'assets/shorts/biz/italian-1',
         businessType: 'restaurant', address: '2114 Rio Grande St, Austin, TX 78705', phone: '(512) 555-0142', priceTier: '$$', cuisine: 'Italian Restaurant',
         areas: makeDefaultRestaurantAreas(), tables: makeDefaultRestaurantTables(), combinations: makeDefaultRestaurantCombinations(),
         hours: makeDefaultRestaurantHours(), durationRules: DEFAULT_RESTAURANT_DURATION_RULES, bufferMinutes: 15, intervalMinutes: 30, maxPartySize: 10, minAdvanceHours: 1, advanceDays: 60,
@@ -1755,15 +1755,15 @@ const FEED = [
             { id: 't-grandtable-svc2', name: 'Full Event Catering', bookingType: 'QUOTE_REQUEST' },
         ]
     },
-    { id: 't-coreandflow-p22', category: 'Educational', name: 'Core & Flow Studio', location: 'Los Angeles, CA', rating: 4.7, price: 32, likes: '363', comments: 9, saves: '298', blurb: 'Ring work isn\'t just for gymnasts.', verified: false, distance: '0.5 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#gymnastics', '#losangeles', '#strengthtraining'], friendsBooked: 8, avatarColor: '#97C400', locationMode: 'At my business location', image: 'assets/shorts/thumbs/pilates-2.jpg', video: 'assets/shorts/biz/pilates-2', taggedBusinessIds: ['t-coreandflow'] },
+    { id: 't-coreandflow-p22', category: 'Educational', name: 'Core & Flow Studio', location: 'Los Angeles, CA', rating: 4.7, price: 32, likes: '363', comments: 9, saves: '298', blurb: 'Ring work isn\'t just for gymnasts.', verified: false, distance: '0.5 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#gymnastics', '#losangeles', '#strengthtraining'], friendsBooked: 8, avatarColor: '#6B4A35', locationMode: 'At my business location', image: 'assets/shorts/thumbs/pilates-2.jpg', video: 'assets/shorts/biz/pilates-2', taggedBusinessIds: ['t-coreandflow'] },
     { id: 't-emberandvine-p26', category: 'Restaurants', name: 'Ember & Vine', location: 'Chicago, IL', rating: 4.8, price: 95, likes: '844', comments: 28, saves: '537', blurb: 'Pan-seared, plated, ready to go out.', verified: true, distance: '0.8 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#platedperfection', '#chicago', '#tastingmenu'], friendsBooked: 13, avatarColor: '#6B4A1E', locationMode: 'At my business location', image: 'assets/shorts/thumbs/finedining-2.jpg', video: 'assets/shorts/biz/finedining-2', taggedBusinessIds: ['t-emberandvine'] },
     { id: 't-vmestostudio-p3', category: 'Beauty', name: 'Vmesto Studio', location: 'Chicago, IL', rating: 4.8, price: 85, likes: '755', comments: 20, saves: '574', blurb: 'Big volume, bigger confidence.', verified: true, distance: '1.2 mi', openStatus: 'Booking Fast · 5 slots left', hashtags: ['#blowout', '#chicago', '#hairstyle'], friendsBooked: 17, avatarColor: '#FFFFFF', locationMode: 'At my business location', image: 'assets/shorts/thumbs/hairsalon-2.jpg', video: 'assets/shorts/biz/hairsalon-2', taggedBusinessIds: ['t-vmestostudio'] },
     { id: 't-neonarcade-p14', category: 'Rentals', name: 'Neon Arcade', location: 'Las Vegas, NV', rating: 4.7, price: 20, likes: '744', comments: 16, saves: '687', blurb: 'New cabinet just dropped. Come try it.', verified: true, distance: '0.6 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#arcade', '#lasvegas', '#gamenight'], friendsBooked: 9, avatarColor: '#6C4CFC', locationMode: 'At my business location', image: 'assets/shorts/thumbs/arcade-2.jpg', video: 'assets/shorts/biz/arcade-2', taggedBusinessIds: ['t-neonarcade'] },
     { id: 't-summitfitness-p52', category: 'Educational', name: 'Summit Fitness Coaching', location: 'Denver, CO', rating: 4.9, price: 75, likes: '471', comments: 17, saves: '277', blurb: 'Dialing in the form, rep by rep.', verified: true, distance: '0.5 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#gym', '#denver', '#strengthtraining'], friendsBooked: 8, avatarColor: '#FFFFFF', locationMode: 'I travel to customers', image: 'assets/shorts/thumbs/training-2.jpg', video: 'assets/shorts/biz/training-2', taggedBusinessIds: ['t-summitfitness'] },
     { id: 't-gildedhall-p55', category: 'Restaurants', name: 'The Gilded Hall', location: 'New York, NY', rating: 4.7, price: 40, likes: '481', comments: 16, saves: '304', blurb: 'Reading the room (and the menu) before service starts.', verified: true, distance: '1.6 mi', openStatus: 'Available Today', hashtags: ['#cocktaillounge', '#newyork', '#whiskey'], friendsBooked: 18, avatarColor: '#5A2E7A', locationMode: 'At my business location', image: 'assets/shorts/thumbs/lounge-2.jpg', video: 'assets/shorts/biz/lounge-2', taggedBusinessIds: ['t-gildedhall'] },
     { id: 't-wavekingdom-p11', category: 'Rentals', name: 'Wave Kingdom Water Park', location: 'Orlando, FL', rating: 4.8, price: 45, likes: '1.9K', comments: 34, saves: '1.9K', blurb: 'The castle slide is still the one to beat.', verified: true, distance: '0.3 mi', openStatus: 'Open Now', hashtags: ['#waterslide', '#orlando', '#familyday'], friendsBooked: 6, avatarColor: '#2E9BFF', locationMode: 'At my business location', image: 'assets/shorts/thumbs/waterpark-2.jpg', video: 'assets/shorts/biz/waterpark-2', taggedBusinessIds: ['t-wavekingdom'] },
-    { id: 't-frameandfocus-p28', category: 'Parties', name: 'Frame & Focus Films', location: 'Brooklyn, NY', rating: 4.9, price: 450, likes: '700', comments: 21, saves: '481', blurb: 'Behind the scenes on today\'s shoot.', verified: true, distance: '2.6 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#bts', '#brooklyn', '#videography'], friendsBooked: 25, avatarColor: '#97C400', locationMode: 'I travel to customers', image: 'assets/shorts/thumbs/video-2.jpg', video: 'assets/shorts/biz/video-2', taggedBusinessIds: ['t-frameandfocus'] },
-    { id: 't-nonnarosas-p62', category: 'Restaurants', name: 'Nonna Rosa\'s Kitchen', location: 'Austin, TX', rating: 4.6, price: 42, likes: '537', comments: 10, saves: '534', blurb: 'A little fire never hurt a good sauce.', verified: false, distance: '1.4 mi', openStatus: 'Booking Fast · 5 slots left', hashtags: ['#flambe', '#austin', '#italianfood'], friendsBooked: 15, avatarColor: '#97C400', locationMode: 'At my business location', image: 'assets/shorts/thumbs/italian-2.jpg', video: 'assets/shorts/biz/italian-2', taggedBusinessIds: ['t-nonnarosas'] },
+    { id: 't-frameandfocus-p28', category: 'Parties', name: 'Frame & Focus Films', location: 'Brooklyn, NY', rating: 4.9, price: 450, likes: '700', comments: 21, saves: '481', blurb: 'Behind the scenes on today\'s shoot.', verified: true, distance: '2.6 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#bts', '#brooklyn', '#videography'], friendsBooked: 25, avatarColor: '#6B4A35', locationMode: 'I travel to customers', image: 'assets/shorts/thumbs/video-2.jpg', video: 'assets/shorts/biz/video-2', taggedBusinessIds: ['t-frameandfocus'] },
+    { id: 't-nonnarosas-p62', category: 'Restaurants', name: 'Nonna Rosa\'s Kitchen', location: 'Austin, TX', rating: 4.6, price: 42, likes: '537', comments: 10, saves: '534', blurb: 'A little fire never hurt a good sauce.', verified: false, distance: '1.4 mi', openStatus: 'Booking Fast · 5 slots left', hashtags: ['#flambe', '#austin', '#italianfood'], friendsBooked: 15, avatarColor: '#6B4A35', locationMode: 'At my business location', image: 'assets/shorts/thumbs/italian-2.jpg', video: 'assets/shorts/biz/italian-2', taggedBusinessIds: ['t-nonnarosas'] },
     { id: 't-novasound-p8', category: 'Parties', name: 'Nova Sound DJs', location: 'Los Angeles, CA', rating: 4.8, price: 400, likes: '1.5K', comments: 45, saves: '1K', blurb: 'Crowd was locked in all night.', verified: true, distance: '3.0 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#djlife', '#losangeles', '#clubnight'], friendsBooked: 33, avatarColor: '#6C4CFC', locationMode: 'I travel to customers', image: 'assets/shorts/thumbs/dj-2.jpg', video: 'assets/shorts/biz/dj-2', taggedBusinessIds: ['t-novasound'] },
     { id: 't-oliveandsage-p13', category: 'Restaurants', name: 'Olive & Sage Bistro', location: 'San Diego, CA', rating: 4.6, price: 48, likes: '537', comments: 11, saves: '489', blurb: 'Pouring the good stuff table-side.', verified: true, distance: '3.0 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#winetime', '#sandiego', '#patiodining'], friendsBooked: 20, avatarColor: '#3FBF8A', locationMode: 'At my business location', image: 'assets/shorts/thumbs/bistro-2.jpg', video: 'assets/shorts/biz/bistro-2', taggedBusinessIds: ['t-oliveandsage'] },
     { id: 't-frostpoint-p39', category: 'Rentals', name: 'Frost Point Ice Rink', location: 'Chicago, IL', rating: 4.5, price: 18, likes: '362', comments: 7, saves: '362', blurb: 'Working on those edges.', verified: false, distance: '0.7 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#iceskating', '#chicago', '#skaterlife'], friendsBooked: 9, avatarColor: '#2E9BFF', locationMode: 'At my business location', image: 'assets/shorts/thumbs/icerink-2.jpg', video: 'assets/shorts/biz/icerink-2', taggedBusinessIds: ['t-frostpoint'] },
@@ -1781,7 +1781,7 @@ const FEED = [
     { id: 't-emberandvine-p56', category: 'Restaurants', name: 'Ember & Vine', location: 'Chicago, IL', rating: 4.8, price: 95, likes: '1.1K', comments: 30, saves: '893', blurb: 'Final touches before it leaves the pass.', verified: true, distance: '0.8 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#chefsknife', '#platingdetails', '#chicago'], friendsBooked: 13, avatarColor: '#6B4A1E', locationMode: 'At my business location', image: 'assets/shorts/thumbs/finedining-4.jpg', video: 'assets/shorts/biz/finedining-4', taggedBusinessIds: ['t-emberandvine'] },
     { id: 't-wildframe-p4', category: 'Parties', name: 'Wildframe Photography', location: 'Austin, TX', rating: 4.8, price: 220, likes: '367', comments: 13, saves: '223', blurb: 'Some shots you take before you even set up the tripod.', verified: true, distance: '0.7 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#photography', '#austin', '#bts'], friendsBooked: 11, avatarColor: '#6C4CFC', locationMode: 'I travel to customers', image: 'assets/shorts/thumbs/photo-2.jpg', video: 'assets/shorts/biz/photo-2', taggedBusinessIds: ['t-wildframe'] },
     { id: 't-summitfitness-p54', category: 'Educational', name: 'Summit Fitness Coaching', location: 'Denver, CO', rating: 4.9, price: 75, likes: '475', comments: 17, saves: '281', blurb: 'Core work to finish strong.', verified: true, distance: '0.5 mi', openStatus: 'Open Now · Closes 7PM', hashtags: ['#absworkout', '#denver', '#personaltrainer'], friendsBooked: 8, avatarColor: '#FFFFFF', locationMode: 'I travel to customers', image: 'assets/shorts/thumbs/training-4.jpg', video: 'assets/shorts/biz/training-4', taggedBusinessIds: ['t-summitfitness'] },
-    { id: 't-frameandfocus-p35', category: 'Parties', name: 'Frame & Focus Films', location: 'Brooklyn, NY', rating: 4.9, price: 450, likes: '767', comments: 22, saves: '560', blurb: 'Even the mannequins get camera-ready.', verified: true, distance: '2.6 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#contentday', '#brooklyn', '#videographer'], friendsBooked: 25, avatarColor: '#97C400', locationMode: 'I travel to customers', image: 'assets/shorts/thumbs/video-3.jpg', video: 'assets/shorts/biz/video-3', taggedBusinessIds: ['t-frameandfocus'] },
+    { id: 't-frameandfocus-p35', category: 'Parties', name: 'Frame & Focus Films', location: 'Brooklyn, NY', rating: 4.9, price: 450, likes: '767', comments: 22, saves: '560', blurb: 'Even the mannequins get camera-ready.', verified: true, distance: '2.6 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#contentday', '#brooklyn', '#videographer'], friendsBooked: 25, avatarColor: '#6B4A35', locationMode: 'I travel to customers', image: 'assets/shorts/thumbs/video-3.jpg', video: 'assets/shorts/biz/video-3', taggedBusinessIds: ['t-frameandfocus'] },
     { id: 't-novasound-p32', category: 'Parties', name: 'Nova Sound DJs', location: 'Los Angeles, CA', rating: 4.8, price: 400, likes: '1.1K', comments: 43, saves: '646', blurb: 'Booth view for tonight\'s set.', verified: true, distance: '3.0 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#dj', '#losangeles', '#nightclub'], friendsBooked: 33, avatarColor: '#6C4CFC', locationMode: 'I travel to customers', image: 'assets/shorts/thumbs/dj-4.jpg', video: 'assets/shorts/biz/dj-4', taggedBusinessIds: ['t-novasound'] },
     { id: 't-fairwayrange', category: 'Rentals', name: 'Fairway Range Club', location: 'Scottsdale, AZ', rating: 4.6, price: 25, likes: '290', comments: 7, saves: '232', blurb: 'Working on that swing before the weekend.', verified: false, distance: '1.6 mi', openStatus: 'Booking Fast · 5 slots left', hashtags: ['#golf', '#scottsdale', '#drivingrange'], friendsBooked: 13, avatarColor: '#3FBF8A', locationMode: 'At my business location', image: 'assets/shorts/thumbs/golf-1.jpg', video: 'assets/shorts/biz/golf-1',
         businessType: 'activities',
@@ -2174,7 +2174,7 @@ function computeAiSearchBadges(results, ctx) {
             badges[item.id] = { icon: '⚡', label: 'Available today', bg: 'rgba(46,155,255,0.12)', color: '#2E9BFF' };
         }
         else if (ctx && ctx.sortBy === 'distance' && !isNaN(d) && d === minDistance) {
-            badges[item.id] = { icon: '📍', label: 'Closest match', bg: 'rgba(151,196,0,0.12)', color: THEME.coral };
+            badges[item.id] = { icon: '📍', label: 'Closest match', bg: 'rgba(107,74,53,0.12)', color: THEME.coral };
         }
         else if ((item.rating || 0) === maxRating && maxRating >= 4.8) {
             badges[item.id] = { icon: '⭐', label: 'Top rated', bg: 'rgba(245,166,35,0.14)', color: THEME.gold };
@@ -6388,7 +6388,7 @@ function App() {
                 React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, marginTop: 6, overflowX: 'auto' } },
                     [{ id: 'no-preference', label: 'No Preference' }, ...activeAreas].map((a) => {
                         const active = rsvPickerArea === a.id;
-                        return React.createElement("button", { key: a.id, className: "avio-pill", onClick: () => { setRsvPickerArea(a.id); setRsvPickerError(null); }, style: { flexShrink: 0, padding: '7px 13px', borderRadius: 14, background: active ? 'rgba(151,196,0,0.12)' : '#F5F5F5', border: `1px solid ${active ? THEME.coral : '#F0F0F0'}` } },
+                        return React.createElement("button", { key: a.id, className: "avio-pill", onClick: () => { setRsvPickerArea(a.id); setRsvPickerError(null); }, style: { flexShrink: 0, padding: '7px 13px', borderRadius: 14, background: active ? 'rgba(107,74,53,0.12)' : '#F5F5F5', border: `1px solid ${active ? THEME.coral : '#F0F0F0'}` } },
                             React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: active ? THEME.coral : '#484848' } }, a.label));
                     }))),
             rsvPickerError && React.createElement("p", { style: { fontSize: 11.5, color: '#D0304A', marginTop: 10, fontWeight: 600 } }, rsvPickerError.message),
@@ -6970,7 +6970,7 @@ function App() {
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 23, color: T.textPrimary, margin: 0, lineHeight: 1.2 } }, "Let's verify your business"),
                         React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 6, lineHeight: 1.5 } }, "This helps keep BookVado trusted and our community safe.")),
-                    React.createElement("div", { style: { width: 52, height: 52, borderRadius: 16, background: 'rgba(151,196,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement("div", { style: { width: 52, height: 52, borderRadius: 16, background: 'rgba(107,74,53,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                         React.createElement(Icon, { name: "shield", size: 26, color: THEME.coral })));
                 const section1 = React.createElement("div", { style: bizCard },
                     cardHeading('store', '1. Business information'),
@@ -7031,7 +7031,7 @@ function App() {
                         BIZ_PROOF_OPTIONS.map((opt) => {
                             const done = opt.id === 'website' ? bizVerify.proof.website.trim().length > 0 : bizVerify.proof[opt.id];
                             const open = bizVerify.proofActive === opt.id;
-                            return React.createElement("button", { key: opt.id, onClick: () => setBizVerify((v) => ({ ...v, proofActive: v.proofActive === opt.id ? null : opt.id })), style: { textAlign: 'center', padding: '14px 8px', borderRadius: 14, border: `1.5px solid ${done ? THEME.coral : open ? '#B5B5B8' : T.border}`, background: done ? 'rgba(151,196,0,0.06)' : T.surface } },
+                            return React.createElement("button", { key: opt.id, onClick: () => setBizVerify((v) => ({ ...v, proofActive: v.proofActive === opt.id ? null : opt.id })), style: { textAlign: 'center', padding: '14px 8px', borderRadius: 14, border: `1.5px solid ${done ? THEME.coral : open ? '#B5B5B8' : T.border}`, background: done ? 'rgba(107,74,53,0.06)' : T.surface } },
                                 React.createElement(Icon, { name: opt.icon, size: 20, color: T.textPrimary }),
                                 React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: T.textPrimary, margin: '8px 0 2px' } }, opt.title),
                                 React.createElement("p", { style: { fontSize: 10, color: T.textSecondary, lineHeight: 1.3 } }, opt.desc),
@@ -7048,9 +7048,9 @@ function App() {
                     React.createElement("button", { onClick: () => setBizVerify((v) => ({ ...v, payoutPickerOpen: true })), style: { ...bizInputStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' } },
                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
                             React.createElement("span", { style: { fontSize: 13.5, color: T.textPrimary, fontWeight: 500 } }, bizVerify.payoutMethod),
-                            bizVerify.payoutMethod === 'Bank Account' && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral, background: 'rgba(151,196,0,0.12)', borderRadius: 8, padding: '2px 7px' } }, "Recommended")),
+                            bizVerify.payoutMethod === 'Bank Account' && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral, background: 'rgba(107,74,53,0.12)', borderRadius: 8, padding: '2px 7px' } }, "Recommended")),
                         React.createElement(Icon, { name: "chevrondown", size: 13, color: "#8A8A8E" })));
-                const nextBox = React.createElement("div", { style: { marginTop: 16, background: 'rgba(151,196,0,0.08)', borderRadius: 16, padding: 14, display: 'flex', alignItems: 'center', gap: 12 } },
+                const nextBox = React.createElement("div", { style: { marginTop: 16, background: 'rgba(107,74,53,0.08)', borderRadius: 16, padding: 14, display: 'flex', alignItems: 'center', gap: 12 } },
                     React.createElement(Icon, { name: "clock", size: 18, color: THEME.coral }),
                     React.createElement("div", { style: { flex: 1 } },
                         React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: T.textPrimary, margin: 0 } }, "What happens next?"),
@@ -7070,7 +7070,7 @@ function App() {
                     BIZ_PAYOUT_METHODS.map((m) => React.createElement("button", { key: m, onClick: () => selectBizPayout(m), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left', padding: '13px 4px', borderBottom: `1px solid ${T.border}` } },
                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
                             React.createElement("span", { style: { fontSize: 14, color: T.textPrimary, fontWeight: bizVerify.payoutMethod === m ? 700 : 400 } }, m),
-                            m === 'Bank Account' && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral, background: 'rgba(151,196,0,0.12)', borderRadius: 8, padding: '2px 7px' } }, "Recommended")),
+                            m === 'Bank Account' && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral, background: 'rgba(107,74,53,0.12)', borderRadius: 8, padding: '2px 7px' } }, "Recommended")),
                         bizVerify.payoutMethod === m && React.createElement(Icon, { name: "check", size: 15, color: THEME.coral }))))),
             authView === 'business-verified' && React.createElement("div", { className: "avio-auth-page", style: { flex: 1, display: 'flex', flexDirection: 'column', padding: `calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px)`, overflowY: 'auto' } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 } },
@@ -7084,10 +7084,10 @@ function App() {
                 React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 32 } },
                     React.createElement("div", { style: { position: 'relative', width: 140, height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                         [[-54, -40, 0], [56, -34, 0.15], [-48, 40, 0.3], [58, 38, 0.45], [0, -62, 0.6], [6, 62, 0.75]].map(([dx, dy, delay], i) => React.createElement("span", { key: i, className: "avio-check-pop", style: { position: 'absolute', left: `calc(50% + ${dx}px)`, top: `calc(50% + ${dy}px)`, width: i % 2 ? 6 : 4, height: i % 2 ? 6 : 4, borderRadius: '50%', background: THEME.coral, opacity: 0.55, animationDelay: `${delay}s`, animationFillMode: 'backwards' } })),
-                        React.createElement("div", { style: { width: 116, height: 116, borderRadius: '50%', background: 'rgba(151,196,0,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement("div", { style: { width: 116, height: 116, borderRadius: '50%', background: 'rgba(107,74,53,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                             React.createElement("div", { className: "avio-check-pop avio-ring-pulse", style: { width: 88, height: 88, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                                 React.createElement(Icon, { name: "check", size: 40, color: "#fff" })))),
-                    React.createElement("span", { style: { marginTop: 14, fontSize: 12.5, fontWeight: 700, color: THEME.coral, background: 'rgba(151,196,0,0.12)', borderRadius: 14, padding: '5px 16px' } }, "Verified")),
+                    React.createElement("span", { style: { marginTop: 14, fontSize: 12.5, fontWeight: 700, color: THEME.coral, background: 'rgba(107,74,53,0.12)', borderRadius: 14, padding: '5px 16px' } }, "Verified")),
                 React.createElement("div", { style: { marginTop: 28, display: 'flex', flexDirection: 'column' } },
                     [
                         ['Your business is now verified', 'You can start receiving bookings and payments.'],
@@ -7872,7 +7872,7 @@ function App() {
                         t.businessName, React.createElement("span", { style: { fontWeight: 500, color: 'rgba(255,255,255,0.75)' } }, "· ", t.service)))))
                 : (taggedBusinesses.length > 0 && React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, maxWidth: 280 } },
                     React.createElement("span", { style: { fontSize: 12, color: 'rgba(255,255,255,0.6)' } }, "with"),
-                    taggedBusinesses.map((b) => React.createElement("button", { key: b.id, onClick: () => openBusinessProfile(b), style: { fontSize: 12, fontWeight: 600, color: THEME.coral, background: 'rgba(151,196,0,0.15)', borderRadius: 12, padding: '3px 10px' } }, b.name))));
+                    taggedBusinesses.map((b) => React.createElement("button", { key: b.id, onClick: () => openBusinessProfile(b), style: { fontSize: 12, fontWeight: 600, color: THEME.coral, background: 'rgba(107,74,53,0.15)', borderRadius: 12, padding: '3px 10px' } }, b.name))));
             const primaryTagTarget = taggedBusinesses[0] || item;
             const bookedCount = parseCount(item.likes).toLocaleString();
             const bookedBadge = React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.14)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', borderRadius: 9, padding: '4px 8px', marginBottom: 5 } },
@@ -7891,7 +7891,7 @@ function App() {
                         React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12, color: THEME.coral } }, thrillCta.priceLabel))));
             const isArrowHere = swipeArrow && swipeArrow.itemId === item.id;
             const arrowOverlay = isArrowHere && React.createElement("div", { style: { position: 'absolute', left: 0, top: '50%', zIndex: 5, pointerEvents: 'none', transform: `translate(${-30 + swipeArrow.progress * 60}px,-50%) scale(${0.7 + swipeArrow.progress * 0.5})`, opacity: swipeArrow.progress, transition: swipeArrow.dragging ? 'none' : 'transform 0.25s ease, opacity 0.25s ease' } },
-                React.createElement("div", { style: { width: 54, height: 54, borderRadius: '50%', background: 'rgba(151,196,0,0.22)', boxShadow: `0 0 ${18 + swipeArrow.progress * 20}px ${6 + swipeArrow.progress * 6}px rgba(151,196,0,0.45)`, backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                React.createElement("div", { style: { width: 54, height: 54, borderRadius: '50%', background: 'rgba(107,74,53,0.22)', boxShadow: `0 0 ${18 + swipeArrow.progress * 20}px ${6 + swipeArrow.progress * 6}px rgba(107,74,53,0.45)`, backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                     React.createElement(Icon, { name: "arrowright", size: 24, color: THEME.coral })));
             const isDraggingHere = profileDrag && profileDrag.itemId === item.id;
             const dragProgress = isDraggingHere ? profileDrag.progress : 0;
@@ -8073,13 +8073,13 @@ function App() {
                             ? React.createElement("div", { className: "avio-skeleton", style: { width: 16, height: 16, borderRadius: '50%', background: 'rgba(255,255,255,0.6)' } })
                             : React.createElement("span", { style: { color: canSubmit ? '#fff' : '#B5B5B8', fontSize: 17, fontWeight: 700, lineHeight: 1 } }, "↑"))),
                 React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, marginTop: 14, overflowX: 'auto' } },
-                    React.createElement("button", { className: "avio-pill", onClick: requestAiLocation, style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 14, background: aiSearchFilters.location ? 'rgba(151,196,0,0.12)' : T.surfaceSecondary, border: `1px solid ${aiSearchFilters.location ? THEME.coral : T.border}` } },
+                    React.createElement("button", { className: "avio-pill", onClick: requestAiLocation, style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 14, background: aiSearchFilters.location ? 'rgba(107,74,53,0.12)' : T.surfaceSecondary, border: `1px solid ${aiSearchFilters.location ? THEME.coral : T.border}` } },
                         React.createElement(Icon, { name: "mappin", size: 13, color: aiSearchFilters.location ? THEME.coral : '#8A8A8E' }),
                         React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: aiSearchFilters.location ? THEME.coral : '#484848', whiteSpace: 'nowrap' } }, locationLabel)),
-                    React.createElement("button", { className: "avio-pill", onClick: cycleAiDateFilter, style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 14, background: aiSearchFilters.date ? 'rgba(151,196,0,0.12)' : T.surfaceSecondary, border: `1px solid ${aiSearchFilters.date ? THEME.coral : T.border}` } },
+                    React.createElement("button", { className: "avio-pill", onClick: cycleAiDateFilter, style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 14, background: aiSearchFilters.date ? 'rgba(107,74,53,0.12)' : T.surfaceSecondary, border: `1px solid ${aiSearchFilters.date ? THEME.coral : T.border}` } },
                         React.createElement(Icon, { name: "calendar", size: 13, color: aiSearchFilters.date ? THEME.coral : '#8A8A8E' }),
                         React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: aiSearchFilters.date ? THEME.coral : '#484848', whiteSpace: 'nowrap' } }, dateLabel)),
-                    React.createElement("button", { className: "avio-pill", onClick: cycleAiPriceFilter, style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 14, background: aiSearchFilters.maxPrice ? 'rgba(151,196,0,0.12)' : T.surfaceSecondary, border: `1px solid ${aiSearchFilters.maxPrice ? THEME.coral : T.border}` } },
+                    React.createElement("button", { className: "avio-pill", onClick: cycleAiPriceFilter, style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 13px', borderRadius: 14, background: aiSearchFilters.maxPrice ? 'rgba(107,74,53,0.12)' : T.surfaceSecondary, border: `1px solid ${aiSearchFilters.maxPrice ? THEME.coral : T.border}` } },
                         React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: aiSearchFilters.maxPrice ? THEME.coral : '#8A8A8E' } }, "$"),
                         React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: aiSearchFilters.maxPrice ? THEME.coral : '#484848', whiteSpace: 'nowrap' } }, priceLabel))));
             const tryChipsSection = React.createElement("div", { style: { padding: '22px 18px 0' } },
@@ -8963,7 +8963,7 @@ function App() {
                                 ? `Comes to you · up to ${serviceAreaDistanceMi(travel)} mi`
                                 : (item.locationMode && item.locationMode !== 'I travel to customers' && item.locationMode !== 'All' ? item.locationMode : null);
                         }
-                        return badgeLabel && React.createElement("span", { style: { display: 'inline-block', marginTop: 6, fontSize: 11, fontWeight: 600, color: THEME.coral, background: 'rgba(151,196,0,0.12)', borderRadius: 10, padding: '3px 9px' } }, badgeLabel);
+                        return badgeLabel && React.createElement("span", { style: { display: 'inline-block', marginTop: 6, fontSize: 11, fontWeight: 600, color: THEME.coral, background: 'rgba(107,74,53,0.12)', borderRadius: 10, padding: '3px 9px' } }, badgeLabel);
                     })(),
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 6 } },
                         React.createElement(Icon, { name: "star", size: 13, color: THEME.coral, fill: THEME.coral }),
@@ -8984,7 +8984,7 @@ function App() {
                 !isOwnProfile && React.createElement("button", { onClick: () => openBusinessConversation(item), style: { width: 46, height: 46, borderRadius: 14, border: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                     React.createElement(Icon, { name: "messageoutline", size: 18, color: "#161616" })));
             const activeProfileDealLabel = (item.mine || item.id === MY_PROVIDER_ID) ? (providerDeal.enabled ? providerDeal.label : null) : (item.deal && item.deal.enabled ? item.deal.label : null);
-            const profileDealBadge = activeProfileDealLabel && React.createElement("div", { style: { margin: '16px 18px 0', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(151,196,0,0.12)', borderRadius: 18, padding: '6px 12px' } },
+            const profileDealBadge = activeProfileDealLabel && React.createElement("div", { style: { margin: '16px 18px 0', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(107,74,53,0.12)', borderRadius: 18, padding: '6px 12px' } },
                 React.createElement("span", { style: { fontSize: 13 } }, "🎁"),
                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, activeProfileDealLabel));
             const BIZ_TABS = [{ id: 'videos', label: 'Thrillz', icon: 'bolt' }, { id: 'services', label: 'Services', icon: 'wings' }, { id: 'reviews', label: 'All Comments', icon: 'message' }];
@@ -9244,7 +9244,7 @@ function App() {
                             React.createElement(Icon, { name: icon, size: 16, color: RF.sub }),
                             React.createElement("span", { style: { fontSize: 13.5, color: RF.text, fontWeight: 600 } }, label)))),
                         React.createElement("p", { style: { fontSize: 12, color: RF.sub, padding: '4px 4px' } }, `Reservation duration: ${f.duration} minutes`),
-                        React.createElement("div", { style: { marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                        React.createElement("div", { style: { marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(107,74,53,0.1)' } },
                             React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral, margin: 0 } }, "No payment required"),
                             React.createElement("p", { style: { fontSize: 11, color: '#5c7a2b', marginTop: 2 } }, "You can modify or cancel later.")),
                         React.createElement("div", { style: { marginTop: 18 } },
@@ -9386,7 +9386,7 @@ function App() {
                     React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 } }, checklist.map((c) => React.createElement("div", { key: c.label, style: { display: 'flex', alignItems: 'center', gap: 8 } },
                         React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', background: c.done ? THEME.coral : '#EDEDED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, c.done && React.createElement(Icon, { name: "check", size: 10, color: "#fff" })),
                         React.createElement("span", { style: { fontSize: 12.5, color: RD.text, fontWeight: 500 } }, c.label)))),
-                    allDone && React.createElement("div", { style: { marginTop: 16, padding: 12, borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                    allDone && React.createElement("div", { style: { marginTop: 16, padding: 12, borderRadius: 12, background: 'rgba(107,74,53,0.1)' } },
                         React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral, margin: 0 } }, "Your restaurant is ready to accept reservations! 🎉"),
                         React.createElement("button", { onClick: () => { setRestaurantDashboardOpen(false); openBusinessProfile(restaurant); }, style: { marginTop: 10, width: '100%', padding: '11px 0', borderRadius: 20, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 12.5 } }, "View Your Profile")));
                 dashBody = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px calc(env(safe-area-inset-bottom) + 40px)' } }, cardsGrid, summaryRow, checklistCard);
@@ -9411,7 +9411,7 @@ function App() {
                     React.createElement("textarea", { value: restaurant.blurb || '', onChange: (e) => updateMyRestaurant({ blurb: e.target.value }), rows: 3, style: { width: '100%', marginTop: 6, padding: 12, borderRadius: 12, border: `1px solid ${RD.border}`, fontSize: 13, color: RD.text, outline: 'none', resize: 'none', fontFamily: 'inherit' } }));
             }
             else if (restaurantDashTab === 'tables') {
-                const AREA_COLORS = ['#97C400', '#2E9BFF', '#F5A623', '#6C4CFC', '#F5134F'];
+                const AREA_COLORS = ['#6B4A35', '#2E9BFF', '#F5A623', '#6C4CFC', '#F5134F'];
                 const areaColorMap = {};
                 (restaurant.areas || []).forEach((a, i) => { areaColorMap[a.id] = AREA_COLORS[i % AREA_COLORS.length]; });
                 const statCards = [
@@ -9436,7 +9436,7 @@ function App() {
                                 React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: RD.text, margin: 0 } }, `${t.capacity} seats · Min ${t.minPartySize}`),
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 } },
                                     React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: areaColorMap[t.area] || RD.sub, background: T.surfaceSecondary, borderRadius: 8, padding: '2px 8px' } }, areaObj ? areaObj.label : t.area),
-                                    React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: t.status === 'active' ? THEME.coral : '#B5B5B8', background: t.status === 'active' ? 'rgba(151,196,0,0.12)' : T.surfaceSecondary, borderRadius: 8, padding: '2px 8px' } }, t.status === 'active' ? 'Active' : t.status === 'disabled' ? 'Disabled' : 'Unavailable'))),
+                                    React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: t.status === 'active' ? THEME.coral : '#B5B5B8', background: t.status === 'active' ? 'rgba(107,74,53,0.12)' : T.surfaceSecondary, borderRadius: 8, padding: '2px 8px' } }, t.status === 'active' ? 'Active' : t.status === 'disabled' ? 'Disabled' : 'Unavailable'))),
                             React.createElement("button", { onClick: () => setTableFormDraft({ id: t.id, capacity: String(t.capacity), minPartySize: String(t.minPartySize), area: t.area, status: t.status, originalId: t.id }), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "pencil", size: 14, color: RD.sub })),
                             React.createElement("button", { onClick: () => deleteTable(t.id), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "trash", size: 14, color: "#D0304A" })));
                     }));
@@ -9547,7 +9547,7 @@ function App() {
                 const RSV_STATUS_META = {
                     upcoming: { label: 'Upcoming', bg: 'rgba(46,155,255,0.12)', color: '#2E9BFF' },
                     arrived: { label: 'Arrived', bg: 'rgba(245,166,35,0.14)', color: THEME.gold },
-                    seated: { label: 'Seated', bg: 'rgba(151,196,0,0.12)', color: THEME.coral },
+                    seated: { label: 'Seated', bg: 'rgba(107,74,53,0.12)', color: THEME.coral },
                     completed: { label: 'Completed', bg: T.border, color: RD.sub },
                     'no-show': { label: 'No Show', bg: 'rgba(208,48,74,0.1)', color: '#D0304A' },
                     cancelled: { label: 'Cancelled', bg: T.border, color: RD.sub },
@@ -9637,7 +9637,7 @@ function App() {
                     React.createElement("p", { style: { fontSize: 12, color: TD.sub, marginBottom: 14 } }, "Select 2 or more tables to combine for larger parties."),
                     React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, restaurant.tables.map((t) => {
                         const checked = comboPickerTables.includes(t.id);
-                        return React.createElement("button", { key: t.id, onClick: () => toggleComboPickerTable(t.id), style: { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 12, border: `1px solid ${checked ? THEME.coral : TD.border}`, background: checked ? 'rgba(151,196,0,0.08)' : '#fff' } },
+                        return React.createElement("button", { key: t.id, onClick: () => toggleComboPickerTable(t.id), style: { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 12, border: `1px solid ${checked ? THEME.coral : TD.border}`, background: checked ? 'rgba(107,74,53,0.08)' : '#fff' } },
                             React.createElement("div", { style: { width: 20, height: 20, borderRadius: 5, border: `1.5px solid ${checked ? THEME.coral : '#D1D1D6'}`, background: checked ? THEME.coral : T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, checked && React.createElement(Icon, { name: "check", size: 12, color: "#fff" })),
                             React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: TD.text } }, `${t.id} · ${t.capacity} seats`));
                     })),
@@ -9825,7 +9825,7 @@ function App() {
                                 React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BF.text, margin: 0 } }, s.name),
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 } },
                                     React.createElement("span", { style: { fontSize: 11.5, color: BF.sub } }, formatDuration(s.durationMin)),
-                                    s.popular && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral, background: 'rgba(151,196,0,0.12)', borderRadius: 8, padding: '2px 7px' } }, "Popular")),
+                                    s.popular && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral, background: 'rgba(107,74,53,0.12)', borderRadius: 8, padding: '2px 7px' } }, "Popular")),
                                 sPromo && React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, color: THEME.coral, marginTop: 3 } }, sPromo.promotionLabel)),
                             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
                                 React.createElement("div", { style: { textAlign: 'right' } },
@@ -9949,7 +9949,7 @@ function App() {
                     (selectedService.variableOptions || []).map((opt) => fieldWrap2(opt.label, React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
                         (opt.choices || []).map((c) => {
                             const active = variableSelections[opt.key] === c.value;
-                            return React.createElement("button", { key: c.value, onClick: () => setVariableSelections((prev) => ({ ...prev, [opt.key]: c.value })), style: { padding: '9px 14px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${BF.border}`, background: active ? 'rgba(151,196,0,0.1)' : 'transparent' } },
+                            return React.createElement("button", { key: c.value, onClick: () => setVariableSelections((prev) => ({ ...prev, [opt.key]: c.value })), style: { padding: '9px 14px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${BF.border}`, background: active ? 'rgba(107,74,53,0.1)' : 'transparent' } },
                                 React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: active ? THEME.coral : BF.text } }, c.label, c.priceDelta ? ` (+$${c.priceDelta})` : ''));
                         })))),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '14px 0', marginTop: 8, borderTop: `1px solid ${BF.border}` } },
@@ -9967,7 +9967,7 @@ function App() {
                         { id: 'customer', title: 'They come to you', sub: `Up to ${travelRadiusMi} mi` },
                     ].map((opt) => {
                         const active = customerServiceLocation === opt.id;
-                        return React.createElement("button", { key: opt.id, onClick: () => setCustomerServiceLocation(opt.id), style: { display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: '12px 14px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${BF.border}`, background: active ? 'rgba(151,196,0,0.07)' : 'transparent' } },
+                        return React.createElement("button", { key: opt.id, onClick: () => setCustomerServiceLocation(opt.id), style: { display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: '12px 14px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${BF.border}`, background: active ? 'rgba(107,74,53,0.07)' : 'transparent' } },
                             React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', border: active ? `5px solid ${THEME.coral}` : `1.5px solid ${BF.sub}`, flexShrink: 0 } }),
                             React.createElement("div", { style: { flex: 1 } },
                                 React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: BF.text, margin: 0 } }, opt.title),
@@ -9990,7 +9990,7 @@ function App() {
                                     { timeout: 5000 });
                             }
                         },
-                        style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, padding: '11px 6px', borderRadius: 14, border: `1.5px solid ${addressEntryMode === m.id ? THEME.coral : BF.border}`, background: addressEntryMode === m.id ? 'rgba(151,196,0,0.07)' : 'transparent' },
+                        style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, padding: '11px 6px', borderRadius: 14, border: `1.5px solid ${addressEntryMode === m.id ? THEME.coral : BF.border}`, background: addressEntryMode === m.id ? 'rgba(107,74,53,0.07)' : 'transparent' },
                     },
                         React.createElement(Icon, { name: m.icon, size: 16, color: addressEntryMode === m.id ? THEME.coral : BF.text }),
                         React.createElement("span", { style: { fontSize: 10.5, fontWeight: 600, color: addressEntryMode === m.id ? THEME.coral : BF.text, textAlign: 'center' } }, m.label))));
@@ -10009,7 +10009,7 @@ function App() {
                                     React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: "#B5790C", margin: 0 } }, "Outside primary service area"),
                                     React.createElement("p", { style: { fontSize: 11.5, color: "#B5790C", margin: '2px 0 0' } }, `${estimatedDistanceMi.toFixed(1)} miles away`),
                                     travelCalc.fee > 0 && React.createElement("p", { style: { fontSize: 11.5, color: "#B5790C", margin: '2px 0 0' } }, `Additional travel fee: ${money(travelCalc.fee)}`)))
-                            : React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, padding: 12, borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                            : React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, padding: 12, borderRadius: 12, background: 'rgba(107,74,53,0.1)' } },
                                 React.createElement(Icon, { name: "check", size: 14, color: THEME.coral }),
                                 React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "You're in our service area")));
                 const addressFields = customerServiceLocation === 'customer' && React.createElement(React.Fragment, null,
@@ -10282,7 +10282,7 @@ function App() {
                 const areaChips = spaceOptions.length > 1 && React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 14, overflowX: 'auto' } },
                     [{ id: 'all', name: 'All Areas' }, ...spaceOptions].map((s) => {
                         const active = activityAreaFilter === s.id;
-                        return React.createElement("button", { key: s.id, onClick: () => setActivityAreaFilter(s.id), style: { flexShrink: 0, padding: '7px 14px', borderRadius: 16, fontSize: 12.5, fontWeight: 600, border: `1px solid ${active ? THEME.coral : AF.border}`, background: active ? 'rgba(151,196,0,0.12)' : T.surface, color: active ? THEME.coral : AF.text } }, s.name);
+                        return React.createElement("button", { key: s.id, onClick: () => setActivityAreaFilter(s.id), style: { flexShrink: 0, padding: '7px 14px', borderRadius: 16, fontSize: 12.5, fontWeight: 600, border: `1px solid ${active ? THEME.coral : AF.border}`, background: active ? 'rgba(107,74,53,0.12)' : T.surface, color: active ? THEME.coral : AF.text } }, s.name);
                     }));
                 const allSessions = computeActivitySessionAvailability(business, selectedActivity, selectedDateObj, bookings);
                 const fitSessions = allSessions.filter((s) => s.remaining >= activityPartySize && (activityAreaFilter === 'all' || s.spaceId === activityAreaFilter));
@@ -10292,7 +10292,7 @@ function App() {
                         ? React.createElement("p", { style: { fontSize: 12.5, color: AF.sub, padding: '14px 0' } }, "No sessions have room for your party on this day — try another date.")
                         : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, fitSessions.map((s) => {
                             const active = selectedActivitySession && selectedActivitySession.minutes === s.minutes && selectedActivitySession.spaceId === s.spaceId;
-                            return React.createElement("button", { key: s.minutes + s.spaceId, onClick: () => setSelectedActivitySession(s), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', borderRadius: 16, border: `1.5px solid ${active ? THEME.coral : AF.border}`, background: active ? 'rgba(151,196,0,0.08)' : T.surface, textAlign: 'left' } },
+                            return React.createElement("button", { key: s.minutes + s.spaceId, onClick: () => setSelectedActivitySession(s), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', borderRadius: 16, border: `1.5px solid ${active ? THEME.coral : AF.border}`, background: active ? 'rgba(107,74,53,0.08)' : T.surface, textAlign: 'left' } },
                                 React.createElement("div", null,
                                     React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: AF.text, margin: 0 } }, s.label),
                                     React.createElement("p", { style: { fontSize: 11.5, color: AF.sub, marginTop: 2 } }, s.spaceName)),
@@ -11141,7 +11141,7 @@ function App() {
                     React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "Solid ring: normal radius. Dashed ring: maximum distance."),
                     React.createElement("div", { style: { position: 'relative', height: 200, borderRadius: 18, overflow: 'hidden', marginTop: 10, background: '#EAF0E4', backgroundImage: 'linear-gradient(0deg, rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px)', backgroundSize: '18px 18px' } },
                         maxDist > dist && React.createElement("div", { style: { position: 'absolute', top: '50%', left: '50%', width: Math.min(240, 30 + maxDist * 2), height: Math.min(240, 30 + maxDist * 2), transform: 'translate(-50%, -50%)', borderRadius: '50%', background: 'rgba(245,166,35,0.10)', border: `1.5px dashed #C98A1A` } }),
-                        React.createElement("div", { style: { position: 'absolute', top: '50%', left: '50%', width: Math.min(200, 30 + dist * 2), height: Math.min(200, 30 + dist * 2), transform: 'translate(-50%, -50%)', borderRadius: '50%', background: 'rgba(151,196,0,0.18)', border: `1.5px solid ${THEME.coral}` } }),
+                        React.createElement("div", { style: { position: 'absolute', top: '50%', left: '50%', width: Math.min(200, 30 + dist * 2), height: Math.min(200, 30 + dist * 2), transform: 'translate(-50%, -50%)', borderRadius: '50%', background: 'rgba(107,74,53,0.18)', border: `1.5px solid ${THEME.coral}` } }),
                         React.createElement("div", { style: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -100%)' } }, React.createElement(Icon, { name: "mappin", size: 26, color: THEME.coral, fill: THEME.coral }))),
                     React.createElement("div", { style: { display: 'flex', gap: 16, marginTop: 10 } },
                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } }, React.createElement("div", { style: { width: 10, height: 10, borderRadius: '50%', border: `1.5px solid ${THEME.coral}` } }), React.createElement("span", { style: { fontSize: 11, color: PD.sub } }, `${dist} mi normal`)),
@@ -11207,7 +11207,7 @@ function App() {
                                 { id: 'other', icon: 'heart', title: 'Other Programs', sub: 'Veterans, Dual Eligible, State Programs' },
                             ].map((c) => {
                                 const active = (draft.coverageGroups || []).includes(c.id);
-                                return React.createElement("button", { key: c.id, onClick: () => setInsuranceSetupDraft((d) => ({ ...d, coverageGroups: (d.coverageGroups || []).includes(c.id) ? d.coverageGroups.filter((x) => x !== c.id) : [...(d.coverageGroups || []), c.id] })), style: { padding: '14px 10px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${PD.border}`, background: active ? 'rgba(151,196,0,0.06)' : T.surface, textAlign: 'left', position: 'relative' } },
+                                return React.createElement("button", { key: c.id, onClick: () => setInsuranceSetupDraft((d) => ({ ...d, coverageGroups: (d.coverageGroups || []).includes(c.id) ? d.coverageGroups.filter((x) => x !== c.id) : [...(d.coverageGroups || []), c.id] })), style: { padding: '14px 10px', borderRadius: 14, border: active ? `1.5px solid ${THEME.coral}` : `1px solid ${PD.border}`, background: active ? 'rgba(107,74,53,0.06)' : T.surface, textAlign: 'left', position: 'relative' } },
                                     active && React.createElement("div", { style: { position: 'absolute', top: 8, right: 8, width: 16, height: 16, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "check", size: 9, color: "#fff" })),
                                     React.createElement(Icon, { name: c.icon, size: 18, color: PD.text }),
                                     React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: PD.text, margin: '8px 0 2px' } }, c.title),
@@ -11357,7 +11357,7 @@ function App() {
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '20px 18px' } },
                     React.createElement("p", { style: { fontSize: 12.5, color: IC.sub, marginBottom: 16 } }, "Add your insurance card so we can check your coverage before your visit."),
                     React.createElement("button", { onClick: () => setAddInsuranceMode('scanFront'), style: { width: '100%', border: `1.5px solid ${IC.border}`, borderRadius: 18, padding: '20px 16px', display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12, textAlign: 'left' } },
-                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: 'rgba(151,196,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "camera", size: 20, color: THEME.coral })),
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: 'rgba(107,74,53,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "camera", size: 20, color: THEME.coral })),
                         React.createElement("div", { style: { flex: 1 } },
                             React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: IC.text, margin: 0 } }, "Scan Insurance Card"),
                             React.createElement("p", { style: { fontSize: 11.5, color: IC.sub, marginTop: 2 } }, "Take a photo of the front and back")),
@@ -11393,7 +11393,7 @@ function App() {
                     isReview && React.createElement("div", { style: { display: 'flex', gap: 8, marginBottom: 16, padding: 12, borderRadius: 12, background: 'rgba(46,155,255,0.08)' } },
                         React.createElement(Icon, { name: "info", size: 15, color: THEME.blue }),
                         React.createElement("p", { style: { fontSize: 11.5, color: IC.sub, lineHeight: 1.4, flex: 1 } }, "We filled this in from your card. Please review and correct anything that's wrong before saving.")),
-                    React.createElement("div", { style: { display: 'inline-block', padding: '4px 10px', borderRadius: 10, background: addInsuranceSlot === 'secondary' ? T.surfaceSecondary : 'rgba(151,196,0,0.12)', marginBottom: 14 } },
+                    React.createElement("div", { style: { display: 'inline-block', padding: '4px 10px', borderRadius: 10, background: addInsuranceSlot === 'secondary' ? T.surfaceSecondary : 'rgba(107,74,53,0.12)', marginBottom: 14 } },
                         React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: addInsuranceSlot === 'secondary' ? IC.text : THEME.coral } }, addInsuranceSlot === 'secondary' ? 'Secondary Insurance' : 'Primary Insurance')),
                     fieldWrap3("Insurance Carrier", React.createElement("input", { value: addInsuranceDraft.carrierName, onChange: (e) => setAddInsuranceDraft((d) => ({ ...d, carrierName: e.target.value })), placeholder: "e.g. Aetna, Blue Cross Blue Shield", style: inputStyle3 })),
                     fieldWrap3("Plan (optional)", React.createElement("input", { value: addInsuranceDraft.planName, onChange: (e) => setAddInsuranceDraft((d) => ({ ...d, planName: e.target.value })), placeholder: "e.g. PPO 500", style: inputStyle3 })),
@@ -11499,7 +11499,7 @@ function App() {
                 if (idx >= 0) setEarningsSelectedDay(idx);
             };
             const highlightItem = (emoji, label, value, onClick) => value == null ? null : React.createElement("button", { key: label, onClick: onClick, style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' } },
-                React.createElement("div", { style: { width: 30, height: 30, borderRadius: 9, background: 'rgba(151,196,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 } }, emoji),
+                React.createElement("div", { style: { width: 30, height: 30, borderRadius: 9, background: 'rgba(107,74,53,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 } }, emoji),
                 React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                     React.createElement("p", { style: { fontSize: 9.5, color: PD.sub, margin: 0 } }, label),
                     React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: PD.text, margin: '1px 0 0' } }, value)),
@@ -11730,7 +11730,7 @@ function App() {
                         [['Bookings', String(slot.count)], ['Revenue', money(slot.earnings)], ['Avg. Booking', money(slot.avgBooking)]].map(([k, v]) => React.createElement("div", { key: k },
                             React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: 0 } }, k),
                             React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: PD.text, margin: '3px 0 0', fontFamily: 'Space Grotesk, sans-serif' } }, v)))),
-                    slot.count > 0 && React.createElement("div", { style: { marginTop: 14, padding: 10, borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                    slot.count > 0 && React.createElement("div", { style: { marginTop: 14, padding: 10, borderRadius: 12, background: 'rgba(107,74,53,0.1)' } },
                         React.createElement("p", { style: { fontSize: 11.5, color: PD.text, margin: 0, lineHeight: 1.35 } }, spendDiffPct === 0 ? `Bookings at this time spend about the same as your average.` : `Bookings at this time spend ${Math.abs(spendDiffPct)}% ${spendDiffPct >= 0 ? 'more' : 'less'} than your average booking.`)),
                     slotBookings.length > 0 && React.createElement("div", { style: { marginTop: 18 } },
                         React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Bookings"),
@@ -12043,7 +12043,7 @@ function App() {
                             return React.createElement("div", { key: dayIdx, style: { border: `1px solid ${PD.border}`, borderRadius: 14, padding: 12 } },
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
                                     React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: PD.text } }, label),
-                                    React.createElement("button", { onClick: () => setStaffDay(dayIdx, hours ? null : { start: '09:00', end: '17:00' }), style: { fontSize: 12, fontWeight: 700, color: hours ? THEME.coral : PD.sub, padding: '6px 12px', borderRadius: 12, background: hours ? 'rgba(151,196,0,0.1)' : T.surfaceSecondary } }, hours ? 'Open' : 'Closed')),
+                                    React.createElement("button", { onClick: () => setStaffDay(dayIdx, hours ? null : { start: '09:00', end: '17:00' }), style: { fontSize: 12, fontWeight: 700, color: hours ? THEME.coral : PD.sub, padding: '6px 12px', borderRadius: 12, background: hours ? 'rgba(107,74,53,0.1)' : T.surfaceSecondary } }, hours ? 'Open' : 'Closed')),
                                 hours && React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 10 } },
                                     React.createElement("input", { type: "time", value: hours.start, onChange: (e) => setStaffDay(dayIdx, { ...hours, start: e.target.value }), style: { ...inputStyle3, flex: 1 } }),
                                     React.createElement("input", { type: "time", value: hours.end, onChange: (e) => setStaffDay(dayIdx, { ...hours, end: e.target.value }), style: { ...inputStyle3, flex: 1 } })));
@@ -12141,7 +12141,7 @@ function App() {
                 }));
             const nameRow = (c, size) => React.createElement("div", { style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 } },
                 React.createElement("span", { style: { fontWeight: 700, fontSize: size, color: CT.text } }, c.name),
-                c.isBusiness && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral, background: 'rgba(151,196,0,0.14)', borderRadius: 8, padding: '1px 6px' } }, "Business"),
+                c.isBusiness && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: THEME.coral, background: 'rgba(107,74,53,0.14)', borderRadius: 8, padding: '1px 6px' } }, "Business"),
                 c.verified && React.createElement("span", { style: { display: 'flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 700, color: THEME.coral } }, React.createElement(Icon, { name: "check", size: 9, color: THEME.coral }), "Verified"),
                 React.createElement("span", { style: { fontSize: 11, color: CT.sub } }, c.time),
                 c.edited && React.createElement("span", { style: { fontSize: 11, color: CT.sub } }, "· Edited"));
@@ -12325,7 +12325,7 @@ function App() {
             function subcatPill(catId, sub) {
                 const key = catId + ':' + sub;
                 const selected = selectedFilterSubcats.has(key);
-                return React.createElement("button", { key: sub, className: "avio-filter-chip", onClick: () => toggleFilterSubcat(catId, sub), style: { position: 'relative', padding: '8px 14px', borderRadius: 18, border: `1.5px solid ${selected ? THEME.coral : FC.border}`, background: selected ? 'rgba(151,196,0,0.08)' : FC.card, fontSize: 12.5, fontWeight: selected ? 700 : 500, color: selected ? THEME.coral : FC.text } },
+                return React.createElement("button", { key: sub, className: "avio-filter-chip", onClick: () => toggleFilterSubcat(catId, sub), style: { position: 'relative', padding: '8px 14px', borderRadius: 18, border: `1.5px solid ${selected ? THEME.coral : FC.border}`, background: selected ? 'rgba(107,74,53,0.08)' : FC.card, fontSize: 12.5, fontWeight: selected ? 700 : 500, color: selected ? THEME.coral : FC.text } },
                     sub,
                     selected && React.createElement("span", { style: { position: 'absolute', top: -6, right: -6, width: 15, height: 15, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${FC.card}` } },
                         React.createElement(Icon, { name: "check", size: 8, color: "#fff" })));
@@ -12393,8 +12393,8 @@ function App() {
             const managementGroup = managementRows.length > 0 && React.createElement("div", { style: { marginTop: 12, border: `1px solid ${T.border}`, borderRadius: 16, overflow: 'hidden' } },
                 managementRows.map((r, i) => React.createElement(React.Fragment, { key: r.label },
                     i > 0 && React.createElement("div", { style: { height: 1, background: T.border, marginLeft: 50 } }),
-                    React.createElement("button", { onClick: r.onClick, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left', background: 'rgba(151,196,0,0.07)' } },
-                        React.createElement("div", { style: { width: 30, height: 30, borderRadius: 9, background: 'rgba(151,196,0,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement("button", { onClick: r.onClick, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left', background: 'rgba(107,74,53,0.07)' } },
+                        React.createElement("div", { style: { width: 30, height: 30, borderRadius: 9, background: 'rgba(107,74,53,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                             React.createElement(Icon, { name: r.icon, size: 15, color: THEME.coral })),
                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                             React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: T.textPrimary, margin: 0 } }, r.label),
@@ -12421,7 +12421,7 @@ function App() {
                     b.promotionApplied && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: T.textSecondary } }, "Promotion Applied"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, b.promotionLabel)),
                     b.promotionApplied && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: T.textSecondary } }, "You Saved"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, money(b.discountAmount))),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: `1px solid ${T.border}` } }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary } }, "Total"), React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: T.textPrimary } }, b.bookingType === 'QUOTE_REQUEST' ? 'Pending' : money(b.total)))),
-                b.promotionApplied && React.createElement("div", { style: { marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                b.promotionApplied && React.createElement("div", { style: { marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'rgba(107,74,53,0.1)' } },
                     React.createElement(Icon, { name: "lock", size: 12, color: THEME.coral }),
                     React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: THEME.coral } }, "This discount is locked to your booking, even if the deal ends.")),
                 b.serviceAddress && React.createElement("div", { style: { marginTop: 10, background: T.surfaceSecondary, borderRadius: 14, padding: 14 } },
@@ -12479,7 +12479,7 @@ function App() {
                     b.promotionApplied && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: T.textSecondary } }, "Promotion"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, b.promotionLabel)),
                     b.promotionApplied && React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8 } }, React.createElement("span", { style: { fontSize: 12, color: T.textSecondary } }, "Discount"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: THEME.coral } }, '-' + money(b.discountAmount))),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 8, paddingTop: 8, borderTop: `1px solid ${T.border}` } }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary } }, b.promotionApplied ? "Total Paid" : "Price"), React.createElement("span", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 14, fontWeight: 700, color: T.textPrimary } }, money(b.price)))),
-                b.promotionApplied && React.createElement("div", { style: { marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                b.promotionApplied && React.createElement("div", { style: { marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', borderRadius: 12, background: 'rgba(107,74,53,0.1)' } },
                     React.createElement(Icon, { name: "lock", size: 12, color: THEME.coral }),
                     React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: THEME.coral } }, "This discount is locked to this booking and won't change.")),
                 b.serviceAddress && React.createElement("div", { style: { marginTop: 10, background: T.surfaceSecondary, borderRadius: 14, padding: 14 } },
@@ -12538,7 +12538,7 @@ function App() {
                         { icon: 'camera', title: 'Record Video', sub: 'Capture a new Thrillz using your camera.', onClick: () => setUploadStep('record') },
                         { icon: 'upload', title: 'Upload from Camera Roll', sub: 'Choose a video from your gallery.', onClick: () => triggerFilePicker(null) },
                     ].map((opt) => React.createElement("button", { key: opt.title, onClick: opt.onClick, style: { width: '100%', border: `1.5px solid ${UP.border}`, borderRadius: 24, padding: '30px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: UP.surface } },
-                        React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', background: 'rgba(151,196,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: opt.icon, size: 22, color: green })),
+                        React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', background: 'rgba(107,74,53,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: opt.icon, size: 22, color: green })),
                         React.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: UP.text, fontFamily: 'Space Grotesk, sans-serif' } }, opt.title),
                         React.createElement("span", { style: { fontSize: 12.5, color: UP.sub, textAlign: 'center' } }, opt.sub)))));
 
@@ -12568,7 +12568,7 @@ function App() {
                     React.createElement("button", { onClick: () => triggerFilePicker(null), style: { fontSize: 12.5, fontWeight: 600, color: "rgba(255,255,255,0.75)" } }, "Upload a video instead"));
             })();
             const recordStep = uploadStep === 'record' && React.createElement("div", { key: "record", style: { position: 'absolute', inset: 0, background: '#000', zIndex: 14, display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
-                React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 42%, rgba(151,196,0,0.10), rgba(0,0,0,0) 60%)', pointerEvents: 'none' } }),
+                React.createElement("div", { style: { position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 42%, rgba(107,74,53,0.10), rgba(0,0,0,0) 60%)', pointerEvents: 'none' } }),
                 React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 18, right: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 } },
                     iconBtn("x", requestCloseUploadFlow, "#fff"),
                     React.createElement("button", { onClick: () => setUploadSheet('sound'), style: { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 16, background: 'rgba(255,255,255,0.14)' } },
@@ -12591,7 +12591,7 @@ function App() {
                         React.createElement("span", { key: cameraCountdown, className: "avio-check-pop", style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 96, color: "#fff" } }, cameraCountdown))),
                 React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 34px calc(env(safe-area-inset-bottom) + 22px)` } },
                     React.createElement("button", { onClick: () => setUploadSheet('effects'), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
-                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: 22, background: cameraEffectId !== 'none' ? 'rgba(151,196,0,0.25)' : 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "sparkles", size: 18, color: cameraEffectId !== 'none' ? green : "#fff" })),
+                        React.createElement("div", { style: { width: 44, height: 44, borderRadius: 22, background: cameraEffectId !== 'none' ? 'rgba(107,74,53,0.25)' : 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "sparkles", size: 18, color: cameraEffectId !== 'none' ? green : "#fff" })),
                         React.createElement("span", { style: { fontSize: 10.5, color: cameraEffectId !== 'none' ? green : "#fff", fontWeight: 600 } }, "Effects")),
                     React.createElement("button", { className: "avio-press", onClick: toggleCameraRecordButton, style: { width: 76, height: 76, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                         React.createElement("svg", { width: 76, height: 76, viewBox: "0 0 76 76" },
@@ -12621,7 +12621,7 @@ function App() {
                         React.createElement("button", { onClick: () => setUploadSheet('cover'), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 0', borderRadius: 16, border: `1px solid ${UP.border}` } },
                             React.createElement(Icon, { name: "image", size: 16, color: UP.text }),
                             React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: UP.text } }, "Adjust Cover"))),
-                    React.createElement("button", { onClick: () => setUploadSheet('sound'), style: { width: '100%', marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', borderRadius: 16, border: `1px solid ${UP.border}`, background: uploadSound ? 'rgba(151,196,0,0.08)' : UP.surface } },
+                    React.createElement("button", { onClick: () => setUploadSheet('sound'), style: { width: '100%', marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', borderRadius: 16, border: `1px solid ${UP.border}`, background: uploadSound ? 'rgba(107,74,53,0.08)' : UP.surface } },
                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 } },
                             React.createElement(Icon, { name: "music", size: 16, color: uploadSound ? green : UP.sub }),
                             React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: UP.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, uploadSound ? `♫ ${uploadSound.name} — ${uploadSound.artist}` : "Add Sound")),
@@ -12663,7 +12663,7 @@ function App() {
                     React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
                         THRILLZ_SOUND_LIBRARY.map((s) => {
                             const active = uploadSound && uploadSound.id === s.id;
-                            return React.createElement("button", { key: s.id, onClick: () => setUploadSound({ id: s.id, name: s.name, artist: s.artist }), style: { display: 'flex', alignItems: 'center', gap: 12, padding: '11px 6px', borderRadius: 14, background: active ? 'rgba(151,196,0,0.10)' : 'transparent' } },
+                            return React.createElement("button", { key: s.id, onClick: () => setUploadSound({ id: s.id, name: s.name, artist: s.artist }), style: { display: 'flex', alignItems: 'center', gap: 12, padding: '11px 6px', borderRadius: 14, background: active ? 'rgba(107,74,53,0.10)' : 'transparent' } },
                                 React.createElement("div", { style: { width: 38, height: 38, borderRadius: 10, background: active ? green : UP.surfaceAlt, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "music", size: 16, color: active ? "#fff" : UP.sub })),
                                 React.createElement("div", { style: { flex: 1, textAlign: 'left', minWidth: 0 } },
                                     React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: UP.text, margin: 0 } }, s.name),
@@ -12730,7 +12730,7 @@ function App() {
             const tagPage = uploadSheet === 'tag' && React.createElement("div", { key: "tag", style: { position: 'absolute', inset: 0, background: UP.bg, zIndex: 16, display: 'flex', flexDirection: 'column' } },
                 pageHeader(iconBtn("arrowleft", () => setUploadSheet(null)), "Tag Business / Service"),
                 React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '14px 20px calc(env(safe-area-inset-bottom) + 20px)' } },
-                    taggedBusiness && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, background: 'rgba(151,196,0,0.10)', marginBottom: 14 } },
+                    taggedBusiness && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, background: 'rgba(107,74,53,0.10)', marginBottom: 14 } },
                         React.createElement(Icon, { name: "tag", size: 16, color: green }),
                         React.createElement("span", { style: { flex: 1, fontSize: 13, fontWeight: 700, color: UP.text } }, `Tagged: ${taggedBusiness.name}${taggedServiceObj ? ' — ' + taggedServiceObj.name : ''}`),
                         React.createElement("button", { onClick: () => { setUploadTagBusinessId(null); setUploadTagServiceId(null); } }, React.createElement(Icon, { name: "x", size: 15, color: UP.sub }))),
@@ -12762,7 +12762,7 @@ function App() {
                         React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: UP.sub, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 10 } }, "Which service is this?"),
                         React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, taggedServices.map((s) => {
                             const active = uploadTagServiceId === s.id;
-                            return React.createElement("button", { key: s.id, onClick: () => setUploadTagServiceId(active ? null : s.id), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 14, border: `1.5px solid ${active ? green : UP.border}`, background: active ? 'rgba(151,196,0,0.08)' : UP.surface } },
+                            return React.createElement("button", { key: s.id, onClick: () => setUploadTagServiceId(active ? null : s.id), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 14, border: `1.5px solid ${active ? green : UP.border}`, background: active ? 'rgba(107,74,53,0.08)' : UP.surface } },
                                 React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: UP.text } }, s.name),
                                 React.createElement("span", { style: { fontSize: 12.5, color: UP.sub } }, money(s.price)));
                         })))),
@@ -12892,7 +12892,7 @@ function App() {
                 opts = opts || {};
                 const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
                 const selected = cancelSelectedIds.has(b.id);
-                return React.createElement(opts.selectable ? "button" : "div", { key: b.id, onClick: opts.selectable ? () => toggleCancelBookingSelected(b.id) : undefined, style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, border: `1.5px solid ${selected && opts.selectable ? green : CF.border}`, background: selected && opts.selectable ? 'rgba(151,196,0,0.06)' : 'transparent', textAlign: 'left', width: '100%' } },
+                return React.createElement(opts.selectable ? "button" : "div", { key: b.id, onClick: opts.selectable ? () => toggleCancelBookingSelected(b.id) : undefined, style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, border: `1.5px solid ${selected && opts.selectable ? green : CF.border}`, background: selected && opts.selectable ? 'rgba(107,74,53,0.06)' : 'transparent', textAlign: 'left', width: '100%' } },
                     opts.selectable && cfSelectCircle(selected),
                     React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(b.avatarColor), fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.initials),
                     React.createElement("div", { style: { flex: 1, minWidth: 0 } },
@@ -12955,14 +12955,14 @@ function App() {
                                     cfDetailField('Time', single.time),
                                     cfDetailField('Amount', money(single.price)),
                                     cfDetailField('Status', BOOKING_STATUS_LABEL[single.status] || single.status)),
-                                React.createElement("div", { style: { marginTop: 14, background: 'rgba(151,196,0,0.08)', borderRadius: 14, padding: 14 } },
+                                React.createElement("div", { style: { marginTop: 14, background: 'rgba(107,74,53,0.08)', borderRadius: 14, padding: 14 } },
                                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } },
                                         React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: CF.text } }, "Refund to customer"),
                                         React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: green } }, money(single.price))),
                                     React.createElement("p", { style: { fontSize: 11.5, color: CF.sub, margin: '6px 0 0', lineHeight: 1.4 } }, "Full refund will be issued to the customer.")))
                             : React.createElement(React.Fragment, null,
                                 React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, cancelSelectedList.map((b) => cfBookingRow(b, { selectable: false }))),
-                                React.createElement("div", { style: { marginTop: 14, background: 'rgba(151,196,0,0.08)', borderRadius: 14, padding: 14 } },
+                                React.createElement("div", { style: { marginTop: 14, background: 'rgba(107,74,53,0.08)', borderRadius: 14, padding: 14 } },
                                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between' } },
                                         React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: CF.text } }, "Refund to customers"),
                                         React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: green } }, money(cancelTotalRefund))),
@@ -13013,7 +13013,7 @@ function App() {
                             cfDetailField('Refund to customer' + (cancelSelectedList.length > 1 ? 's' : ''), money(cancelTotalRefund), green),
                             cfDetailField('Refund method', 'Original payment method'),
                             cfDetailField('Refund timing', 'Immediately')),
-                        React.createElement("div", { style: { display: 'flex', gap: 10, alignItems: 'flex-start', background: 'rgba(151,196,0,0.08)', borderRadius: 14, padding: 14 } },
+                        React.createElement("div", { style: { display: 'flex', gap: 10, alignItems: 'flex-start', background: 'rgba(107,74,53,0.08)', borderRadius: 14, padding: 14 } },
                             React.createElement(Icon, { name: "shield", size: 17, color: green }),
                             React.createElement("div", { style: { flex: 1 } },
                                 React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: CF.text, margin: 0 } }, "Cancellation Policy"),
@@ -13406,7 +13406,7 @@ function App() {
                     ? React.createElement("p", { style: { fontSize: 13, color: RS.sub, textAlign: 'center', marginTop: 40 } }, "No bookings are currently eligible for rescheduling.")
                     : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, eligible.map((b) => {
                         const selected = rescheduleFlow.bookingId === b.id;
-                        return React.createElement("button", { key: b.id, onClick: () => setRescheduleFlow((prev) => ({ ...prev, bookingId: b.id, calMonth: new Date(b.year != null ? b.year : new Date().getFullYear(), b.month != null ? b.month : new Date().getMonth(), 1) })), style: { textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 16, border: selected ? `1.5px solid ${THEME.coral}` : `1px solid ${RS.border}`, background: selected ? 'rgba(151,196,0,0.08)' : T.surface } },
+                        return React.createElement("button", { key: b.id, onClick: () => setRescheduleFlow((prev) => ({ ...prev, bookingId: b.id, calMonth: new Date(b.year != null ? b.year : new Date().getFullYear(), b.month != null ? b.month : new Date().getMonth(), 1) })), style: { textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 16, border: selected ? `1.5px solid ${THEME.coral}` : `1px solid ${RS.border}`, background: selected ? 'rgba(107,74,53,0.08)' : T.surface } },
                             React.createElement("div", { style: { width: 40, height: 40, borderRadius: 11, flexShrink: 0, background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 11.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.logoText || (b.business || b.name).slice(0, 2).toUpperCase()),
                             React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                 React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: RS.text, margin: 0 } }, b.business || b.name),
@@ -13519,7 +13519,7 @@ function App() {
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: MB.text, margin: 0 } }, "Manage Bookings")),
                 React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '18px 18px calc(env(safe-area-inset-bottom) + 18px)', display: 'flex', flexDirection: 'column', gap: 14 } },
                     cards.map((c) => React.createElement("button", { key: c.title, onClick: c.onClick, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 14, background: MB.surface, border: `1px solid ${MB.border}`, borderRadius: 18, padding: '18px 16px', textAlign: 'left', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' } },
-                        React.createElement("div", { style: { width: 40, height: 40, borderRadius: 12, background: 'rgba(151,196,0,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                        React.createElement("div", { style: { width: 40, height: 40, borderRadius: 12, background: 'rgba(107,74,53,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
                             React.createElement(Icon, { name: c.icon, size: 19, color: THEME.coral })),
                         React.createElement("span", { style: { flex: 1, fontSize: 15, fontWeight: 700, color: MB.text } }, c.title),
                         React.createElement(Icon, { name: "chevronright", size: 16, color: MB.text })))));
@@ -13654,7 +13654,7 @@ function App() {
                     React.createElement("p", { style: { fontSize: 12, color: TS.sub, margin: '0 0 16px' } }, "This applies to any ticketed admissions you sell — day passes, general entry, and similar."),
                     options.map((o) => {
                         const active = businessTicketingMode === o.id;
-                        return React.createElement("button", { key: o.id, onClick: () => setBusinessTicketingMode(o.id), style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: 12, padding: 14, borderRadius: 16, border: `1.5px solid ${active ? THEME.coral : TS.border}`, background: active ? 'rgba(151,196,0,0.06)' : 'transparent', marginBottom: 10 } },
+                        return React.createElement("button", { key: o.id, onClick: () => setBusinessTicketingMode(o.id), style: { width: '100%', textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: 12, padding: 14, borderRadius: 16, border: `1.5px solid ${active ? THEME.coral : TS.border}`, background: active ? 'rgba(107,74,53,0.06)' : 'transparent', marginBottom: 10 } },
                             React.createElement("div", { style: { width: 20, height: 20, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : TS.border}`, background: active ? THEME.coral : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 } },
                                 active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" })),
                             React.createElement("div", { style: { flex: 1 } },
@@ -13701,7 +13701,7 @@ function App() {
                                     React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: "#B5790C", margin: 0 } }, "Outside primary service area"),
                                     React.createElement("p", { style: { fontSize: 11.5, color: "#B5790C", margin: '2px 0 0' } }, `${distanceMi.toFixed(1)} miles away`),
                                     calc.fee > 0 && React.createElement("p", { style: { fontSize: 11.5, color: "#B5790C", margin: '2px 0 0' } }, `Additional travel fee: ${money(calc.fee)}`)))
-                            : React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, padding: 12, borderRadius: 12, background: 'rgba(151,196,0,0.1)' } },
+                            : React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, padding: 12, borderRadius: 12, background: 'rgba(107,74,53,0.1)' } },
                                 React.createElement(Icon, { name: "check", size: 14, color: THEME.coral }),
                                 React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "You're in our service area")));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } },
@@ -13732,7 +13732,7 @@ function App() {
                         React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: `1px solid ${T.border}` } }, React.createElement("span", { style: { fontSize: 12, color: EA.sub } }, "New Travel Fee"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, money(newFee))),
                         React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: `1px solid ${T.border}` } }, React.createElement("span", { style: { fontSize: 12, color: EA.sub } }, "Current Total"), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: EA.text } }, money(b.total))),
                         React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: `1px solid ${T.border}` } }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: EA.text } }, "New Total"), React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: THEME.coral } }, money(newTotal)))),
-                    React.createElement("div", { style: { marginTop: 14, display: 'flex', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, background: diff === 0 ? EA.alt : 'rgba(151,196,0,0.08)' } },
+                    React.createElement("div", { style: { marginTop: 14, display: 'flex', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, background: diff === 0 ? EA.alt : 'rgba(107,74,53,0.08)' } },
                         React.createElement(Icon, { name: "info", size: 13, color: diff === 0 ? EA.sub : THEME.coral }),
                         React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: diff === 0 ? EA.sub : THEME.coral } }, diff === 0 ? "No price change." : `Your total will ${diff > 0 ? 'increase' : 'decrease'} by ${money(Math.abs(diff))}.`)));
                 footer = React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${EA.border}` } },
