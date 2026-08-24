@@ -13986,8 +13986,17 @@ function App() {
             if (!b) return null;
             const TF = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
             const providerLabel = b.staffName || b.business || b.name;
-            const closeBtn = React.createElement("button", { onClick: closeTipFlow, style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', right: 18, zIndex: 2, width: 32, height: 32, borderRadius: 16, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                React.createElement(Icon, { name: "x", size: 16, color: "#fff" }));
+            // Sits inside headerSpacer below, whose own height already reserves the safe area —
+            // so this only ever needs to center itself in that reserved 44px band, never guess
+            // at a device-specific offset from the true top of the screen.
+            const closeBtn = React.createElement("button", { onClick: closeTipFlow, style: { position: 'absolute', top: '50%', right: 8, transform: 'translateY(-50%)', zIndex: 2, width: 44, height: 44, borderRadius: 22, background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                React.createElement(Icon, { name: "x", size: 20, color: "#fff" }));
+            // Reserves the safe area (Dynamic Island / notch / status bar) for every step of this
+            // full-screen flow, not just the ones with a close button — so vertically-centered
+            // content on the processing/success steps can never drift up under the status bar
+            // either. A fixed pixel offset can't do this across devices; only the real inset can.
+            const headerSpacer = React.createElement("div", { style: { flexShrink: 0, position: 'relative', height: 'calc(env(safe-area-inset-top) + 44px)' } },
+                (tipFlow.step === 'review' || tipFlow.step === 'custom') && closeBtn);
             let body;
             if (tipFlow.step === 'review') {
                 const stars = React.createElement("div", { style: { display: 'flex', gap: 8, justifyContent: 'center', marginTop: 14 } },
@@ -14003,8 +14012,8 @@ function App() {
                     }),
                     React.createElement("button", { onClick: () => setTipFlow((f) => ({ ...f, step: 'custom' })), style: { flex: 1, padding: '14px 6px', borderRadius: 16, border: `1.5px solid ${TF.border}`, background: T.surface, textAlign: 'center' } },
                         React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: TF.text, margin: 0 } }, "Custom")));
-                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 20px calc(env(safe-area-inset-bottom) + 16px)' } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: TF.text, textAlign: 'center', margin: '18px 0 0' } }, "How was your appointment?"),
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 20px calc(env(safe-area-inset-bottom) + 16px)' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 'clamp(18px, 5.5vw, 21px)', color: TF.text, textAlign: 'center', margin: 0, whiteSpace: 'nowrap' } }, "How was your appointment?"),
                     React.createElement("p", { style: { fontSize: 13, color: TF.sub, textAlign: 'center', margin: '6px 0 0' } }, b.business || b.name),
                     providerLabel && providerLabel !== (b.business || b.name) && React.createElement("p", { style: { fontSize: 13, color: TF.sub, textAlign: 'center', margin: '1px 0 0' } }, `with ${providerLabel}`),
                     stars,
@@ -14030,10 +14039,10 @@ function App() {
             else if (tipFlow.step === 'custom') {
                 const amt = Math.round((Number(tipFlow.customAmount) || 0) * 100) / 100;
                 const valid = amt > 0 && tipFlow.customAmount.trim() !== '';
-                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 20px calc(env(safe-area-inset-bottom) + 16px)' } },
-                    React.createElement("button", { onClick: () => setTipFlow((f) => ({ ...f, step: 'review' })), style: { marginTop: 18, display: 'flex', alignItems: 'center', gap: 6 } },
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 20px calc(env(safe-area-inset-bottom) + 16px)' } },
+                    React.createElement("button", { onClick: () => setTipFlow((f) => ({ ...f, step: 'review' })), style: { display: 'flex', alignItems: 'center', gap: 6 } },
                         React.createElement(Icon, { name: "arrowleft", size: 15, color: TF.sub }), React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: TF.sub } }, "Back")),
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: TF.text, textAlign: 'center', margin: '18px 0 0' } }, "Enter a custom tip"),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 'clamp(18px, 5.5vw, 21px)', color: TF.text, textAlign: 'center', margin: '18px 0 0' } }, "Enter a custom tip"),
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 22 } },
                         React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: TF.text } }, "$"),
                         React.createElement("input", {
@@ -14071,7 +14080,7 @@ function App() {
                         React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: TF.sub } }, "Done")));
             }
             return React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 17, display: 'flex', flexDirection: 'column' } },
-                (tipFlow.step === 'review' || tipFlow.step === 'custom') && closeBtn, body);
+                headerSpacer, body);
         })(),
         postServiceBanner && accountType !== 'business' && React.createElement("button", {
             onClick: () => openTipFlow(postServiceBanner),
