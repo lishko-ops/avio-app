@@ -2817,6 +2817,98 @@ function getProviderRoleLabel(business) {
         return 'Stylist';
     return 'Provider';
 }
+// ---- Location-aware discovery (Home ranking + Nearby map) ----
+// Category → {icon (for map pins/badges), booking bucket, ideal discovery radius in
+// miles}. Radii are ranking GUIDANCE (a soft decay curve, not a hard cutoff) per the
+// product spec — an exceptional match far outside its bucket's ideal radius can still
+// surface, it just needs more going for it (rating/popularity/interest) to outrank a
+// closer, merely-decent one.
+const CATEGORY_DISCOVERY = {
+    Restaurants: { icon: '🍽️', bucket: 'restaurant', idealMi: 12 },
+    Rentals: { icon: '🎢', bucket: 'activity', idealMi: 25 },
+    Parties: { icon: '🎉', bucket: 'activity', idealMi: 20 },
+    Events: { icon: '🎟️', bucket: 'destination', idealMi: 40 },
+    Movies: { icon: '🎬', bucket: 'destination', idealMi: 15 },
+    Educational: { icon: '🏋️', bucket: 'everyday', idealMi: 6 },
+    'Healthcare / Medical': { icon: '⚕️', bucket: 'everyday', idealMi: 8 },
+    Beauty: { icon: '💅', bucket: 'everyday', idealMi: 6 },
+    Nails: { icon: '💅', bucket: 'everyday', idealMi: 6 },
+    Makeup: { icon: '💄', bucket: 'everyday', idealMi: 6 },
+    Tattoo: { icon: '🖋️', bucket: 'everyday', idealMi: 8 },
+    Loctician: { icon: '💇', bucket: 'everyday', idealMi: 6 },
+    Barbershop: { icon: '✂️', bucket: 'everyday', idealMi: 6 },
+    DJ: { icon: '🎧', bucket: 'activity', idealMi: 20 },
+    Photography: { icon: '📷', bucket: 'activity', idealMi: 20 },
+    'Home Services': { icon: '🧹', bucket: 'everyday', idealMi: 8 },
+};
+const DEFAULT_CATEGORY_DISCOVERY = { icon: '📍', bucket: 'everyday', idealMi: 8 };
+function getCategoryDiscovery(category) { return CATEGORY_DISCOVERY[category] || DEFAULT_CATEGORY_DISCOVERY; }
+// The CTA text a discovery card/pin should show — driven by the same authoritative
+// fields the real booking flow already branches on (startBookingFor), not a parallel
+// guess, so the label never lies about what tapping it will actually open.
+function getBookingCtaLabel(business) {
+    if (!business)
+        return 'Book Now';
+    if (business.businessType === 'restaurant')
+        return 'Reserve Table';
+    if (business.businessType === 'activities')
+        return 'Book Activity';
+    if (business.category === 'Movies' || business.category === 'Events')
+        return 'Get Tickets';
+    return 'Book Appointment';
+}
+function parseCompactNumber(v) {
+    if (typeof v === 'number')
+        return v;
+    const m = String(v || '0').trim().match(/^([\d.]+)\s*(K|M)?$/i);
+    if (!m)
+        return parseFloat(v) || 0;
+    const n = parseFloat(m[1]);
+    return m[2] ? (m[2].toUpperCase() === 'K' ? n * 1000 : n * 1e6) : n;
+}
+// This app's seed data has no real lat/lng or geocoding backend behind it — there's
+// nothing to fake-call. What it DOES already have is each business's own `distance`
+// string, seeded to be plausible for "near the user." This derives a stable {dx,dy}
+// (miles east/west, north/south of the user) from that same distance plus the
+// business's id, so the map's pin placement is always consistent with the distance
+// already shown everywhere else in the app instead of being a second, disagreeing guess.
+function getBusinessGeo(business, distanceOverrideMi) {
+    if (!business)
+        return null;
+    const mi = distanceOverrideMi != null ? distanceOverrideMi : parseFloat(business.distance);
+    if (!isFinite(mi))
+        return null;
+    const h = parseInt(bvHash(business.id), 36) || 0;
+    const angle = (h % 360) * (Math.PI / 180);
+    return { dx: Math.cos(angle) * mi, dy: Math.sin(angle) * mi, mi };
+}
+function getPrimaryBusinessId(item) { return (item && item.taggedBusinessIds && item.taggedBusinessIds[0]) || (item && item.id); }
+// The core discovery question is never "where is this business" — it's "can it serve
+// this user." A fixed-location business is eligible by straight-line distance; a
+// traveling provider is eligible only if the user falls inside the service area they
+// configured (getBusinessTravelInfo/serviceAreaMaxDistanceMi — the exact same model
+// booking and travel-fee calculation already use), regardless of how far their own base
+// happens to sit. `showsDistance` is false for a mobile-only match on purpose: a
+// provider's base location is private and must never be shown as "X mi away."
+// Multi-factor ranking so Home never becomes "closest business wins" — distance-fit to
+// the category's ideal radius (soft decay, not a cliff), rating, popularity, plus small
+// boosts for verified/interest-match/followed/active-promotion. This is guidance
+// applied as a SORT, never a hard filter — ineligible businesses just sort last rather
+// than vanishing, so a still-developing mock dataset can never render an empty feed.
+function computeDiscoveryScore(business, elig, ctx) {
+    ctx = ctx || {};
+    if (!elig.eligible)
+        return -Infinity;
+    const cat = getCategoryDiscovery(business.category);
+    const mi = elig.distanceMi != null ? elig.distanceMi : cat.idealMi;
+    const distanceFit = 1 / (1 + Math.max(0, mi - cat.idealMi) / cat.idealMi);
+    const rating = (business.rating || 4) / 5;
+    const popularity = Math.min(1, Math.log10(parseCompactNumber(business.likes) + 10) / 5);
+    const verifiedBoost = business.verified ? 0.08 : 0;
+    const interestBoost = (ctx.interests || []).some((i) => (business.hashtags || []).some((h) => h.toLowerCase().includes(String(i).toLowerCase()))) ? 0.15 : 0;
+    const followedBoost = ctx.followedIds && ctx.followedIds.has(business.id) ? 0.2 : 0;
+    return distanceFit * 0.4 + rating * 0.25 + popularity * 0.2 + verifiedBoost + interestBoost + followedBoost;
+}
 function App() {
     var _a;
     const [themeMode, setThemeModeRaw] = useState(() => {
@@ -2873,6 +2965,21 @@ function App() {
     const [tab, setTab] = useState('discover');
     const [activeCat, setActiveCat] = useState(null);
     const [shortsFeedTab, setShortsFeedTab] = useState('forYou');
+    // ---- Nearby: full-screen discovery map (replaces the old "same video feed, re-sorted" tab) ----
+    const [nearbyView, setNearbyView] = useState('map'); // 'map' | 'list'
+    const [nearbySearch, setNearbySearch] = useState('');
+    const [nearbyCategory, setNearbyCategory] = useState('all');
+    const [nearbyComesToYouOnly, setNearbyComesToYouOnly] = useState(false);
+    const [nearbySelectedId, setNearbySelectedId] = useState(null);
+    const [nearbyExploreLocation, setNearbyExploreLocation] = useState(null); // null = current location
+    const [nearbyLocationPickerOpen, setNearbyLocationPickerOpen] = useState(false);
+    const [nearbyMapOffset, setNearbyMapOffset] = useState({ x: 0, y: 0 });
+    const [nearbyMapZoom, setNearbyMapZoom] = useState(1);
+    const [nearbyPendingPan, setNearbyPendingPan] = useState(false);
+    const [nearbySearchAreaOffset, setNearbySearchAreaOffset] = useState({ x: 0, y: 0 });
+    const [nearbyRadiusExpand, setNearbyRadiusExpand] = useState(1);
+    const [nearbyClusterExpand, setNearbyClusterExpand] = useState(null);
+    const [nearbyLocationStatus, setNearbyLocationStatus] = useState('unknown'); // unknown | granted | denied
     const [feed, setFeed] = useState(FEED);
     const shortsHydratedRef = useRef(false);
     useEffect(() => {
@@ -4608,6 +4715,29 @@ function App() {
             return { enabled: true, startingAddress: business.location || '', distanceMi: 15, isCustom: false, maxDistanceMi: 25, isCustomMax: false, feeType: 'none', flatFee: '', perMileRate: '', freeMi: '', extendedFee: '' };
         return { enabled: false };
     }
+    // The core discovery question is never "where is this business" — it's "can it serve
+    // this user." A fixed-location business is eligible by straight-line distance; a
+    // traveling provider is eligible only if the user falls inside the service area they
+    // configured (serviceAreaMaxDistanceMi — the exact same model booking and travel-fee
+    // calculation already use), regardless of how far their own base happens to sit.
+    // `showsDistance` is false for a mobile-only match on purpose: a provider's base
+    // location is private and must never be shown to the customer as "X mi away."
+    function getDiscoveryEligibility(business) {
+        const mi = parseFloat(business.distance);
+        const travel = getBusinessTravelInfo(business);
+        const isFixed = business.locationMode !== 'I travel to customers';
+        const isMobile = !!travel.enabled;
+        const fixedEligible = isFixed && isFinite(mi);
+        const mobileEligible = isMobile && isFinite(mi) && mi <= serviceAreaMaxDistanceMi(travel);
+        return {
+            eligible: fixedEligible || mobileEligible,
+            mode: fixedEligible && mobileEligible ? 'both' : mobileEligible ? 'mobile' : 'fixed',
+            distanceMi: mi,
+            showsDistance: fixedEligible,
+            travelInfo: travel,
+            travelFeeInfo: mobileEligible ? computeTravelFee(travel, mi) : null,
+        };
+    }
     const [daysRankMode, setDaysRankMode] = useState('bookings');
     const [servicesRankMode, setServicesRankMode] = useState('bookings');
     const [selectedServiceDetail, setSelectedServiceDetail] = useState(null);
@@ -5035,10 +5165,232 @@ function App() {
         const activeLocationModes = new Set(Object.keys(LOCATION_TOGGLE_MODES).filter((id) => filterToggles.has(id)).map((id) => LOCATION_TOGGLE_MODES[id]));
         if (activeLocationModes.size > 0)
             result = result.filter((item) => !item.locationMode || item.locationMode === 'All' || activeLocationModes.has(item.locationMode));
-        if (shortsFeedTab === 'nearby')
-            result = [...result].sort((a, b) => (parseFloat(a.distance) || Infinity) - (parseFloat(b.distance) || Infinity));
+        // Home is already location-aware by default — ranked by category-appropriate distance
+        // fit + rating + popularity + interests/follows, not just "closest first" — so the
+        // customer never has to open Nearby just to see what's actually relevant to them.
+        if (shortsFeedTab === 'forYou') {
+            const ctx = { interests: selectedInterests, followedIds };
+            result = [...result].sort((a, b) => computeDiscoveryScore(b, getDiscoveryEligibility(b), ctx) - computeDiscoveryScore(a, getDiscoveryEligibility(a), ctx));
+        }
         return result;
-    }, [shortsFeedTab, followedIds, feed, filterToggles]);
+    }, [shortsFeedTab, followedIds, feed, filterToggles, selectedInterests]);
+    // ---- Nearby map data pipeline ----
+    // `feed` mixes canonical business records with lighter "post" entries that tag back
+    // to one via taggedBusinessIds (that's how the Thrillz video feed shows multiple
+    // clips per business) — Nearby is a business directory, not a video feed, so it
+    // first collapses back down to one representative record per real business.
+    const nearbyBusinessesDeduped = useMemo(() => {
+        const seen = new Set();
+        const list = [];
+        feed.forEach((item) => {
+            const pid = getPrimaryBusinessId(item);
+            if (seen.has(pid))
+                return;
+            seen.add(pid);
+            list.push(item);
+        });
+        return list;
+    }, [feed]);
+    const NEARBY_CATEGORY_BUCKETS = { restaurants: ['Restaurants'], activities: ['Rentals', 'Parties', 'DJ', 'Photography'], beauty: ['Beauty', 'Nails', 'Makeup', 'Tattoo', 'Loctician', 'Barbershop'], wellness: ['Healthcare / Medical', 'Educational'], events: ['Events', 'Movies'], services: ['Home Services'] };
+    const nearbyDiscoveryCtx = useMemo(() => ({ interests: selectedInterests, followedIds }), [selectedInterests, followedIds]);
+    const nearbyFiltered = useMemo(() => {
+        let items = nearbyBusinessesDeduped;
+        if (nearbyCategory !== 'all') {
+            const cats = NEARBY_CATEGORY_BUCKETS[nearbyCategory];
+            if (cats)
+                items = items.filter((b) => cats.includes(b.category));
+        }
+        if (nearbyComesToYouOnly)
+            items = items.filter((b) => getBusinessTravelInfo(b).enabled);
+        if (nearbySearch.trim()) {
+            const q = nearbySearch.trim().toLowerCase();
+            items = items.filter((b) => [b.name, b.category, b.blurb, ...(b.hashtags || [])].filter(Boolean).join(' ').toLowerCase().includes(q));
+        }
+        // Exploring somewhere other than the user's own location: there's no real
+        // geocoding backend behind this demo to re-derive distance-from-Miami, so this
+        // matches on the business's own seeded city instead and skips the local
+        // eligibility/radius pipeline entirely — it's a different question ("what's in
+        // Miami") than "what can serve me right now."
+        if (nearbyExploreLocation) {
+            const cityQ = nearbyExploreLocation.label.toLowerCase();
+            items = items.filter((b) => (b.location || '').toLowerCase().includes(cityQ));
+            return items.map((b) => ({
+                business: b,
+                elig: { eligible: true, mode: b.locationMode === 'I travel to customers' ? 'mobile' : (b.locationMode === 'All' ? 'both' : 'fixed'), distanceMi: null, showsDistance: false, travelFeeInfo: null },
+                geo: getBusinessGeo(b, 1 + (parseInt(bvHash(b.id), 36) % 8)),
+            })).sort((a, b) => (b.business.rating || 0) - (a.business.rating || 0));
+        }
+        const maxMi = 60 * nearbyRadiusExpand;
+        return items
+            .map((b) => ({ business: b, elig: getDiscoveryEligibility(b), geo: getBusinessGeo(b) }))
+            .filter((x) => x.elig.eligible && (x.elig.distanceMi == null || x.elig.distanceMi <= maxMi))
+            .sort((a, b) => computeDiscoveryScore(b.business, b.elig, nearbyDiscoveryCtx) - computeDiscoveryScore(a.business, a.elig, nearbyDiscoveryCtx));
+    }, [nearbyBusinessesDeduped, nearbyCategory, nearbyComesToYouOnly, nearbySearch, nearbyExploreLocation, nearbyRadiusExpand, nearbyDiscoveryCtx]);
+    const nearbySelectedEntry = nearbyFiltered.find((x) => x.business.id === nearbySelectedId) || null;
+    const nearbyDragRef = useRef(null);
+    function nearbyPanStart(e) {
+        const p = e.touches ? e.touches[0] : e;
+        nearbyDragRef.current = { startX: p.clientX, startY: p.clientY, lastX: p.clientX, lastY: p.clientY, moved: 0 };
+    }
+    function nearbyPanMove(e) {
+        if (!nearbyDragRef.current)
+            return;
+        const p = e.touches ? e.touches[0] : e;
+        const d = nearbyDragRef.current;
+        const dx = p.clientX - d.lastX, dy = p.clientY - d.lastY;
+        d.lastX = p.clientX; d.lastY = p.clientY;
+        d.moved += Math.abs(dx) + Math.abs(dy);
+        setNearbyMapOffset((o) => ({ x: o.x - dx, y: o.y - dy }));
+        if (d.moved > 18)
+            setNearbyPendingPan(true);
+    }
+    function nearbyPanEnd() { nearbyDragRef.current = null; }
+    function requestNearbyLocation() {
+        if (!('geolocation' in navigator)) { setNearbyLocationPickerOpen(true); return; }
+        navigator.geolocation.getCurrentPosition(() => {
+            setNearbyLocationStatus('granted');
+            setNearbyMapOffset({ x: 0, y: 0 });
+            setNearbyMapZoom(1);
+            setNearbyPendingPan(false);
+            flashToast('Recentered on your location');
+        }, () => { setNearbyLocationStatus('denied'); setNearbyLocationPickerOpen(true); }, { timeout: 6000 });
+    }
+    function nearbyBookingCta(business) {
+        closeAllNearbyOverlays();
+        startBookingFor(business);
+    }
+    function closeAllNearbyOverlays() { setNearbySelectedId(null); }
+    function renderNearbyMap() {
+        const NBG = T.background;
+        const scalePxPerMi = 9 * nearbyMapZoom;
+        const plottable = nearbyFiltered.filter((x) => x.geo);
+        const unplottableMobile = nearbyFiltered.filter((x) => !x.geo);
+        const clusters = [];
+        plottable.forEach((it) => {
+            const px = it.geo.dx * scalePxPerMi - nearbyMapOffset.x;
+            const py = it.geo.dy * scalePxPerMi - nearbyMapOffset.y;
+            const near = clusters.find((c) => Math.hypot(c.px - px, c.py - py) < 42);
+            if (near) { near.items.push(it); near.sumPx += px; near.sumPy += py; near.px = near.sumPx / near.items.length; near.py = near.sumPy / near.items.length; }
+            else clusters.push({ px, py, sumPx: px, sumPy: py, items: [it] });
+        });
+        const header = React.createElement("div", { style: { flexShrink: 0, position: 'relative', zIndex: 3, padding: `calc(env(safe-area-inset-top) + 10px) 14px 10px` } },
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                React.createElement("button", { onClick: () => setShortsFeedTab('forYou'), style: { width: 38, height: 38, borderRadius: 19, background: 'rgba(0,0,0,0.55)', border: `1px solid ${THEME.inkLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement(Icon, { name: "arrowleft", size: 16, color: "#fff" })),
+                React.createElement("div", { style: { flex: 1, position: 'relative' } },
+                    React.createElement("input", {
+                        value: nearbySearch, onChange: (e) => setNearbySearch(e.target.value),
+                        placeholder: "Search places, activities & services",
+                        style: { width: '100%', height: 44, borderRadius: 22, border: `1px solid ${THEME.inkLine}`, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(10px)', color: '#fff', fontSize: 13, padding: '0 16px 0 40px', outline: 'none' },
+                    }),
+                    React.createElement("div", { style: { position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', display: 'flex' } }, React.createElement(Icon, { name: "search", size: 15, color: "rgba(255,255,255,0.5)" }))),
+                React.createElement("button", { onClick: () => setNearbyLocationPickerOpen(true), style: { width: 44, height: 44, borderRadius: 22, background: 'rgba(0,0,0,0.55)', border: `1px solid ${THEME.inkLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement(Icon, { name: "mappin", size: 16, color: nearbyExploreLocation ? THEME.coral : "#fff" })),
+                React.createElement("button", { onClick: () => { setNearbyView((v) => v === 'map' ? 'list' : 'map'); }, style: { height: 44, padding: '0 14px', borderRadius: 22, background: THEME.coral, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 } },
+                    React.createElement(Icon, { name: nearbyView === 'map' ? "filepen" : "compass", size: 14, color: "#fff" }),
+                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: '#fff' } }, nearbyView === 'map' ? 'List' : 'Map'))),
+            React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, marginTop: 10, overflowX: 'auto' } },
+                [{ id: 'all', label: 'All' }, { id: 'restaurants', label: 'Restaurants' }, { id: 'activities', label: 'Activities' }, { id: 'beauty', label: 'Beauty' }, { id: 'wellness', label: 'Wellness' }, { id: 'events', label: 'Events' }, { id: 'services', label: 'Services' }].map((c) => {
+                    const active = nearbyCategory === c.id;
+                    return React.createElement("button", { key: c.id, onClick: () => setNearbyCategory(c.id), style: { flexShrink: 0, padding: '8px 14px', borderRadius: 16, background: active ? THEME.coral : 'rgba(0,0,0,0.55)', border: `1px solid ${active ? THEME.coral : THEME.inkLine}` } },
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: '#fff' } }, c.label));
+                }),
+                React.createElement("button", { onClick: () => setNearbyComesToYouOnly((v) => !v), style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: 16, background: nearbyComesToYouOnly ? THEME.coral : 'rgba(0,0,0,0.55)', border: `1px solid ${nearbyComesToYouOnly ? THEME.coral : THEME.inkLine}` } },
+                    React.createElement("span", { style: { fontSize: 12 } }, "🚗"),
+                    React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: '#fff' } }, "Comes to You"))),
+            nearbyExploreLocation && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '8px 12px', borderRadius: 14, background: 'rgba(166,124,82,0.16)', border: `1px solid ${THEME.coral}` } },
+                React.createElement(Icon, { name: "mappin", size: 13, color: THEME.coral }),
+                React.createElement("span", { style: { flex: 1, fontSize: 12, fontWeight: 700, color: '#fff' } }, `Exploring ${nearbyExploreLocation.label}`),
+                React.createElement("button", { onClick: () => { setNearbyExploreLocation(null); setNearbyMapOffset({ x: 0, y: 0 }); }, style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral } }, "Return to my location")));
+        const mapCanvas = nearbyView === 'map' && React.createElement("div", {
+            style: { position: 'absolute', inset: 0, overflow: 'hidden', touchAction: 'none', background: `radial-gradient(circle at 50% 45%, rgba(166,124,82,0.10), ${NBG} 65%)` },
+            onMouseDown: nearbyPanStart, onMouseMove: nearbyPanMove, onMouseUp: nearbyPanEnd, onMouseLeave: nearbyPanEnd,
+            onTouchStart: nearbyPanStart, onTouchMove: nearbyPanMove, onTouchEnd: nearbyPanEnd,
+        },
+            React.createElement("div", { style: { position: 'absolute', inset: '-50%', backgroundImage: 'linear-gradient(rgba(166,124,82,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(166,124,82,0.08) 1px, transparent 1px)', backgroundSize: `${scalePxPerMi * 2}px ${scalePxPerMi * 2}px`, backgroundPosition: `calc(50% - ${nearbyMapOffset.x}px) calc(50% - ${nearbyMapOffset.y}px)` } }),
+            !nearbyExploreLocation && React.createElement("div", { style: { position: 'absolute', left: `calc(50% - ${nearbyMapOffset.x}px)`, top: `calc(50% - ${nearbyMapOffset.y}px)`, transform: 'translate(-50%, -50%)' } },
+                React.createElement("div", { className: "avio-ring-pulse", style: { width: 16, height: 16, borderRadius: '50%', background: '#2E9BFF', border: '3px solid #fff', boxShadow: '0 0 0 4px rgba(46,155,255,0.25)' } })),
+            clusters.map((c, i) => {
+                const solo = c.items.length === 1;
+                const biz = solo ? c.items[0].business : null;
+                const cat = solo ? getCategoryDiscovery(biz.category) : null;
+                const isSelected = solo && nearbySelectedId === biz.id;
+                return React.createElement("button", {
+                    key: solo ? biz.id : 'cluster' + i,
+                    onClick: () => { if (solo) setNearbySelectedId(biz.id); else { setNearbyMapZoom((z) => Math.min(4, z * 1.7)); setNearbyMapOffset((o) => ({ x: o.x + c.px, y: o.y + c.py })); } },
+                    style: { position: 'absolute', left: `calc(50% + ${c.px}px)`, top: `calc(50% + ${c.py}px)`, transform: 'translate(-50%, -100%)', zIndex: isSelected ? 5 : 2 },
+                },
+                    solo
+                        ? React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center' } },
+                            React.createElement("div", { style: { width: 36, height: 36, borderRadius: '50% 50% 50% 4px', transform: 'rotate(45deg)', background: isSelected ? THEME.coral : T.surface, border: `2px solid ${isSelected ? '#fff' : THEME.coral}`, boxShadow: '0 4px 10px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                                React.createElement("span", { style: { transform: 'rotate(-45deg)', fontSize: 15 } }, cat.icon)))
+                        : React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', background: THEME.coral, border: '2.5px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.4)' } },
+                            React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: 'Space Grotesk, sans-serif' } }, c.items.length)));
+            }),
+            nearbyPendingPan && React.createElement("button", { onClick: () => setNearbyPendingPan(false), style: { position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', padding: '9px 18px', borderRadius: 20, background: THEME.ink, border: `1px solid ${THEME.coral}`, boxShadow: '0 6px 16px rgba(0,0,0,0.4)', zIndex: 4 } },
+                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "🔎 Search this area")),
+            React.createElement("div", { style: { position: 'absolute', right: 14, bottom: nearbySelectedEntry ? 260 : 'calc(env(safe-area-inset-bottom) + 96px)', display: 'flex', flexDirection: 'column', gap: 10, zIndex: 4 } },
+                React.createElement("button", { onClick: () => setNearbyMapZoom((z) => Math.min(4, z + 0.5)), style: { width: 40, height: 40, borderRadius: 20, background: 'rgba(0,0,0,0.6)', border: `1px solid ${THEME.inkLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement("span", { style: { fontSize: 17, color: '#fff', fontWeight: 700 } }, "+")),
+                React.createElement("button", { onClick: () => setNearbyMapZoom((z) => Math.max(0.4, z - 0.5)), style: { width: 40, height: 40, borderRadius: 20, background: 'rgba(0,0,0,0.6)', border: `1px solid ${THEME.inkLine}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement("span", { style: { fontSize: 17, color: '#fff', fontWeight: 700 } }, "−")),
+                React.createElement("button", { onClick: requestNearbyLocation, style: { width: 44, height: 44, borderRadius: 22, background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 16px rgba(166,124,82,0.4)' } }, React.createElement(Icon, { name: "compass", size: 19, color: "#fff" }))));
+        const cardCta = (business) => getBookingCtaLabel(business);
+        const previewCardBody = (business, elig) => {
+            const cat = getCategoryDiscovery(business.category);
+            const promo = business.deal && business.deal.enabled;
+            return [
+                React.createElement("div", { key: "top", style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' } },
+                    React.createElement("span", { style: { fontSize: 12.5, color: T.textSecondary } }, `${cat.icon} ${business.category}`),
+                    React.createElement("span", { style: { fontSize: 12.5, color: T.textSecondary } }, "•"),
+                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: T.textPrimary } }, `${business.rating} ★`)),
+                React.createElement("div", { key: "loc", style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 } },
+                    elig.mode === 'mobile'
+                        ? React.createElement(React.Fragment, null,
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "🚗 Comes to you"),
+                            React.createElement("span", { style: { fontSize: 12, color: T.textSecondary } }, "· Serves your area"))
+                        : elig.mode === 'both'
+                            ? React.createElement("span", { style: { fontSize: 12.5, color: T.textSecondary } }, `${elig.showsDistance && elig.distanceMi != null ? elig.distanceMi.toFixed(1) + ' mi away' : business.location} · also comes to you`)
+                            : React.createElement("span", { style: { fontSize: 12.5, color: T.textSecondary } }, elig.showsDistance && elig.distanceMi != null ? `${elig.distanceMi.toFixed(1)} mi away` : business.location)),
+                elig.travelFeeInfo && elig.travelFeeInfo.fee > 0 && React.createElement("p", { key: "fee", style: { fontSize: 11, color: T.textSecondary, marginTop: 3 } }, `+${money(elig.travelFeeInfo.fee)} travel fee`),
+                React.createElement("div", { key: "price", style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 } },
+                    React.createElement("span", { style: { fontSize: 14.5, fontWeight: 700, color: THEME.coral } }, business.price ? `From ${money(business.price)}` : 'See pricing'),
+                    React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: T.textPrimary, background: T.surfaceSecondary, borderRadius: 8, padding: '3px 8px' } }, business.openStatus ? (business.openStatus.includes('Open') ? 'Available Today' : business.openStatus) : 'Check availability')),
+                promo && React.createElement("p", { key: "promo", style: { fontSize: 11.5, fontWeight: 700, color: THEME.gold, marginTop: 4 } }, business.deal.label || 'Limited-time deal')];
+        };
+        const bottomSheet = nearbySelectedEntry && React.createElement("div", { onClick: () => setNearbySelectedId(null), style: { position: 'absolute', inset: 0, zIndex: 6, display: 'flex', alignItems: 'flex-end' } },
+            React.createElement("div", { onClick: (e) => e.stopPropagation(), className: "avio-filter-sheet", style: { width: '100%', maxHeight: '56%', overflowY: 'auto', background: T.modalBackground, borderRadius: '24px 24px 0 0', padding: `14px 18px calc(env(safe-area-inset-bottom) + 16px)` } },
+                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: T.border, margin: '0 auto 14px' } }),
+                React.createElement("div", { style: { display: 'flex', gap: 12 } },
+                    React.createElement("div", { style: { width: 76, height: 76, borderRadius: 16, overflow: 'hidden', flexShrink: 0, background: nearbySelectedEntry.business.avatarColor || T.surfaceSecondary, position: 'relative' } },
+                        nearbySelectedEntry.business.image && React.createElement("img", { src: nearbySelectedEntry.business.image, style: { width: '100%', height: '100%', objectFit: 'cover' } }),
+                        nearbySelectedEntry.business.video && React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.25)' } }, React.createElement(Icon, { name: "bolt", size: 16, color: "#fff" }))),
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
+                            React.createElement("p", { style: { fontSize: 16, fontWeight: 700, color: T.textPrimary, margin: 0, fontFamily: 'Space Grotesk, sans-serif' } }, nearbySelectedEntry.business.name),
+                            nearbySelectedEntry.business.verified && React.createElement("div", { style: { width: 14, height: 14, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" }))),
+                        ...previewCardBody(nearbySelectedEntry.business, nearbySelectedEntry.elig))),
+                React.createElement("button", { onClick: () => nearbyBookingCta(nearbySelectedEntry.business), style: { width: '100%', marginTop: 16, height: 50, borderRadius: 25, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14, fontFamily: 'Space Grotesk, sans-serif' } }, cardCta(nearbySelectedEntry.business))));
+        const emptyState = nearbyFiltered.length === 0 && React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 40px', textAlign: 'center', zIndex: 3 } },
+            React.createElement(Icon, { name: "compass", size: 30, color: T.textSecondary }),
+            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, marginTop: 12 } }, "Not much here yet"),
+            React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 4 } }, "Try widening your search or explore what's popular."),
+            React.createElement("button", { onClick: () => setNearbyRadiusExpand((r) => r * 2), style: { marginTop: 16, padding: '11px 20px', borderRadius: 20, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 12.5 } }, "Expand Search Area"),
+            React.createElement("button", { onClick: () => { setNearbyCategory('all'); setNearbySearch(''); setNearbyComesToYouOnly(false); setNearbyRadiusExpand(4); }, style: { marginTop: 10, padding: '11px 20px', borderRadius: 20, border: `1px solid ${T.border}`, color: T.textPrimary, fontWeight: 700, fontSize: 12.5 } }, "Explore Popular Places Nearby"));
+        const listView = nearbyView === 'list' && React.createElement("div", { className: "avio-scroll", style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 20px)' } },
+            nearbyFiltered.map(({ business, elig }) => React.createElement("button", { key: business.id, onClick: () => setNearbySelectedId(business.id), style: { width: '100%', display: 'flex', gap: 12, padding: 12, borderRadius: 18, border: `1px solid ${T.border}`, background: T.surface, marginBottom: 12, textAlign: 'left' } },
+                React.createElement("div", { style: { width: 64, height: 64, borderRadius: 14, overflow: 'hidden', flexShrink: 0, background: business.avatarColor || T.surfaceSecondary } },
+                    business.image && React.createElement("img", { src: business.image, style: { width: '100%', height: '100%', objectFit: 'cover' } })),
+                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: T.textPrimary, margin: 0 } }, business.name),
+                    ...previewCardBody(business, elig)))));
+        return React.createElement("div", { style: { position: 'absolute', inset: 0, background: NBG, display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
+            header,
+            React.createElement("div", { style: { flex: 1, position: 'relative' } }, mapCanvas, listView, emptyState, bottomSheet),
+            nearbyLocationPickerOpen && React.createElement("div", { onClick: () => setNearbyLocationPickerOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-end', zIndex: 10 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `16px 18px calc(env(safe-area-inset-bottom) + 16px)` } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: T.textPrimary, marginBottom: 4 } }, nearbyLocationStatus === 'denied' ? "Location access unavailable" : "Explore a location"),
+                    React.createElement("p", { style: { fontSize: 12, color: T.textSecondary, marginBottom: 12 } }, "Pick a city to explore, or enable location for results near you."),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6 } }, AI_SEARCH_CITY_NAMES.map((city) => React.createElement("button", { key: city, className: "avio-pill", onClick: () => { setNearbyExploreLocation({ label: city.replace(/\b\w/g, (c) => c.toUpperCase()) }); setNearbyLocationPickerOpen(false); setNearbyView('list'); }, style: { padding: '7px 13px', borderRadius: 14, background: T.surfaceSecondary, border: `1px solid ${T.border}` } }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary, textTransform: 'capitalize' } }, city)))))));
+    }
     const rawActiveShortIdx = filteredFeed.findIndex((f) => f.id === activeShortId);
     const activeShortIdx = rawActiveShortIdx === -1 ? 0 : rawActiveShortIdx;
     useEffect(() => {
@@ -8037,7 +8389,8 @@ function App() {
     }
     return React.createElement(AppThemeContext.Provider, { value: T }, React.createElement("div", { style: { width: '100%', margin: '0 auto', position: 'fixed', top: 0, bottom: 0, left: 0, right: 0, overflow: 'hidden', background: T.background } },
         React.createElement("input", { ref: fileInputRef, type: "file", accept: "video/*", style: { display: 'none' }, onChange: handleFileChosen }),
-        tab === 'discover' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
+        tab === 'discover' && shortsFeedTab === 'nearby' && renderNearbyMap(),
+        tab === 'discover' && shortsFeedTab !== 'nearby' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
             React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16, zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 } },
                 React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6 } },
                     [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
