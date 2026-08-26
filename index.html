@@ -10428,7 +10428,7 @@ function App() {
                     React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, services.map((s) => {
                         const active = selectedService && selectedService.name === s.name;
                         const sPromo = resolvePromotionSnapshot(activeDeal, s, Date.now());
-                        return React.createElement("button", { key: s.name, onClick: () => setSelectedService(s), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', borderRadius: 16, border: `1.5px solid ${active ? T.textPrimary : BF.border}`, background: active ? T.surfaceSecondary : T.surface } },
+                        return React.createElement("button", { key: s.name, onClick: () => setSelectedService(s), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', borderRadius: 16, border: `1.5px solid ${active ? THEME.coral : BF.border}`, background: active ? T.surfaceSecondary : T.surface } },
                             React.createElement("div", { style: { textAlign: 'left' } },
                                 React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: BF.text, margin: 0 } }, s.name),
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 } },
@@ -10439,7 +10439,7 @@ function App() {
                                 React.createElement("div", { style: { textAlign: 'right' } },
                                     sPromo && React.createElement("p", { style: { fontSize: 11, color: BF.sub, textDecoration: 'line-through', margin: 0 } }, money(sPromo.originalPrice)),
                                     React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: THEME.coral } }, money(sPromo ? sPromo.finalPrice : s.price))),
-                                React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${active ? T.textPrimary : '#D1D1D6'}`, background: active ? T.textPrimary : T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" }))));
+                                React.createElement("div", { style: { width: 22, height: 22, borderRadius: '50%', border: `1.5px solid ${active ? THEME.coral : '#D1D1D6'}`, background: active ? THEME.coral : T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, active && React.createElement(Icon, { name: "check", size: 11, color: "#fff" }))));
                     })));
             }
             else if (bookingStep === 'staff') {
@@ -10483,7 +10483,7 @@ function App() {
                     const isToday2 = calYear2 === today.getFullYear() && calMonthIdx2 === today.getMonth() && day === today.getDate();
                     const selected2 = day === bookingSelectedDay;
                     return React.createElement("button", { key: day, disabled, onClick: () => { setBookingSelectedDay(day); setSelTime(null); }, style: { padding: '6px 0', opacity: disabled ? 0.3 : 1 } },
-                        React.createElement("span", { style: { width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontSize: 13, fontWeight: selected2 ? 700 : 500, background: selected2 ? T.textPrimary : 'transparent', color: selected2 ? '#fff' : BF.text, border: !selected2 && isToday2 ? `1.5px solid ${THEME.coral}` : 'none' } }, day));
+                        React.createElement("span", { style: { width: 30, height: 30, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontSize: 13, fontWeight: selected2 ? 700 : 500, background: selected2 ? THEME.coral : 'transparent', color: selected2 ? '#fff' : BF.text, border: !selected2 && isToday2 ? `1.5px solid ${THEME.coral}` : 'none' } }, day));
                 }));
                 const quickBtns = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 14 } },
                     React.createElement("button", { onClick: () => { setBookingCalMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setBookingSelectedDay(today.getDate()); setSelTime(null); }, style: { flex: 1, padding: '9px 0', borderRadius: 14, border: `1px solid ${BF.border}`, fontSize: 12.5, fontWeight: 600, color: BF.text } }, "Today"),
@@ -10505,7 +10505,7 @@ function App() {
                         ? React.createElement("p", { style: { fontSize: 12.5, color: BF.sub, padding: '14px 0' } }, "No slots long enough for this service on this day — try another date.")
                         : React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 } }, daySlots.map((slot) => {
                             const active = selTime === slot.minutes;
-                            return React.createElement("button", { key: slot.minutes, disabled: !slot.available, onClick: () => setSelTime(slot.minutes), style: { padding: '10px 0', borderRadius: 14, fontSize: 12.5, fontWeight: 600, border: `1.5px solid ${active ? T.textPrimary : slot.available ? BF.border : T.border}`, background: active ? T.textPrimary : T.surface, color: active ? '#fff' : slot.available ? BF.text : '#C7C7CC', textDecoration: slot.available ? 'none' : 'line-through' } }, slot.label);
+                            return React.createElement("button", { key: slot.minutes, disabled: !slot.available, onClick: () => setSelTime(slot.minutes), style: { padding: '10px 0', borderRadius: 14, fontSize: 12.5, fontWeight: 600, border: `1.5px solid ${active ? THEME.coral : slot.available ? BF.border : T.border}`, background: active ? THEME.coral : T.surface, color: active ? '#fff' : slot.available ? BF.text : '#C7C7CC', textDecoration: slot.available ? 'none' : 'line-through' } }, slot.label);
                         })),
                     React.createElement("p", { style: { fontSize: 10.5, color: BF.sub, marginTop: 14 } }, "All times are in your local timezone"));
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px 20px' } }, timeGrid);
@@ -10806,7 +10806,7 @@ function App() {
                         React.createElement("span", { style: { fontSize: 11, color: BF.sub } }, `A confirmation text has been sent to ${customerInfo.phone.trim()}`)));
             }
             let footer = null;
-            const ctaStyle = (ready) => ({ width: '100%', height: 52, borderRadius: 26, background: ready ? T.textPrimary : '#EDEDED', color: ready ? '#fff' : '#B5B5B8', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' });
+            const ctaStyle = (ready) => ({ width: '100%', height: 52, borderRadius: 26, background: ready ? THEME.coral : '#EDEDED', color: ready ? '#fff' : '#B5B5B8', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' });
             const footerWrap = (node) => React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${BF.border}` } }, node);
             if (bookingStep === 'service')
                 footer = footerWrap(React.createElement("button", { disabled: !selectedService, onClick: goNext, style: ctaStyle(!!selectedService) }, "Continue"));
