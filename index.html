@@ -1833,6 +1833,52 @@ const FEED = [
     { id: 't-wildframe-p10', category: 'Parties', name: 'Wildframe Photography', location: 'Austin, TX', rating: 4.8, price: 220, likes: '370', comments: 13, saves: '226', blurb: 'Found this bridge on a location scout.', verified: true, distance: '0.7 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#locationscout', '#austin', '#photography'], friendsBooked: 11, avatarColor: '#6C4CFC', locationMode: 'I travel to customers', image: 'assets/shorts/thumbs/photo-4.jpg', video: 'assets/shorts/biz/photo-4', taggedBusinessIds: ['t-wildframe'] },
     { id: 't-wildframe-p44', category: 'Parties', name: 'Wildframe Photography', location: 'Austin, TX', rating: 4.8, price: 220, likes: '517', comments: 14, saves: '393', blurb: 'Chasing light down a dirt road.', verified: true, distance: '0.7 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#photography', '#austin', '#goldenhour'], friendsBooked: 11, avatarColor: '#6C4CFC', locationMode: 'I travel to customers', image: 'assets/shorts/thumbs/photo-5.jpg', video: 'assets/shorts/biz/photo-5', taggedBusinessIds: ['t-wildframe'] },
 ];
+// --- People / Creator Discovery seed data ---
+// This is a single-account demo with no multi-user backend, so — same as FEED itself being
+// entirely seeded fictional businesses — these are seeded fictional OTHER customers, so People
+// discovery has real content to browse rather than showing only the one logged-in account.
+// Each references real FEED business ids so their tagged places carry the app's actual booking
+// config, never a parallel/fake inventory.
+const CREATOR_SEED = [
+    { id: 'creator-alex', username: 'alexeatsnyc', displayName: 'Alex Eats NYC', bio: 'NYC food & hidden spots', city: 'new york', categories: ['food'], avatarColor: '#A67C52', verified: true, followers: 28400 },
+    { id: 'creator-jordan', username: 'jordanstyled', displayName: 'Jordan Cuts', bio: 'Fresh fades, no wait', city: 'brooklyn', categories: ['beauty'], avatarColor: '#3F6FBF', verified: false, followers: 6200 },
+    { id: 'creator-casey', username: 'caseyadventures', displayName: 'Casey Adventures', bio: 'Things to do this weekend', city: 'phoenix', categories: ['activities', 'family'], avatarColor: '#F5134F', verified: true, followers: 9200 },
+    { id: 'creator-maya', username: 'mayaafterdark', displayName: 'Maya After Dark', bio: 'LA nightlife, mapped out', city: 'los angeles', categories: ['nightlife'], avatarColor: '#6C4CFC', verified: false, followers: 15100 },
+    { id: 'creator-sam', username: 'samgoesout', displayName: 'Sam Goes Out', bio: 'Boats, greens & sweat sessions', city: 'fort lauderdale', categories: ['travel', 'sports'], avatarColor: '#1FA97A', verified: false, followers: 4300 },
+    { id: 'creator-priya', username: 'priyawellness', displayName: 'Priya Unwinds', bio: 'Pilates, spa days & self-care', city: 'los angeles', categories: ['beauty'], avatarColor: '#D4536B', verified: true, followers: 19800 },
+    { id: 'creator-nina', username: 'ninaandkids', displayName: 'Nina & Kids', bio: 'Family trips, done right', city: 'orlando', categories: ['family'], avatarColor: '#E08A2B', verified: false, followers: 7600 },
+];
+const CREATOR_CATEGORY_CHIPS = [
+    { id: 'forYou', label: 'For You' }, { id: 'food', label: 'Food' }, { id: 'activities', label: 'Activities' },
+    { id: 'beauty', label: 'Beauty' }, { id: 'travel', label: 'Travel' }, { id: 'sports', label: 'Sports' },
+    { id: 'family', label: 'Family' }, { id: 'nightlife', label: 'Nightlife' },
+];
+function creatorSeedPost(id, creatorId, businessId, category, location, likes, comments, saves, blurb, image, video, verified) {
+    return {
+        id, category, name: CREATOR_SEED.find((c) => c.id === creatorId).displayName, location, rating: 5.0, price: null,
+        likes, comments, saves, blurb, verified: false, distance: '0 mi', openStatus: 'Available Today',
+        hashtags: [], friendsBooked: 0, avatarColor: CREATOR_SEED.find((c) => c.id === creatorId).avatarColor,
+        image, video, mine: false, isCustomerPost: true, creatorId,
+        taggedBusinessIds: [businessId],
+        verifiedTags: [{ businessId, businessName: FEED.find((f) => f.id === businessId).name, service: '', verified }],
+    };
+}
+const CREATOR_SEED_POSTS = [
+    creatorSeedPost('cp-alex-1', 'creator-alex', 'bella-vista-demo', 'Restaurants', 'Brooklyn, NY', '3.1K', 64, '2.8K', 'This omakase is worth the wait every time 🍣', 'assets/shorts/thumbs/sushi-2.jpg', 'assets/shorts/biz/sushi-2', true),
+    creatorSeedPost('cp-alex-2', 'creator-alex', 't-gildedhall', 'Restaurants', 'New York, NY', '2.2K', 40, '1.9K', 'Date night done right at The Gilded Hall.', 'assets/shorts/thumbs/finedining-2.jpg', 'assets/shorts/biz/finedining-2', false),
+    creatorSeedPost('cp-jordan-1', 'creator-jordan', 't-fadedistrict', 'Beauty', 'Brooklyn, NY', '1.8K', 51, '1.5K', 'My go-to for a clean fade in Brooklyn.', 'assets/shorts/thumbs/barber-2.jpg', 'assets/shorts/biz/barber-2', true),
+    creatorSeedPost('cp-jordan-2', 'creator-jordan', 't-vmestostudio', 'Beauty', 'Chicago, IL', '1.1K', 30, '900', 'Tried a new color at Vmesto — obsessed.', 'assets/shorts/thumbs/hairsalon-2.jpg', 'assets/shorts/biz/hairsalon-2', false),
+    creatorSeedPost('cp-casey-1', 'creator-casey', 't-combatzone', 'Rentals', 'Phoenix, AZ', '4.6K', 210, '3.9K', 'Group paintball for the win 🎯', 'assets/shorts/thumbs/paintball-1.jpg', 'assets/shorts/biz/paintball-1', true),
+    creatorSeedPost('cp-casey-2', 'creator-casey', 't-frostpoint', 'Rentals', 'Chicago, IL', '3.8K', 165, '3.1K', 'Ice skating with the whole crew.', 'assets/shorts/thumbs/icerink-2.jpg', 'assets/shorts/biz/icerink-2', false),
+    creatorSeedPost('cp-maya-1', 'creator-maya', 't-novasound', 'Parties', 'Los Angeles, CA', '2.4K', 70, '2.0K', 'This DJ set was UNREAL last night.', 'assets/shorts/thumbs/dj-3.jpg', 'assets/shorts/biz/dj-3', true),
+    creatorSeedPost('cp-maya-2', 'creator-maya', 't-neonarcade', 'Rentals', 'Las Vegas, NV', '1.6K', 45, '1.2K', 'Retro arcade night in Vegas.', 'assets/shorts/thumbs/arcade-2.jpg', 'assets/shorts/biz/arcade-2', false),
+    creatorSeedPost('cp-sam-1', 'creator-sam', 't-bluewater', 'Rentals', 'Fort Lauderdale, FL', '980', 28, '760', 'Chartered a boat for the day — worth it.', 'assets/shorts/thumbs/boat-3.jpg', 'assets/shorts/biz/boat-3', true),
+    creatorSeedPost('cp-sam-2', 'creator-sam', 't-fairwayrange', 'Rentals', 'Scottsdale, AZ', '640', 15, '410', 'Morning round before it got hot.', 'assets/shorts/thumbs/golf-1.jpg', 'assets/shorts/biz/golf-1', false),
+    creatorSeedPost('cp-priya-1', 'creator-priya', 't-coreandflow', 'Educational', 'Los Angeles, CA', '2.0K', 55, '1.7K', 'Reformer class kicked my butt today.', 'assets/shorts/thumbs/pilates-2.jpg', 'assets/shorts/biz/pilates-2', true),
+    creatorSeedPost('cp-priya-2', 'creator-priya', 't-bloomnailbar', 'Beauty', 'Miami, FL', '1.7K', 38, '1.3K', 'Fresh set before the weekend.', 'assets/shorts/thumbs/nails-2.jpg', 'assets/shorts/biz/nails-2', false),
+    creatorSeedPost('cp-nina-1', 'creator-nina', 't-wavekingdom', 'Rentals', 'Orlando, FL', '2.9K', 140, '2.5K', 'Kids did NOT want to leave this water park.', 'assets/shorts/thumbs/waterpark-2.jpg', 'assets/shorts/biz/waterpark-2', true),
+    creatorSeedPost('cp-nina-2', 'creator-nina', 't-oliveandsage', 'Restaurants', 'San Diego, CA', '1.2K', 33, '950', 'Family dinner spot that actually welcomes kids.', 'assets/shorts/thumbs/bistro-3.jpg', 'assets/shorts/biz/bistro-3', false),
+];
 const CATEGORIES = [
     { id: 'shorts', label: 'All shorts', count: 31, icon: 'compass', color: '#2E9BFF' },
     { id: 'beauty', label: 'Beauty', count: 14, icon: 'bottle', color: '#F5134F' },
@@ -3033,7 +3079,7 @@ function App() {
     const nearbyClusterGroupRef = useRef(null);
     const nearbyUserMarkerRef = useRef(null);
     const nearbyCommittedCenterRef = useRef(null);
-    const [feed, setFeed] = useState(FEED);
+    const [feed, setFeed] = useState(() => [...FEED, ...CREATOR_SEED_POSTS]);
     const shortsHydratedRef = useRef(false);
     useEffect(() => {
         if (!shortsHydratedRef.current)
@@ -4246,6 +4292,7 @@ function App() {
                 customVideoUrl: uploadVideoUrl,
                 mine: true,
                 isCustomerPost,
+                creatorId: isCustomerPost ? MY_USER_ID : null,
                 commentsOn: uploadCommentsOn,
                 sound: uploadSound,
                 playbackRate: uploadPlaybackRate,
@@ -4317,6 +4364,21 @@ function App() {
     const [toast, setToast] = useState(null);
     const [likedIds, setLikedIds] = useState(() => new Set());
     const [followedIds, setFollowedIds] = useState(() => new Set());
+    // --- People / Creator Discovery ---
+    const [followedCreatorIds, setFollowedCreatorIds] = useState(() => new Set());
+    const [blockedCreatorIds, setBlockedCreatorIds] = useState(() => new Set(loadLS('avio_blocked_creators', [])));
+    useEffect(() => { saveLS('avio_blocked_creators', Array.from(blockedCreatorIds)); }, [blockedCreatorIds]);
+    const [peopleSearchQuery, setPeopleSearchQuery] = useState('');
+    const [peopleCategoryFilter, setPeopleCategoryFilter] = useState('forYou');
+    const [creatorProfileTarget, setCreatorProfileTarget] = useState(null);
+    const [creatorProfileTab, setCreatorProfileTab] = useState('posts');
+    // Captured the instant a tagged post's booking CTA is tapped, consumed into
+    // `postAttributions` at the moment that specific booking actually finalizes — never
+    // inferred later from matching user/business/date, so a booking only ever attributes to
+    // the post that genuinely drove it.
+    const [pendingPostAttribution, setPendingPostAttribution] = useState(null);
+    const [postAttributions, setPostAttributions] = useState(() => loadLS('avio_post_attributions', []));
+    useEffect(() => { saveLS('avio_post_attributions', postAttributions); }, [postAttributions]);
     const [savedShorts, setSavedShorts] = useState(() => new Set());
     const [commentsByItem, setCommentsByItem] = useState({});
     const [commentItem, setCommentItem] = useState(null);
@@ -5231,7 +5293,8 @@ function App() {
     }, [feed]);
     const aiSearchHasDeals = useMemo(() => aiSearchCandidates.some((i) => i.deal && i.deal.enabled), [aiSearchCandidates]);
     const filteredFeed = useMemo(() => {
-        let result = shortsFeedTab === 'following' ? feed.filter((item) => followedIds.has(item.id)) : feed;
+        let result = feed.filter((item) => !item.isCustomerPost || !blockedCreatorIds.has(item.creatorId));
+        result = shortsFeedTab === 'following' ? result.filter((item) => followedIds.has(item.id) || (item.isCustomerPost && followedCreatorIds.has(item.creatorId))) : result;
         const LOCATION_TOGGLE_MODES = { inStudio: 'At my business location', atHome: 'I travel to customers', mobile: 'I travel to customers' };
         const activeLocationModes = new Set(Object.keys(LOCATION_TOGGLE_MODES).filter((id) => filterToggles.has(id)).map((id) => LOCATION_TOGGLE_MODES[id]));
         if (activeLocationModes.size > 0)
@@ -5244,7 +5307,7 @@ function App() {
             result = [...result].sort((a, b) => computeDiscoveryScore(b, getDiscoveryEligibility(b), ctx) - computeDiscoveryScore(a, getDiscoveryEligibility(a), ctx));
         }
         return result;
-    }, [shortsFeedTab, followedIds, feed, filterToggles, selectedInterests]);
+    }, [shortsFeedTab, followedIds, followedCreatorIds, blockedCreatorIds, feed, filterToggles, selectedInterests]);
     // ---- Nearby map data pipeline ----
     // `feed` mixes canonical business records with lighter "post" entries that tag back
     // to one via taggedBusinessIds (that's how the Thrillz video feed shows multiple
@@ -5428,6 +5491,184 @@ function App() {
         if (card)
             card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }, [nearbySelectedIdx]);
+    // --- People / Creator Discovery: render ---
+    const PEOPLE_CITY_ALIASES = { nyc: 'new york', la: 'los angeles', vegas: 'las vegas' };
+    function peopleSearchMatch(creatorRow, query) {
+        if (!query)
+            return true;
+        const q = query.toLowerCase().trim();
+        const qCity = PEOPLE_CITY_ALIASES[q] || q;
+        const haystack = [
+            creatorRow.info.displayName, creatorRow.info.username, creatorRow.info.bio, creatorRow.info.city,
+            ...(creatorRow.info.categories || []),
+            ...creatorRow.places.map((p) => p.business.name), ...creatorRow.places.map((p) => p.business.category),
+        ].filter(Boolean).join(' ').toLowerCase();
+        return haystack.includes(q) || haystack.includes(qCity);
+    }
+    function renderPeopleCreatorCard(row) {
+        const { info, posts, places, followers } = row;
+        const isFollowing = followedCreatorIds.has(info.id);
+        const recentPosts = posts.slice(0, 3);
+        return React.createElement("div", { key: info.id, style: { padding: '14px 0', borderBottom: `1px solid ${THEME.inkLine}` } },
+            React.createElement("button", { onClick: () => openCreatorProfile(info.id), style: { width: '100%', display: 'flex', alignItems: 'flex-start', gap: 12, textAlign: 'left' } },
+                info.avatarPhoto
+                    ? React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', flexShrink: 0, backgroundImage: `url(${info.avatarPhoto})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
+                    : React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', flexShrink: 0, background: info.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18 } }, info.displayName.charAt(0).toUpperCase()),
+                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
+                        React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: '#fff', margin: 0 } }, info.displayName),
+                        info.verified && React.createElement("div", { style: { width: 13, height: 13, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" }))),
+                    React.createElement("p", { style: { fontSize: 12, color: 'rgba(255,255,255,0.55)', margin: '2px 0 0' } }, '@' + info.username),
+                    React.createElement("p", { style: { fontSize: 12, color: 'rgba(255,255,255,0.75)', margin: '5px 0 0', lineHeight: 1.35 } }, info.bio),
+                    React.createElement("p", { style: { fontSize: 11.5, color: 'rgba(255,255,255,0.5)', margin: '5px 0 0' } }, `${formatCount(followers)} followers · ${places.length} places`)),
+                React.createElement("span", { onClick: (e) => { e.stopPropagation(); toggleFollowCreator(info.id); }, style: { flexShrink: 0, padding: '7px 16px', borderRadius: 16, border: `1.5px solid ${THEME.coral}`, background: isFollowing ? 'transparent' : THEME.coral, color: isFollowing ? THEME.coral : '#fff', fontSize: 12, fontWeight: 700, alignSelf: 'center' } }, isFollowing ? 'Following' : 'Follow')),
+            recentPosts.length > 0 && React.createElement("div", { style: { display: 'flex', gap: 6, marginTop: 10, marginLeft: 64 } },
+                recentPosts.map((p) => React.createElement("div", { key: p.id, onClick: () => openCreatorProfile(info.id), style: { width: 64, height: 92, borderRadius: 8, backgroundImage: p.image ? `url(${p.image})` : 'none', backgroundColor: p.image ? undefined : info.avatarColor, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } }))));
+    }
+    function renderPeoplePage() {
+        const rows = getAllCreatorIds().map((id) => {
+            const info = getCreatorInfo(id);
+            return { info, posts: getCreatorPosts(id), places: getCreatorPlaces(id), followers: getCreatorFollowerCount(id), engagement: getCreatorEngagementScore(id) };
+        });
+        const categoryFiltered = peopleCategoryFilter === 'forYou' ? rows : rows.filter((r) => (r.info.categories || []).includes(peopleCategoryFilter));
+        const searchFiltered = categoryFiltered.filter((r) => peopleSearchMatch(r, peopleSearchQuery));
+        const suggested = searchFiltered.filter((r) => !followedCreatorIds.has(r.info.id));
+        const trending = [...searchFiltered].sort((a, b) => b.engagement - a.engagement).slice(0, 5);
+        return React.createElement("div", { key: "peoplePage", style: { position: 'absolute', inset: 0, background: THEME.ink, display: 'flex', flexDirection: 'column' } },
+            React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 14px) 18px calc(env(safe-area-inset-bottom) + 90px)` } },
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#fff', margin: 0 } }, "People"),
+                React.createElement("p", { style: { fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4, marginBottom: 16 } }, "Discover people. Find places worth booking."),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 14, padding: '11px 12px', marginBottom: 14 } },
+                    React.createElement(Icon, { name: "search", size: 15, color: 'rgba(255,255,255,0.6)' }),
+                    React.createElement("input", { value: peopleSearchQuery, onChange: (e) => setPeopleSearchQuery(e.target.value), placeholder: "Search people, food, places, activities…", style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13.5, color: '#fff' } })),
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 18 } },
+                    CREATOR_CATEGORY_CHIPS.map((c) => {
+                        const active = peopleCategoryFilter === c.id;
+                        return React.createElement("button", { key: c.id, onClick: () => setPeopleCategoryFilter(c.id), style: { flexShrink: 0, padding: '7px 14px', borderRadius: 14, border: `1.5px solid ${active ? THEME.coral : 'rgba(255,255,255,0.2)'}`, background: active ? THEME.coral : 'transparent' } },
+                            React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: active ? '#fff' : 'rgba(255,255,255,0.7)' } }, c.label));
+                    })),
+                trending.length > 0 && React.createElement("div", { style: { marginBottom: 18 } },
+                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 } }, "Trending People"),
+                    React.createElement("p", { style: { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 10 } }, "Ranked by real engagement — views, saves, shares and bookings — not just follower count."),
+                    trending.map((r, i) => React.createElement("button", { key: r.info.id, onClick: () => openCreatorProfile(r.info.id), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', textAlign: 'left' } },
+                        React.createElement("span", { style: { width: 18, fontSize: 13, fontWeight: 700, color: THEME.coral, flexShrink: 0 } }, i + 1),
+                        r.info.avatarPhoto
+                            ? React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', flexShrink: 0, backgroundImage: `url(${r.info.avatarPhoto})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
+                            : React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', flexShrink: 0, background: r.info.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 700 } }, r.info.displayName.charAt(0).toUpperCase()),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: '#fff', margin: 0 } }, r.info.displayName),
+                            React.createElement("p", { style: { fontSize: 11, color: 'rgba(255,255,255,0.5)', margin: '1px 0 0' } }, `${formatCount(r.followers)} followers`)),
+                        React.createElement(Icon, { name: "chevronright", size: 15, color: 'rgba(255,255,255,0.4)' })))),
+                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 } }, "Suggested for You"),
+                suggested.length === 0
+                    ? React.createElement("p", { style: { fontSize: 12.5, color: 'rgba(255,255,255,0.5)', padding: '20px 0' } }, "No people found — try another search or category.")
+                    : suggested.map((r) => renderPeopleCreatorCard(r))));
+    }
+    function renderCreatorProfile() {
+        const info = getCreatorInfo(creatorProfileTarget);
+        if (!info)
+            return null;
+        const posts = getCreatorPosts(info.id);
+        const places = getCreatorPlaces(info.id);
+        const followers = getCreatorFollowerCount(info.id);
+        const totalLikes = posts.reduce((sum, p) => sum + parseCount(p.likes), 0);
+        const isFollowing = followedCreatorIds.has(info.id);
+        const isBlocked = blockedCreatorIds.has(info.id);
+        const header = React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 14px) 18px 0` } },
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 } },
+                React.createElement("button", { onClick: closeCreatorProfile, style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "arrowleft", size: 20, color: T.textPrimary })),
+                !info.isMe && React.createElement("button", { onClick: () => reportCreator(info.id), style: { fontSize: 12, fontWeight: 600, color: T.textSecondary } }, "Report")),
+            React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' } },
+                info.avatarPhoto
+                    ? React.createElement("div", { style: { width: 84, height: 84, borderRadius: '50%', backgroundImage: `url(${info.avatarPhoto})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
+                    : React.createElement("div", { style: { width: 84, height: 84, borderRadius: '50%', background: info.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 28 } }, info.displayName.charAt(0).toUpperCase()),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 10 } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: T.textPrimary, margin: 0 } }, info.displayName),
+                    info.verified && React.createElement("div", { style: { width: 15, height: 15, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" }))),
+                React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 2 } }, '@' + info.username),
+                info.bio && React.createElement("p", { style: { fontSize: 13, color: T.textPrimary, marginTop: 8, maxWidth: 280, lineHeight: 1.4 } }, info.bio),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 18, marginTop: 14 } },
+                    [{ label: 'Followers', value: formatCount(followers) }, { label: 'Likes', value: formatCount(totalLikes) }, { label: 'Places', value: places.length }].map((s, i) => React.createElement("div", { key: s.label, style: { textAlign: 'center' } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: T.textPrimary, margin: 0 } }, s.value),
+                        React.createElement("p", { style: { fontSize: 11, color: T.textSecondary, marginTop: 2 } }, s.label)))),
+                !info.isMe && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, width: '100%', maxWidth: 280 } },
+                    React.createElement("button", { onClick: () => toggleFollowCreator(info.id), style: { flex: 1, padding: '11px 0', borderRadius: 20, background: isFollowing ? T.surfaceSecondary : THEME.coral, color: isFollowing ? T.textPrimary : '#fff', fontSize: 13.5, fontWeight: 700 } }, isFollowing ? 'Following' : 'Follow'),
+                    React.createElement("button", { onClick: () => shareItem({ name: info.displayName }), style: { padding: '11px 18px', borderRadius: 20, border: `1px solid ${T.border}`, color: T.textPrimary, fontSize: 13.5, fontWeight: 700 } }, "Share"),
+                    React.createElement("button", { onClick: () => toggleBlockCreator(info.id), style: { padding: '11px 14px', borderRadius: 20, border: `1px solid ${T.border}`, color: '#D0304A', fontSize: 12.5, fontWeight: 700 } }, isBlocked ? "Unblock" : "Block"))),
+            React.createElement("div", { style: { display: 'flex', borderBottom: `1px solid ${T.border}`, marginTop: 18 } },
+                [{ id: 'posts', label: 'Posts' }, { id: 'places', label: 'Places' }, { id: 'saved', label: 'Saved' }].map((t) => {
+                    const active = creatorProfileTab === t.id;
+                    return React.createElement("button", { key: t.id, onClick: () => setCreatorProfileTab(t.id), style: { flex: 1, padding: '10px 0', textAlign: 'center', borderBottom: active ? `2px solid ${THEME.coral}` : '2px solid transparent' } },
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: active ? THEME.coral : T.textSecondary } }, t.label));
+                })));
+        let body;
+        if (creatorProfileTab === 'posts') {
+            body = posts.length === 0
+                ? React.createElement("p", { style: { fontSize: 13, color: T.textSecondary, textAlign: 'center', padding: '40px 0' } }, "No posts yet")
+                : React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginTop: 3 } },
+                    posts.map((p) => React.createElement("button", { key: p.id, onClick: () => { closeCreatorProfile(); openPostViewer({ id: info.id, name: info.displayName, avatarColor: info.avatarColor, mine: info.isMe }, posts.map((v) => ({ id: v.id, image: v.image, video: v.video, videoUrl: v.customVideoUrl || null, likes: v.likes })), posts.indexOf(p)); }, style: { position: 'relative', aspectRatio: '1 / 1', backgroundImage: p.image ? `url(${p.image})` : 'none', backgroundColor: p.image ? undefined : info.avatarColor, backgroundSize: 'cover', backgroundPosition: 'center' } },
+                        (p.verifiedTags || []).some((t) => t.verified) && React.createElement("div", { style: { position: 'absolute', top: 6, left: 6, width: 16, height: 16, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "check", size: 9, color: "#fff" })),
+                        React.createElement("div", { style: { position: 'absolute', left: 6, bottom: 6, display: 'flex', alignItems: 'center', gap: 3 } },
+                            React.createElement("span", { style: { fontSize: 9, color: '#fff' } }, "▶"),
+                            React.createElement("span", { style: { fontSize: 10, color: '#fff', fontWeight: 600 } }, p.likes)))));
+        }
+        else if (creatorProfileTab === 'places') {
+            body = places.length === 0
+                ? React.createElement("p", { style: { fontSize: 13, color: T.textSecondary, textAlign: 'center', padding: '40px 0' } }, "No places featured yet")
+                : React.createElement("div", { style: { padding: '14px 18px' } },
+                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: T.textPrimary, marginBottom: 12 } }, `Places ${info.displayName.split(' ')[0]} Recommends`),
+                    places.map((row) => {
+                        const cta = getBookingCta(row.business);
+                        return React.createElement("div", { key: row.business.id, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: `1px solid ${T.border}` } },
+                            React.createElement("button", { onClick: () => { closeCreatorProfile(); openBusinessProfile(row.business); }, style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' } },
+                                React.createElement("div", { style: { width: 52, height: 52, borderRadius: 12, flexShrink: 0, backgroundImage: row.business.image ? `url(${row.business.image})` : 'none', backgroundColor: row.business.image ? undefined : (row.business.avatarColor || THEME.violet), backgroundSize: 'cover', backgroundPosition: 'center' } }),
+                                React.createElement("div", { style: { minWidth: 0 } },
+                                    React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: T.textPrimary, margin: 0 } }, row.business.name),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, margin: '2px 0 0' } }, row.business.location),
+                                    React.createElement("p", { style: { fontSize: 11, color: row.verified ? THEME.coral : T.textSecondary, fontWeight: row.verified ? 700 : 500, margin: '3px 0 0' } }, `${row.postCount} creator post${row.postCount > 1 ? 's' : ''}${row.verified ? ' · ✓ Verified Visit' : ''}`))),
+                            React.createElement("button", { onClick: () => { closeCreatorProfile(); startBookingFor(row.business); }, style: { flexShrink: 0, padding: '9px 14px', borderRadius: 16, background: THEME.coral, color: '#fff', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap' } }, cta.label));
+                    }));
+        }
+        else {
+            // Saved respects the same profile-visibility expectations as the rest of the app —
+            // only the account's own Saved is ever shown; another creator's Saved stays private.
+            body = info.isMe
+                ? (savedShorts.size === 0
+                    ? React.createElement("p", { style: { fontSize: 13, color: T.textSecondary, textAlign: 'center', padding: '40px 0' } }, "Nothing saved yet")
+                    : React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginTop: 3 } },
+                        feed.filter((f) => savedShorts.has(f.id)).map((f) => React.createElement("div", { key: f.id, style: { position: 'relative', aspectRatio: '1 / 1', backgroundImage: f.image ? `url(${f.image})` : 'none', backgroundColor: f.image ? undefined : (f.avatarColor || THEME.violet), backgroundSize: 'cover', backgroundPosition: 'center' } }))))
+                : React.createElement("p", { style: { fontSize: 13, color: T.textSecondary, textAlign: 'center', padding: '40px 0' } }, "This creator's saved places are private");
+        }
+        return React.createElement("div", { key: "creatorProfile", style: { position: 'absolute', inset: 0, zIndex: 15, background: T.background, display: 'flex', flexDirection: 'column' } },
+            header, React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)' } }, body));
+    }
+    // Public-facing — any visitor to the business page sees this, not just the business owner
+    // (the owner's private, moderation-focused view of the same underlying posts lives in the
+    // provider dashboard's "Customer Posts" tab). Businesses can never edit or remove this
+    // content themselves; Report is the only lever they get.
+    function renderCommunityVideos(business) {
+        const posts = feed.filter((f) => f.isCustomerPost && !blockedCreatorIds.has(f.creatorId) && (f.verifiedTags || []).some((t) => t.businessId === business.id));
+        if (posts.length === 0)
+            return null;
+        const sorted = [...posts].sort((a, b) => {
+            const av = (a.verifiedTags.find((t) => t.businessId === business.id) || {}).verified ? 1 : 0;
+            const bv = (b.verifiedTags.find((t) => t.businessId === business.id) || {}).verified ? 1 : 0;
+            return av !== bv ? bv - av : parseCount(b.likes) - parseCount(a.likes);
+        });
+        return React.createElement("div", { style: { padding: '20px 18px 4px' } },
+            React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: T.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 10 } }, "Community Videos"),
+            React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 10, overflowX: 'auto' } },
+                sorted.map((p) => {
+                    const creator = getCreatorInfo(p.creatorId);
+                    const verified = (p.verifiedTags.find((t) => t.businessId === business.id) || {}).verified;
+                    return React.createElement("div", { key: p.id, style: { width: 108, flexShrink: 0 } },
+                        React.createElement("button", { onClick: () => openCreatorProfile(p.creatorId), style: { position: 'relative', width: 108, height: 148, borderRadius: 12, display: 'block', backgroundImage: p.image ? `url(${p.image})` : 'none', backgroundColor: p.image ? undefined : creator.avatarColor, backgroundSize: 'cover', backgroundPosition: 'center' } },
+                            verified && React.createElement("div", { style: { position: 'absolute', top: 6, left: 6, width: 16, height: 16, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "check", size: 9, color: "#fff" })),
+                            React.createElement("button", { onClick: (e) => { e.stopPropagation(); reportPost(p.id); }, style: { position: 'absolute', top: 6, right: 6, width: 20, height: 20, borderRadius: 10, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement("span", { style: { fontSize: 12, color: 'rgba(255,255,255,0.8)' } }, "⋯"))),
+                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: T.textPrimary, marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, '@' + creator.username));
+                })));
+    }
     function renderNearbyMap() {
         const cardCta = (business) => getBookingCtaLabel(business);
         const metaLine = (business, elig) => {
@@ -6456,6 +6697,7 @@ function App() {
         if (selectedActivity.pricingModel === 'perPerson')
             booking.tickets = buildTickets(booking.id, activityPartySize, ticketSource, selectedActivity.name, activityCustomerInfo.fullName.trim());
         setBookings((prev) => [booking, ...prev]);
+        consumePostAttribution(booking);
         setConfirmedActivityBooking(booking);
         setActivityBookingStep('success');
         if (booking.tickets && ticketSource === 'partner') {
@@ -6504,6 +6746,7 @@ function App() {
                 discountAmount: 0, promotionApplied: false, promotionId: null, promotionLabel: null, promotionType: null, promotionValue: null, promotionAppliedAt: null,
             };
             setBookings((prev) => [booking, ...prev]);
+        consumePostAttribution(booking);
             setBalance((b) => Math.max(0, b - total));
             setConfirmedBooking(booking);
             setBookingStep('success');
@@ -6529,6 +6772,7 @@ function App() {
                 discountAmount: 0, promotionApplied: false, promotionId: null, promotionLabel: null, promotionType: null, promotionValue: null, promotionAppliedAt: null,
             };
             setBookings((prev) => [booking, ...prev]);
+        consumePostAttribution(booking);
             setBalance((b) => Math.max(0, b - total));
             setConfirmedBooking(booking);
             setBookingStep('success');
@@ -6546,6 +6790,7 @@ function App() {
                 discountAmount: 0, promotionApplied: false, promotionId: null, promotionLabel: null, promotionType: null, promotionValue: null, promotionAppliedAt: null,
             };
             setBookings((prev) => [booking, ...prev]);
+        consumePostAttribution(booking);
             setConfirmedBooking(booking);
             setBookingStep('success');
             return;
@@ -6622,6 +6867,7 @@ function App() {
             insurance: buildBookingInsuranceRecord(),
         };
         setBookings((prev) => [booking, ...prev]);
+        consumePostAttribution(booking);
         setBalance((b) => Math.max(0, b - total));
         setConfirmedBooking(booking);
         setBookingStep('success');
@@ -6738,6 +6984,112 @@ function App() {
                 next.add(id);
             return next;
         });
+    }
+    // --- People / Creator Discovery: helpers ---
+    // Resolves a creatorId to display info — either the real logged-in customer (their own
+    // profile/name/photo, kept as the single source of truth rather than a duplicate "creator"
+    // record) or one of the seeded demo creators.
+    function getCreatorInfo(creatorId) {
+        if (!creatorId)
+            return null;
+        if (creatorId === MY_USER_ID) {
+            return {
+                id: MY_USER_ID, isMe: true, username: customerProfile.username.trim() || 'me',
+                displayName: customerProfile.fullName.trim() || 'You', bio: customerProfile.bio || '',
+                city: customerProfile.location || '', avatarColor: THEME.violet, avatarPhoto: customerProfile.avatarPhoto,
+                verified: false, followers: 0,
+            };
+        }
+        const seed = CREATOR_SEED.find((c) => c.id === creatorId);
+        if (!seed)
+            return null;
+        return { ...seed, isMe: false, avatarPhoto: null };
+    }
+    function getCreatorPosts(creatorId) {
+        return feed.filter((f) => f.isCustomerPost && f.creatorId === creatorId);
+    }
+    function getCreatorFollowerCount(creatorId) {
+        const info = getCreatorInfo(creatorId);
+        if (!info)
+            return 0;
+        const base = info.isMe ? 0 : info.followers;
+        return base + (followedCreatorIds.has(creatorId) ? 1 : 0);
+    }
+    // Deduped businesses a creator has tagged across their posts, each with a post count and
+    // whether ANY of those posts carries a real Verified Visit for that business.
+    function getCreatorPlaces(creatorId) {
+        const byBusiness = new Map();
+        getCreatorPosts(creatorId).forEach((post) => {
+            (post.verifiedTags || []).forEach((t) => {
+                const business = feed.find((f) => f.id === t.businessId);
+                if (!business)
+                    return;
+                const existing = byBusiness.get(t.businessId) || { business, postCount: 0, verified: false };
+                existing.postCount += 1;
+                existing.verified = existing.verified || t.verified;
+                byBusiness.set(t.businessId, existing);
+            });
+        });
+        return Array.from(byBusiness.values()).sort((a, b) => b.postCount - a.postCount);
+    }
+    // Ranks by real engagement (likes + saves, weighted, plus comments weighted higher as the
+    // strongest signal) rather than raw follower count — a smaller creator with a post that's
+    // genuinely taking off outranks a bigger account coasting on old followers.
+    function getCreatorEngagementScore(creatorId) {
+        return getCreatorPosts(creatorId).reduce((sum, post) => {
+            return sum + parseCount(post.likes) + parseCount(post.saves) * 1.5 + (post.comments || 0) * 20;
+        }, 0);
+    }
+    function getAllCreatorIds() {
+        return CREATOR_SEED.map((c) => c.id).filter((id) => !blockedCreatorIds.has(id));
+    }
+    function openCreatorProfile(creatorId) {
+        if (!creatorId || blockedCreatorIds.has(creatorId))
+            return;
+        setPostViewer(null);
+        setBusinessProfileTarget(null);
+        setCreatorProfileTab('posts');
+        setCreatorProfileTarget(creatorId);
+    }
+    function closeCreatorProfile() { setCreatorProfileTarget(null); }
+    function toggleFollowCreator(creatorId) {
+        setFollowedCreatorIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(creatorId))
+                next.delete(creatorId);
+            else
+                next.add(creatorId);
+            return next;
+        });
+    }
+    function toggleBlockCreator(creatorId) {
+        setBlockedCreatorIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(creatorId)) { next.delete(creatorId); }
+            else { next.add(creatorId); setFollowedCreatorIds((f) => { const n = new Set(f); n.delete(creatorId); return n; }); setCreatorProfileTarget(null); }
+            return next;
+        });
+        flashToast(blockedCreatorIds.has(creatorId) ? 'Unblocked' : 'Blocked — you won\'t see their posts anymore');
+    }
+    function reportCreator(creatorId) { flashToast('Reported — our team will review this profile'); }
+    function reportPost(postId) { flashToast('Reported — our team will review this post'); }
+    // Captures which post/creator/business a booking CTA was tapped from — consumed at the
+    // moment that specific booking actually gets created, in the same finalize functions
+    // Trip-style features already hook, never inferred later from matching user/business/date.
+    function startBookingFromPost(post, business) {
+        if (post && post.isCustomerPost) {
+            setPendingPostAttribution({ creatorId: post.creatorId, postId: post.id, businessId: business.id });
+        }
+        startBookingFor(business);
+    }
+    function consumePostAttribution(booking) {
+        if (!pendingPostAttribution)
+            return;
+        const attr = pendingPostAttribution;
+        setPendingPostAttribution(null);
+        if (attr.businessId !== booking.providerId && attr.businessId !== (booking.restaurantId || booking.providerId))
+            return;
+        setPostAttributions((prev) => [{ id: 'attr-' + bvNonce(), creatorId: attr.creatorId, postId: attr.postId, businessId: attr.businessId, bookingId: booking.id, createdAt: Date.now() }, ...prev]);
     }
     function restartShort(item) {
         const el = shortVideoRefs.current[item.id];
@@ -7027,7 +7379,7 @@ function App() {
                     React.createElement("span", { style: { fontSize: 12.5, color: RP.text, fontWeight: dow === new Date().getDay() ? 700 : 500 } }, WEEKDAY_LABELS[dow]),
                     React.createElement("span", { style: { fontSize: 12.5, color: h ? RP.text : RP.sub } }, h ? `${hhmmToLabel(h.start)} – ${h.end === '23:59' ? '12:00 AM' : hhmmToLabel(h.end)}` : 'Closed'));
             }));
-        const tabBody = restaurantProfileTab === 'overview' ? React.createElement(React.Fragment, null, reservationCard, aboutSection)
+        const tabBody = restaurantProfileTab === 'overview' ? React.createElement(React.Fragment, null, reservationCard, aboutSection, renderCommunityVideos(item))
             : restaurantProfileTab === 'reviews' ? reviewsSection
                 : infoSection;
         return React.createElement("div", { key: "restaurantProfile", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 11, display: 'flex', flexDirection: 'column' } },
@@ -8425,15 +8777,15 @@ function App() {
                 React.createElement(Icon, { name: "chevrondown", size: 11, color: THEME.coral }));
             const brand = React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16, zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 10 } },
                 modeSwitcher,
-                showFeedHeader && React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', width: '100%', gap: 24 } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6 } },
-                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
+                showFeedHeader && React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', width: '100%', gap: 12 } },
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', alignItems: 'flex-end', gap: 14, overflowX: 'auto', minWidth: 0 } },
+                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'people', label: 'People' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
                         const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
                         const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
                         const isMain = t.id === 'forYou';
-                        return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
+                        return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
                             React.createElement("span", { style: { position: 'relative', display: 'inline-block' } },
-                                React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
+                                React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' } }, t.label),
                                 isMain && React.createElement("span", { style: { position: 'absolute', top: 0, right: -9, width: 6, height: 6, borderRadius: '50%', background: THEME.coral } })),
                             React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: T.surface, transition: 'width 0.2s' } }));
                     })),
@@ -8462,11 +8814,20 @@ function App() {
                                     React.createElement("div", { className: "avio-rail-circle" }, React.createElement(Icon, { name: "sendoutline", size: 26, color: "#fff" }))),
                                 React.createElement("span", { style: { fontSize: 12.5, fontWeight: 500, color: 'rgba(255,255,255,0.9)' } }, shareCount)));
                     })());
+            const postCreator = item.isCustomerPost ? getCreatorInfo(item.creatorId) : null;
+            // A creator's post is identified by WHO posted it, never confused with the business
+            // they're reviewing — tapping the name here opens their creator profile, not the
+            // business's (that's what the tagged-business pill / booking CTA below are for).
             const nameRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-                React.createElement("button", { onClick: () => openBusinessProfile(item), style: { display: 'flex', alignItems: 'center', gap: 6 } },
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: '#fff', margin: 0 } }, item.name),
-                    item.verified && React.createElement("div", { style: { width: 15, height: 15, borderRadius: '50%', background: T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                        React.createElement(Icon, { name: "check", size: 8, color: THEME.ink }))));
+                postCreator
+                    ? React.createElement("button", { onClick: () => openCreatorProfile(postCreator.id), style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: '#fff', margin: 0 } }, '@' + postCreator.username),
+                        postCreator.verified && React.createElement("div", { style: { width: 15, height: 15, borderRadius: '50%', background: T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                            React.createElement(Icon, { name: "check", size: 8, color: THEME.ink })))
+                    : React.createElement("button", { onClick: () => openBusinessProfile(item), style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: '#fff', margin: 0 } }, item.name),
+                        item.verified && React.createElement("div", { style: { width: 15, height: 15, borderRadius: '50%', background: T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                            React.createElement(Icon, { name: "check", size: 8, color: THEME.ink }))));
             const categoryRow2 = React.createElement("p", { style: { fontSize: 11.5, color: 'rgba(255,255,255,0.75)', margin: '2px 0 0' } }, item.location);
             const captionP = React.createElement("p", { style: { fontSize: 11.5, color: '#fff', marginTop: 5, maxWidth: 260, lineHeight: 1.3 } }, item.blurb);
             const taggedBusinesses = (item.taggedBusinessIds || []).map((id) => feed.find((f) => f.id === id)).filter(Boolean);
@@ -8474,8 +8835,9 @@ function App() {
             const taggedRow = verifiedTags.length > 0
                 ? React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, maxWidth: 280 } }, verifiedTags.map((t) => React.createElement("div", { key: t.businessId, style: { display: 'flex', alignItems: 'center', gap: 6 } },
                     React.createElement("button", { onClick: () => openBusinessProfile(t.business), style: { display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: '#fff', background: 'rgba(255,255,255,0.14)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', borderRadius: 12, padding: '4px 10px 4px 8px' } },
-                        React.createElement("span", { style: { display: 'inline-flex', width: 13, height: 13, borderRadius: '50%', background: THEME.coral, alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" })),
-                        t.businessName, React.createElement("span", { style: { fontWeight: 500, color: 'rgba(255,255,255,0.75)' } }, "· ", t.service)))))
+                        t.verified && React.createElement("span", { style: { display: 'inline-flex', width: 13, height: 13, borderRadius: '50%', background: THEME.coral, alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" })),
+                        React.createElement("span", { style: { color: t.verified ? '#fff' : 'rgba(255,255,255,0.75)' } }, t.verified ? 'Verified Visit · ' : 'Tagged · '),
+                        t.businessName, t.service && React.createElement("span", { style: { fontWeight: 500, color: 'rgba(255,255,255,0.75)' } }, " · ", t.service)))))
                 : (taggedBusinesses.length > 0 && React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, maxWidth: 280 } },
                     React.createElement("span", { style: { fontSize: 12, color: 'rgba(255,255,255,0.6)' } }, "with"),
                     taggedBusinesses.map((b) => React.createElement("button", { key: b.id, onClick: () => openBusinessProfile(b), style: { fontSize: 12, fontWeight: 600, color: THEME.coral, background: 'rgba(166,124,82,0.15)', borderRadius: 12, padding: '3px 10px' } }, b.name))));
@@ -8489,7 +8851,7 @@ function App() {
                 bookedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, taggedRow);
             const thrillCta = getBookingCta(primaryTagTarget);
             const bookCta = !item.mine && React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(max(0px, env(safe-area-inset-bottom) - 37px) + 72px)', zIndex: 2, borderRadius: 18, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
-                React.createElement("button", { onClick: () => startBookingFor(primaryTagTarget), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 19.5px' } },
+                React.createElement("button", { onClick: () => startBookingFromPost(item, primaryTagTarget), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 19.5px' } },
                     React.createElement(Icon, { name: "calendar", size: 14, color: "#fff" }),
                     React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12, color: "#fff" } }, thrillCta.label),
                     thrillCta.priceLabel && React.createElement(React.Fragment, null,
@@ -8541,23 +8903,24 @@ function App() {
     return React.createElement(AppThemeContext.Provider, { value: T }, React.createElement("div", { style: { width: '100%', margin: '0 auto', position: 'fixed', top: 0, bottom: 0, left: 0, right: 0, overflow: 'hidden', background: T.background } },
         React.createElement("input", { ref: fileInputRef, type: "file", accept: "video/*", style: { display: 'none' }, onChange: handleFileChosen }),
         tab === 'discover' && shortsFeedTab === 'nearby' && renderNearbyMap(),
-        tab === 'discover' && shortsFeedTab !== 'nearby' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
-            React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16, zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 } },
-                React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', gap: 6 } },
-                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
+        tab === 'discover' && shortsFeedTab === 'people' && renderPeoplePage(),
+        tab === 'discover' && shortsFeedTab !== 'nearby' && shortsFeedTab !== 'people' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
+            React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16, zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 } },
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', alignItems: 'flex-end', gap: 14, overflowX: 'auto', minWidth: 0 } },
+                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'people', label: 'People' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
                         const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
                         const isMain = t.id === 'forYou';
                         const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
-                        return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
-                            React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)' } }, t.label),
+                        return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
+                            React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' } }, t.label),
                             React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: T.surface, transition: 'width 0.2s' } }));
                     })),
-                React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 } },
+                React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
                     React.createElement(Icon, { name: "search", size: 20, color: "#fff" }),
                     React.createElement("span", { style: { width: 0, height: 2 } }))),
             React.createElement(Icon, { name: shortsFeedTab === 'following' ? "user" : "search", size: 22, color: THEME.mutedDark }),
             React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : "No shorts to show right now"),
-            shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('forYou'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Browse Thrillz"))) : filteredFeed.map((item, itemIdx) => renderShortCard(item, itemIdx, activeShortIdx, true)))),
+            shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('people'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Find People"))) : filteredFeed.map((item, itemIdx) => renderShortCard(item, itemIdx, activeShortIdx, true)))),
         tab === 'browse' && (React.createElement("div", { style: { position: 'absolute', inset: 0, overflowY: 'auto', background: T.background, padding: `calc(env(safe-area-inset-top) + 16px) 0 calc(env(safe-area-inset-bottom) + 90px)` } }, (() => {
             const categories = CATEGORIES.filter((c) => c.id !== 'shorts');
             const quickFilters = [
@@ -9674,7 +10037,8 @@ function App() {
                     `View all ${reviewCount} comments`, React.createElement(Icon, { name: "chevronright", size: 14, color: THEME.coral })));
             const activeSection = bizProfileTab === 'services' ? servicesSection : bizProfileTab === 'reviews' ? commentsSection : thrillzSection;
             return React.createElement("div", { key: "bizprofile", onTouchStart: handleBizPanelTouchStart, onTouchMove: handleBizPanelTouchMove, onTouchEnd: handleBizPanelTouchEnd, style: { position: 'absolute', inset: 0, zIndex: isOwnProfile ? 2 : 11, background: T.background, overflowY: 'auto', paddingBottom: isOwnProfile ? 'calc(env(safe-area-inset-bottom) + 90px)' : 40, transform: `translateX(${(1 - P.progress) * 100}%)`, transition: P.dragging ? 'none' : 'transform 0.28s cubic-bezier(0.22,1,0.36,1)' } },
-                header, avatarRow, statsRow, bioRow, actionRow, profileDealBadge, tabsRow, activeSection);
+                header, avatarRow, statsRow, bioRow, actionRow, profileDealBadge, tabsRow, activeSection,
+                bizProfileTab === 'services' && renderCommunityVideos(item));
         })(),
         editBusinessProfileOpen && editProfileDraft && (() => {
             const d = editProfileDraft;
@@ -14598,6 +14962,7 @@ function App() {
                 onClick: (e) => { e.stopPropagation(); setPostServiceBanner(null); },
                 style: { flexShrink: 0, padding: 4 },
             }, React.createElement(Icon, { name: "x", size: 14, color: "rgba(255,255,255,0.7)" }))),
+        creatorProfileTarget && renderCreatorProfile(),
         toast && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }, toast))));
 }
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App, null));
