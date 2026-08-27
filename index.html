@@ -143,7 +143,7 @@
 <script src="promotions.js"></script>
 <script>
 "use strict";
-const { useState, useMemo, useEffect, useRef, useContext } = React;
+const { useState, useMemo, useEffect, useLayoutEffect, useRef, useContext } = React;
 const SettingsThemeContext = React.createContext({ dark: false, ST: { bg: '#fff', text: '#161616', sub: '#8A8A8E', border: '#ECECEE', card: '#fff' }, accent: '#A67C52', isRTL: false });
 const THEME = {
     ink: '#000000', inkLine: 'rgba(255,255,255,0.10)',
@@ -698,6 +698,109 @@ const BOOKING_STATUS_STYLE = {
     quote_requested: { bg: '#EDEDED', color: '#6B6B6B', border: 'none' },
 };
 const BOOKING_STATUS_LABEL = { confirmed: 'Confirmed', pending: 'Pending', completed: 'Completed', cancelled: 'Cancelled', quote_requested: 'Quote Requested' };
+// ============================================================================
+// Shared booking lifecycle engine — the single source of truth for whether a
+// booking/reservation is still active or has actually finished. Every screen that
+// filters into Upcoming/Past or renders a status badge is expected to end up reading
+// a `.status` this engine has already reconciled (see reconcileBookingStatuses in
+// App()), rather than re-deriving "is this past" independently per screen.
+// ============================================================================
+const DEFAULT_BOOKING_DURATION_MIN = 60;
+// Explicit exception/administrative statuses. These are terminal — once set, the
+// lifecycle engine never overwrites them with an automatic "completed".
+const BOOKING_FINAL_STATUSES = new Set(['cancelled', 'no-show', 'refunded', 'partially_refunded', 'disputed', 'declined']);
+const RESERVATION_FINAL_STATUSES = new Set(['cancelled', 'no-show']);
+// Statuses the engine is willing to auto-advance to "completed" once end time passes.
+// Anything not in this set (final statuses, or already 'completed') is left alone.
+const BOOKING_AUTO_COMPLETABLE_STATUSES = new Set(['confirmed', 'pending', 'accepted', 'rescheduled']);
+function parseTimeLabelToMinutes(label) {
+    if (typeof label === 'number')
+        return label;
+    if (!label || typeof label !== 'string')
+        return null;
+    const m = /(\d+):(\d+)\s*(AM|PM)/i.exec(label);
+    if (!m)
+        return null;
+    let h = parseInt(m[1], 10) % 12;
+    if (/PM/i.test(m[3]))
+        h += 12;
+    return h * 60 + parseInt(m[2], 10);
+}
+// End timestamp for a `bookings`-array-shaped item that carries a real day/month/year (an
+// actual scheduled occurrence — always the CURRENT/rescheduled date, since reschedule flows
+// overwrite these fields in place rather than keeping a second stale occurrence around).
+// Returns null when there's no scheduled date yet (e.g. an unanswered quote request).
+function getBookingEndMs(booking) {
+    if (booking.day == null)
+        return null;
+    if (booking.bookingType === 'RENTAL') {
+        // Rentals span days, not a time-of-day window — end of the return day.
+        const days = booking.rentalDays || 1;
+        return new Date(booking.year, booking.month, booking.day + days, 23, 59, 59, 999).getTime();
+    }
+    const startMinutes = booking.timeMinutes != null ? booking.timeMinutes : parseTimeLabelToMinutes(booking.time);
+    if (startMinutes == null)
+        return new Date(booking.year, booking.month, booking.day, 23, 59, 59, 999).getTime();
+    const durationMinutes = booking.bookingType === 'VENUE' && booking.venueHours
+        ? booking.venueHours * 60
+        : (booking.durationMinutes != null ? booking.durationMinutes : DEFAULT_BOOKING_DURATION_MIN);
+    // Passing minutes-past-midnight (which can exceed 60) as the Date constructor's minutes
+    // argument lets JS normalize hour/day overflow for us — a booking ending after midnight
+    // just rolls into the next calendar day, no separate crossing-midnight logic needed.
+    return new Date(booking.year, booking.month, booking.day, 0, startMinutes + durationMinutes, 0, 0).getTime();
+}
+// `businessBookings` seed items use relative dateGroup ('today'/'tomorrow'/'past') instead of
+// a real day/month/year — same lifecycle rules, just resolved against the actual current date.
+function getRelativeBookingEndMs(booking, nowMs) {
+    if (booking.dateGroup === 'tomorrow')
+        return null; // definitely still in the future, no need to compute further
+    const startMinutes = parseTimeLabelToMinutes(booking.time);
+    const durationMinutes = booking.durationMinutes != null ? booking.durationMinutes : DEFAULT_BOOKING_DURATION_MIN;
+    if (booking.dateGroup === 'past')
+        return nowMs; // already a past day regardless of time-of-day — treat as ended now
+    const today = new Date(nowMs);
+    if (startMinutes == null)
+        return new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).getTime();
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, startMinutes + durationMinutes, 0, 0).getTime();
+}
+// getEffectiveBookingStatus(booking, currentTime) — the shared function every screen relies
+// on. Final/exception statuses (cancelled, no-show, refunded, ...) are always preserved;
+// quote requests with no scheduled time yet never auto-complete; everything else becomes
+// "completed" the instant currentTime reaches the booking's real end time, not merely once
+// the calendar date arrives.
+function getEffectiveBookingStatus(booking, currentTime) {
+    const nowMs = currentTime == null ? Date.now() : currentTime;
+    if (BOOKING_FINAL_STATUSES.has(booking.status))
+        return booking.status;
+    if (!BOOKING_AUTO_COMPLETABLE_STATUSES.has(booking.status))
+        return booking.status; // already 'completed', 'quote_requested', or a status this engine doesn't own
+    const endMs = booking.day == null && booking.dateGroup
+        ? getRelativeBookingEndMs(booking, nowMs)
+        : getBookingEndMs(booking);
+    if (endMs == null)
+        return booking.status;
+    return nowMs >= endMs ? 'completed' : booking.status;
+}
+function getReservationEndMs(rr) {
+    if (!rr.date)
+        return null;
+    const [y, m, d] = rr.date.split('-').map(Number);
+    const startMinutes = rr.time != null ? rr.time : 0;
+    const durationMinutes = rr.duration != null ? rr.duration : DEFAULT_BOOKING_DURATION_MIN;
+    return new Date(y, m - 1, d, 0, startMinutes + durationMinutes, 0, 0).getTime();
+}
+// Restaurant reservations use their own richer vocabulary (upcoming/arrived/seated/completed/
+// no-show/cancelled) — 'arrived'/'seated' are active intermediate states, not final ones, so
+// they auto-complete too once the reservation's end time passes, same as upcoming.
+function getEffectiveReservationStatus(rr, currentTime) {
+    const nowMs = currentTime == null ? Date.now() : currentTime;
+    if (RESERVATION_FINAL_STATUSES.has(rr.status) || rr.status === 'completed')
+        return rr.status;
+    const endMs = getReservationEndMs(rr);
+    if (endMs == null)
+        return rr.status;
+    return nowMs >= endMs ? 'completed' : rr.status;
+}
 const CANCEL_REASONS = [
     { id: 'scheduling', label: 'Scheduling conflict' },
     { id: 'emergency', label: 'Emergency' },
@@ -4619,6 +4722,83 @@ function App() {
     useEffect(() => { saveLS('avio_provider_staff', providerStaff); }, [providerStaff]);
     const [businessBookings, setBusinessBookings] = useState(BUSINESS_INCOMING_BOOKINGS);
     const [businessBookingDetail, setBusinessBookingDetail] = useState(null);
+    // Reconciles booking/reservation status against the shared lifecycle engine and PERSISTS
+    // the result into state — not just a display-time trick. Only ever writes a status the
+    // engine itself would derive, so running this repeatedly is a no-op once everything is
+    // already reconciled: each setter bails out (returns the same array reference) when
+    // nothing actually changed, making this safe to call as often as needed.
+    function reconcileBookingStatuses() {
+        const nowMs = Date.now();
+        setBookings((prev) => {
+            let changed = false;
+            const next = prev.map((b) => {
+                if (b.tickets && b.tickets.length)
+                    return b; // tickets/passes have their own separate lifecycle — never touched here
+                const eff = getEffectiveBookingStatus(b, nowMs);
+                if (eff === b.status)
+                    return b;
+                changed = true;
+                return { ...b, status: eff, completedAt: eff === 'completed' && !b.completedAt ? nowMs : b.completedAt };
+            });
+            return changed ? next : prev;
+        });
+        setBusinessBookings((prev) => {
+            let changed = false;
+            const next = prev.map((b) => {
+                const eff = getEffectiveBookingStatus(b, nowMs);
+                if (eff === b.status)
+                    return b;
+                changed = true;
+                return { ...b, status: eff, completedAt: eff === 'completed' && !b.completedAt ? nowMs : b.completedAt };
+            });
+            return changed ? next : prev;
+        });
+        setRestaurantReservations((prev) => {
+            let changed = false;
+            const next = prev.map((rr) => {
+                const eff = getEffectiveReservationStatus(rr, nowMs);
+                if (eff === rr.status)
+                    return rr;
+                changed = true;
+                return { ...rr, status: eff, completedAt: eff === 'completed' && !rr.completedAt ? nowMs : rr.completedAt };
+            });
+            return changed ? next : prev;
+        });
+    }
+    // Runs before first paint (useLayoutEffect, not useEffect) so a customer never sees a
+    // flash of a stale "Confirmed"/"Pending" badge on a booking that already ended, then keeps
+    // re-checking periodically and whenever the app becomes visible again — covering "screen
+    // opens" and "app resumes from background" without needing every individual screen to
+    // remember to call this itself.
+    useLayoutEffect(() => {
+        reconcileBookingStatuses();
+        const intervalId = setInterval(reconcileBookingStatuses, 45000);
+        const onVisible = () => { if (document.visibilityState === 'visible') reconcileBookingStatuses(); };
+        document.addEventListener('visibilitychange', onVisible);
+        window.addEventListener('focus', reconcileBookingStatuses);
+        return () => {
+            clearInterval(intervalId);
+            document.removeEventListener('visibilitychange', onVisible);
+            window.removeEventListener('focus', reconcileBookingStatuses);
+        };
+    }, []);
+    // A booking detail sheet holds a snapshot of the record at the moment it was opened —
+    // keep it live-synced to the reconciled array instead of letting it go stale if the
+    // lifecycle engine completes the booking while the sheet is still open.
+    useEffect(() => {
+        if (!bookingDetail)
+            return;
+        const fresh = bookings.find((b) => b.id === bookingDetail.id);
+        if (fresh && fresh !== bookingDetail)
+            setBookingDetail(fresh);
+    }, [bookings, bookingDetail]);
+    useEffect(() => {
+        if (!businessBookingDetail)
+            return;
+        const fresh = businessBookings.find((b) => b.id === businessBookingDetail.id);
+        if (fresh && fresh !== businessBookingDetail)
+            setBusinessBookingDetail(fresh);
+    }, [businessBookings, businessBookingDetail]);
     const [businessCalendarDay, setBusinessCalendarDay] = useState(() => new Date().getDate());
     const [earningsInsightsOpen, setEarningsInsightsOpen] = useState(false);
     const [earningsPeriod, setEarningsPeriod] = useState('7D');
@@ -9559,10 +9739,14 @@ function App() {
         tab === 'bookings' && (React.createElement("div", { style: { position: 'absolute', inset: 0, background: T.background } }, (() => {
             const BK = { text: T.textPrimary, sub: T.textSecondary, border: T.border, alt: T.surfaceSecondary };
             const today = new Date();
-            const nowMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
             const bookingSortMs = (b) => b.day != null ? new Date(b.year, b.month, b.day).getTime() : (b.bookingCreatedAt || 0);
-            const isUpcoming = (b) => (b.status === 'confirmed' || b.status === 'pending' || b.status === 'quote_requested') && (b.day == null || new Date(b.year, b.month, b.day).getTime() >= nowMidnight.getTime());
+            // Driven by the actual booking end time via the shared lifecycle engine, not just
+            // "is the calendar date >= today" — a same-day booking whose end time already
+            // passed belongs in Past even though its date is still today.
+            const isUpcoming = (b) => {
+                const eff = getEffectiveBookingStatus(b, today.getTime());
+                return eff === 'confirmed' || eff === 'pending' || eff === 'quote_requested';
+            };
             // Tickets/passes are a completely different purchase type from normal service
             // bookings and must never appear mixed into Upcoming/Past — they live only
             // under the Tickets & Passes tab below.
