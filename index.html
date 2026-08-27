@@ -2901,45 +2901,6 @@ const CITY_COORDS = {
     orlando: [28.5383, -81.3792],
 };
 const DEFAULT_MAP_CENTER = CITY_COORDS['new york'];
-// Trip Mode's destination system reuses this same demo city set rather than inventing a
-// separate one — CITY_COORDS keys ARE the stable destination identifiers. IANA zones are
-// keyed identically so every destination Bookvado already "knows" also resolves a real
-// timezone; this is scoped to that same limited city list, not a general geocoder.
-const CITY_TIMEZONES = {
-    'new york': 'America/New_York', brooklyn: 'America/New_York', manhattan: 'America/New_York',
-    miami: 'America/New_York', denver: 'America/Denver', austin: 'America/Chicago',
-    chicago: 'America/Chicago', 'los angeles': 'America/Los_Angeles', 'las vegas': 'America/Los_Angeles',
-    portland: 'America/Los_Angeles', 'san diego': 'America/Los_Angeles', dallas: 'America/Chicago',
-    'fort lauderdale': 'America/New_York', scottsdale: 'America/Phoenix', newark: 'America/New_York',
-    orlando: 'America/New_York',
-};
-const CITY_EMOJI = {
-    'los angeles': '🌴', miami: '🌴', 'las vegas': '🎰', 'new york': '🗽', brooklyn: '🗽', manhattan: '🗽',
-    chicago: '🌆', austin: '🎸', denver: '⛰️', portland: '🌲', 'san diego': '🏖️', dallas: '🤠',
-    'fort lauderdale': '🌴', scottsdale: '🌵', newark: '🗽', orlando: '🎢',
-};
-function destinationDisplayName(cityKey) {
-    if (!cityKey) return '';
-    return cityKey.replace(/\b\w/g, (c) => c.toUpperCase());
-}
-// "Today" (and any other date) resolved in a given IANA zone rather than the device's own —
-// this is what lets Trip lifecycle/itinerary use destination-local dates instead of wherever
-// the traveler's phone happens to think it is. en-CA conveniently formats as YYYY-MM-DD.
-function dateKeyInTimezone(date, timezone) {
-    try {
-        return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-    } catch (e) {
-        return dateKey(date);
-    }
-}
-function destinationTodayKey(timezone) { return dateKeyInTimezone(new Date(), timezone); }
-function computeTripLifecycle(trip) {
-    if (!trip) return 'upcoming';
-    const today = destinationTodayKey(trip.destinationTimezone);
-    if (today < trip.startDate) return 'upcoming';
-    if (today > trip.endDate) return 'past';
-    return 'active';
-}
 function cityKeyFromLocation(location) {
     if (!location)
         return null;
@@ -4434,34 +4395,6 @@ function App() {
     const [restaurantDashboardOpen, setRestaurantDashboardOpen] = useState(false);
     const [restaurantDashTab, setRestaurantDashTab] = useState('overview');
     const [restaurantReservations, setRestaurantReservations] = useState(() => loadLS('avio_restaurant_reservations', []));
-    // --- Trip Mode (Plan a Trip) ---
-    // Trips are durable planning data (destination/dates/party size), so they persist like
-    // customerProfile/providerDeal do. Bookings themselves are NOT persisted anywhere in this
-    // app today (they're seeded, in-memory state) — a Trip association riding on a booking
-    // object lasts exactly as long as the booking already does, no worse than the status quo.
-    const [trips, setTrips] = useState(() => loadLS('avio_trips_v1', []));
-    // The Trip currently being planned/browsed. Deliberately separate from a Trip's own
-    // lifecycle (upcoming/active/past, derived in computeTripLifecycle) — selecting an
-    // Upcoming trip to plan it does not make it Active.
-    const [tripContextId, setTripContextId] = useState(() => loadLS('avio_trip_context_v1', null));
-    // Saved-for-a-trip is intentionally its own store, not the existing `savedShorts` set —
-    // that set means "thrillz I liked on my profile"; this means "considering for this trip,"
-    // a different relationship that needs to be scoped per-trip.
-    const [tripSavedIds, setTripSavedIds] = useState(() => loadLS('avio_trip_saved_v1', {}));
-    const [tripPlannerOpen, setTripPlannerOpen] = useState(false);
-    const [tripDraft, setTripDraft] = useState(null);
-    const [tripDraftError, setTripDraftError] = useState(null);
-    const [tripListOpen, setTripListOpen] = useState(false);
-    // Selecting a Trip (tripContextId) and having its Dashboard screen open are different
-    // things: context persists while the traveler goes off and uses the rest of Bookvado
-    // (destination-scoped discovery keeps working), the Dashboard is just one screen you can
-    // close without leaving Trip Mode — a persistent chip on Home reopens it.
-    const [tripDashboardOpen, setTripDashboardOpen] = useState(false);
-    const [tripDashboardTab, setTripDashboardTab] = useState('plan');
-    const [tripSelectedDay, setTripSelectedDay] = useState(null);
-    const [tripCancelConfirm, setTripCancelConfirm] = useState(null);
-    const [tripDeleteConfirm, setTripDeleteConfirm] = useState(null);
-    const [tripDiscoverCategory, setTripDiscoverCategory] = useState('all');
     const [tableFormDraft, setTableFormDraft] = useState(null);
     const [comboPickerOpen, setComboPickerOpen] = useState(false);
     const [comboPickerTables, setComboPickerTables] = useState([]);
@@ -5495,216 +5428,6 @@ function App() {
         if (card)
             card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }, [nearbySelectedIdx]);
-    // --- Trip Mode: render ---
-    function renderTripPlanner() {
-        const d = tripDraft || { destinationKey: null, startDate: '', endDate: '', partySize: 2 };
-        const setD = (patch) => { setTripDraft({ ...d, ...patch }); setTripDraftError(null); };
-        const destKeys = Object.keys(CITY_COORDS);
-        return React.createElement("div", { key: "tripPlanner", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 16, display: 'flex', flexDirection: 'column' } },
-            React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${T.border}` } },
-                React.createElement("button", { onClick: () => { closeTripPlanner(); if (trips.length) openTripList(); }, style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement(Icon, { name: "arrowleft", size: 20, color: T.textPrimary })),
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: T.textPrimary, margin: 0 } }, "Plan a Trip")),
-            React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '20px 18px calc(env(safe-area-inset-bottom) + 100px)' } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, color: T.textPrimary, margin: 0 } }, "Plan a Trip"),
-                React.createElement("p", { style: { fontSize: 13, color: T.textSecondary, marginTop: 4, marginBottom: 24 } }, "Book your week before you get there."),
-                React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: T.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 } }, "Where are you going?"),
-                React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 } },
-                    destKeys.map((k) => {
-                        const active = d.destinationKey === k;
-                        return React.createElement("button", { key: k, onClick: () => setD({ destinationKey: k }), style: { padding: '8px 14px', borderRadius: 16, border: `1.5px solid ${active ? THEME.coral : T.border}`, background: active ? THEME.coral : T.surface } },
-                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: active ? '#fff' : T.textPrimary } }, (CITY_EMOJI[k] || '') + ' ' + destinationDisplayName(k)));
-                    })),
-                React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: T.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 } }, "Trip Dates"),
-                React.createElement("div", { style: { display: 'flex', gap: 10, marginBottom: 24 } },
-                    React.createElement("input", { type: "date", value: d.startDate, onChange: (e) => setD({ startDate: e.target.value }), style: { flex: 1, border: `1px solid ${T.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 13.5, color: '#161616', colorScheme: 'light', outline: 'none', fontFamily: 'inherit', background: T.inputBackground } }),
-                    React.createElement("input", { type: "date", value: d.endDate, onChange: (e) => setD({ endDate: e.target.value }), style: { flex: 1, border: `1px solid ${T.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 13.5, color: '#161616', colorScheme: 'light', outline: 'none', fontFamily: 'inherit', background: T.inputBackground } })),
-                React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: T.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 } }, "Who's Going?"),
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 } },
-                    React.createElement("button", { onClick: () => setD({ partySize: Math.max(1, d.partySize - 1) }), style: { width: 36, height: 36, borderRadius: 18, border: `1.5px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "minus", size: 15, color: T.textPrimary })),
-                    React.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: T.textPrimary, minWidth: 24, textAlign: 'center' } }, d.partySize),
-                    React.createElement("button", { onClick: () => setD({ partySize: d.partySize + 1 }), style: { width: 36, height: 36, borderRadius: 18, border: `1.5px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "plus", size: 15, color: T.textPrimary }))),
-                tripDraftError && React.createElement("p", { style: { fontSize: 12.5, color: '#E5484D', marginBottom: 14 } }, tripDraftError),
-                React.createElement("button", { onClick: createTrip, style: { width: '100%', padding: '15px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Start Planning")));
-    }
-    function renderTripList() {
-        return React.createElement("div", { key: "tripList", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 16, display: 'flex', flexDirection: 'column' } },
-            React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${T.border}` } },
-                React.createElement("button", { onClick: closeTripList, style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement(Icon, { name: "arrowleft", size: 20, color: T.textPrimary })),
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: T.textPrimary, margin: 0 } }, "My Trips"),
-                React.createElement("button", { onClick: openTripPlanner, style: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement(Icon, { name: "plus", size: 20, color: THEME.coral }))),
-            React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 100px)' } },
-                trips.length === 0
-                    ? React.createElement("div", { style: { textAlign: 'center', padding: '60px 20px' } },
-                        React.createElement("p", { style: { fontSize: 13.5, color: T.textSecondary, marginBottom: 18 } }, "No trips yet. Plan your first one!"),
-                        React.createElement("button", { onClick: openTripPlanner, style: { padding: '12px 24px', borderRadius: 20, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 13.5 } }, "Plan a Trip"))
-                    : trips.map((t) => {
-                        const lifecycle = computeTripLifecycle(t);
-                        const cancelled = !!t.cancelledAt;
-                        const badge = cancelled ? 'Cancelled' : lifecycle === 'active' ? 'Active' : lifecycle === 'past' ? 'Past' : 'Upcoming';
-                        const badgeColor = cancelled ? '#8A8A8E' : lifecycle === 'active' ? THEME.coral : T.textSecondary;
-                        return React.createElement("div", { key: t.id, style: { display: 'flex', alignItems: 'center', gap: 8, padding: '14px 0', borderBottom: `1px solid ${T.border}` } },
-                            React.createElement("button", { onClick: () => selectTripContext(t.id), style: { flex: 1, minWidth: 0, textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                                React.createElement("div", { style: { minWidth: 0 } },
-                                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: T.textPrimary, margin: 0 } }, (CITY_EMOJI[t.destination] || '') + ' ' + t.destinationDisplayName),
-                                    React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, margin: '3px 0 0' } }, `${formatTripDateRange(t)} · ${t.partySize} ${t.partySize === 1 ? 'person' : 'people'}`)),
-                                React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: badgeColor, flexShrink: 0, marginLeft: 8 } }, badge)),
-                            React.createElement(Icon, { name: "chevronright", size: 16, color: T.textSecondary }));
-                    })));
-    }
-    function renderTripDiscoverRow(item, trip, disabled) {
-        const isSaved = (tripSavedIds[trip.id] || []).includes(item.id);
-        return React.createElement("div", { key: item.id, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: `1px solid ${T.border}` } },
-            React.createElement("button", { onClick: () => { if (!disabled) { setTripDashboardOpen(false); startBookingFor(item); } }, style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left' } },
-                React.createElement("div", { style: { width: 52, height: 52, borderRadius: 12, flexShrink: 0, backgroundImage: item.image ? `url(${item.image})` : 'none', backgroundColor: item.image ? undefined : (item.avatarColor || THEME.violet), backgroundSize: 'cover', backgroundPosition: 'center' } }),
-                React.createElement("div", { style: { minWidth: 0 } },
-                    React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: T.textPrimary, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, item.name),
-                    React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, margin: '2px 0 0' } }, item.category + (item.rating ? ` · ★ ${item.rating}` : '')))),
-            !disabled && React.createElement("button", { onClick: () => toggleTripSaved(trip.id, item.id), style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                React.createElement(Icon, { name: "bookmark", size: 16, color: THEME.coral, fill: isSaved ? THEME.coral : 'none' })));
-    }
-    function renderTripDashboard() {
-        const trip = activeTrip;
-        if (!trip) return null;
-        const lifecycle = computeTripLifecycle(trip);
-        const cancelled = !!trip.cancelledAt;
-        const readOnly = lifecycle === 'past' || cancelled;
-        const assoc = tripAllAssociated(trip.id);
-        const days = tripDateRange(trip);
-        const selectedDay = tripSelectedDay && days.includes(tripSelectedDay) ? tripSelectedDay : days[0];
-
-        const statRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 18, padding: '2px 18px 14px' } },
-            [{ label: 'Bookings', value: assoc.bookingsCount }, { label: 'Tickets', value: assoc.ticketsCount }, { label: 'Saved', value: assoc.savedCount }].map((s) => React.createElement("div", { key: s.label },
-                React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: T.textPrimary } }, s.value),
-                React.createElement("span", { style: { fontSize: 11.5, color: T.textSecondary, marginLeft: 4 } }, s.label))));
-
-        const noticeBanner = (cancelled || lifecycle === 'past') && React.createElement("div", { style: { margin: '0 18px 12px', padding: '10px 12px', borderRadius: 12, background: T.surfaceSecondary } },
-            React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: T.textSecondary } }, cancelled ? "This trip is cancelled — its bookings and tickets are unaffected." : "This trip is in the past — planning is read-only."));
-
-        const manageRow = !cancelled && React.createElement("div", { style: { display: 'flex', gap: 16, padding: '0 18px 14px' } },
-            lifecycle === 'upcoming' && React.createElement("button", { onClick: () => requestCancelTrip(trip.id), style: { fontSize: 12, fontWeight: 700, color: T.textSecondary } }, "Cancel Trip"),
-            !tripHasProtectedHistory(trip.id) && React.createElement("button", { onClick: () => requestDeleteTrip(trip.id), style: { fontSize: 12, fontWeight: 700, color: '#E5484D' } }, "Delete Trip"));
-
-        const NAV = [{ id: 'plan', label: 'Plan' }, { id: 'discover', label: 'Discover' }, { id: 'saved', label: 'Saved' }, { id: 'bookings', label: 'Bookings' }];
-        const subNav = React.createElement("div", { style: { display: 'flex', borderBottom: `1px solid ${T.border}`, padding: '0 18px' } },
-            NAV.map((n) => {
-                const active = tripDashboardTab === n.id;
-                return React.createElement("button", { key: n.id, onClick: () => setTripDashboardTab(n.id), style: { flex: 1, padding: '10px 0', textAlign: 'center', borderBottom: active ? `2px solid ${THEME.coral}` : '2px solid transparent' } },
-                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: active ? THEME.coral : T.textSecondary } }, n.label));
-            }));
-
-        let body;
-        if (tripDashboardTab === 'plan') {
-            const dayItems = tripItineraryForDay(trip, selectedDay);
-            const dayStrip = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 18px' } },
-                days.map((dk) => {
-                    const dObj = new Date(dk + 'T00:00:00');
-                    const active = dk === selectedDay;
-                    return React.createElement("button", { key: dk, onClick: () => setTripSelectedDay(dk), style: { flexShrink: 0, width: 52, padding: '10px 0', borderRadius: 14, border: `1.5px solid ${active ? THEME.coral : T.border}`, background: active ? THEME.coral : T.surface, textAlign: 'center' } },
-                        React.createElement("p", { style: { fontSize: 10, fontWeight: 700, color: active ? 'rgba(255,255,255,0.85)' : T.textSecondary, margin: 0, textTransform: 'uppercase' } }, dObj.toLocaleDateString('en-US', { weekday: 'short' })),
-                        React.createElement("p", { style: { fontSize: 15, fontWeight: 700, color: active ? '#fff' : T.textPrimary, margin: '2px 0 0' } }, dObj.getDate()));
-                }));
-            const itineraryList = dayItems.length === 0
-                ? React.createElement("div", { style: { textAlign: 'center', padding: '46px 24px' } },
-                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: T.textPrimary, margin: 0 } }, readOnly ? "Nothing planned this day" : "Wide open ✨"),
-                    !readOnly && React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 4 } }, `Find something to do in ${trip.destinationDisplayName}`))
-                : React.createElement("div", { style: { padding: '0 18px' } }, dayItems.map((entry) => React.createElement("button", { key: entry.kind + entry.id, onClick: () => openTripItineraryItem(entry), style: { width: '100%', textAlign: 'left', display: 'flex', gap: 12, padding: '14px 0', borderBottom: `1px solid ${T.border}` } },
-                    React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: T.textSecondary, width: 72, flexShrink: 0 } }, entry.timeLabel),
-                    React.createElement("div", { style: { minWidth: 0 } },
-                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: T.textPrimary, margin: 0 } }, entry.title),
-                        React.createElement("p", { style: { fontSize: 12, color: T.textSecondary, margin: '2px 0 0' } }, entry.sub),
-                        React.createElement("p", { style: { fontSize: 11.5, color: THEME.coral, margin: '3px 0 0', fontWeight: 600 } }, (entry.status === 'confirmed' || entry.status === 'upcoming' ? 'Confirmed ✓' : entry.status) + (entry.hasTicket ? ' · Ticket in Wallet ✓' : ''))))));
-            const addSomething = !readOnly && React.createElement("div", { style: { padding: '4px 18px 24px' } },
-                React.createElement("button", { onClick: () => setTripDashboardTab('discover'), style: { width: '100%', padding: '13px 0', borderRadius: 22, border: `1.5px solid ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5 } }, "+ Add Something"));
-            body = React.createElement(React.Fragment, null, dayStrip, itineraryList, addSomething);
-        }
-        else if (tripDashboardTab === 'discover') {
-            const destFeed = tripDestinationFeed(trip);
-            const cats = ['all', ...Array.from(new Set(destFeed.map((f) => f.category).filter(Boolean)))];
-            const filtered = tripDiscoverCategory === 'all' ? destFeed : destFeed.filter((f) => f.category === tripDiscoverCategory);
-            body = React.createElement(React.Fragment, null,
-                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 18px 4px' } },
-                    cats.map((c) => {
-                        const active = tripDiscoverCategory === c;
-                        return React.createElement("button", { key: c, onClick: () => setTripDiscoverCategory(c), style: { flexShrink: 0, padding: '7px 14px', borderRadius: 14, border: `1.5px solid ${active ? THEME.coral : T.border}`, background: active ? THEME.coral : T.surface } },
-                            React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: active ? '#fff' : T.textPrimary, textTransform: 'capitalize' } }, c));
-                    })),
-                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '8px 18px 24px' } },
-                    filtered.length === 0
-                        ? React.createElement("p", { style: { fontSize: 13, color: T.textSecondary, textAlign: 'center', padding: '40px 0' } }, `Nothing found in ${trip.destinationDisplayName} yet`)
-                        : filtered.map((item) => renderTripDiscoverRow(item, trip, readOnly))));
-        }
-        else if (tripDashboardTab === 'saved') {
-            const savedItems = (tripSavedIds[trip.id] || []).map((id) => FEED.find((f) => f.id === id)).filter(Boolean);
-            body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '14px 18px 24px' } },
-                savedItems.length === 0
-                    ? React.createElement("div", { style: { textAlign: 'center', padding: '46px 24px' } },
-                        React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: T.textPrimary, margin: 0 } }, "Nothing saved yet"),
-                        React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 4 } }, "Save restaurants, activities, services and events you're considering."))
-                    : savedItems.map((item) => renderTripDiscoverRow(item, trip, readOnly)));
-        }
-        else {
-            const entries = [
-                ...assoc.bookingItems.map((b) => ({ kind: 'booking', id: b.id, title: b.service || b.name, sub: b.business, dateLabel: b.date, dk: bookingItineraryDateKey(b) || '', minutes: b.timeMinutes != null ? b.timeMinutes : parseTimeLabelToMinutes(b.time), timeLabel: b.time || '', status: b.status, hasTicket: !!(b.tickets && b.tickets.length), raw: b })),
-                ...assoc.reservationItems.map((r) => { const restaurant = FEED.find((f) => f.id === r.restaurantId); return { kind: 'reservation', id: r.id, title: 'Reservation', sub: (restaurant && restaurant.name) || 'Restaurant', dateLabel: r.date, dk: r.date || '', minutes: parseTimeLabelToMinutes(r.time), timeLabel: typeof r.time === 'number' ? minutesToTimeLabel(r.time) : '', status: r.status, hasTicket: false, raw: r }; }),
-            ].sort((a, b) => a.dk.localeCompare(b.dk) || a.minutes - b.minutes);
-            body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '14px 18px 24px' } },
-                entries.length === 0
-                    ? React.createElement("div", { style: { textAlign: 'center', padding: '46px 24px' } },
-                        React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: T.textPrimary, margin: 0 } }, "No bookings yet"),
-                        React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 4 } }, "Anything you book through this Trip will appear here automatically."))
-                    : entries.map((entry) => React.createElement("button", { key: entry.kind + entry.id, onClick: () => openTripItineraryItem(entry), style: { width: '100%', textAlign: 'left', display: 'flex', gap: 12, padding: '13px 0', borderBottom: `1px solid ${T.border}` } },
-                        React.createElement("div", { style: { minWidth: 0, flex: 1 } },
-                            React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: T.textPrimary, margin: 0 } }, entry.title),
-                            React.createElement("p", { style: { fontSize: 12, color: T.textSecondary, margin: '2px 0 0' } }, `${entry.sub} · ${entry.dateLabel}${entry.timeLabel ? ' · ' + entry.timeLabel : ''}`)),
-                        React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral, flexShrink: 0 } }, entry.status === 'confirmed' || entry.status === 'upcoming' ? 'Confirmed ✓' : entry.status))));
-        }
-
-        const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 10px` } },
-            React.createElement("div", { style: { minWidth: 0 } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: T.textPrimary, margin: 0 } }, (CITY_EMOJI[trip.destination] || '') + ' ' + trip.destinationDisplayName),
-                React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, margin: '3px 0 0' } }, `${formatTripDateRange(trip)} · ${trip.partySize} ${trip.partySize === 1 ? 'person' : 'people'}`)),
-            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 } },
-                React.createElement("button", { onClick: exitTripMode, style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, "Exit Trip Mode"),
-                React.createElement("button", { onClick: closeTripDashboard, style: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
-                    React.createElement(Icon, { name: "x", size: 18, color: T.textPrimary }))));
-
-        return React.createElement("div", { key: "tripDashboard", style: { position: 'absolute', inset: 0, zIndex: 15, background: T.background, display: 'flex', flexDirection: 'column' } },
-            header, statRow, noticeBanner, manageRow, subNav,
-            React.createElement("div", { style: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: tripDashboardTab === 'plan' ? 'auto' : 'hidden' }, className: tripDashboardTab === 'plan' ? 'avio-scroll' : '' }, body));
-    }
-    function renderTripCancelConfirm() {
-        const t = trips.find((x) => x.id === tripCancelConfirm);
-        if (!t) return null;
-        const hasHistory = tripHasProtectedHistory(t.id);
-        return React.createElement("div", { key: "tripCancelConfirm", onClick: () => setTripCancelConfirm(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 18 } },
-            React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `18px 20px calc(env(safe-area-inset-bottom) + 18px)` } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, marginBottom: 8 } }, `Cancel this trip?`),
-                React.createElement("p", { style: { fontSize: 13, color: T.textSecondary, lineHeight: 1.5, marginBottom: 20 } }, hasHistory ? "Your existing bookings and tickets will not be cancelled. Manage them individually through Bookvado if needed." : "You can plan a new trip anytime."),
-                React.createElement("button", { onClick: () => setTripCancelConfirm(null), style: { width: '100%', padding: '14px 0', borderRadius: 24, background: T.surfaceSecondary, color: T.textPrimary, fontWeight: 700, fontSize: 14, marginBottom: 10 } }, "Keep Trip"),
-                React.createElement("button", { onClick: confirmCancelTrip, style: { width: '100%', padding: '14px 0', borderRadius: 24, border: '1.5px solid #E5484D', color: '#E5484D', fontWeight: 700, fontSize: 14 } }, "Cancel Trip")));
-    }
-    function renderTripDeleteConfirm() {
-        const t = trips.find((x) => x.id === tripDeleteConfirm);
-        if (!t) return null;
-        return React.createElement("div", { key: "tripDeleteConfirm", onClick: () => setTripDeleteConfirm(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 18 } },
-            React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `18px 20px calc(env(safe-area-inset-bottom) + 18px)` } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, marginBottom: 8 } }, `Delete this trip?`),
-                React.createElement("p", { style: { fontSize: 13, color: T.textSecondary, lineHeight: 1.5, marginBottom: 20 } }, "This will remove this trip and its planning information. This cannot be undone."),
-                React.createElement("button", { onClick: () => setTripDeleteConfirm(null), style: { width: '100%', padding: '14px 0', borderRadius: 24, background: T.surfaceSecondary, color: T.textPrimary, fontWeight: 700, fontSize: 14, marginBottom: 10 } }, "Keep Trip"),
-                React.createElement("button", { onClick: confirmDeleteTrip, style: { width: '100%', padding: '14px 0', borderRadius: 24, border: '1.5px solid #E5484D', color: '#E5484D', fontWeight: 700, fontSize: 14 } }, "Delete Trip")));
-    }
-    function renderTripContextChip() {
-        if (!activeTrip) return null;
-        return React.createElement("button", { key: "tripContextChip", onClick: openTripDashboard, style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 8px)', left: 12, right: 12, zIndex: 5, display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: `1px solid ${THEME.inkLine}`, borderRadius: 14, padding: '9px 12px', textAlign: 'left' } },
-            React.createElement(Icon, { name: "compass", size: 15, color: THEME.coral }),
-            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: '#fff', margin: 0 } }, `Planning: ${activeTrip.destinationDisplayName}`),
-                React.createElement("p", { style: { fontSize: 11, color: 'rgba(255,255,255,0.7)', margin: '1px 0 0' } }, formatTripDateRange(activeTrip))),
-            React.createElement("span", { onClick: (e) => { e.stopPropagation(); exitTripMode(); }, style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral, padding: '4px 8px' } }, "Exit"));
-    }
     function renderNearbyMap() {
         const cardCta = (business) => getBookingCtaLabel(business);
         const metaLine = (business, elig) => {
@@ -5962,9 +5685,6 @@ function App() {
     // --- Healthcare: Patient Insurance Wallet ---
     const [customerInsuranceWallet, setCustomerInsuranceWallet] = useState(() => loadLS('avio_customer_insurance_wallet', { primary: null, secondary: null }));
     useEffect(() => { saveLS('avio_customer_insurance_wallet', customerInsuranceWallet); }, [customerInsuranceWallet]);
-    useEffect(() => { saveLS('avio_trips_v1', trips); }, [trips]);
-    useEffect(() => { saveLS('avio_trip_context_v1', tripContextId); }, [tripContextId]);
-    useEffect(() => { saveLS('avio_trip_saved_v1', tripSavedIds); }, [tripSavedIds]);
     const [addInsuranceOpen, setAddInsuranceOpen] = useState(false);
     const [addInsuranceSlot, setAddInsuranceSlot] = useState('primary'); // 'primary' | 'secondary'
     const [addInsuranceMode, setAddInsuranceMode] = useState('choose'); // choose | scanFront | scanBack | reviewScan | manual
@@ -6668,171 +6388,6 @@ function App() {
         setVenueEndMin(null);
         setVariableSelections({});
     }
-    // --- Trip Mode: Trip CRUD ---
-    // This is a single-device, single-user demo app with no backend/auth server — there is no
-    // second account to check `trip.userId == authenticatedUser.id` against. The one ownership
-    // rule that actually applies here is enforced structurally instead: every Trip read/write
-    // below is scoped to `trips`/`tripContextId`, this session's own state, so there is no path
-    // by which a guessed/edited id could reach another user's data — there is no other user.
-    const activeTrip = trips.find((t) => t.id === tripContextId) || null;
-    function tripBookingCount(tripId) {
-        return bookings.filter((b) => b.tripContextId === tripId).length
-            + restaurantReservations.filter((r) => r.tripContextId === tripId && r.status !== 'cancelled').length;
-    }
-    function tripHasProtectedHistory(tripId) {
-        return tripBookingCount(tripId) > 0;
-    }
-    function openTripPlanner() {
-        setTripDraft({ destinationKey: null, destinationQuery: '', startDate: '', endDate: '', partySize: 2 });
-        setTripDraftError(null);
-        setTripListOpen(false);
-        setTripPlannerOpen(true);
-    }
-    function closeTripPlanner() { setTripPlannerOpen(false); setTripDraft(null); setTripDraftError(null); }
-    function openTripList() { setTripListOpen(true); }
-    function closeTripList() { setTripListOpen(false); }
-    // The one deterministic association mechanism Trip Mode needs: every booking/reservation
-    // created while a Trip is selected is tagged with that Trip's id at creation time, in the
-    // same synchronous state update that creates the record. Because this app has no server
-    // round-trip between "booking created" and "any further processing," there is no window in
-    // which a booking can succeed without its Trip tag also landing — the failure mode the spec
-    // guards against (payment/booking succeeds, async attachment fails) has no place to occur
-    // here. Re-running this — or re-delivering the same booking — can never create a second
-    // association, since the tag lives on the booking record itself, not a separate join row.
-    function currentTripTag() { return tripContextId; }
-    function createTrip() {
-        const d = tripDraft;
-        if (!d || !d.destinationKey) { setTripDraftError('Choose a destination.'); return; }
-        if (!d.startDate || !d.endDate) { setTripDraftError('Choose your trip dates.'); return; }
-        if (d.endDate < d.startDate) { setTripDraftError('Return date must be on or after your start date.'); return; }
-        const timezone = CITY_TIMEZONES[d.destinationKey] || 'America/New_York';
-        const today = destinationTodayKey(timezone);
-        if (d.endDate < today) { setTripDraftError("That trip's dates have already passed."); return; }
-        const partySize = Math.max(1, parseInt(d.partySize, 10) || 1);
-        const trip = {
-            id: 'trip-' + bvNonce(), destination: d.destinationKey, destinationDisplayName: destinationDisplayName(d.destinationKey),
-            destinationTimezone: timezone, startDate: d.startDate, endDate: d.endDate, partySize,
-            cancelledAt: null, createdAt: Date.now(),
-        };
-        setTrips((prev) => [trip, ...prev]);
-        setTripContextId(trip.id);
-        setTripDashboardTab('plan');
-        setTripSelectedDay(d.startDate);
-        setTripPlannerOpen(false);
-        setTripDraft(null);
-        setTripListOpen(false);
-        setTripDashboardOpen(true);
-    }
-    function selectTripContext(id) {
-        const t = trips.find((x) => x.id === id);
-        if (!t) return;
-        setTripContextId(id);
-        setTripDashboardTab('plan');
-        setTripSelectedDay(computeTripLifecycle(t) === 'past' ? t.startDate : (destinationTodayKey(t.destinationTimezone) < t.startDate ? t.startDate : destinationTodayKey(t.destinationTimezone)));
-        setTripListOpen(false);
-        setTripDashboardOpen(true);
-    }
-    // Deselecting a Trip only clears which Trip is being browsed — it never touches the Trip
-    // itself, its Bookings, or real `currentLocation`-driven discovery, which resumes exactly
-    // as it behaved before the Trip was selected.
-    function exitTripMode() { setTripContextId(null); setTripDashboardOpen(false); }
-    function closeTripDashboard() { setTripDashboardOpen(false); }
-    function openTripDashboard() { if (tripContextId) setTripDashboardOpen(true); }
-    function requestCancelTrip(id) { setTripCancelConfirm(id); }
-    function confirmCancelTrip() {
-        const id = tripCancelConfirm;
-        if (!id) return;
-        // Cancelling records intent only (cancelledAt) — it is never allowed to touch the
-        // underlying Bookings/reservations/tickets/payments those bookings created.
-        setTrips((prev) => prev.map((t) => t.id === id ? { ...t, cancelledAt: Date.now() } : t));
-        if (tripContextId === id) setTripContextId(null);
-        setTripCancelConfirm(null);
-    }
-    function requestDeleteTrip(id) { setTripDeleteConfirm(id); }
-    function confirmDeleteTrip() {
-        const id = tripDeleteConfirm;
-        if (!id || tripHasProtectedHistory(id)) { setTripDeleteConfirm(null); return; }
-        setTrips((prev) => prev.filter((t) => t.id !== id));
-        setTripSavedIds((prev) => { const next = { ...prev }; delete next[id]; return next; });
-        if (tripContextId === id) setTripContextId(null);
-        setTripDeleteConfirm(null);
-    }
-    function toggleTripSaved(tripId, itemId) {
-        setTripSavedIds((prev) => {
-            const list = prev[tripId] || [];
-            const next = list.includes(itemId) ? list.filter((x) => x !== itemId) : [itemId, ...list];
-            return { ...prev, [tripId]: next };
-        });
-    }
-    function formatTripDateRange(t) {
-        const s = new Date(t.startDate + 'T00:00:00');
-        const e = new Date(t.endDate + 'T00:00:00');
-        const sLabel = s.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        const eLabel = e.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        return `${sLabel} – ${eLabel}`;
-    }
-    function tripDateRange(t) {
-        const out = [];
-        let cur = new Date(t.startDate + 'T00:00:00');
-        const end = new Date(t.endDate + 'T00:00:00');
-        while (cur <= end) { out.push(dateKey(cur)); cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1); }
-        return out;
-    }
-    function bookingItineraryDateKey(b) {
-        if (b.dateKey) return b.dateKey;
-        if (b.year != null && b.month != null && b.day != null) return dateKey(new Date(b.year, b.month, b.day));
-        return null;
-    }
-    function parseTimeLabelToMinutes(label) {
-        if (typeof label === 'number') return label;
-        if (!label || typeof label !== 'string') return 0;
-        const m = label.match(/(\d+):(\d+)\s*(AM|PM)/i);
-        if (!m) return 0;
-        let h = parseInt(m[1], 10) % 12;
-        if (/PM/i.test(m[3])) h += 12;
-        return h * 60 + parseInt(m[2], 10);
-    }
-    function tripItineraryForDay(trip, dayKeyStr) {
-        const fromBookings = bookings.filter((b) => b.tripContextId === trip.id && b.status !== 'cancelled' && bookingItineraryDateKey(b) === dayKeyStr).map((b) => ({
-            kind: 'booking', id: b.id, title: b.service || b.name, sub: b.business,
-            minutes: b.timeMinutes != null ? b.timeMinutes : parseTimeLabelToMinutes(b.time),
-            timeLabel: b.time || 'All day', status: b.status, hasTicket: !!(b.tickets && b.tickets.length), raw: b,
-        }));
-        const fromReservations = restaurantReservations.filter((r) => r.tripContextId === trip.id && r.status !== 'cancelled' && r.date === dayKeyStr).map((r) => {
-            const restaurant = FEED.find((f) => f.id === r.restaurantId);
-            return {
-                kind: 'reservation', id: r.id, title: 'Reservation', sub: (restaurant && restaurant.name) || 'Restaurant',
-                minutes: parseTimeLabelToMinutes(r.time), timeLabel: typeof r.time === 'number' ? minutesToTimeLabel(r.time) : String(r.time || ''),
-                status: r.status, hasTicket: false, raw: r,
-            };
-        });
-        return [...fromBookings, ...fromReservations].sort((a, b) => a.minutes - b.minutes);
-    }
-    function tripAllAssociated(tripId) {
-        const b = bookings.filter((x) => x.tripContextId === tripId && x.status !== 'cancelled');
-        const r = restaurantReservations.filter((x) => x.tripContextId === tripId && x.status !== 'cancelled');
-        return { bookingsCount: b.length + r.length, ticketsCount: b.filter((x) => x.tickets && x.tickets.length).length, savedCount: (tripSavedIds[tripId] || []).length, bookingItems: b, reservationItems: r };
-    }
-    function tripDestinationFeed(trip) {
-        // `feed` holds one entry per video post — multiple posts share the same business, so
-        // this dedupes on the same getPrimaryBusinessId key the Nearby map already uses, rather
-        // than showing the same business once per post.
-        const seen = new Set();
-        const out = [];
-        feed.forEach((item) => {
-            if (cityKeyFromLocation(item.location) !== trip.destination) return;
-            const pid = getPrimaryBusinessId(item);
-            if (seen.has(pid)) return;
-            seen.add(pid);
-            out.push(item);
-        });
-        return out;
-    }
-    function openTripItineraryItem(entry) {
-        setTripDashboardOpen(false);
-        if (entry.kind === 'booking') setBookingDetail(entry.raw);
-        else startModifyReservation(entry.raw);
-    }
     // Single entry point every "Book"/"Reserve"/"Rent"/etc. CTA in the app should call. Routes
     // to whichever engine actually matches the business instead of assuming a generic appointment.
     function startBookingFor(item, preselectedService) {
@@ -6893,7 +6448,6 @@ function App() {
             date: label, dateKey: dateKey(d), day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), time: minutesToTimeLabel(fresh.minutes), timeMinutes: fresh.minutes, timeRange: formatTimeRange(fresh.minutes, selectedActivity.durationMin),
             total, status: 'confirmed', address: business.address || business.location, duration: formatDuration(selectedActivity.durationMin), logoText: initials,
             confirmationNumber, customerName: activityCustomerInfo.fullName.trim(), customerPhone: activityCustomerInfo.phone.trim(), notes: activityCustomerInfo.notes.trim(),
-            tripContextId: currentTripTag(),
         };
         // Per-person activities are ticketed admissions (one ticket per attendee);
         // flat-group activities (a whole cabana/room booked as one unit) stay a
@@ -6948,7 +6502,6 @@ function App() {
                 confirmationNumber, paymentMethod, staffId: null, staffName: null,
                 bookingCreatedAt, originalPrice: subtotal, finalPrice: subtotal,
                 discountAmount: 0, promotionApplied: false, promotionId: null, promotionLabel: null, promotionType: null, promotionValue: null, promotionAppliedAt: null,
-                tripContextId: currentTripTag(),
             };
             setBookings((prev) => [booking, ...prev]);
             setBalance((b) => Math.max(0, b - total));
@@ -6974,7 +6527,6 @@ function App() {
                 confirmationNumber, paymentMethod, staffId: null, staffName: null,
                 bookingCreatedAt, originalPrice: subtotal, finalPrice: subtotal,
                 discountAmount: 0, promotionApplied: false, promotionId: null, promotionLabel: null, promotionType: null, promotionValue: null, promotionAppliedAt: null,
-                tripContextId: currentTripTag(),
             };
             setBookings((prev) => [booking, ...prev]);
             setBalance((b) => Math.max(0, b - total));
@@ -6992,7 +6544,6 @@ function App() {
                 confirmationNumber, paymentMethod: null, staffId: null, staffName: null,
                 bookingCreatedAt, originalPrice: 0, finalPrice: 0,
                 discountAmount: 0, promotionApplied: false, promotionId: null, promotionLabel: null, promotionType: null, promotionValue: null, promotionAppliedAt: null,
-                tripContextId: currentTripTag(),
             };
             setBookings((prev) => [booking, ...prev]);
             setConfirmedBooking(booking);
@@ -7069,7 +6620,6 @@ function App() {
             promotionValue: promo ? promo.promotionValue : null,
             promotionAppliedAt: promo ? promo.promotionAppliedAt : null,
             insurance: buildBookingInsuranceRecord(),
-            tripContextId: currentTripTag(),
         };
         setBookings((prev) => [booking, ...prev]);
         setBalance((b) => Math.max(0, b - total));
@@ -7354,7 +6904,6 @@ function App() {
             id: 'rsv' + Date.now(), restaurantId: restaurant.id, date: f.date, time: f.time, duration: f.duration, partySize: f.partySize,
             area: areaLabel, tableIds: f.tableIds, isCombo: f.isCombo, name: f.name.trim(), phone: f.phone.trim(), email: f.email.trim(), notes: f.notes.trim(),
             status: 'upcoming', confirmationCode: 'BV' + Math.random().toString(36).slice(2, 7).toUpperCase(), createdAt: Date.now(),
-            tripContextId: currentTripTag(),
         };
         saveRestaurantReservations([...restaurantReservations, reservation]);
         setRsvFlow((prev) => ({ ...prev, stage: 'confirmed', confirmed: reservation }));
@@ -9922,9 +9471,7 @@ function App() {
                                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: CP.text, margin: 0 } }, s.value),
                                 React.createElement("p", { style: { fontSize: 11.5, color: CP.sub, marginTop: 2 } }, s.label))))),
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 18 } },
-                        React.createElement("button", { onClick: openEditProfile, style: { flex: 1, padding: '12px 0', borderRadius: 20, background: T.textPrimary, color: T.background, fontSize: 13.5, fontWeight: 700 } }, "Edit Profile"),
-                        React.createElement("button", { onClick: () => { closeCustomerProfile(); trips.length === 0 ? openTripPlanner() : openTripList(); }, style: { display: 'flex', alignItems: 'center', gap: 6, padding: '12px 16px', borderRadius: 20, border: `1.5px solid ${THEME.coral}`, color: THEME.coral, fontSize: 13.5, fontWeight: 700, whiteSpace: 'nowrap' } },
-                            React.createElement(Icon, { name: "compass", size: 15, color: THEME.coral }), "Trips")),
+                        React.createElement("button", { onClick: openEditProfile, style: { flex: 1, padding: '12px 0', borderRadius: 20, background: T.textPrimary, color: T.background, fontSize: 13.5, fontWeight: 700 } }, "Edit Profile")),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', marginTop: 22, borderBottom: `1px solid ${CP.border}` } },
                         TABS.map((t) => {
                             const active = activeTab === t.id;
@@ -15039,7 +14586,7 @@ function App() {
             return React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 17, display: 'flex', flexDirection: 'column' } },
                 headerSpacer, body);
         })(),
-        postServiceBanner && accountType !== 'business' && shortsFeedTab !== 'nearby' && !tripDashboardOpen && !tripPlannerOpen && !tripListOpen && React.createElement("button", {
+        postServiceBanner && accountType !== 'business' && shortsFeedTab !== 'nearby' && React.createElement("button", {
             onClick: () => openTipFlow(postServiceBanner),
             style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, color: '#fff', fontSize: 12, padding: '12px 14px', borderRadius: 14, zIndex: 19, boxShadow: '0 8px 20px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' },
         },
@@ -15051,12 +14598,6 @@ function App() {
                 onClick: (e) => { e.stopPropagation(); setPostServiceBanner(null); },
                 style: { flexShrink: 0, padding: 4 },
             }, React.createElement(Icon, { name: "x", size: 14, color: "rgba(255,255,255,0.7)" }))),
-        tripContextId && !tripDashboardOpen && !tripListOpen && !tripPlannerOpen && tab === 'discover' && shortsFeedTab !== 'nearby' && renderTripContextChip(),
-        tripPlannerOpen && renderTripPlanner(),
-        tripListOpen && renderTripList(),
-        tripDashboardOpen && renderTripDashboard(),
-        tripCancelConfirm && renderTripCancelConfirm(),
-        tripDeleteConfirm && renderTripDeleteConfirm(),
         toast && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }, toast))));
 }
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App, null));
