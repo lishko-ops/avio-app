@@ -2600,6 +2600,14 @@ const FILTER_MASTER_CATEGORIES = [
     { id: 'auto', label: 'Auto', subs: ['Car Detailing', 'Window Tinting', 'Car Wraps', 'Car Wash'] },
     { id: 'home', label: 'Home & Property', subs: ['Cleaning', 'Landscaping', 'Handyman', 'Painting'] },
 ];
+// Bridges the filter sheet's lifestyle categories to the actual `category` strings FEED items
+// carry — coarser than the subcategory pills shown, since items don't carry a matching
+// sub-taxonomy field of their own; subcategory selections narrow further via a hashtag/blurb
+// keyword match, falling back to the category-level set rather than dead-ending on zero results.
+const FILTER_CATEGORY_BUSINESS_MAP = {
+    beauty: ['Beauty'], fitness: ['Educational'], events: ['Parties', 'Events', 'Movies'],
+    activities: ['Rentals'], boats: ['Rentals'], food: ['Restaurants'], auto: ['Home Services'], home: ['Home Services'],
+};
 const FILTER_LOCATION_OPTIONS = ['My location', 'Current city', 'Choose on map'];
 const FILTER_PRICE_LEVELS = ['Any price', '$', '$$', '$$$', '$$$$', 'Custom range'];
 const FILTER_DISTANCE_OPTIONS = ['Any distance', '5 miles', '10 miles', '25 miles', '50 miles', 'Custom range'];
@@ -4368,8 +4376,6 @@ function App() {
     const [followedCreatorIds, setFollowedCreatorIds] = useState(() => new Set());
     const [blockedCreatorIds, setBlockedCreatorIds] = useState(() => new Set(loadLS('avio_blocked_creators', [])));
     useEffect(() => { saveLS('avio_blocked_creators', Array.from(blockedCreatorIds)); }, [blockedCreatorIds]);
-    const [peopleSearchQuery, setPeopleSearchQuery] = useState('');
-    const [peopleCategoryFilter, setPeopleCategoryFilter] = useState('forYou');
     const [creatorProfileTarget, setCreatorProfileTarget] = useState(null);
     const [creatorProfileTab, setCreatorProfileTab] = useState('posts');
     // Captured the instant a tagged post's booking CTA is tapped, consumed into
@@ -4945,6 +4951,12 @@ function App() {
     const [filterRating, setFilterRating] = useState('Any rating');
     const [filterAvailability, setFilterAvailability] = useState('Any time');
     const [filterToggles, setFilterToggles] = useState(() => new Set());
+    // Contextual filters that only make sense for the People / Following feeds — kept separate
+    // from the generic category/location/price system above rather than overloading it.
+    const [peopleFeedSort, setPeopleFeedSort] = useState('forYou');
+    const [peopleFilterCreatorId, setPeopleFilterCreatorId] = useState(null);
+    const [followingFilterMode, setFollowingFilterMode] = useState('all');
+    const [followingSortMode, setFollowingSortMode] = useState('newest');
     function toggleFilterCategoryAll(catId) {
         setSelectedFilterCategories((prev) => {
             const next = new Set(prev);
@@ -4982,10 +4994,16 @@ function App() {
         setFilterRating('Any rating');
         setFilterAvailability('Any time');
         setFilterToggles(new Set());
+        setPeopleFeedSort('forYou');
+        setPeopleFilterCreatorId(null);
+        setFollowingFilterMode('all');
+        setFollowingSortMode('newest');
     }
     const filterSelectionCount = selectedFilterCategories.size + selectedFilterSubcats.size
         + (filterLocation !== 'My location' ? 1 : 0) + (filterDistance !== 'Any distance' ? 1 : 0)
-        + (filterPrice !== 'Any price' ? 1 : 0) + (filterRating !== 'Any rating' ? 1 : 0) + (filterAvailability !== 'Any time' ? 1 : 0);
+        + (filterPrice !== 'Any price' ? 1 : 0) + (filterRating !== 'Any rating' ? 1 : 0) + (filterAvailability !== 'Any time' ? 1 : 0)
+        + (peopleFeedSort !== 'forYou' ? 1 : 0) + (peopleFilterCreatorId ? 1 : 0)
+        + (followingFilterMode !== 'all' ? 1 : 0) + (followingSortMode !== 'newest' ? 1 : 0);
     const filterResultCount = Math.max(3, 247 - selectedFilterSubcats.size * 13 - selectedFilterCategories.size * 24 - filterToggles.size * 9 - (filterRating !== 'Any rating' ? 12 : 0) - (filterAvailability !== 'Any time' ? 10 : 0) - (filterDistance !== 'Any distance' ? 8 : 0));
     function toggleBookmark(id) {
         setExploreBookmarks((prev) => {
@@ -5292,9 +5310,79 @@ function App() {
         return list;
     }, [feed]);
     const aiSearchHasDeals = useMemo(() => aiSearchCandidates.some((i) => i.deal && i.deal.enabled), [aiSearchCandidates]);
+    function itemCreatedAt(item) {
+        if (item.uploadedAt)
+            return item.uploadedAt;
+        const m = /^thrillz-(\d+)/.exec(item.id);
+        return m ? parseInt(m[1], 10) : 0;
+    }
     const filteredFeed = useMemo(() => {
         let result = feed.filter((item) => !item.isCustomerPost || !blockedCreatorIds.has(item.creatorId));
-        result = shortsFeedTab === 'following' ? result.filter((item) => followedIds.has(item.id) || (item.isCustomerPost && followedCreatorIds.has(item.creatorId))) : result;
+
+        // People is a discovery MODE inside the same vertical feed, not a separate page — it
+        // shows posts made by Bookvado users/creators rather than primarily business posts.
+        if (shortsFeedTab === 'people') {
+            result = result.filter((item) => item.isCustomerPost);
+            if (peopleFilterCreatorId)
+                result = result.filter((item) => item.creatorId === peopleFilterCreatorId);
+            if (peopleFeedSort === 'following')
+                result = result.filter((item) => followedCreatorIds.has(item.creatorId));
+            else if (peopleFeedSort === 'trending')
+                result = [...result].sort((a, b) => getCreatorEngagementScore(b.creatorId) - getCreatorEngagementScore(a.creatorId));
+            else if (peopleFeedSort === 'mostBooked')
+                result = [...result].sort((a, b) => parseCount(b.likes) - parseCount(a.likes));
+            else if (peopleFeedSort === 'newest')
+                result = [...result].sort((a, b) => itemCreatedAt(b) - itemCreatedAt(a));
+        }
+        // Following combines BOTH businesses the user follows and people/creators they follow
+        // into one personalized feed — never two separate tabs — with an optional narrow to
+        // just one side and a sort, both purely presentational over that same combined set.
+        else if (shortsFeedTab === 'following') {
+            result = result.filter((item) => followedIds.has(item.id) || (item.isCustomerPost && followedCreatorIds.has(item.creatorId)));
+            if (followingFilterMode === 'people')
+                result = result.filter((item) => item.isCustomerPost);
+            else if (followingFilterMode === 'businesses')
+                result = result.filter((item) => !item.isCustomerPost);
+            result = followingSortMode === 'popular'
+                ? [...result].sort((a, b) => parseCount(b.likes) - parseCount(a.likes))
+                : [...result].sort((a, b) => itemCreatedAt(b) - itemCreatedAt(a));
+        }
+
+        if (selectedFilterCategories.size > 0 || selectedFilterSubcats.size > 0) {
+            const allowedCats = new Set();
+            selectedFilterCategories.forEach((id) => (FILTER_CATEGORY_BUSINESS_MAP[id] || []).forEach((c) => allowedCats.add(c)));
+            FILTER_MASTER_CATEGORIES.forEach((cat) => {
+                const hasSub = cat.subs.concat(cat.moreSubs || []).some((s) => selectedFilterSubcats.has(cat.id + ':' + s));
+                if (hasSub)
+                    (FILTER_CATEGORY_BUSINESS_MAP[cat.id] || []).forEach((c) => allowedCats.add(c));
+            });
+            const byCategory = result.filter((item) => allowedCats.has(item.category));
+            const subKeywords = Array.from(selectedFilterSubcats).map((k) => k.split(':')[1].toLowerCase());
+            if (subKeywords.length > 0) {
+                const bySubKeyword = byCategory.filter((item) => {
+                    const hay = ((item.hashtags || []).join(' ') + ' ' + (item.blurb || '')).toLowerCase();
+                    return subKeywords.some((kw) => hay.includes(kw.replace(/\s*\/.*$/, '').toLowerCase()));
+                });
+                result = bySubKeyword.length > 0 ? bySubKeyword : byCategory;
+            }
+            else {
+                result = byCategory;
+            }
+        }
+        if (filterRating !== 'Any rating')
+            result = result.filter((item) => item.rating == null || item.rating >= parseFloat(filterRating));
+        if (filterPrice !== 'Any price' && filterPrice !== 'Custom range') {
+            const tier = filterPrice.length;
+            const bounds = { 1: [0, 40], 2: [40, 100], 3: [100, 250], 4: [250, Infinity] }[tier];
+            if (bounds)
+                result = result.filter((item) => item.price == null || (item.price >= bounds[0] && item.price < bounds[1]));
+        }
+        if (filterDistance !== 'Any distance' && filterDistance !== 'Custom range') {
+            const maxMi = parseFloat(filterDistance);
+            result = result.filter((item) => { const d = parseFloat(item.distance); return !isFinite(d) || d <= maxMi; });
+        }
+        if (filterAvailability === 'Today')
+            result = result.filter((item) => !item.openStatus || item.openStatus.includes('Open'));
         const LOCATION_TOGGLE_MODES = { inStudio: 'At my business location', atHome: 'I travel to customers', mobile: 'I travel to customers' };
         const activeLocationModes = new Set(Object.keys(LOCATION_TOGGLE_MODES).filter((id) => filterToggles.has(id)).map((id) => LOCATION_TOGGLE_MODES[id]));
         if (activeLocationModes.size > 0)
@@ -5302,12 +5390,16 @@ function App() {
         // Home is already location-aware by default — ranked by category-appropriate distance
         // fit + rating + popularity + interests/follows, not just "closest first" — so the
         // customer never has to open Nearby just to see what's actually relevant to them.
-        if (shortsFeedTab === 'forYou') {
+        // The same ranking also drives "For You" sort inside People — it already weighs
+        // interests/follows/rating/popularity per post rather than raw follower count.
+        if (shortsFeedTab === 'forYou' || (shortsFeedTab === 'people' && peopleFeedSort === 'forYou')) {
             const ctx = { interests: selectedInterests, followedIds };
             result = [...result].sort((a, b) => computeDiscoveryScore(b, getDiscoveryEligibility(b), ctx) - computeDiscoveryScore(a, getDiscoveryEligibility(a), ctx));
         }
         return result;
-    }, [shortsFeedTab, followedIds, followedCreatorIds, blockedCreatorIds, feed, filterToggles, selectedInterests]);
+    }, [shortsFeedTab, followedIds, followedCreatorIds, blockedCreatorIds, feed, filterToggles, selectedInterests,
+        peopleFeedSort, peopleFilterCreatorId, followingFilterMode, followingSortMode,
+        selectedFilterCategories, selectedFilterSubcats, filterRating, filterPrice, filterDistance, filterAvailability]);
     // ---- Nearby map data pipeline ----
     // `feed` mixes canonical business records with lighter "post" entries that tag back
     // to one via taggedBusinessIds (that's how the Thrillz video feed shows multiple
@@ -5492,78 +5584,6 @@ function App() {
             card.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }, [nearbySelectedIdx]);
     // --- People / Creator Discovery: render ---
-    const PEOPLE_CITY_ALIASES = { nyc: 'new york', la: 'los angeles', vegas: 'las vegas' };
-    function peopleSearchMatch(creatorRow, query) {
-        if (!query)
-            return true;
-        const q = query.toLowerCase().trim();
-        const qCity = PEOPLE_CITY_ALIASES[q] || q;
-        const haystack = [
-            creatorRow.info.displayName, creatorRow.info.username, creatorRow.info.bio, creatorRow.info.city,
-            ...(creatorRow.info.categories || []),
-            ...creatorRow.places.map((p) => p.business.name), ...creatorRow.places.map((p) => p.business.category),
-        ].filter(Boolean).join(' ').toLowerCase();
-        return haystack.includes(q) || haystack.includes(qCity);
-    }
-    function renderPeopleCreatorCard(row) {
-        const { info, posts, places, followers } = row;
-        const isFollowing = followedCreatorIds.has(info.id);
-        const recentPosts = posts.slice(0, 3);
-        return React.createElement("div", { key: info.id, style: { padding: '14px 0', borderBottom: `1px solid ${THEME.inkLine}` } },
-            React.createElement("button", { onClick: () => openCreatorProfile(info.id), style: { width: '100%', display: 'flex', alignItems: 'flex-start', gap: 12, textAlign: 'left' } },
-                info.avatarPhoto
-                    ? React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', flexShrink: 0, backgroundImage: `url(${info.avatarPhoto})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
-                    : React.createElement("div", { style: { width: 52, height: 52, borderRadius: '50%', flexShrink: 0, background: info.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18 } }, info.displayName.charAt(0).toUpperCase()),
-                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
-                        React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: '#fff', margin: 0 } }, info.displayName),
-                        info.verified && React.createElement("div", { style: { width: 13, height: 13, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" }))),
-                    React.createElement("p", { style: { fontSize: 12, color: 'rgba(255,255,255,0.55)', margin: '2px 0 0' } }, '@' + info.username),
-                    React.createElement("p", { style: { fontSize: 12, color: 'rgba(255,255,255,0.75)', margin: '5px 0 0', lineHeight: 1.35 } }, info.bio),
-                    React.createElement("p", { style: { fontSize: 11.5, color: 'rgba(255,255,255,0.5)', margin: '5px 0 0' } }, `${formatCount(followers)} followers · ${places.length} places`)),
-                React.createElement("span", { onClick: (e) => { e.stopPropagation(); toggleFollowCreator(info.id); }, style: { flexShrink: 0, padding: '7px 16px', borderRadius: 16, border: `1.5px solid ${THEME.coral}`, background: isFollowing ? 'transparent' : THEME.coral, color: isFollowing ? THEME.coral : '#fff', fontSize: 12, fontWeight: 700, alignSelf: 'center' } }, isFollowing ? 'Following' : 'Follow')),
-            recentPosts.length > 0 && React.createElement("div", { style: { display: 'flex', gap: 6, marginTop: 10, marginLeft: 64 } },
-                recentPosts.map((p) => React.createElement("div", { key: p.id, onClick: () => openCreatorProfile(info.id), style: { width: 64, height: 92, borderRadius: 8, backgroundImage: p.image ? `url(${p.image})` : 'none', backgroundColor: p.image ? undefined : info.avatarColor, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } }))));
-    }
-    function renderPeoplePage() {
-        const rows = getAllCreatorIds().map((id) => {
-            const info = getCreatorInfo(id);
-            return { info, posts: getCreatorPosts(id), places: getCreatorPlaces(id), followers: getCreatorFollowerCount(id), engagement: getCreatorEngagementScore(id) };
-        });
-        const categoryFiltered = peopleCategoryFilter === 'forYou' ? rows : rows.filter((r) => (r.info.categories || []).includes(peopleCategoryFilter));
-        const searchFiltered = categoryFiltered.filter((r) => peopleSearchMatch(r, peopleSearchQuery));
-        const suggested = searchFiltered.filter((r) => !followedCreatorIds.has(r.info.id));
-        const trending = [...searchFiltered].sort((a, b) => b.engagement - a.engagement).slice(0, 5);
-        return React.createElement("div", { key: "peoplePage", style: { position: 'absolute', inset: 0, background: THEME.ink, display: 'flex', flexDirection: 'column' } },
-            React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 14px) 18px calc(env(safe-area-inset-bottom) + 90px)` } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 24, color: '#fff', margin: 0 } }, "People"),
-                React.createElement("p", { style: { fontSize: 13, color: 'rgba(255,255,255,0.6)', marginTop: 4, marginBottom: 16 } }, "Discover people. Find places worth booking."),
-                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 14, padding: '11px 12px', marginBottom: 14 } },
-                    React.createElement(Icon, { name: "search", size: 15, color: 'rgba(255,255,255,0.6)' }),
-                    React.createElement("input", { value: peopleSearchQuery, onChange: (e) => setPeopleSearchQuery(e.target.value), placeholder: "Search people, food, places, activities…", style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13.5, color: '#fff' } })),
-                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 18 } },
-                    CREATOR_CATEGORY_CHIPS.map((c) => {
-                        const active = peopleCategoryFilter === c.id;
-                        return React.createElement("button", { key: c.id, onClick: () => setPeopleCategoryFilter(c.id), style: { flexShrink: 0, padding: '7px 14px', borderRadius: 14, border: `1.5px solid ${active ? THEME.coral : 'rgba(255,255,255,0.2)'}`, background: active ? THEME.coral : 'transparent' } },
-                            React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: active ? '#fff' : 'rgba(255,255,255,0.7)' } }, c.label));
-                    })),
-                trending.length > 0 && React.createElement("div", { style: { marginBottom: 18 } },
-                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 } }, "Trending People"),
-                    React.createElement("p", { style: { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 10 } }, "Ranked by real engagement — views, saves, shares and bookings — not just follower count."),
-                    trending.map((r, i) => React.createElement("button", { key: r.info.id, onClick: () => openCreatorProfile(r.info.id), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', textAlign: 'left' } },
-                        React.createElement("span", { style: { width: 18, fontSize: 13, fontWeight: 700, color: THEME.coral, flexShrink: 0 } }, i + 1),
-                        r.info.avatarPhoto
-                            ? React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', flexShrink: 0, backgroundImage: `url(${r.info.avatarPhoto})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
-                            : React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', flexShrink: 0, background: r.info.avatarColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 700 } }, r.info.displayName.charAt(0).toUpperCase()),
-                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                            React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: '#fff', margin: 0 } }, r.info.displayName),
-                            React.createElement("p", { style: { fontSize: 11, color: 'rgba(255,255,255,0.5)', margin: '1px 0 0' } }, `${formatCount(r.followers)} followers`)),
-                        React.createElement(Icon, { name: "chevronright", size: 15, color: 'rgba(255,255,255,0.4)' })))),
-                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 } }, "Suggested for You"),
-                suggested.length === 0
-                    ? React.createElement("p", { style: { fontSize: 12.5, color: 'rgba(255,255,255,0.5)', padding: '20px 0' } }, "No people found — try another search or category.")
-                    : suggested.map((r) => renderPeopleCreatorCard(r))));
-    }
     function renderCreatorProfile() {
         const info = getCreatorInfo(creatorProfileTarget);
         if (!info)
@@ -8779,19 +8799,24 @@ function App() {
                 modeSwitcher,
                 showFeedHeader && React.createElement("div", { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', width: '100%', gap: 12 } },
                 React.createElement("div", { className: "avio-scroll", style: { display: 'flex', alignItems: 'flex-end', gap: 14, overflowX: 'auto', minWidth: 0 } },
-                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'people', label: 'People' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
-                        const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
-                        const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
+                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'people', label: 'People' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }].map((t) => {
+                        const active = shortsFeedTab === t.id;
                         const isMain = t.id === 'forYou';
-                        return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
+                        return React.createElement("button", { key: t.id, onClick: () => setShortsFeedTab(t.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
                             React.createElement("span", { style: { position: 'relative', display: 'inline-block' } },
                                 React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' } }, t.label),
                                 isMain && React.createElement("span", { style: { position: 'absolute', top: 0, right: -9, width: 6, height: 6, borderRadius: '50%', background: THEME.coral } })),
-                            React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: T.surface, transition: 'width 0.2s' } }));
+                            React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: t.id === 'people' ? THEME.coral : T.surface, transition: 'width 0.2s' } }));
                     })),
-                React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
-                    React.createElement(Icon, { name: "search", size: 20, color: "#fff" }),
-                    React.createElement("span", { style: { width: 0, height: 2 } }))));
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 } },
+                    React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
+                        React.createElement(Icon, { name: "search", size: 20, color: "#fff" }),
+                        React.createElement("span", { style: { width: 0, height: 2 } })),
+                    React.createElement("button", { onClick: () => setFilterSheetOpen(true), style: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
+                        React.createElement(Icon, { name: "sliders", size: 20, color: "#fff" }),
+                        filterSelectionCount > 0 && React.createElement("span", { style: { position: 'absolute', top: -3, right: -6, minWidth: 14, height: 14, padding: '0 3px', borderRadius: 7, background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: '#fff' } }, filterSelectionCount)),
+                        React.createElement("span", { style: { width: 0, height: 2 } })))));
             const actionStack = React.createElement("div", { style: { position: 'absolute', right: 'calc(3% - 15px)', bottom: 'calc(env(safe-area-inset-bottom) + 96px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, zIndex: 2 } },
                     (() => {
                         return React.createElement(React.Fragment, null,
@@ -8903,24 +8928,29 @@ function App() {
     return React.createElement(AppThemeContext.Provider, { value: T }, React.createElement("div", { style: { width: '100%', margin: '0 auto', position: 'fixed', top: 0, bottom: 0, left: 0, right: 0, overflow: 'hidden', background: T.background } },
         React.createElement("input", { ref: fileInputRef, type: "file", accept: "video/*", style: { display: 'none' }, onChange: handleFileChosen }),
         tab === 'discover' && shortsFeedTab === 'nearby' && renderNearbyMap(),
-        tab === 'discover' && shortsFeedTab === 'people' && renderPeoplePage(),
-        tab === 'discover' && shortsFeedTab !== 'nearby' && shortsFeedTab !== 'people' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
+        tab === 'discover' && shortsFeedTab !== 'nearby' && (React.createElement("div", { ref: discoverScrollRef, className: "avio-scroll", style: { height: '100%', overflowY: 'auto', scrollSnapType: 'y mandatory' } }, filteredFeed.length === 0 ? (React.createElement("div", { style: { height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: THEME.ink, gap: 6 } },
             React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 12px)', left: 16, right: 16, zIndex: 2, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 } },
                 React.createElement("div", { className: "avio-scroll", style: { display: 'flex', alignItems: 'flex-end', gap: 14, overflowX: 'auto', minWidth: 0 } },
-                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'following', label: 'Following' }, { id: 'people', label: 'People' }, { id: 'nearby', label: 'Nearby' }, { id: 'filters', label: 'Filters' }].map((t) => {
-                        const active = t.id === 'filters' ? filterSheetOpen : shortsFeedTab === t.id;
+                    [{ id: 'forYou', label: 'Thrillz' }, { id: 'people', label: 'People' }, { id: 'following', label: 'Following' }, { id: 'nearby', label: 'Nearby' }].map((t) => {
+                        const active = shortsFeedTab === t.id;
                         const isMain = t.id === 'forYou';
-                        const onClick = t.id === 'filters' ? () => setFilterSheetOpen(true) : () => setShortsFeedTab(t.id);
-                        return React.createElement("button", { key: t.id, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
+                        return React.createElement("button", { key: t.id, onClick: () => setShortsFeedTab(t.id), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
                             React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: isMain ? 19 : 16, color: active ? '#fff' : 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' } }, t.label),
-                            React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: T.surface, transition: 'width 0.2s' } }));
+                            React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: t.id === 'people' ? THEME.coral : T.surface, transition: 'width 0.2s' } }));
                     })),
-                React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
-                    React.createElement(Icon, { name: "search", size: 20, color: "#fff" }),
-                    React.createElement("span", { style: { width: 0, height: 2 } }))),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 } },
+                    React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
+                        React.createElement(Icon, { name: "search", size: 20, color: "#fff" }),
+                        React.createElement("span", { style: { width: 0, height: 2 } })),
+                    React.createElement("button", { onClick: () => setFilterSheetOpen(true), style: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
+                        React.createElement(Icon, { name: "sliders", size: 20, color: "#fff" }),
+                        filterSelectionCount > 0 && React.createElement("span", { style: { position: 'absolute', top: -3, right: -6, minWidth: 14, height: 14, padding: '0 3px', borderRadius: 7, background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement("span", { style: { fontSize: 9, fontWeight: 700, color: '#fff' } }, filterSelectionCount)),
+                        React.createElement("span", { style: { width: 0, height: 2 } })))),
             React.createElement(Icon, { name: shortsFeedTab === 'following' ? "user" : "search", size: 22, color: THEME.mutedDark }),
-            React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : "No shorts to show right now"),
-            shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('people'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Find People"))) : filteredFeed.map((item, itemIdx) => renderShortCard(item, itemIdx, activeShortIdx, true)))),
+            React.createElement("p", { style: { fontSize: 13, color: THEME.mutedDark } }, shortsFeedTab === 'following' ? "Follow creators to see their shorts here" : shortsFeedTab === 'people' ? "No creator posts match right now" : "No shorts to show right now"),
+            shortsFeedTab === 'following' && React.createElement("button", { onClick: () => setShortsFeedTab('people'), style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Find People"),
+            (shortsFeedTab === 'people' && filterSelectionCount > 0) && React.createElement("button", { onClick: resetFilters, style: { marginTop: 10, padding: '9px 20px', borderRadius: 20, border: `1px solid ${THEME.coral}`, color: THEME.coral, fontSize: 12.5, fontWeight: 600 } }, "Reset Filters"))) : filteredFeed.map((item, itemIdx) => renderShortCard(item, itemIdx, activeShortIdx, true)))),
         tab === 'browse' && (React.createElement("div", { style: { position: 'absolute', inset: 0, overflowY: 'auto', background: T.background, padding: `calc(env(safe-area-inset-top) + 16px) 0 calc(env(safe-area-inset-bottom) + 90px)` } }, (() => {
             const categories = CATEGORIES.filter((c) => c.id !== 'shorts');
             const quickFilters = [
@@ -13423,8 +13453,45 @@ function App() {
                 React.createElement(Icon, { name: "info", size: 14, color: FC.sub }),
                 React.createElement("p", { style: { fontSize: 11.5, color: FC.sub, margin: 0, lineHeight: 1.5 } },
                     React.createElement("span", { style: { fontWeight: 700, color: FC.text } }, "Good to know: "), "Your selections stay saved when you return. You can change or clear them anytime."));
+            // Smart contextual filters: People and Following get their own relevant filter set
+            // instead of the generic "what are you booking" category system — a follower count
+            // and a distance radius mean very different things depending on which feed is active.
+            const isPeopleContext = tab === 'discover' && shortsFeedTab === 'people';
+            const isFollowingContext = tab === 'discover' && shortsFeedTab === 'following';
+            function sheetChipRow(label, options, value, onChange) {
+                return React.createElement("div", { style: { marginBottom: 18 } },
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: FC.sub, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 } }, label),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
+                        options.map((opt) => {
+                            const active = value === opt.id;
+                            return React.createElement("button", { key: opt.id, className: "avio-filter-chip", onClick: () => onChange(active ? options[0].id : opt.id), style: { padding: '8px 14px', borderRadius: 16, border: `1.5px solid ${active ? THEME.coral : FC.border}`, background: active ? 'rgba(166,124,82,0.08)' : FC.card } },
+                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: active ? 700 : 500, color: active ? THEME.coral : FC.text } }, opt.label));
+                        })));
+            }
+            const peopleContextBlock = isPeopleContext && React.createElement("div", { style: { padding: '18px 18px 0' } },
+                sheetChipRow('Sort', [
+                    { id: 'forYou', label: 'For You' }, { id: 'trending', label: 'Trending' }, { id: 'mostBooked', label: 'Most Booked' },
+                    { id: 'newest', label: 'Newest' }, { id: 'following', label: 'People I Follow' },
+                ], peopleFeedSort, setPeopleFeedSort),
+                getAllCreatorIds().length > 0 && React.createElement("div", { style: { marginBottom: 4 } },
+                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: FC.sub, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8 } }, "Creator"),
+                    React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 } },
+                        React.createElement("button", { className: "avio-filter-chip", onClick: () => setPeopleFilterCreatorId(null), style: { flexShrink: 0, padding: '8px 14px', borderRadius: 16, border: `1.5px solid ${!peopleFilterCreatorId ? THEME.coral : FC.border}`, background: !peopleFilterCreatorId ? 'rgba(166,124,82,0.08)' : FC.card } },
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: !peopleFilterCreatorId ? 700 : 500, color: !peopleFilterCreatorId ? THEME.coral : FC.text } }, "All")),
+                        getAllCreatorIds().map((id) => {
+                            const c = getCreatorInfo(id);
+                            const active = peopleFilterCreatorId === id;
+                            return React.createElement("button", { key: id, className: "avio-filter-chip", onClick: () => setPeopleFilterCreatorId(active ? null : id), style: { flexShrink: 0, padding: '8px 14px', borderRadius: 16, border: `1.5px solid ${active ? THEME.coral : FC.border}`, background: active ? 'rgba(166,124,82,0.08)' : FC.card } },
+                                React.createElement("span", { style: { fontSize: 12.5, fontWeight: active ? 700 : 500, color: active ? THEME.coral : FC.text } }, c.displayName));
+                        }))));
+            const followingContextBlock = isFollowingContext && React.createElement("div", { style: { padding: '18px 18px 0' } },
+                sheetChipRow('Show', [{ id: 'all', label: 'All' }, { id: 'people', label: 'People' }, { id: 'businesses', label: 'Businesses' }], followingFilterMode, setFollowingFilterMode),
+                sheetChipRow('Sort', [{ id: 'newest', label: 'Newest' }, { id: 'popular', label: 'Most Popular' }], followingSortMode, setFollowingSortMode));
             const bodyScroll = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto' } },
-                topFiltersRow, categoriesBlock, tipBlock);
+                isPeopleContext ? React.createElement(React.Fragment, null, peopleContextBlock, categoriesBlock)
+                    : isFollowingContext ? followingContextBlock
+                        : React.createElement(React.Fragment, null, topFiltersRow, categoriesBlock),
+                tipBlock);
             const footerBlock = React.createElement("div", { style: { flexShrink: 0, padding: '10px 18px calc(env(safe-area-inset-bottom) + 14px)', background: FC.bg, borderTop: `1px solid ${FC.border}` } },
                 React.createElement("button", { onClick: () => setSavePreferences((v) => !v), style: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 } },
                     React.createElement(Icon, { name: "bookmark", size: 16, color: savePreferences ? THEME.coral : FC.sub, fill: savePreferences ? THEME.coral : 'none' }),
@@ -13432,7 +13499,7 @@ function App() {
                         React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: FC.text, margin: 0 } }, "Save my preferences"),
                         React.createElement("p", { style: { fontSize: 10.5, color: FC.sub, margin: '1px 0 0' } }, "We'll remember your filters"))),
                 React.createElement("button", { onClick: () => setFilterSheetOpen(false), style: { width: '100%', height: 56, borderRadius: 28, background: THEME.coral, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } },
-                    `Show ${filterResultCount} Results`, React.createElement(Icon, { name: "arrowright", size: 16, color: "#fff" })));
+                    `Show ${tab === 'discover' && shortsFeedTab !== 'nearby' ? filteredFeed.length : filterResultCount} Results`, React.createElement(Icon, { name: "arrowright", size: 16, color: "#fff" })));
             return React.createElement("div", { className: "avio-filter-sheet", onClick: (e) => e.stopPropagation(), style: { width: '100%', height: '90%', background: FC.bg, borderRadius: '24px 24px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 -12px 40px rgba(0,0,0,0.22)', position: 'relative' } },
                 headerBlock, bodyScroll, footerBlock, popoverBackdrop, popover);
         })())),
