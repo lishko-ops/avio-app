@@ -2042,8 +2042,11 @@ const AI_SEARCH_CATEGORY_KEYWORDS = [
     { category: 'Beauty', words: ['barber', 'barbershop', 'haircut', 'hair', 'hairstylist', 'stylist', 'salon', 'nail', 'nails', 'mani', 'pedi', 'makeup', 'mua', 'balayage', 'blowout', 'braid', 'braids', 'massage', 'masseuse', 'spa', 'beauty', 'color correction', 'loctician'] },
     { category: 'Home Services', words: ['clean', 'cleaning', 'cleaner', 'maid', 'apartment', 'move-in', 'move-out', 'housekeeping'] },
     { category: 'Parties', words: ['dj', 'deejay', 'party', 'birthday', 'event', 'wedding', 'photographer', 'photography', 'photoshoot'] },
-    { category: 'Restaurants', words: ['restaurant', 'brunch', 'dinner', 'date night', 'tasting menu', 'chef', 'reservation'] },
-    { category: 'Educational', words: ['tutor', 'tutoring', 'lesson', 'coaching', 'tutors'] },
+    { category: 'Restaurants', words: ['restaurant', 'brunch', 'dinner', 'date night', 'tasting menu', 'chef', 'reservation', 'italian', 'sushi', 'lunch'] },
+    { category: 'Educational', words: ['tutor', 'tutoring', 'lesson', 'coaching', 'tutors', 'personal trainer', 'trainer', 'training'] },
+    { category: 'Rentals', words: ['pottery', 'painting class', 'paint night', 'activity', 'activities', 'arcade', 'paintball', 'laser tag', 'escape room', 'axe throwing', 'bowling', 'mini golf', 'golf', 'ice skating', 'ice rink', 'water park', 'waterpark', 'boat', 'charter', 'jet ski', 'yacht', 'trampoline', 'climbing', 'zipline', 'ziplining', 'amusement park', 'things to do'] },
+    { category: 'Movies', words: ['movie', 'movies', 'film', 'cinema', 'showtime'] },
+    { category: 'Events', words: ['concert', 'festival', 'sports event', 'game tickets'] },
 ];
 const AI_SEARCH_SERVICE_KEYWORDS = [
     { service: 'Photographer', words: ['photographer', 'photography', 'photoshoot'] },
@@ -2055,11 +2058,15 @@ const AI_SEARCH_SERVICE_KEYWORDS = [
     { service: 'Massage Therapist', words: ['massage', 'masseuse', 'spa'] },
     { service: 'Cleaner', words: ['clean', 'cleaning', 'cleaner', 'maid', 'housekeeping'] },
     { service: 'Tutor', words: ['tutor', 'tutoring', 'coaching'] },
+    { service: 'Experience', words: ['pottery', 'painting class', 'paint night', 'activity', 'activities', 'arcade', 'paintball', 'laser tag', 'escape room', 'axe throwing', 'bowling', 'mini golf', 'golf', 'ice skating', 'ice rink', 'water park', 'waterpark', 'boat', 'charter', 'jet ski', 'yacht', 'trampoline', 'climbing', 'zipline', 'ziplining', 'amusement park', 'things to do'] },
+    { service: 'Movie', words: ['movie', 'movies', 'film', 'cinema', 'showtime'] },
+    { service: 'Event', words: ['concert', 'festival', 'sports event', 'game tickets'] },
 ];
 const AI_SEARCH_EVENT_WORDS = ['birthday', 'wedding', 'anniversary', 'graduation', 'corporate', 'baby shower', 'engagement', 'bachelorette', 'bachelor party'];
 const AI_SEARCH_CITY_NAMES = ['miami', 'denver', 'austin', 'brooklyn', 'chicago', 'new orleans', 'los angeles', 'phoenix'];
 const AI_SEARCH_WEEKDAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-const AI_SEARCH_STOPWORDS = new Set(['find', 'me', 'a', 'an', 'the', 'for', 'near', 'nearby', 'my', 'that', 'who', 'comes', 'to', 'house', 'home', 'today', 'tomorrow', 'tonight', 'under', 'below', 'less', 'than', 'best', 'good', 'available', 'this', 'weekend', 'afternoon', 'evening', 'morning', 'after', 'before', 'with', 'and', 'only', 'show', 'ones', 'some', 'i', 'need', 'someone', 'something', 'fun', 'do', 'looking', 'want', 'is', 'are', 'of', 'in', 'on', 'at', 'nice', 'next', 'within', 'miles', 'mile', 'mi', 'over', 'above', 'least', 'minimum', 'closest', 'cheapest', 'lowest', 'price', 'rated', 'highly', 'top', 'actually']);
+const AI_SEARCH_STOPWORDS = new Set(['find', 'me', 'a', 'an', 'the', 'for', 'near', 'nearby', 'my', 'that', 'who', 'comes', 'to', 'house', 'home', 'today', 'tomorrow', 'tonight', 'under', 'below', 'less', 'than', 'best', 'good', 'available', 'this', 'weekend', 'afternoon', 'evening', 'morning', 'after', 'before', 'with', 'and', 'only', 'show', 'ones', 'some', 'i', 'need', 'someone', 'something', 'fun', 'do', 'looking', 'want', 'is', 'are', 'of', 'in', 'on', 'at', 'nice', 'next', 'within', 'miles', 'mile', 'mi', 'over', 'above', 'least', 'minimum', 'closest', 'cheapest', 'lowest', 'price', 'rated', 'highly', 'top', 'actually',
+    'hours', 'hour', 'minutes', 'minute', 'mins', 'min', 'right', 'now', 'asap', 'immediately', 'work', 'about', 'around', 'cheaper', 'affordable', 'instead', 'people', 'person', 'party', 'guests']);
 function aiCapitalize(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
 function aiStartOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function aiEndOfDay(d) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
@@ -2099,41 +2106,77 @@ function resolveAiDatePhrase(text, now) {
     }
     return null;
 }
-function resolveAiTimePhrase(text) {
-    let timeFrom = null, timeTo = null;
+// Half-width of the availability window built around a single target instant (e.g. "in 2
+// hours", "around 6", "right now") — wide enough to surface a genuinely close slot without
+// widening so far it stops meaning what the customer asked for.
+const AI_SEARCH_TARGET_WINDOW_MIN = 40;
+function resolveAiTimePhrase(text, now) {
+    const nowDate = now || new Date();
+    const nowMinutes = nowDate.getHours() * 60 + nowDate.getMinutes();
+    let timeFrom = null, timeTo = null, targetMinutes = null;
+    const setTarget = (t) => {
+        targetMinutes = t;
+        timeFrom = Math.max(0, t - AI_SEARCH_TARGET_WINDOW_MIN);
+        timeTo = Math.min(23 * 60 + 59, t + AI_SEARCH_TARGET_WINDOW_MIN);
+    };
+    const inHoursMatch = /\bin\s+(\d+)\s*hours?\b/.exec(text);
+    const inMinsMatch = /\bin\s+(\d+)\s*(?:minutes?|mins?)\b/.exec(text);
+    if (inHoursMatch)
+        setTarget(nowMinutes + parseInt(inHoursMatch[1], 10) * 60);
+    else if (inMinsMatch)
+        setTarget(nowMinutes + parseInt(inMinsMatch[1], 10));
+    else if (/\bright now\b|\basap\b|\bimmediately\b|(?:^|\s)now\b/.test(text))
+        setTarget(nowMinutes);
+    // No real work-schedule data exists in this demo — "after work" is a documented, fixed
+    // assumption (5:30 PM) rather than anything personalized.
+    else if (/\bafter work\b/.test(text))
+        setTarget(17 * 60 + 30);
     if (/morning/.test(text)) { timeFrom = 6 * 60; timeTo = 12 * 60; }
     else if (/afternoon/.test(text)) { timeFrom = 12 * 60; timeTo = 17 * 60; }
     else if (/evening/.test(text)) { timeFrom = 17 * 60; timeTo = 21 * 60; }
     const parseHour = (h, m, ap) => { let hh = parseInt(h, 10); if (ap === 'pm' && hh !== 12) hh += 12; if (ap === 'am' && hh === 12) hh = 0; if (!ap && hh < 8) hh += 12; return hh * 60 + (m ? parseInt(m, 10) : 0); };
-    const afterMatch = /after\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/.exec(text);
+    // "around"/"about" X is an approximate target (a window either side), distinct from the
+    // harder "at" X below, which pins an exact start time.
+    const aroundMatch = /(?:around|about)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/.exec(text);
+    if (aroundMatch)
+        setTarget(parseHour(aroundMatch[1], aroundMatch[2], aroundMatch[3]));
+    const afterMatch = /\bafter\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/.exec(text);
     if (afterMatch)
         timeFrom = parseHour(afterMatch[1], afterMatch[2], afterMatch[3]);
-    const beforeMatch = /before\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/.exec(text);
+    const beforeMatch = /\bbefore\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/.exec(text);
     if (beforeMatch)
         timeTo = parseHour(beforeMatch[1], beforeMatch[2], beforeMatch[3]);
-    if (!afterMatch && !beforeMatch) {
+    if (!afterMatch && !beforeMatch && !aroundMatch) {
         const atMatch = /\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/.exec(text);
         if (atMatch) {
             const start = parseHour(atMatch[1], atMatch[2], atMatch[3]);
             timeFrom = start;
             timeTo = start + 60;
+            targetMinutes = start;
         }
     }
-    return (timeFrom != null || timeTo != null) ? { timeFrom, timeTo } : null;
+    return (timeFrom != null || timeTo != null || targetMinutes != null) ? { timeFrom, timeTo, targetMinutes } : null;
 }
 function aiSearchEmptyContext() {
-    return { query: '', category: null, service: null, eventType: null, location: null, radius: null, dateFrom: null, dateTo: null, dateLabel: null, timeFrom: null, timeTo: null, minPrice: null, maxPrice: null, minRating: null, availabilityRequired: false, openNow: false, sortBy: null, mobile: false, inStudio: false, dealsOnly: false, keywords: [] };
+    return { query: '', category: null, service: null, eventType: null, location: null, radius: null, dateFrom: null, dateTo: null, dateLabel: null, timeFrom: null, timeTo: null, targetMinutes: null, partySize: null, minPrice: null, maxPrice: null, minRating: null, availabilityRequired: false, openNow: false, sortBy: null, mobile: false, inStudio: false, dealsOnly: false, keywords: [] };
 }
 function parseAiSearchQuery(rawText, prevContext) {
     const text = String(rawText || '').toLowerCase();
     const ctx = prevContext ? { ...prevContext } : aiSearchEmptyContext();
     ctx.query = String(rawText || '').trim();
+    const prevCategory = ctx.category;
     const matchedCategory = AI_SEARCH_CATEGORY_KEYWORDS.find((g) => g.words.some((w) => text.includes(w)));
     if (matchedCategory)
         ctx.category = matchedCategory.category;
     const matchedService = AI_SEARCH_SERVICE_KEYWORDS.find((g) => g.words.some((w) => text.includes(w)));
     if (matchedService)
         ctx.service = matchedService.service;
+    // A follow-up that switches category without naming a specific service ("Italian
+    // restaurant tonight for 4" after a barber search) shouldn't leave the OLD service
+    // ("Barber") stuck in context — that's what produced a stale "4 Barbers" summary over
+    // restaurant results.
+    else if (matchedCategory && matchedCategory.category !== prevCategory)
+        ctx.service = null;
     const eventHit = AI_SEARCH_EVENT_WORDS.find((w) => text.includes(w));
     if (eventHit)
         ctx.eventType = eventHit;
@@ -2165,7 +2208,8 @@ function parseAiSearchQuery(rawText, prevContext) {
         ctx.openNow = true;
     if (/\bdeal\b|discount|% off|percent off/.test(text))
         ctx.dealsOnly = true;
-    const dateInfo = resolveAiDatePhrase(text, new Date());
+    const now = new Date();
+    const dateInfo = resolveAiDatePhrase(text, now);
     if (dateInfo) {
         ctx.dateFrom = dateInfo.dateFrom;
         ctx.dateTo = dateInfo.dateTo;
@@ -2176,13 +2220,22 @@ function parseAiSearchQuery(rawText, prevContext) {
         if (dateInfo.timeTo != null)
             ctx.timeTo = dateInfo.timeTo;
     }
-    const timeInfo = resolveAiTimePhrase(text);
+    const timeInfo = resolveAiTimePhrase(text, now);
     if (timeInfo) {
         if (timeInfo.timeFrom != null)
             ctx.timeFrom = timeInfo.timeFrom;
         if (timeInfo.timeTo != null)
             ctx.timeTo = timeInfo.timeTo;
+        if (timeInfo.targetMinutes != null)
+            ctx.targetMinutes = timeInfo.targetMinutes;
         ctx.availabilityRequired = true;
+        // A time-only request ("in 2 hours", "right now") implies today unless the text also
+        // named a different day above — never silently reinterpret an explicit future date.
+        if (!dateInfo) {
+            ctx.dateFrom = aiStartOfDay(now);
+            ctx.dateTo = aiEndOfDay(now);
+            ctx.dateLabel = 'Today';
+        }
     }
     if (/\bavailable\b|\bavailability\b/.test(text))
         ctx.availabilityRequired = true;
@@ -2191,6 +2244,15 @@ function parseAiSearchQuery(rawText, prevContext) {
         ctx.location = 'current';
     else if (cityHit)
         ctx.location = cityHit;
+    // "for 4", "for four people", "party of 4", "table for 4" — only meaningful for
+    // party-size-aware categories (restaurants today), left null everywhere else.
+    const partyWordNums = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8 };
+    const partyDigitMatch = /(?:for|party of|table for)\s+(\d{1,2})\s*(?:people|guests|person)?\b/.exec(text);
+    const partyWordMatch = !partyDigitMatch && /(?:for|party of|table for)\s+(two|three|four|five|six|seven|eight)\b/.exec(text);
+    if (partyDigitMatch)
+        ctx.partySize = parseInt(partyDigitMatch[1], 10);
+    else if (partyWordMatch)
+        ctx.partySize = partyWordNums[partyWordMatch[1]];
     const leftoverWords = text.replace(/[^\w\s]/g, ' ').split(/\s+/).filter((w) => w && !AI_SEARCH_STOPWORDS.has(w) && !/\d/.test(w) && w.length > 2 && !AI_SEARCH_WEEKDAY_NAMES.includes(w));
     ctx.keywords = leftoverWords.filter((w) => !AI_SEARCH_CATEGORY_KEYWORDS.some((g) => g.words.includes(w)) && !AI_SEARCH_SERVICE_KEYWORDS.some((g) => g.words.includes(w)));
     return ctx;
@@ -5274,12 +5336,24 @@ function App() {
         };
         recognition.start();
     }
-    function aiCandidateAvailability(item, ctx) {
-        if (!ctx.availabilityRequired)
-            return { available: true, availableToday: false, checked: false };
+    // Restaurants don't have staff/appointment slots — they have tables and a party size, so
+    // they run through the real table-availability engine (computeRestaurantAvailability, the
+    // same function the actual reservation flow uses) instead of the generic appointment path.
+    function aiSlotsForDay(item, day, ctx) {
+        if (item.businessType === 'restaurant')
+            return computeRestaurantAvailability(item, restaurantReservations, { date: dateKey(day), partySize: ctx.partySize || 2, area: 'no-preference' });
         const staffList = getStaffForTarget(item);
         const services = getServicesForTarget(item);
         const duration = (services[0] && services[0].durationMin) || 30;
+        const staffToCheck = staffList.length ? staffList : [null];
+        let slots = [];
+        for (const st of staffToCheck)
+            slots = slots.concat(generateAvailableSlots(item.id, day, duration, st));
+        return slots;
+    }
+    function aiCandidateAvailability(item, ctx) {
+        if (!ctx.availabilityRequired)
+            return { available: true, availableToday: false, checked: false };
         const days = [];
         if (ctx.dateFrom) {
             let d = aiStartOfDay(ctx.dateFrom);
@@ -5294,47 +5368,36 @@ function App() {
         else {
             days.push(aiStartOfDay(new Date()));
         }
-        const staffToCheck = staffList.length ? staffList : [null];
         let available = false;
         let availableToday = false;
         const todayKey = dateKey(new Date());
         const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
         for (const day of days) {
-            for (const st of staffToCheck) {
-                let slots = generateAvailableSlots(item.id, day, duration, st);
-                if (ctx.timeFrom != null)
-                    slots = slots.filter((s) => s.minutes >= ctx.timeFrom);
-                if (ctx.timeTo != null)
-                    slots = slots.filter((s) => s.minutes <= ctx.timeTo);
-                if (ctx.openNow && dateKey(day) === todayKey)
-                    slots = slots.filter((s) => s.minutes >= nowMin);
-                if (slots.length > 0) {
-                    available = true;
-                    if (dateKey(day) === todayKey)
-                        availableToday = true;
-                }
+            let slots = aiSlotsForDay(item, day, ctx);
+            if (ctx.timeFrom != null)
+                slots = slots.filter((s) => s.minutes >= ctx.timeFrom);
+            if (ctx.timeTo != null)
+                slots = slots.filter((s) => s.minutes <= ctx.timeTo);
+            if (ctx.openNow && dateKey(day) === todayKey)
+                slots = slots.filter((s) => s.minutes >= nowMin);
+            if (slots.length > 0) {
+                available = true;
+                if (dateKey(day) === todayKey)
+                    availableToday = true;
             }
         }
         return { available, availableToday, checked: true };
     }
-    function aiEarliestAvailability(item) {
-        const staffList = getStaffForTarget(item);
-        const services = getServicesForTarget(item);
-        const duration = (services[0] && services[0].durationMin) || 30;
-        const staffToCheck = staffList.length ? staffList : [null];
+    function aiEarliestAvailability(item, ctx) {
         const now = new Date();
         const nowMin = now.getHours() * 60 + now.getMinutes();
         const todayStart = aiStartOfDay(now);
         for (let dayOffset = 0; dayOffset < 3; dayOffset++) {
             const day = aiAddDays(todayStart, dayOffset);
-            let earliest = null;
-            for (const st of staffToCheck) {
-                let slots = generateAvailableSlots(item.id, day, duration, st);
-                if (dayOffset === 0)
-                    slots = slots.filter((s) => s.minutes >= nowMin);
-                if (slots.length > 0 && (!earliest || slots[0].minutes < earliest.minutes))
-                    earliest = slots[0];
-            }
+            let slots = aiSlotsForDay(item, day, ctx || {});
+            if (dayOffset === 0)
+                slots = slots.filter((s) => s.minutes >= nowMin);
+            const earliest = slots.length ? slots.reduce((a, b) => a.minutes < b.minutes ? a : b) : null;
             if (earliest) {
                 const dayLabel = dayOffset === 0 ? 'Today' : dayOffset === 1 ? 'Tomorrow' : day.toLocaleDateString('en-US', { weekday: 'short' });
                 return { dayLabel, timeLabel: earliest.label, isToday: dayOffset === 0 };
@@ -5414,12 +5477,44 @@ function App() {
             return;
         setAiRefineDraft('');
         const parsed = parseAiSearchQuery(text, aiSearchContext);
+        // A bare relative adjustment ("cheaper", "more affordable") carries no number for
+        // parseAiSearchQuery to extract — anchor a new ceiling to what's actually on screen
+        // right now rather than guessing at an absolute dollar figure.
+        if (/\bcheaper\b|\bmore affordable\b|\blower price\b/.test(text.toLowerCase()) && parsed.maxPrice === aiSearchContext.maxPrice) {
+            const prices = aiSearchResults.map((r) => r.price).filter((p) => p != null);
+            if (prices.length) {
+                const currentCeiling = aiSearchContext.maxPrice != null ? aiSearchContext.maxPrice : Math.max(...prices);
+                const cheaperCeiling = Math.max(10, Math.round(Math.min(currentCeiling, Math.max(...prices)) * 0.75));
+                parsed.maxPrice = cheaperCeiling;
+                parsed.sortBy = 'price';
+            }
+        }
         applyAiSearchResult(parsed);
     }
     function updateAiContextFields(patch) {
         if (!aiSearchContext)
             return;
         applyAiSearchResult({ ...aiSearchContext, ...patch });
+    }
+    // Tapping the time/party-size chips (as opposed to their X) nudges the value and reruns
+    // the search immediately — "editable without rewriting the search" from a single tap,
+    // same lightweight cycle-on-tap pattern the pre-search date/price pills already use.
+    function cycleAiChipTime() {
+        if (!aiSearchContext)
+            return;
+        const now = new Date();
+        const cur = aiSearchContext.targetMinutes != null ? aiSearchContext.targetMinutes
+            : aiSearchContext.timeFrom != null ? aiSearchContext.timeFrom + AI_SEARCH_TARGET_WINDOW_MIN
+                : now.getHours() * 60 + now.getMinutes();
+        const next = cur + 30 > 22 * 60 ? 8 * 60 : cur + 30;
+        updateAiContextFields({ targetMinutes: next, timeFrom: Math.max(0, next - AI_SEARCH_TARGET_WINDOW_MIN), timeTo: Math.min(23 * 60 + 59, next + AI_SEARCH_TARGET_WINDOW_MIN) });
+    }
+    function cycleAiChipPartySize() {
+        if (!aiSearchContext)
+            return;
+        const options = [2, 3, 4, 5, 6];
+        const idx = options.indexOf(aiSearchContext.partySize || 2);
+        updateAiContextFields({ partySize: options[(idx + 1) % options.length] });
     }
     function applyAiRecoveryStep(step) {
         if (!aiSearchContext)
@@ -8989,7 +9084,7 @@ function App() {
                             React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: t.id === 'people' ? THEME.coral : T.surface, transition: 'width 0.2s' } }));
                     })),
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 } },
-                    React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
+                    React.createElement("button", { onClick: () => openAiSearchFromHome(), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
                         React.createElement(Icon, { name: "search", size: 20, color: "#fff" }),
                         React.createElement("span", { style: { width: 0, height: 2 } })),
                     React.createElement("button", { onClick: () => setFilterSheetOpen(true), style: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
@@ -9119,7 +9214,7 @@ function App() {
                             React.createElement("span", { style: { width: active ? (isMain ? 22 : 15) : 0, height: 2, borderRadius: 2, background: t.id === 'people' ? THEME.coral : T.surface, transition: 'width 0.2s' } }));
                     })),
                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 } },
-                    React.createElement("button", { onClick: openHomeSearch, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
+                    React.createElement("button", { onClick: () => openAiSearchFromHome(), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
                         React.createElement(Icon, { name: "search", size: 20, color: "#fff" }),
                         React.createElement("span", { style: { width: 0, height: 2 } })),
                     React.createElement("button", { onClick: () => setFilterSheetOpen(true), style: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
@@ -9338,19 +9433,25 @@ function App() {
                         locationPicker,
                         stage === 'loading' ? loadingSkeleton : React.createElement(React.Fragment, null, tryChipsSection, recentSearchesCard, trendingSection, aiPicksSection, React.createElement("div", { style: { height: 30 } }))));
             }
-            const timeChipLabel = ctx && (ctx.timeFrom != null || ctx.timeTo != null)
-                ? (ctx.timeFrom != null && ctx.timeTo != null ? `${minutesToTimeLabel(ctx.timeFrom)}–${minutesToTimeLabel(ctx.timeTo)}` : ctx.timeFrom != null ? `After ${minutesToTimeLabel(ctx.timeFrom)}` : `Before ${minutesToTimeLabel(ctx.timeTo)}`)
-                : null;
+            const timeChipLabel = ctx && ctx.targetMinutes != null
+                ? `Around ${minutesToTimeLabel(ctx.targetMinutes)}`
+                : ctx && (ctx.timeFrom != null || ctx.timeTo != null)
+                    ? (ctx.timeFrom != null && ctx.timeTo != null ? `${minutesToTimeLabel(ctx.timeFrom)}–${minutesToTimeLabel(ctx.timeTo)}` : ctx.timeFrom != null ? `After ${minutesToTimeLabel(ctx.timeFrom)}` : `Before ${minutesToTimeLabel(ctx.timeTo)}`)
+                    : null;
             const activeFilterChips = [];
             if (ctx) {
                 if (ctx.service || ctx.category)
-                    activeFilterChips.push({ key: 'category', label: `${ctx.service || ctx.category}s`, onRemove: () => updateAiContextFields({ category: null, service: null }) });
+                    activeFilterChips.push({ key: 'category', label: (() => { const base = ctx.service || ctx.category; return base.endsWith('s') ? base : base + 's'; })(), onRemove: () => updateAiContextFields({ category: null, service: null }) });
                 if (ctx.eventType)
                     activeFilterChips.push({ key: 'eventType', label: aiCapitalize(ctx.eventType), onRemove: () => updateAiContextFields({ eventType: null }) });
                 if (ctx.dateLabel)
-                    activeFilterChips.push({ key: 'date', label: ctx.dateLabel, onRemove: () => updateAiContextFields({ dateFrom: null, dateTo: null, dateLabel: null, timeFrom: null, timeTo: null, availabilityRequired: false }) });
+                    activeFilterChips.push({ key: 'date', label: ctx.dateLabel, onRemove: () => updateAiContextFields({ dateFrom: null, dateTo: null, dateLabel: null, timeFrom: null, timeTo: null, targetMinutes: null, availabilityRequired: false }) });
+                // Tapping the label nudges the time forward and reruns; the X still clears it —
+                // "editable without rewriting the search" from a single tap on the chip itself.
                 if (timeChipLabel)
-                    activeFilterChips.push({ key: 'time', label: timeChipLabel, onRemove: () => updateAiContextFields({ timeFrom: null, timeTo: null }) });
+                    activeFilterChips.push({ key: 'time', label: timeChipLabel, onTap: cycleAiChipTime, onRemove: () => updateAiContextFields({ timeFrom: null, timeTo: null, targetMinutes: null }) });
+                if (ctx.category === 'Restaurants')
+                    activeFilterChips.push({ key: 'partySize', label: `${ctx.partySize || 2} ${(ctx.partySize || 2) === 1 ? 'guest' : 'guests'}`, onTap: cycleAiChipPartySize, onRemove: () => updateAiContextFields({ partySize: null }) });
                 if (ctx.location)
                     activeFilterChips.push({ key: 'location', label: ctx.location === 'current' ? 'Near me' : aiCapitalize(ctx.location), onRemove: () => updateAiContextFields({ location: null }) });
                 if (ctx.radius != null)
@@ -9387,9 +9488,12 @@ function App() {
             const recoverySteps = (aiSearchRelaxedField && aiSearchRelaxedField !== 'none' && ctx)
                 ? AI_SEARCH_RELAX_STEPS.filter((s) => s.key !== aiSearchRelaxedField && s.key !== 'category' && aiSearchRelaxStepHasValue(ctx, s.key)).slice(0, 2)
                 : [];
-            const summaryNoun = ctx ? `${(ctx.service || ctx.category || 'option')}${aiSearchResults.length === 1 ? '' : 's'}` : 'options';
-            const summaryDateBit = ctx && ctx.dateLabel ? ` available ${ctx.dateLabel.toLowerCase()}` : '';
-            const summaryText = aiSearchRelaxedNote || `I found ${aiSearchResults.length} ${summaryNoun}${summaryDateBit}. I ranked them based on availability, distance, rating, price, and how closely they match your request.`;
+            const summaryNounBase = ctx ? (ctx.service || ctx.category || 'option') : 'option';
+            const summaryNoun = ctx ? `${summaryNounBase}${aiSearchResults.length !== 1 && !summaryNounBase.endsWith('s') ? 's' : ''}` : 'options';
+            const summaryTimeBit = ctx && ctx.targetMinutes != null
+                ? ` around ${minutesToTimeLabel(ctx.targetMinutes)}`
+                : ctx && ctx.dateLabel ? ` available ${ctx.dateLabel.toLowerCase()}` : '';
+            const summaryText = aiSearchRelaxedNote || `I found ${aiSearchResults.length} ${summaryNoun}${summaryTimeBit}. I ranked them based on availability, distance, rating, price, and how closely they match your request.`;
             const resultsHeader = React.createElement("div", { style: { flexShrink: 0, padding: '14px 18px 0' } },
                 aiQueryEditing
                     ? React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', borderRadius: 16, background: T.surfaceSecondary, border: `1.5px solid ${THEME.coral}` } },
@@ -9407,7 +9511,11 @@ function App() {
                 recoverySteps.length > 0 && React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 } }, recoverySteps.map((step) => React.createElement("button", { key: step.key, className: "avio-pill", onClick: () => applyAiRecoveryStep(step), style: { padding: '7px 12px', borderRadius: 12, background: T.surface, border: `1px solid ${THEME.violet}` } },
                     React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: THEME.violet } }, step.actionLabel(ctx))))),
                 activeFilterChips.length > 0 && React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 6, marginTop: 12, overflowX: 'auto' } }, activeFilterChips.map((c) => React.createElement("div", { key: c.key, className: "avio-chip-pop", style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 12, background: T.textPrimary } },
-                    React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: T.background } }, c.label),
+                    c.onTap
+                        ? React.createElement("button", { onClick: c.onTap, style: { display: 'flex', alignItems: 'center', gap: 3 } },
+                            React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: T.background } }, c.label),
+                            React.createElement(Icon, { name: "chevrondown", size: 9, color: T.background }))
+                        : React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: T.background } }, c.label),
                     React.createElement("button", { onClick: c.onRemove, style: { display: 'flex' } }, React.createElement(Icon, { name: "x", size: 10, color: T.background }))))),
                 suggestedChips.length > 0 && React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, marginTop: 12, overflowX: 'auto' } }, suggestedChips.map((chip) => React.createElement("button", { key: chip.key, className: "avio-pill", onClick: chip.onTap, style: { flexShrink: 0, padding: '8px 14px', borderRadius: 16, background: T.surfaceSecondary, border: `1px solid ${T.border}` } },
                     React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: '#484848' } }, chip.label)))));
@@ -9419,7 +9527,7 @@ function App() {
                         const badge = resultBadges[item.id];
                         const reviewCount = item.comments || 0;
                         const isOpen = (item.openStatus || '').startsWith('Open Now') || (item.openStatus || '').startsWith('Available');
-                        const earliest = aiEarliestAvailability(item);
+                        const earliest = aiEarliestAvailability(item, ctx);
                         return React.createElement("button", { key: item.id, onClick: () => openBusinessProfile(item), className: "avio-results-in avio-press", style: { animationDelay: `${Math.min(i, 6) * 0.04}s`, display: 'flex', gap: 12, width: '100%', textAlign: 'left', padding: 12, borderRadius: 18, border: `1px solid ${T.border}`, background: T.surface, marginBottom: 10, boxShadow: '0 2px 10px rgba(0,0,0,0.04)' } },
                             item.image
                                 ? React.createElement("div", { style: { width: 76, height: 76, borderRadius: 14, flexShrink: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
