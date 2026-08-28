@@ -2051,7 +2051,7 @@ const AI_SEARCH_CATEGORY_KEYWORDS = [
 const AI_SEARCH_SERVICE_KEYWORDS = [
     { service: 'Photographer', words: ['photographer', 'photography', 'photoshoot'] },
     { service: 'DJ', words: ['dj', 'deejay'] },
-    { service: 'Barber', words: ['barber', 'barbershop', 'fade', 'haircut'] },
+    { service: 'Barber', words: ['barber', 'barbershop', 'fade', 'haircut', 'cut my hair', 'lineup', 'line up'] },
     { service: 'Hair Stylist', words: ['hairstylist', 'hair stylist', 'stylist', 'balayage', 'blowout', 'braid', 'braids', 'salon'] },
     { service: 'Makeup Artist', words: ['makeup', 'mua'] },
     { service: 'Nail Tech', words: ['nail', 'nails', 'mani', 'pedi'] },
@@ -2067,6 +2067,13 @@ const AI_SEARCH_CITY_NAMES = ['miami', 'denver', 'austin', 'brooklyn', 'chicago'
 const AI_SEARCH_WEEKDAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const AI_SEARCH_STOPWORDS = new Set(['find', 'me', 'a', 'an', 'the', 'for', 'near', 'nearby', 'my', 'that', 'who', 'comes', 'to', 'house', 'home', 'today', 'tomorrow', 'tonight', 'under', 'below', 'less', 'than', 'best', 'good', 'available', 'this', 'weekend', 'afternoon', 'evening', 'morning', 'after', 'before', 'with', 'and', 'only', 'show', 'ones', 'some', 'i', 'need', 'someone', 'something', 'fun', 'do', 'looking', 'want', 'is', 'are', 'of', 'in', 'on', 'at', 'nice', 'next', 'within', 'miles', 'mile', 'mi', 'over', 'above', 'least', 'minimum', 'closest', 'cheapest', 'lowest', 'price', 'rated', 'highly', 'top', 'actually',
     'hours', 'hour', 'minutes', 'minute', 'mins', 'min', 'right', 'now', 'asap', 'immediately', 'work', 'about', 'around', 'cheaper', 'affordable', 'instead', 'people', 'person', 'party', 'guests']);
+// "Near me" without an explicit radius must still mean SOMETHING enforceable — a real
+// device-location search defaults to a genuine walk/drive-able radius, a named-city
+// search defaults to a metro-scale radius, and neither is ever silently widened past
+// this without the customer actively choosing to (see AI_SEARCH_RELAX_STEPS skipping
+// 'radius', and the explicit "10 miles / 25 miles / Change location" recovery UI).
+const AI_SEARCH_DEFAULT_NEARBY_RADIUS_MI = 5;
+const AI_SEARCH_DEFAULT_CITY_RADIUS_MI = 25;
 function aiCapitalize(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
 function aiStartOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function aiEndOfDay(d) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
@@ -2244,6 +2251,17 @@ function parseAiSearchQuery(rawText, prevContext) {
         ctx.location = 'current';
     else if (cityHit)
         ctx.location = cityHit;
+    // "Near me" (or a named city) is meaningless as a hard requirement without an actual
+    // radius to enforce it — default to a real, sane distance rather than letting it sit
+    // there as decoration. Never overwrites a radius the customer (or a prior turn) already
+    // set, and never re-applies once the customer has actively cleared it (that happens via
+    // updateAiContextFields, which calls applyAiSearchResult directly and skips this parser).
+    if (ctx.radius == null) {
+        if (ctx.location === 'current')
+            ctx.radius = AI_SEARCH_DEFAULT_NEARBY_RADIUS_MI;
+        else if (ctx.location)
+            ctx.radius = AI_SEARCH_DEFAULT_CITY_RADIUS_MI;
+    }
     // "for 4", "for four people", "party of 4", "table for 4" — only meaningful for
     // party-size-aware categories (restaurants today), left null everywhere else.
     const partyWordNums = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8 };
@@ -2270,8 +2288,24 @@ function normalizeAiSearchCandidate(feedList, exploreItem) {
         distance: '2.0 mi', openStatus: 'Open Now', locationMode: 'At my business location', hashtags: [],
     };
 }
+// A shared parent category (e.g. "Beauty") is never enough to qualify for a specific
+// service request — a nail salon must not pass a barber search just because both are
+// Beauty businesses. This checks the actual name/category/blurb/hashtags text against
+// that service's own keyword list, the same word-matching approach QUICK_SEARCH_GROUPS
+// already uses elsewhere in the app.
+function aiItemMatchesService(item, service) {
+    if (!service)
+        return true;
+    const group = AI_SEARCH_SERVICE_KEYWORDS.find((g) => g.service === service);
+    if (!group)
+        return true;
+    const hay = `${item.name} ${item.category} ${item.blurb || ''} ${(item.hashtags || []).join(' ')}`.toLowerCase();
+    return group.words.some((w) => hay.includes(w));
+}
 function matchesAiSearchContext(item, ctx) {
     if (ctx.category && item.category !== ctx.category)
+        return false;
+    if (ctx.service && !aiItemMatchesService(item, ctx.service))
         return false;
     if (ctx.maxPrice != null && (item.price || 0) > ctx.maxPrice)
         return false;
@@ -2279,7 +2313,21 @@ function matchesAiSearchContext(item, ctx) {
         return false;
     if (ctx.minRating != null && (item.rating || 0) < ctx.minRating)
         return false;
-    if (ctx.radius != null) {
+    // Once a location intent is set, real geography (annotated onto the candidate by
+    // annotateAiSearchGeo — real haversine distance + real service-area eligibility)
+    // decides, never the seeded per-item `distance` string. The legacy string check only
+    // remains as a defensive fallback for a candidate that somehow reached here
+    // un-annotated (should not happen once the search pipeline runs end to end).
+    if (ctx.location) {
+        if (item._locationEligible === false)
+            return false;
+        if (item._locationEligible == null && ctx.radius != null) {
+            const d = parseFloat(item.distance);
+            if (isNaN(d) || d > ctx.radius)
+                return false;
+        }
+    }
+    else if (ctx.radius != null) {
         const d = parseFloat(item.distance);
         if (isNaN(d) || d > ctx.radius)
             return false;
@@ -2309,7 +2357,7 @@ function scoreAiSearchCandidate(item, ctx) {
         else if (item._availability.available)
             score += 1000;
     }
-    const distanceMi = parseFloat(item.distance);
+    const distanceMi = item._realDistanceMi != null ? item._realDistanceMi : parseFloat(item.distance);
     score += Math.max(0, 200 - (isNaN(distanceMi) ? 100 : distanceMi) * 15);
     score += (item.rating || 4.5) * 20;
     score += Math.min(50, Math.log10((item.comments || 0) + 1) * 20);
@@ -2352,10 +2400,15 @@ function runAiSearch(candidates, ctx) {
     let relaxedNote = null;
     let relaxedField = null;
     let workingCtx = ctx;
+    let locationBlocked = false;
     if (results.length === 0) {
         let relaxedCtx = ctx;
         for (const step of AI_SEARCH_RELAX_STEPS) {
-            if (step.key === 'dateFrom')
+            // radius, category, and dateFrom are hard requirements the customer explicitly
+            // asked for (or that "near me"/a service search implied) — silently dropping any
+            // of them is exactly what let unrelated-city and unrelated-category results
+            // through before. Only genuine soft preferences auto-relax here, one at a time.
+            if (step.key === 'dateFrom' || step.key === 'radius' || step.key === 'category')
                 continue;
             if (aiSearchRelaxStepHasValue(relaxedCtx, step.key)) {
                 relaxedCtx = step.clear(relaxedCtx);
@@ -2370,13 +2423,31 @@ function runAiSearch(candidates, ctx) {
             }
         }
         if (results.length === 0) {
-            results = [...candidates].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 6);
-            relaxedNote = "I couldn't find an exact match, but here are some highly rated options nearby.";
-            relaxedField = 'none';
+            if (ctx.location && ctx.radius != null) {
+                // Zero matches inside the radius the customer set (explicitly or via the
+                // "near me" default) is never silently backfilled with distant results —
+                // the customer has to actively choose to expand the search.
+                locationBlocked = true;
+                relaxedField = 'locationBlocked';
+            }
+            else {
+                // Even the last-resort fallback must never cross into a category or service
+                // the customer didn't ask for (that's exactly how a nail salon used to show
+                // up for a barber search) — it only ever loosens price/rating/availability.
+                const strict = candidates.filter((i) => (!ctx.category || i.category === ctx.category) && aiItemMatchesService(i, ctx.service));
+                if (strict.length > 0) {
+                    results = [...strict].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 6);
+                    relaxedNote = "I couldn't find an exact match, but here are some highly rated options that fit your request.";
+                }
+                else {
+                    relaxedNote = "I couldn't find any matches for that — try a different search or fewer requirements.";
+                }
+                relaxedField = 'none';
+            }
         }
     }
     results = aiSortResults(results, ctx, workingCtx);
-    return { results, relaxedNote, relaxedField };
+    return { results, relaxedNote, relaxedField, locationBlocked };
 }
 function aiSortResults(results, ctx, scoreCtx) {
     return [...results].sort((a, b) => {
@@ -2401,13 +2472,13 @@ function computeAiSearchBadges(results, ctx) {
     const badges = {};
     if (!results.length)
         return badges;
-    const distances = results.map((r) => { const d = parseFloat(r.distance); return isNaN(d) ? Infinity : d; });
+    const distances = results.map((r) => { const d = r._realDistanceMi != null ? r._realDistanceMi : parseFloat(r.distance); return isNaN(d) ? Infinity : d; });
     const minDistance = Math.min(...distances);
     const maxRating = Math.max(...results.map((r) => r.rating || 0));
     const prices = results.map((r) => r.price != null ? r.price : Infinity);
     const minPrice = Math.min(...prices);
     results.forEach((item, i) => {
-        const d = parseFloat(item.distance);
+        const d = item._realDistanceMi != null ? item._realDistanceMi : parseFloat(item.distance);
         if (item._availability && item._availability.availableToday) {
             badges[item.id] = { icon: '⚡', label: 'Available today', bg: 'rgba(46,155,255,0.12)', color: '#2E9BFF' };
         }
@@ -4595,6 +4666,8 @@ function App() {
     const [aiSearchResults, setAiSearchResults] = useState([]);
     const [aiSearchRelaxedNote, setAiSearchRelaxedNote] = useState(null);
     const [aiSearchRelaxedField, setAiSearchRelaxedField] = useState(null);
+    const [aiSearchLocationBlocked, setAiSearchLocationBlocked] = useState(false);
+    const [aiPendingSearchCtx, setAiPendingSearchCtx] = useState(null);
     const [aiRefineDraft, setAiRefineDraft] = useState('');
     const [aiRecentSearches, setAiRecentSearches] = useState(() => loadLS('avio_ai_recent_searches', [
         { id: 'seed-barber', text: 'Barber', ts: Date.now() - 50000 },
@@ -5295,6 +5368,8 @@ function App() {
         setAiSearchResults([]);
         setAiSearchRelaxedNote(null);
         setAiSearchRelaxedField(null);
+        setAiSearchLocationBlocked(false);
+        setAiPendingSearchCtx(null);
         setAiRefineDraft('');
         setAiQueryEditing(false);
         setAiQueryDraft('');
@@ -5407,25 +5482,72 @@ function App() {
     }
     function runAiSearchFull(candidates, ctx) {
         const base = runAiSearch(candidates, ctx);
+        if (base.locationBlocked)
+            return base;
         if (!ctx.availabilityRequired)
             return base;
         const withAvailability = base.results.map((item) => ({ ...item, _availability: aiCandidateAvailability(item, ctx) }));
         const filtered = withAvailability.filter((i) => i._availability.available);
         if (filtered.length > 0) {
             const resorted = aiSortResults(filtered, ctx, ctx);
-            return { results: resorted, relaxedNote: base.relaxedNote, relaxedField: base.relaxedField };
+            return { results: resorted, relaxedNote: base.relaxedNote, relaxedField: base.relaxedField, locationBlocked: false };
         }
         const fallbackNote = base.relaxedNote
             ? `${base.relaxedNote} None had confirmed availability for that exact time either — check each profile for other times.`
             : "I couldn't confirm availability for that exact time, so here are the closest matches — check each profile for other available times.";
-        return { results: withAvailability, relaxedNote: fallbackNote, relaxedField: base.relaxedField || 'dateFrom' };
+        return { results: withAvailability, relaxedNote: fallbackNote, relaxedField: base.relaxedField || 'dateFrom', locationBlocked: false };
     }
-    function applyAiSearchResult(ctx) {
-        const { results, relaxedNote, relaxedField } = runAiSearchFull(aiSearchCandidates, ctx);
+    // Real geography for real "near me" enforcement — resolves the search center (the
+    // customer's actual device location for "current", or a named city's real center),
+    // then computes each candidate's genuine haversine distance from it and whether it can
+    // actually serve that location (reusing the exact eligibility model the Nearby map
+    // already uses: fixed businesses by straight-line distance, mobile/traveling providers
+    // by their configured service area). Returns candidates unchanged when no real center is
+    // resolvable yet (e.g. "near me" before location has been granted) — callers must gate
+    // on that themselves rather than ever falling back to a guess.
+    function annotateAiSearchGeo(candidates, ctx, overrideUserLatLng) {
+        if (!ctx || !ctx.location)
+            return candidates;
+        const center = ctx.location === 'current' ? (overrideUserLatLng || nearbyUserLatLng) : (CITY_COORDS[ctx.location] || null);
+        if (!center)
+            return candidates;
+        const radius = ctx.radius != null ? ctx.radius : Infinity;
+        return candidates.map((item) => {
+            const latlng = getBusinessLatLng(item);
+            const distanceMi = latlng ? haversineMi(center[0], center[1], latlng[0], latlng[1]) : null;
+            const travel = getBusinessTravelInfo(item);
+            const elig = getNearbyEligibility(item, distanceMi, travel);
+            const showsRealDistance = !!(elig.showsDistance && distanceMi != null);
+            return {
+                ...item,
+                distance: showsRealDistance ? `${distanceMi < 0.1 ? '<0.1' : distanceMi.toFixed(1)} mi` : item.distance,
+                _realDistanceMi: distanceMi,
+                _showsRealDistance: showsRealDistance,
+                _locationEligible: elig.eligible && distanceMi != null && distanceMi <= radius,
+            };
+        });
+    }
+    function applyAiSearchResult(ctx, resolvedLatLng) {
+        // Never guess a "near me" result before real device location is known — defer the
+        // search and ask for it instead. This is the single choke point every entry point
+        // (initial search, query edit, refine, chip edits, recovery steps) runs through, so
+        // gating here covers all of them uniformly. `resolvedLatLng` lets a caller that just
+        // acquired real coordinates this same tick (setState is async, so nearbyUserLatLng
+        // itself won't reflect it until the next render) pass them straight through instead
+        // of bouncing back into the "needs location" gate it only just resolved.
+        const userLatLng = resolvedLatLng || nearbyUserLatLng;
+        if (ctx.location === 'current' && !userLatLng) {
+            setAiPendingSearchCtx(ctx);
+            setAiSearchStage('needsLocation');
+            return;
+        }
+        const geoCandidates = annotateAiSearchGeo(aiSearchCandidates, ctx, userLatLng);
+        const { results, relaxedNote, relaxedField, locationBlocked } = runAiSearchFull(geoCandidates, ctx);
         setAiSearchContext(ctx);
         setAiSearchResults(results);
         setAiSearchRelaxedNote(relaxedNote);
         setAiSearchRelaxedField(relaxedField);
+        setAiSearchLocationBlocked(!!locationBlocked);
         setAiSearchStage('results');
     }
     function submitAiSearch(queryText) {
@@ -5541,10 +5663,37 @@ function App() {
             setAiLocationPickerOpen(true);
             return;
         }
-        navigator.geolocation.getCurrentPosition(() => {
+        navigator.geolocation.getCurrentPosition((pos) => {
+            // Reuses the same canonical "user's real device location" state the Nearby map
+            // populates — capturing the actual coordinates (not just a granted/denied flag)
+            // is what lets "near me" be enforced against real geography instead of decoration.
+            setNearbyUserLatLng([pos.coords.latitude, pos.coords.longitude]);
             setAiLocationStatus('granted');
             setAiSearchFilters((prev) => ({ ...prev, location: 'current' }));
             flashToast('Using your current location');
+        }, () => {
+            setAiLocationStatus('denied');
+            setAiLocationPickerOpen(true);
+        }, { timeout: 6000 });
+    }
+    // Resolves the "📍 Use your location to find nearby matches" prompt shown when a
+    // "near me" search was requested before real coordinates were known — acquires real
+    // location, then runs the search that was waiting on it. Never runs a near-me search
+    // without this actually succeeding.
+    function retryAiPendingLocationSearch() {
+        if (!aiPendingSearchCtx)
+            return;
+        if (!('geolocation' in navigator)) {
+            setAiLocationPickerOpen(true);
+            return;
+        }
+        navigator.geolocation.getCurrentPosition((pos) => {
+            const ll = [pos.coords.latitude, pos.coords.longitude];
+            setNearbyUserLatLng(ll);
+            setAiLocationStatus('granted');
+            const ctx = aiPendingSearchCtx;
+            setAiPendingSearchCtx(null);
+            applyAiSearchResult(ctx, ll);
         }, () => {
             setAiLocationStatus('denied');
             setAiLocationPickerOpen(true);
@@ -5555,6 +5704,15 @@ function App() {
         setAiLocationStatus('manual');
         setAiLocationPickerOpen(false);
         setAiManualCity('');
+        // Manually picking a city resolves either a pending "near me" search waiting on real
+        // location, or a "Change location" tap from an already-blocked result set — both
+        // cases substitute a real, named place for "current" rather than ever guessing.
+        const waitingCtx = aiPendingSearchCtx || aiSearchContext;
+        if (waitingCtx) {
+            const ctx = { ...waitingCtx, location: city, radius: AI_SEARCH_DEFAULT_CITY_RADIUS_MI };
+            setAiPendingSearchCtx(null);
+            applyAiSearchResult(ctx);
+        }
     }
     const exploreItems = useMemo(() => {
         let items = EXPLORE_ITEMS;
@@ -9425,6 +9583,21 @@ function App() {
                         React.createElement("div", { className: "avio-skeleton", style: { height: 14, width: '70%' } }),
                         React.createElement("div", { className: "avio-skeleton", style: { height: 11, width: '50%' } }),
                         React.createElement("div", { className: "avio-skeleton", style: { height: 11, width: '40%' } })))));
+            if (stage === 'needsLocation') {
+                return React.createElement(React.Fragment, null,
+                    header,
+                    React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto' } },
+                        React.createElement("div", { style: { margin: '50px 28px 0', textAlign: 'center' } },
+                            React.createElement("span", { style: { fontSize: 32 } }, "📍"),
+                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: T.textPrimary, marginTop: 16 } }, "Use your location to find nearby matches"),
+                            React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 6, lineHeight: 1.5 } }, "We need your real location to show results that are actually near you — we never guess."),
+                            React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, marginTop: 24 } },
+                                React.createElement("button", { className: "avio-press", onClick: retryAiPendingLocationSearch, style: { padding: '13px 0', borderRadius: 16, background: THEME.coral } },
+                                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: '#fff' } }, "Use My Location")),
+                                React.createElement("button", { className: "avio-press", onClick: () => setAiLocationPickerOpen(true), style: { padding: '13px 0', borderRadius: 16, border: `1px solid ${T.border}` } },
+                                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: T.textPrimary } }, "Enter Location")))),
+                        locationPicker));
+            }
             if (stage === 'home' || stage === 'loading') {
                 return React.createElement(React.Fragment, null,
                     header,
@@ -9485,15 +9658,17 @@ function App() {
                 { key: 'dealsOnly', label: 'Deals only', show: () => aiSearchHasDeals && !ctx.dealsOnly, onTap: () => updateAiContextFields({ dealsOnly: true }) },
             ];
             const suggestedChips = ctx ? SUGGESTED_CHIP_DEFS.filter((c) => c.show()).slice(0, 6) : [];
-            const recoverySteps = (aiSearchRelaxedField && aiSearchRelaxedField !== 'none' && ctx)
-                ? AI_SEARCH_RELAX_STEPS.filter((s) => s.key !== aiSearchRelaxedField && s.key !== 'category' && aiSearchRelaxStepHasValue(ctx, s.key)).slice(0, 2)
+            const recoverySteps = (!aiSearchLocationBlocked && aiSearchRelaxedField && aiSearchRelaxedField !== 'none' && ctx)
+                ? AI_SEARCH_RELAX_STEPS.filter((s) => s.key !== aiSearchRelaxedField && s.key !== 'category' && s.key !== 'radius' && aiSearchRelaxStepHasValue(ctx, s.key)).slice(0, 2)
                 : [];
             const summaryNounBase = ctx ? (ctx.service || ctx.category || 'option') : 'option';
             const summaryNoun = ctx ? `${summaryNounBase}${aiSearchResults.length !== 1 && !summaryNounBase.endsWith('s') ? 's' : ''}` : 'options';
             const summaryTimeBit = ctx && ctx.targetMinutes != null
                 ? ` around ${minutesToTimeLabel(ctx.targetMinutes)}`
                 : ctx && ctx.dateLabel ? ` available ${ctx.dateLabel.toLowerCase()}` : '';
-            const summaryText = aiSearchRelaxedNote || `I found ${aiSearchResults.length} ${summaryNoun}${summaryTimeBit}. I ranked them based on availability, distance, rating, price, and how closely they match your request.`;
+            const summaryText = aiSearchLocationBlocked
+                ? `I checked within ${ctx ? ctx.radius : ''} miles but didn't find a match — try expanding your search area below.`
+                : (aiSearchRelaxedNote || `I found ${aiSearchResults.length} ${summaryNoun}${summaryTimeBit}. I ranked them based on availability, distance, rating, price, and how closely they match your request.`);
             const resultsHeader = React.createElement("div", { style: { flexShrink: 0, padding: '14px 18px 0' } },
                 aiQueryEditing
                     ? React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 14px', borderRadius: 16, background: T.surfaceSecondary, border: `1.5px solid ${THEME.coral}` } },
@@ -9519,8 +9694,23 @@ function App() {
                     React.createElement("button", { onClick: c.onRemove, style: { display: 'flex' } }, React.createElement(Icon, { name: "x", size: 10, color: T.background }))))),
                 suggestedChips.length > 0 && React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, marginTop: 12, overflowX: 'auto' } }, suggestedChips.map((chip) => React.createElement("button", { key: chip.key, className: "avio-pill", onClick: chip.onTap, style: { flexShrink: 0, padding: '8px 14px', borderRadius: 16, background: T.surfaceSecondary, border: `1px solid ${T.border}` } },
                     React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: '#484848' } }, chip.label)))));
+            // Zero matches inside the radius the customer set is shown as its own explicit
+            // "expand the search" choice — never silently backfilled with results the
+            // customer never asked to see (a different city, a different service).
+            const blockedRadiusOptions = [10, 25].filter((mi) => ctx && ctx.radius != null && mi > ctx.radius);
+            const blockedPanel = aiSearchLocationBlocked && React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '50px 26px' } },
+                React.createElement("div", { style: { textAlign: 'center' } },
+                    React.createElement("span", { style: { fontSize: 26 } }, "✨"),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14.5, color: T.textPrimary, marginTop: 12 } }, `No ${summaryNoun} found within ${ctx ? ctx.radius : ''} miles`),
+                    React.createElement("p", { style: { fontSize: 12, color: T.textSecondary, marginTop: 6 } }, "Expand your search area to see more, or change location."),
+                    React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 18 } },
+                        blockedRadiusOptions.map((mi) => React.createElement("button", { key: mi, className: "avio-pill avio-press", onClick: () => updateAiContextFields({ radius: mi }), style: { padding: '9px 16px', borderRadius: 16, background: T.surfaceSecondary, border: `1px solid ${T.border}` } },
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary } }, `${mi} miles`))),
+                        React.createElement("button", { className: "avio-pill avio-press", onClick: () => setAiLocationPickerOpen(true), style: { padding: '9px 16px', borderRadius: 16, background: T.surfaceSecondary, border: `1px solid ${T.border}` } },
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: T.textPrimary } }, "Change location")))),
+                locationPicker);
             const resultBadges = computeAiSearchBadges(aiSearchResults, ctx);
-            const resultsList = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '14px 18px' } },
+            const resultsList = blockedPanel || React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '14px 18px' } },
                 aiSearchResults.length === 0
                     ? React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, textAlign: 'center', padding: '40px 0' } }, "No results yet.")
                     : aiSearchResults.map((item, i) => {
@@ -9545,6 +9735,9 @@ function App() {
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 } },
                                     React.createElement("span", { style: { width: 6, height: 6, borderRadius: '50%', background: isOpen ? THEME.coral : '#B5B5B8', flexShrink: 0 } }),
                                     React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: isOpen ? THEME.coral : '#8A8A8E' } }, item.openStatus || (isOpen ? 'Open Now' : 'Closed'))),
+                                item._showsRealDistance && item._realDistanceMi != null && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 } },
+                                    React.createElement(Icon, { name: "mappin", size: 11, color: T.textSecondary }),
+                                    React.createElement("span", { style: { fontSize: 11, color: T.textSecondary } }, `${item._realDistanceMi < 0.1 ? '<0.1' : item._realDistanceMi.toFixed(1)} mi away`)),
                                 earliest && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 } },
                                     React.createElement(Icon, { name: "clock", size: 11, color: THEME.coral }),
                                     React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: T.textPrimary } }, `Next available: ${earliest.dayLabel} ${earliest.timeLabel}`)),
