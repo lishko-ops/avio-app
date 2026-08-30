@@ -36,11 +36,25 @@
      if that token is ever retinted, update it here too. */
   .leaflet-container { background: #0A0A0C !important; font-family: 'Inter', sans-serif !important; touch-action: none; }
   .avio-map-cluster-wrap, .avio-map-pin-wrap, .avio-user-dot-wrap { background: none !important; border: none !important; }
+  /* The marker wrapper (Leaflet's own icon element, the thing its click/tap listener is
+     actually attached to) must always be able to receive the tap — explicit rather than
+     relying on the browser default, since it sits inside panes stacked above the tile layer. */
+  .avio-map-cluster-wrap, .avio-map-pin-wrap { pointer-events: auto; }
   /* Hit-slop wrappers: the divIcon's own box is the real Leaflet click/tap target, so it's
      sized to a full >=44x44pt touch area even though the visible circle inside stays the
      original smaller size — padding is invisible, never changes how the marker looks. */
-  .avio-map-pin-hit { width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; touch-action: manipulation; cursor: pointer; }
-  .avio-map-cluster-hit { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; touch-action: manipulation; cursor: pointer; }
+  .avio-map-pin-hit { width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; touch-action: manipulation; cursor: pointer; pointer-events: auto; }
+  .avio-map-cluster-hit { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; touch-action: manipulation; cursor: pointer; pointer-events: auto; }
+  /* Every decorative layer drawn INSIDE the hit box (the circle, its photo, the category
+     badge, the cluster's count) is pointer-events:none. On iOS Safari specifically, a bare
+     <img> is not just inert — it's a native touch target of its own (long-press callout,
+     drag-to-save), so a tap landing on the photo portion of a marker (most of its visible
+     area) could be swallowed by iOS's own image gesture handling before it ever reached
+     Leaflet's click listener, instead of bubbling up to it like a normal tap. Killing
+     pointer-events (and the callout/selection/drag side-effects) on every inner layer means
+     a tap ANYWHERE in the circle always hits the *-hit wrapper — a plain div — which is what
+     Leaflet's marker actually listens on. */
+  .avio-map-pin, .avio-map-pin *, .avio-map-cluster, .avio-map-cluster * { pointer-events: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-user-drag: none; }
   .avio-map-cluster { width: 44px; height: 44px; border-radius: 50%; background: #97C400; border: 2.5px solid #fff; color: #fff; font-weight: 700; font-family: 'Space Grotesk', sans-serif; font-size: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.45); }
   .avio-map-pin { position: relative; width: 40px; height: 40px; border-radius: 50%; overflow: hidden; border: 2.5px solid #97C400; box-shadow: 0 4px 10px rgba(0,0,0,0.45); background: #161618 center/cover; }
   .avio-map-pin img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -6286,6 +6300,13 @@ function App() {
             zoomToBoundsOnClick: true,
             iconCreateFunction: (c) => buildNearbyClusterIcon(c.getChildCount()),
         });
+        // TEMPORARY debug proof that a cluster tap is actually reaching Leaflet — check
+        // Safari's remote Web Inspector console on a real device. Purely observational:
+        // added alongside (not instead of) zoomToBoundsOnClick above, so it never changes
+        // what a cluster tap actually does.
+        cluster.on('clusterclick', (e) => {
+            console.log('MAP CLUSTER TAP', e.layer.getAllChildMarkers().map((m) => m.options.businessId));
+        });
         map.addLayer(cluster);
         nearbyMapInstanceRef.current = map;
         nearbyClusterGroupRef.current = cluster;
@@ -6336,11 +6357,20 @@ function App() {
             if (!latlng)
                 return;
             const isSelected = nearbySelectedId === business.id;
-            const marker = L.marker(latlng, { icon: buildNearbyPinIcon(business, isSelected) });
+            // businessId travels on the marker's own options (not just the closure) so a
+            // cluster's getAllChildMarkers() can always be traced back to the exact
+            // businesses it contains — e.g. for the debug log on cluster taps below.
+            const marker = L.marker(latlng, { icon: buildNearbyPinIcon(business, isSelected), businessId: business.id });
             // Reads the latest selection handler via a ref instead of closing over it directly,
             // so this effect's own identity (and therefore whether markers get rebuilt) never
             // has to depend on it.
-            marker.on('click', () => selectNearbyBusinessRef.current(business.id));
+            marker.on('click', () => {
+                // TEMPORARY debug proof that the tap is actually reaching this handler on a
+                // real device — check Safari's remote Web Inspector console. Safe to remove
+                // once confirmed; it has no effect on behavior either way.
+                console.log('MAP MARKER TAP', business.id);
+                selectNearbyBusinessRef.current(business.id);
+            });
             cluster.addLayer(marker);
             markersById.set(business.id, marker);
         });
