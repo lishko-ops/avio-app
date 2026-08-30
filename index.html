@@ -2063,7 +2063,7 @@ const AI_SEARCH_SERVICE_KEYWORDS = [
     { service: 'Event', words: ['concert', 'festival', 'sports event', 'game tickets'] },
 ];
 const AI_SEARCH_EVENT_WORDS = ['birthday', 'wedding', 'anniversary', 'graduation', 'corporate', 'baby shower', 'engagement', 'bachelorette', 'bachelor party'];
-const AI_SEARCH_CITY_NAMES = ['miami', 'denver', 'austin', 'brooklyn', 'chicago', 'new orleans', 'los angeles', 'phoenix'];
+const AI_SEARCH_CITY_NAMES = ['miami', 'denver', 'austin', 'brooklyn', 'chicago', 'new orleans', 'los angeles', 'phoenix', 'manhattan'];
 // Short-form ways people actually name a destination ("go to LA", "need it in NYC") — kept
 // as a separate alias map (rather than folded into AI_SEARCH_CITY_NAMES) because these are
 // short enough that naive substring matching would false-positive inside unrelated words
@@ -2092,6 +2092,17 @@ const AI_SEARCH_DEFAULT_CITY_RADIUS_MI = 25;
 // modest (not a real routing estimate, which this demo has no data for) so "in 2 hours"
 // still comfortably clears it while "right now" correctly filters out mobile-only matches.
 const AI_SEARCH_MOBILE_ARRIVAL_BUFFER_MIN = 30;
+// The Geolocation API doesn't expose a "precise vs. reduced accuracy" boolean directly —
+// both iOS and Android instead report a much larger `coords.accuracy` (meters) when the OS
+// only gave an approximate fix. This is the standard, honest way to detect that and say so,
+// rather than ever presenting a coarse fix as if it were an exact address.
+const AI_SEARCH_COARSE_ACCURACY_M = 500;
+function locationAccuracyToast(accuracyM) {
+    if (accuracyM == null || accuracyM <= AI_SEARCH_COARSE_ACCURACY_M)
+        return 'Using your current location';
+    const mi = Math.round((accuracyM / 1609) * 10) / 10;
+    return `Using your approximate location (±${mi} mi)`;
+}
 // A query that doesn't name a location at all isn't a query with "no location intent" —
 // it's a query that means whatever the customer's currently active context already is
 // (their real location once known, or a city they've already set). Only ever a fallback:
@@ -2194,6 +2205,39 @@ function resolveAiTimePhrase(text, now) {
     }
     return (timeFrom != null || timeTo != null || targetMinutes != null) ? { timeFrom, timeTo, targetMinutes } : null;
 }
+// Shared by the AI Search parser AND the Nearby map's own search bar, so "under $50" means
+// exactly the same dollar figure and exact-vs-bare-dollar-sign rules in both places rather
+// than two independently-drifting regex sets.
+function parseAiPriceConstraint(text) {
+    const maxPriceMatch = /(?:under|below|less than|max(?:imum)?)\s*\$?(\d+)/.exec(text);
+    const minPriceMatch = /(?:over|above|at least|min(?:imum)?)\s*\$?(\d+)/.exec(text);
+    let maxPrice = maxPriceMatch ? parseInt(maxPriceMatch[1], 10) : null;
+    const minPrice = minPriceMatch ? parseInt(minPriceMatch[1], 10) : null;
+    if (!maxPriceMatch && !minPriceMatch) {
+        const bareMatch = /\$(\d+)/.exec(text);
+        if (bareMatch)
+            maxPrice = parseInt(bareMatch[1], 10);
+    }
+    return { maxPrice, minPrice };
+}
+// "Within 20 minutes" has no real routing/traffic data behind it in this demo — it's
+// converted to a distance using a documented, average-urban-travel-speed assumption
+// (roughly 25mph, so ~0.4 miles per minute) rather than silently ignored or treated as
+// nonsense. A literal "X miles" phrase always takes precedence when both are present.
+const AI_SEARCH_MI_PER_MINUTE = 0.4;
+function parseAiRadiusConstraint(text) {
+    // (?!\w) instead of \b — "mi" is immediately followed by another word character in
+    // "minutes" (no i/n boundary exists between two letters), so a plain \b would still let
+    // "within 20 minutes" false-match as 20 miles. The lookahead only accepts "mi"/"mile"/
+    // "miles" when nothing else word-like follows it.
+    const miMatch = /within\s+(\d+)\s*(?:mi|mile|miles)(?!\w)/.exec(text);
+    if (miMatch)
+        return parseInt(miMatch[1], 10);
+    const minMatch = /within\s+(\d+)\s*min(?:ute)?s?/.exec(text);
+    if (minMatch)
+        return Math.max(1, Math.round(parseInt(minMatch[1], 10) * AI_SEARCH_MI_PER_MINUTE));
+    return null;
+}
 function aiSearchEmptyContext() {
     return { query: '', category: null, service: null, eventType: null, location: null, radius: null, dateFrom: null, dateTo: null, dateLabel: null, timeFrom: null, timeTo: null, targetMinutes: null, partySize: null, minPrice: null, maxPrice: null, minRating: null, availabilityRequired: false, openNow: false, sortBy: null, mobile: false, inStudio: false, dealsOnly: false, keywords: [] };
 }
@@ -2217,27 +2261,25 @@ function parseAiSearchQuery(rawText, prevContext) {
     const eventHit = AI_SEARCH_EVENT_WORDS.find((w) => text.includes(w));
     if (eventHit)
         ctx.eventType = eventHit;
-    const maxPriceMatch = /(?:under|below|less than|max(?:imum)?)\s*\$?(\d+)/.exec(text);
-    if (maxPriceMatch)
-        ctx.maxPrice = parseInt(maxPriceMatch[1], 10);
-    const minPriceMatch = /(?:over|above|at least|min(?:imum)?)\s*\$?(\d+)/.exec(text);
-    if (minPriceMatch)
-        ctx.minPrice = parseInt(minPriceMatch[1], 10);
-    if (!maxPriceMatch && !minPriceMatch) {
-        const bareMatch = /\$(\d+)/.exec(text);
-        if (bareMatch)
-            ctx.maxPrice = parseInt(bareMatch[1], 10);
-    }
-    const radiusMatch = /within\s+(\d+)\s*(?:mi|mile|miles)/.exec(text);
-    if (radiusMatch)
-        ctx.radius = parseInt(radiusMatch[1], 10);
+    const priceConstraint = parseAiPriceConstraint(text);
+    if (priceConstraint.maxPrice != null)
+        ctx.maxPrice = priceConstraint.maxPrice;
+    if (priceConstraint.minPrice != null)
+        ctx.minPrice = priceConstraint.minPrice;
+    // "within X miles/minutes" is an explicit radius the customer stated outright — this is
+    // what parseAiSearchQuery's own location section below checks (via `radiusMatch`) before
+    // ever applying its own near-me/city default, and what stops the silent auto-relax loop
+    // from ever touching it.
+    const radiusMatch = parseAiRadiusConstraint(text);
+    if (radiusMatch != null)
+        ctx.radius = radiusMatch;
     if (/cheapest|lowest price/.test(text))
         ctx.sortBy = 'price';
     else if (/closest|nearest/.test(text))
         ctx.sortBy = 'distance';
     else if (/best rated|top rated|highest rated/.test(text))
         ctx.sortBy = 'rating';
-    if (/\bmobile\b|come[s]?\s*to\s*(me|my house|my home|my place)|house call/.test(text))
+    if (/\bmobile\b|come[s]?\s*to\s*(me|my house|my home|my place)|house call|travels?\s*to\s*(me|my house|my home|my place)|who travels/.test(text))
         ctx.mobile = true;
     if (/in.?studio|at (their|the) (shop|salon|location)/.test(text))
         ctx.inStudio = true;
@@ -3350,16 +3392,27 @@ function App() {
     const [tab, setTab] = useState('discover');
     const [activeCat, setActiveCat] = useState(null);
     const [shortsFeedTab, setShortsFeedTab] = useState('forYou');
+    // The single source of truth for "where is this search happening" — every location-aware
+    // surface (the Nearby map, its list view, category/price/hours filtering, AI search, AI
+    // Picks, mobile-provider eligibility) reads from this ONE object instead of maintaining
+    // its own idea of "current location." key is 'current' (real device GPS — ALWAYS resolved
+    // via nearbyUserLatLng, never a panned map position, per "near me never lies") or a
+    // CITY_COORDS key; latlng is the real resolved coordinates; source records how it was set
+    // (device | typed | map) purely for display/UI decisions. Only ever updated by an explicit
+    // action (a location grant, a manual city pick, an explicit destination in a query, or
+    // "Search this area") — never silently, and never cleared just because one search's
+    // location CHIP was removed (that only affects that one search, not where the customer is).
+    const [activeSearchLocation, setActiveSearchLocation] = useState(null);
     // ---- Nearby: full-screen discovery map (real Leaflet map + CartoDB dark tiles) ----
     const [nearbyView, setNearbyView] = useState('map'); // 'map' | 'list'
     const [nearbySearch, setNearbySearch] = useState('');
     const [nearbyCategory, setNearbyCategory] = useState('all');
     const [nearbyComesToYouOnly, setNearbyComesToYouOnly] = useState(false);
     const [nearbySelectedId, setNearbySelectedId] = useState(null);
-    const [nearbyExploreLocation, setNearbyExploreLocation] = useState(null); // null = current location
     const [nearbyLocationPickerOpen, setNearbyLocationPickerOpen] = useState(false);
     const [nearbyLocationStatus, setNearbyLocationStatus] = useState('unknown'); // unknown | granted | denied
     const [nearbyUserLatLng, setNearbyUserLatLng] = useState(null);
+    const [nearbyUserLocationAccuracyM, setNearbyUserLocationAccuracyM] = useState(null);
     const [nearbyCommittedCenter, setNearbyCommittedCenter] = useState(null); // [lat,lng] actually being searched
     const [nearbyRadiusMi, setNearbyRadiusMi] = useState(60);
     const [nearbyPendingSearch, setNearbyPendingSearch] = useState(false);
@@ -5604,6 +5657,15 @@ function App() {
             setAiSearchStage('needsLocation');
             return;
         }
+        // A search that names a real location is the most explicit statement of "here's
+        // where we are/going" the app gets — carry it into the one shared location context so
+        // the Nearby map (or a fresh AI search) reflects the same destination afterward,
+        // instead of only this one search screen knowing about it.
+        if (ctx.location) {
+            const destLatLng = ctx.location === 'current' ? userLatLng : (CITY_COORDS[ctx.location] || null);
+            if (destLatLng)
+                commitActiveSearchLocation(ctx.location, destLatLng, ctx.location === 'current' ? 'Current Location' : aiCapitalize(ctx.location), ctx.location === 'current' ? 'device' : 'typed');
+        }
         const geoCandidates = annotateAiSearchGeo(aiSearchCandidates, ctx, userLatLng);
         const { results, relaxedNote, relaxedField, locationBlocked } = runAiSearchFull(geoCandidates, ctx);
         setAiSearchContext(ctx);
@@ -5631,7 +5693,7 @@ function App() {
             // location — apply as a default, so a stale "near me" pill can never silently
             // override a "restaurants in Miami" the customer just typed.
             if (!parsed.location)
-                applyAiSearchLocationDefault(parsed, activeSearchLocation);
+                applyAiSearchLocationDefault(parsed, activeSearchLocation && activeSearchLocation.key);
             if (aiSearchFilters.date) {
                 const dateInfo = resolveAiDatePhrase(aiSearchFilters.date, new Date());
                 if (dateInfo) {
@@ -5737,14 +5799,17 @@ function App() {
             // Reuses the same canonical "user's real device location" state the Nearby map
             // populates — capturing the actual coordinates (not just a granted/denied flag)
             // is what lets "near me" be enforced against real geography instead of decoration.
-            setNearbyUserLatLng([pos.coords.latitude, pos.coords.longitude]);
+            const ll = [pos.coords.latitude, pos.coords.longitude];
+            setNearbyUserLatLng(ll);
+            setNearbyUserLocationAccuracyM(pos.coords.accuracy != null ? Math.round(pos.coords.accuracy) : null);
             setAiLocationStatus('granted');
             setAiSearchFilters((prev) => ({ ...prev, location: 'current' }));
-            flashToast('Using your current location');
+            commitActiveSearchLocation('current', ll, 'Current Location', 'device');
+            flashToast(locationAccuracyToast(pos.coords.accuracy));
         }, () => {
             setAiLocationStatus('denied');
             setAiLocationPickerOpen(true);
-        }, { timeout: 6000 });
+        }, { enableHighAccuracy: true, timeout: 8000 });
     }
     // Resolves the "📍 Use your location to find nearby matches" prompt shown when a
     // "near me" search was requested before real coordinates were known — acquires real
@@ -5760,6 +5825,7 @@ function App() {
         navigator.geolocation.getCurrentPosition((pos) => {
             const ll = [pos.coords.latitude, pos.coords.longitude];
             setNearbyUserLatLng(ll);
+            setNearbyUserLocationAccuracyM(pos.coords.accuracy != null ? Math.round(pos.coords.accuracy) : null);
             setAiLocationStatus('granted');
             const ctx = aiPendingSearchCtx;
             setAiPendingSearchCtx(null);
@@ -5767,13 +5833,14 @@ function App() {
         }, () => {
             setAiLocationStatus('denied');
             setAiLocationPickerOpen(true);
-        }, { timeout: 6000 });
+        }, { enableHighAccuracy: true, timeout: 8000 });
     }
     function selectAiManualCity(city) {
         setAiSearchFilters((prev) => ({ ...prev, location: city }));
         setAiLocationStatus('manual');
         setAiLocationPickerOpen(false);
         setAiManualCity('');
+        commitActiveSearchLocation(city, CITY_COORDS[city] || null, aiCapitalize(city), 'typed');
         // Manually picking a city resolves either a pending "near me" search waiting on real
         // location, or a "Change location" tap from an already-blocked result set — both
         // cases substitute a real, named place for "current" rather than ever guessing.
@@ -5813,11 +5880,6 @@ function App() {
         return list;
     }, [feed]);
     const aiSearchHasDeals = useMemo(() => aiSearchCandidates.some((i) => i.deal && i.deal.enabled), [aiSearchCandidates]);
-    // The one active Search Location Context every AI-search-adjacent surface (AI Picks,
-    // a query that doesn't name its own destination, an opened Trending search) reads from
-    // — a manually set city/near-me pill wins, otherwise the customer's already-known real
-    // location, otherwise no location context at all (nothing has been established yet).
-    const activeSearchLocation = aiSearchFilters.location || (nearbyUserLatLng ? 'current' : null);
     function itemCreatedAt(item) {
         if (item.uploadedAt)
             return item.uploadedAt;
@@ -5927,10 +5989,17 @@ function App() {
     }, [feed]);
     const NEARBY_CATEGORY_BUCKETS = { restaurants: ['Restaurants'], activities: ['Rentals', 'Parties', 'DJ', 'Photography'], beauty: ['Beauty', 'Nails', 'Makeup', 'Tattoo', 'Loctician', 'Barbershop'], wellness: ['Healthcare / Medical', 'Educational'], events: ['Events', 'Movies'], services: ['Home Services'] };
     const nearbyDiscoveryCtx = useMemo(() => ({ interests: selectedInterests, followedIds }), [selectedInterests, followedIds]);
+    // "Exploring {city}" / "Return to my location" are just a read of the one shared
+    // activeSearchLocation — a destination set from AI Search shows up here too, instead of
+    // Nearby keeping its own separate idea of where the customer is looking.
+    const nearbyExploreLocation = activeSearchLocation && activeSearchLocation.source !== 'device' ? { label: activeSearchLocation.label } : null;
     // Everything here is anchored to `nearbyCommittedCenter` — the region the user
     // actually asked to search (via My Location, Search this area, or exploring a
     // different city) — never the live, still-being-dragged map position. That's what
     // keeps results stable while panning and only updates on an explicit action.
+    // Falls back to the shared activeSearchLocation only when Nearby itself hasn't been
+    // anchored yet this visit (e.g. arriving fresh after "barber in LA" in AI Search) —
+    // once Nearby commits its own center, that stays authoritative for panning within it.
     const nearbyFiltered = useMemo(() => {
         let items = nearbyBusinessesDeduped;
         if (nearbyCategory !== 'all') {
@@ -5940,23 +6009,40 @@ function App() {
         }
         if (nearbyComesToYouOnly)
             items = items.filter((b) => getBusinessTravelInfo(b).enabled);
-        if (nearbySearch.trim()) {
-            const q = nearbySearch.trim().toLowerCase();
-            items = items.filter((b) => [b.name, b.category, b.blurb, ...(b.hashtags || [])].filter(Boolean).join(' ').toLowerCase().includes(q));
+        const priceConstraint = parseAiPriceConstraint(nearbySearch.toLowerCase());
+        const servicePriceOk = (s) => (priceConstraint.maxPrice == null || s.price <= priceConstraint.maxPrice) && (priceConstraint.minPrice == null || s.price >= priceConstraint.minPrice);
+        if (priceConstraint.maxPrice != null || priceConstraint.minPrice != null)
+            items = items.filter((b) => getServicesForTarget(b).some(servicePriceOk));
+        const keywordText = nearbySearch.trim().toLowerCase().replace(/(?:under|below|less than|max(?:imum)?|over|above|at least|min(?:imum)?)\s*\$?\d+/g, '').replace(/\$\d+/g, '').trim();
+        if (keywordText) {
+            items = items.filter((b) => [b.name, b.category, b.blurb, ...(b.hashtags || [])].filter(Boolean).join(' ').toLowerCase().includes(keywordText));
         }
-        const center = nearbyCommittedCenter || nearbyUserLatLng || DEFAULT_MAP_CENTER;
+        const center = nearbyCommittedCenter || (activeSearchLocation && activeSearchLocation.latlng) || nearbyUserLatLng || DEFAULT_MAP_CENTER;
         return items
             .map((b) => {
                 const latlng = getBusinessLatLng(b);
                 const distanceMi = latlng ? haversineMi(center[0], center[1], latlng[0], latlng[1]) : null;
                 const travel = getBusinessTravelInfo(b);
-                return { business: b, elig: getNearbyEligibility(b, distanceMi, travel), latlng };
+                const elig = getNearbyEligibility(b, distanceMi, travel);
+                // The specific service (and its real price) that actually satisfies a price
+                // search — shown on the card instead of just the business's generic "from"
+                // price, so a $50 search never misleadingly points at an unrelated $150 service.
+                const matchingService = (priceConstraint.maxPrice != null || priceConstraint.minPrice != null)
+                    ? getServicesForTarget(b).find(servicePriceOk)
+                    : null;
+                return { business: b, elig, latlng, matchingService };
             })
             .filter((x) => x.elig.eligible && x.elig.distanceMi != null && x.elig.distanceMi <= nearbyRadiusMi)
             .sort((a, b) => computeDiscoveryScore(b.business, b.elig, nearbyDiscoveryCtx) - computeDiscoveryScore(a.business, a.elig, nearbyDiscoveryCtx));
-    }, [nearbyBusinessesDeduped, nearbyCategory, nearbyComesToYouOnly, nearbySearch, nearbyCommittedCenter, nearbyUserLatLng, nearbyRadiusMi, nearbyDiscoveryCtx]);
+    }, [nearbyBusinessesDeduped, nearbyCategory, nearbyComesToYouOnly, nearbySearch, nearbyCommittedCenter, activeSearchLocation, nearbyUserLatLng, nearbyRadiusMi, nearbyDiscoveryCtx]);
     const nearbySelectedEntry = nearbyFiltered.find((x) => x.business.id === nearbySelectedId) || null;
     const nearbySelectedIdx = nearbySelectedEntry ? nearbyFiltered.indexOf(nearbySelectedEntry) : -1;
+    // Writes to the ONE shared location context every location-aware surface (AI search, AI
+    // Picks, Nearby's map/list/filters) reads from — the single choke point that stops
+    // different parts of Bookvado from independently thinking the customer is somewhere else.
+    function commitActiveSearchLocation(key, latlng, label, source) {
+        setActiveSearchLocation({ key, latlng, label, source });
+    }
     // Recenters the real Leaflet map and commits a new search region. This is the ONLY
     // path that changes which businesses are considered "in scope" — plain panning never
     // does, matching "don't reload every tiny movement."
@@ -5966,6 +6052,8 @@ function App() {
         setNearbyCommittedCenter(latlng);
         setNearbyPendingSearch(false);
         setNearbyRadiusMi(60);
+        if (opts.source)
+            commitActiveSearchLocation(opts.key != null ? opts.key : null, latlng, opts.label || 'This area', opts.source);
         const map = nearbyMapInstanceRef.current;
         if (map)
             map.flyTo(latlng, opts.zoom || Math.max(map.getZoom() || 12, 12), { duration: 0.8 });
@@ -5976,25 +6064,41 @@ function App() {
             const ll = [pos.coords.latitude, pos.coords.longitude];
             setNearbyLocationStatus('granted');
             setNearbyUserLatLng(ll);
-            setNearbyExploreLocation(null);
-            commitNearbyCenter(ll, { zoom: 13 });
-            flashToast('Recentered on your location');
-        }, () => { setNearbyLocationStatus('denied'); setNearbyLocationPickerOpen(true); }, { timeout: 6000 });
+            // iOS/Android both surface reduced-accuracy location as a much larger `accuracy`
+            // (meters) rather than a separate boolean — this is the honest, standard-API way
+            // to know the fix is approximate rather than pretending a coarse location is exact.
+            setNearbyUserLocationAccuracyM(pos.coords.accuracy != null ? Math.round(pos.coords.accuracy) : null);
+            commitNearbyCenter(ll, { zoom: 13, key: 'current', label: 'Current Location', source: 'device' });
+            flashToast(locationAccuracyToast(pos.coords.accuracy));
+        }, () => { setNearbyLocationStatus('denied'); setNearbyLocationPickerOpen(true); }, { enableHighAccuracy: true, timeout: 8000 });
     }
     function exploreNearbyCity(cityKey) {
         const coords = CITY_COORDS[cityKey] || DEFAULT_MAP_CENTER;
-        setNearbyExploreLocation({ label: cityKey.replace(/\b\w/g, (c) => c.toUpperCase()) });
-        commitNearbyCenter(coords, { zoom: 12 });
+        commitNearbyCenter(coords, { zoom: 12, key: cityKey, label: cityKey.replace(/\b\w/g, (c) => c.toUpperCase()), source: 'typed' });
         setNearbyLocationPickerOpen(false);
     }
     function returnToMyLocation() {
-        setNearbyExploreLocation(null);
-        commitNearbyCenter(nearbyUserLatLng || DEFAULT_MAP_CENTER, { zoom: 13 });
+        commitNearbyCenter(nearbyUserLatLng || DEFAULT_MAP_CENTER, { zoom: 13, key: 'current', label: 'Current Location', source: 'device' });
     }
     function nearbyBookingCta(business) { setNearbySelectedId(null); startBookingFor(business); }
+    // If a destination was already established elsewhere (e.g. "barber in LA" typed into AI
+    // Search) before Nearby was ever opened this session, arrive already showing it instead
+    // of defaulting back to the device location — this is the fix for the map, AI search, and
+    // list all being able to silently disagree about where the customer is.
+    useEffect(() => {
+        if (shortsFeedTab !== 'nearby' || nearbyCommittedCenterRef.current)
+            return;
+        if (activeSearchLocation && activeSearchLocation.latlng) {
+            nearbyCommittedCenterRef.current = activeSearchLocation.latlng;
+            setNearbyCommittedCenter(activeSearchLocation.latlng);
+        }
+    }, [shortsFeedTab, activeSearchLocation]);
     // Auto-attempt location once on first entering Nearby (silent — permission prompts
     // triggered by an explicit tap happen separately via the My Location button), so the
     // map centers on the user without making location a hard requirement to use it at all.
+    // Never overrides an already-established active location (e.g. the LA destination
+    // above) — a silent background fix shouldn't yank the customer back to their real
+    // location out from under a destination they explicitly just searched for.
     useEffect(() => {
         if (shortsFeedTab !== 'nearby' || nearbyLocationStatus !== 'unknown')
             return;
@@ -6003,11 +6107,14 @@ function App() {
             const ll = [pos.coords.latitude, pos.coords.longitude];
             setNearbyLocationStatus('granted');
             setNearbyUserLatLng(ll);
+            setNearbyUserLocationAccuracyM(pos.coords.accuracy != null ? Math.round(pos.coords.accuracy) : null);
             if (!nearbyCommittedCenterRef.current) {
                 nearbyCommittedCenterRef.current = ll;
                 setNearbyCommittedCenter(ll);
             }
-        }, () => setNearbyLocationStatus('denied'), { timeout: 6000 });
+            if (!activeSearchLocation)
+                commitActiveSearchLocation('current', ll, 'Current Location', 'device');
+        }, () => setNearbyLocationStatus('denied'), { enableHighAccuracy: true, timeout: 8000 });
     }, [shortsFeedTab, nearbyLocationStatus]);
     // Mounts/tears down the real Leaflet map exactly once per visit to Nearby. CartoDB's
     // free "dark matter" tiles need no API key and give real streets/parks/neighborhood
@@ -6017,7 +6124,7 @@ function App() {
             return;
         if (typeof L === 'undefined' || !nearbyMapDivRef.current || nearbyMapInstanceRef.current)
             return;
-        const startCenter = nearbyCommittedCenterRef.current || nearbyUserLatLng || DEFAULT_MAP_CENTER;
+        const startCenter = nearbyCommittedCenterRef.current || (activeSearchLocation && activeSearchLocation.latlng) || nearbyUserLatLng || DEFAULT_MAP_CENTER;
         const map = L.map(nearbyMapDivRef.current, { zoomControl: false, attributionControl: false, minZoom: 3, maxZoom: 18 }).setView(startCenter, 13);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19 }).addTo(map);
         const cluster = L.markerClusterGroup({
@@ -6071,15 +6178,22 @@ function App() {
             cluster.addLayer(marker);
         });
     }, [nearbyFiltered, nearbySelectedId, nearbyMapReady]);
-    // The user's own location dot — separate layer so re-filtering never touches it.
+    // The user's own location dot — separate layer so re-filtering never touches it. When the
+    // fix is only approximate (coords.accuracy well above GPS-grade precision), a soft radius
+    // circle is drawn around it too, so an approximate location is visibly approximate on the
+    // map itself rather than presented as a precise pin.
     useEffect(() => {
         const map = nearbyMapInstanceRef.current;
         if (!map || !nearbyUserLatLng || typeof L === 'undefined')
             return;
         if (nearbyUserMarkerRef.current)
             map.removeLayer(nearbyUserMarkerRef.current);
-        nearbyUserMarkerRef.current = L.marker(nearbyUserLatLng, { icon: L.divIcon({ className: 'avio-user-dot-wrap', html: '<div class="avio-user-dot"></div>', iconSize: [16, 16] }), interactive: false, zIndexOffset: -100 }).addTo(map);
-    }, [nearbyUserLatLng, nearbyMapReady]);
+        const layers = [L.marker(nearbyUserLatLng, { icon: L.divIcon({ className: 'avio-user-dot-wrap', html: '<div class="avio-user-dot"></div>', iconSize: [16, 16] }), interactive: false, zIndexOffset: -100 })];
+        if (nearbyUserLocationAccuracyM != null && nearbyUserLocationAccuracyM > AI_SEARCH_COARSE_ACCURACY_M) {
+            layers.push(L.circle(nearbyUserLatLng, { radius: nearbyUserLocationAccuracyM, interactive: false, color: THEME.coral, weight: 1, fillColor: THEME.coral, fillOpacity: 0.08 }));
+        }
+        nearbyUserMarkerRef.current = L.layerGroup(layers).addTo(map);
+    }, [nearbyUserLatLng, nearbyUserLocationAccuracyM, nearbyMapReady]);
     // When a different pin/card becomes selected, keep the swipeable carousel scrolled to
     // match (and vice versa via its own onScroll handler below).
     const nearbyCarouselRef = useRef(null);
@@ -6202,7 +6316,7 @@ function App() {
         const metaLine = (business, elig) => {
             const cat = getCategoryDiscovery(business.category);
             if (elig.mode === 'mobile')
-                return `🚗 Comes to you · Serves your area`;
+                return `🚗 Travels to you · Serves your area`;
             const distLabel = elig.showsDistance && elig.distanceMi != null ? `${elig.distanceMi.toFixed(1)} mi` : business.location;
             return `${cat.icon} ${business.category} · ${business.rating} ★ · ${distLabel}`;
         };
@@ -6243,7 +6357,7 @@ function App() {
             React.createElement("button", { onClick: () => setNearbyBannerDismissed(true), style: { flexShrink: 0, padding: 4 } }, React.createElement(Icon, { name: "x", size: 13, color: "rgba(255,255,255,0.6)" })));
         const mapCanvas = nearbyView === 'map' && React.createElement("div", { style: { position: 'absolute', inset: 0 } },
             React.createElement("div", { ref: nearbyMapDivRef, style: { position: 'absolute', inset: 0 } }),
-            nearbyPendingSearch && React.createElement("button", { onClick: () => { const map = nearbyMapInstanceRef.current; if (map) { const c = map.getCenter(); commitNearbyCenter([c.lat, c.lng], { zoom: map.getZoom() }); } }, style: { position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 20, background: THEME.ink, border: `1px solid ${THEME.coral}`, boxShadow: '0 6px 16px rgba(0,0,0,0.45)', zIndex: 4 } },
+            nearbyPendingSearch && React.createElement("button", { onClick: () => { const map = nearbyMapInstanceRef.current; if (map) { const c = map.getCenter(); commitNearbyCenter([c.lat, c.lng], { zoom: map.getZoom(), key: null, label: 'This area', source: 'map' }); } }, style: { position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 20, background: THEME.ink, border: `1px solid ${THEME.coral}`, boxShadow: '0 6px 16px rgba(0,0,0,0.45)', zIndex: 4 } },
                 React.createElement(Icon, { name: "search", size: 13, color: THEME.coral }),
                 React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "Search this area")),
             React.createElement("div", { style: { position: 'absolute', right: 14, bottom: nearbySelectedEntry ? 232 : 'calc(env(safe-area-inset-bottom) + 96px)', display: 'flex', flexDirection: 'column', gap: 10, zIndex: 4 } },
@@ -6251,18 +6365,27 @@ function App() {
                     React.createElement("button", { onClick: () => { const map = nearbyMapInstanceRef.current; if (map) map.zoomIn(); }, style: { width: 40, height: 40, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: `1px solid ${THEME.inkLine}` } }, React.createElement("span", { style: { fontSize: 17, color: '#fff', fontWeight: 700 } }, "+")),
                     React.createElement("button", { onClick: () => { const map = nearbyMapInstanceRef.current; if (map) map.zoomOut(); }, style: { width: 40, height: 40, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement("span", { style: { fontSize: 17, color: '#fff', fontWeight: 700 } }, "−"))),
                 React.createElement("button", { onClick: requestNearbyLocation, style: { width: 44, height: 44, borderRadius: 22, background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 16px rgba(166,124,82,0.4)' } }, React.createElement(Icon, { name: "compass", size: 19, color: "#fff" }))));
-        const previewCardBody = (business, elig) => {
+        const previewCardBody = (business, elig, matchingService) => {
             const promo = business.deal && business.deal.enabled;
+            const isOpen = (business.openStatus || '').startsWith('Open Now') || (business.openStatus || '').startsWith('Available');
+            // "Open" and "has a bookable slot" are different facts — a business can be open
+            // right now with nothing free until this evening, so these are never collapsed
+            // into one status the way a bare "Available Today" pill used to imply.
+            const earliest = aiEarliestAvailability(business, {});
+            const priceLine = matchingService
+                ? `${matchingService.name} · ${money(matchingService.price)}`
+                : (business.price ? `From ${money(business.price)}` : 'See pricing');
             return [
                 React.createElement("p", { key: "meta", style: { fontSize: elig.mode === 'mobile' ? 12.5 : 12, fontWeight: elig.mode === 'mobile' ? 700 : 500, color: elig.mode === 'mobile' ? THEME.coral : T.textSecondary, margin: '4px 0 0' } }, metaLine(business, elig)),
-                elig.mode === 'both' && React.createElement("p", { key: "also", style: { fontSize: 11, color: T.textSecondary, margin: '1px 0 0' } }, "🚗 Also comes to you"),
+                elig.mode === 'both' && React.createElement("p", { key: "also", style: { fontSize: 11, color: T.textSecondary, margin: '1px 0 0' } }, "🚗 Also travels to you"),
                 elig.travelFeeInfo && elig.travelFeeInfo.fee > 0 && React.createElement("p", { key: "fee", style: { fontSize: 11, color: T.textSecondary, marginTop: 3 } }, `+${money(elig.travelFeeInfo.fee)} travel fee`),
-                React.createElement("div", { key: "price", style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 } },
-                    React.createElement("span", { style: { fontSize: 14.5, fontWeight: 700, color: THEME.coral } }, business.price ? `From ${money(business.price)}` : 'See pricing'),
-                    React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: T.textPrimary, background: T.surfaceSecondary, borderRadius: 8, padding: '3px 8px' } }, business.openStatus ? (business.openStatus.includes('Open') ? 'Available Today' : business.openStatus) : 'Check availability')),
+                React.createElement("div", { key: "price", style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, gap: 8 } },
+                    React.createElement("span", { style: { fontSize: 14.5, fontWeight: 700, color: THEME.coral, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, priceLine),
+                    React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: T.textPrimary, background: T.surfaceSecondary, borderRadius: 8, padding: '3px 8px', flexShrink: 0 } }, business.openStatus ? (isOpen ? 'Open Now' : business.openStatus) : 'Check availability')),
+                earliest && React.createElement("p", { key: "next", style: { fontSize: 11, fontWeight: 600, color: T.textSecondary, marginTop: 4 } }, `🕐 Next available: ${earliest.isToday ? earliest.timeLabel : earliest.dayLabel + ' ' + earliest.timeLabel}`),
                 promo && React.createElement("p", { key: "promo", style: { fontSize: 11, fontWeight: 700, color: THEME.gold, marginTop: 4 } }, business.deal.label || 'Limited-time deal')];
         };
-        const previewCard = ({ business, elig }, i) => React.createElement("div", { key: business.id, style: { flex: '0 0 88%', scrollSnapAlign: 'center', background: T.modalBackground, borderRadius: 20, border: `1px solid ${T.border}`, overflow: 'hidden', marginRight: 10 } },
+        const previewCard = ({ business, elig, matchingService }, i) => React.createElement("div", { key: business.id, style: { flex: '0 0 88%', scrollSnapAlign: 'center', background: T.modalBackground, borderRadius: 20, border: `1px solid ${T.border}`, overflow: 'hidden', marginRight: 10 } },
             React.createElement("div", { style: { display: 'flex', gap: 12, padding: 12 } },
                 React.createElement("div", { style: { width: 68, height: 68, borderRadius: 14, overflow: 'hidden', flexShrink: 0, background: business.avatarColor || T.surfaceSecondary } },
                     business.image && React.createElement("img", { src: business.image, style: { width: '100%', height: '100%', objectFit: 'cover' } })),
@@ -6270,7 +6393,7 @@ function App() {
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
                         React.createElement("p", { style: { fontSize: 15, fontWeight: 700, color: T.textPrimary, margin: 0, fontFamily: 'Space Grotesk, sans-serif', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, business.name),
                         business.verified && React.createElement("div", { style: { width: 13, height: 13, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 7, color: "#fff" }))),
-                    ...previewCardBody(business, elig))),
+                    ...previewCardBody(business, elig, matchingService))),
             React.createElement("div", { style: { display: 'flex', gap: 8, padding: '0 12px 12px' } },
                 React.createElement("button", { onClick: () => openBusinessProfile(business), style: { flex: 1, padding: '11px 0', borderRadius: 16, border: `1px solid ${T.border}`, fontSize: 12.5, fontWeight: 700, color: T.textPrimary } }, "View"),
                 React.createElement("button", { onClick: () => nearbyBookingCta(business), style: { flex: 1.4, padding: '11px 0', borderRadius: 16, background: THEME.coral, fontSize: 12.5, fontWeight: 700, color: '#fff' } }, cardCta(business))));
@@ -6290,17 +6413,19 @@ function App() {
         const emptyState = nearbyFiltered.length === 0 && React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 40px', textAlign: 'center', zIndex: 3, pointerEvents: 'none' } },
             React.createElement("div", { style: { pointerEvents: 'auto', background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', borderRadius: 20, padding: '22px 26px', border: `1px solid ${THEME.inkLine}` } },
                 React.createElement(Icon, { name: "compass", size: 28, color: "rgba(255,255,255,0.6)" }),
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#fff', marginTop: 10 } }, "No Bookvado places here yet"),
-                React.createElement("button", { onClick: () => setNearbyRadiusMi((r) => r * 2), style: { marginTop: 14, padding: '10px 18px', borderRadius: 18, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 12.5 } }, "Expand Search Area"),
-                React.createElement("button", { onClick: () => { setNearbyCategory('all'); setNearbySearch(''); setNearbyComesToYouOnly(false); setNearbyRadiusMi(240); }, style: { marginTop: 8, padding: '10px 18px', borderRadius: 18, border: `1px solid rgba(255,255,255,0.3)`, color: '#fff', fontWeight: 700, fontSize: 12.5 } }, "Explore Nearby")));
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#fff', marginTop: 10 } }, "No matches in this area"),
+                React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 14 } },
+                    React.createElement("button", { onClick: () => setNearbyRadiusMi((r) => r * 2), style: { padding: '10px 18px', borderRadius: 18, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 12.5 } }, "Expand Distance"),
+                    (nearbyCategory !== 'all' || nearbySearch || nearbyComesToYouOnly) && React.createElement("button", { onClick: () => { setNearbyCategory('all'); setNearbySearch(''); setNearbyComesToYouOnly(false); }, style: { padding: '10px 18px', borderRadius: 18, border: `1px solid rgba(255,255,255,0.3)`, color: '#fff', fontWeight: 700, fontSize: 12.5 } }, "Change Filters"),
+                    nearbyView === 'map' && React.createElement("button", { onClick: () => { const map = nearbyMapInstanceRef.current; if (map) { const c = map.getCenter(); commitNearbyCenter([c.lat, c.lng], { zoom: map.getZoom(), key: null, label: 'This area', source: 'map' }); } }, style: { padding: '10px 18px', borderRadius: 18, border: `1px solid rgba(255,255,255,0.3)`, color: '#fff', fontWeight: 700, fontSize: 12.5 } }, "Search This Area"))));
         const listView = nearbyView === 'list' && React.createElement("div", { className: "avio-scroll", style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 20px)' } },
             React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, margin: '2px 0 12px' } }, `${nearbyFiltered.length} place${nearbyFiltered.length === 1 ? '' : 's'} found`),
-            nearbyFiltered.map(({ business, elig }) => React.createElement("button", { key: business.id, onClick: () => { setNearbySelectedId(business.id); setNearbyView('map'); }, style: { width: '100%', display: 'flex', gap: 12, padding: 12, borderRadius: 18, border: `1px solid ${T.border}`, background: T.surface, marginBottom: 12, textAlign: 'left' } },
+            nearbyFiltered.map(({ business, elig, matchingService }) => React.createElement("button", { key: business.id, onClick: () => { setNearbySelectedId(business.id); setNearbyView('map'); }, style: { width: '100%', display: 'flex', gap: 12, padding: 12, borderRadius: 18, border: `1px solid ${T.border}`, background: T.surface, marginBottom: 12, textAlign: 'left' } },
                 React.createElement("div", { style: { width: 64, height: 64, borderRadius: 14, overflow: 'hidden', flexShrink: 0, background: business.avatarColor || T.surfaceSecondary } },
                     business.image && React.createElement("img", { src: business.image, style: { width: '100%', height: '100%', objectFit: 'cover' } })),
                 React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                     React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: T.textPrimary, margin: 0 } }, business.name),
-                    ...previewCardBody(business, elig)))));
+                    ...previewCardBody(business, elig, matchingService)))));
         return React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#0A0A0C', display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
             header,
             compactBanner,
@@ -9622,7 +9747,8 @@ function App() {
             // (real geography + travel eligibility, exactly like a search) so this section can
             // never mix in unrelated businesses from a different city. Falls back to the
             // unfiltered pool only in the edge case where literally nothing is eligible yet.
-            const aiPicksLocCtx = activeSearchLocation ? { location: activeSearchLocation, radius: activeSearchLocation === 'current' ? AI_SEARCH_DEFAULT_NEARBY_RADIUS_MI : AI_SEARCH_DEFAULT_CITY_RADIUS_MI } : null;
+            const aiPicksLocKey = activeSearchLocation && activeSearchLocation.key;
+            const aiPicksLocCtx = aiPicksLocKey ? { location: aiPicksLocKey, radius: aiPicksLocKey === 'current' ? AI_SEARCH_DEFAULT_NEARBY_RADIUS_MI : AI_SEARCH_DEFAULT_CITY_RADIUS_MI } : null;
             const aiPicksAnnotated = aiPicksLocCtx ? annotateAiSearchGeo(aiSearchCandidates, aiPicksLocCtx) : aiSearchCandidates;
             const aiPicksEligible = aiPicksLocCtx ? aiPicksAnnotated.filter((i) => i._locationEligible !== false) : aiPicksAnnotated;
             const aiPicksPool = aiPicksEligible.length > 0 ? aiPicksEligible : aiPicksAnnotated;
