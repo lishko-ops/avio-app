@@ -1446,6 +1446,11 @@ function formatTimeRange(startMinutes, durationMinutes) {
 function hhmmToLabel(hhmm) {
     return minutesToTimeLabel(timeStrToMinutes(hhmm));
 }
+function minutesToHHMM(mins) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
 function dateKey(d) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
@@ -1480,6 +1485,84 @@ function makeDefaultRestaurantCombinations() {
 }
 function makeDefaultRestaurantHours() {
     return { 0: { start: '11:00', end: '21:00' }, 1: { start: '11:00', end: '22:00' }, 2: { start: '11:00', end: '22:00' }, 3: { start: '11:00', end: '22:00' }, 4: { start: '11:00', end: '22:00' }, 5: { start: '11:00', end: '23:59' }, 6: { start: '11:00', end: '23:59' } };
+}
+// ---- Restaurant menu system ----
+// A menu belongs entirely to its restaurant (menu.categories/menu.items live on the
+// restaurant business object itself, same as its tables/areas/hours), so no menu row can
+// ever leak between restaurants — there's nothing to key by, it's just a plain field on the
+// owning object. `hidden` categories and unavailable items stay in the data (never deleted
+// by a status change) so a restaurant can flip something back on without re-entering it.
+const MENU_FEATURED_LIMIT = 4;
+const MENU_DIETARY_TAGS = [
+    { id: 'vegetarian', label: 'Vegetarian' },
+    { id: 'vegan', label: 'Vegan' },
+    { id: 'glutenFree', label: 'Gluten-Free' },
+    { id: 'dairyFree', label: 'Dairy-Free' },
+];
+const MENU_ALLERGEN_TAGS = [
+    { id: 'nuts', label: 'Nuts' },
+    { id: 'dairy', label: 'Dairy' },
+    { id: 'shellfish', label: 'Shellfish' },
+    { id: 'eggs', label: 'Eggs' },
+    { id: 'soy', label: 'Soy' },
+    { id: 'gluten', label: 'Gluten' },
+    { id: 'fish', label: 'Fish' },
+];
+function emptyRestaurantMenu() { return { categories: [], items: [] }; }
+// Seed menu for the one demo restaurant the logged-in account owns (bella-vista-demo) — the
+// other two seeded restaurants deliberately have no menu, so "a restaurant with no menu still
+// has a clean profile" is exercised by real seed data rather than only by a unit test.
+function makeBellaVistaMenu() {
+    return {
+        categories: [
+            { id: 'menucat-appetizers', name: 'Appetizers', hidden: false, schedule: null },
+            { id: 'menucat-sushi', name: 'Sushi', hidden: false, schedule: null },
+            { id: 'menucat-entrees', name: 'Entrees', hidden: false, schedule: null },
+            { id: 'menucat-desserts', name: 'Desserts', hidden: false, schedule: null },
+            { id: 'menucat-drinks', name: 'Drinks', hidden: false, schedule: null },
+        ],
+        items: [
+            { id: 'menuitem-tunatartare', categoryId: 'menucat-appetizers', name: 'Tuna Tartare', description: 'Ahi tuna, avocado, sesame, spicy mayo, scallions', price: 18, photo: null, dietary: [], allergens: ['fish'], spicy: true, featured: true, available: true },
+            { id: 'menuitem-calamari', categoryId: 'menucat-appetizers', name: 'Crispy Calamari', description: 'Lemon, herbs, house dipping sauce', price: 16, photo: null, dietary: [], allergens: ['shellfish'], spicy: false, featured: false, available: true },
+            { id: 'menuitem-edamame', categoryId: 'menucat-appetizers', name: 'Edamame', description: 'Steamed, sea salt', price: 8, photo: null, dietary: ['vegan', 'glutenFree'], allergens: ['soy'], spicy: false, featured: false, available: true },
+            { id: 'menuitem-rainbowroll', categoryId: 'menucat-sushi', name: 'Rainbow Roll', description: 'California roll topped with tuna, salmon, avocado', price: 19, photo: null, dietary: [], allergens: ['fish', 'shellfish'], spicy: false, featured: false, available: true },
+            { id: 'menuitem-spicytuna', categoryId: 'menucat-sushi', name: 'Spicy Tuna Roll', description: 'Tuna, spicy mayo, scallion, crispy rice cracker', price: 15, photo: null, dietary: [], allergens: ['fish', 'eggs'], spicy: true, featured: false, available: true },
+            { id: 'menuitem-salmon', categoryId: 'menucat-entrees', name: 'Seared Salmon', description: 'Fresh salmon, avocado, cucumber, yuzu sauce', price: 28, photo: null, dietary: ['glutenFree', 'dairyFree'], allergens: ['fish'], spicy: false, featured: true, available: true },
+            { id: 'menuitem-trufflepasta', categoryId: 'menucat-entrees', name: 'Truffle Pasta', description: 'Creamy truffle sauce, parmesan, chives', price: 24, photo: null, dietary: ['vegetarian'], allergens: ['dairy', 'gluten'], spicy: false, featured: true, available: true },
+            { id: 'menuitem-misocod', categoryId: 'menucat-entrees', name: 'Miso Glazed Cod', description: 'Miso glaze, bok choy', price: 26, photo: null, dietary: ['glutenFree'], allergens: ['soy', 'fish'], spicy: false, featured: true, available: true },
+            { id: 'menuitem-mochi', categoryId: 'menucat-desserts', name: 'Mochi Trio', description: 'Matcha, mango, black sesame', price: 10, photo: null, dietary: ['vegetarian', 'glutenFree'], allergens: ['dairy'], spicy: false, featured: false, available: true },
+            { id: 'menuitem-sake', categoryId: 'menucat-drinks', name: 'House Sake Flight', description: 'Three 2oz pours, ask your server for today\'s selection', price: 22, photo: null, dietary: ['vegan', 'glutenFree'], allergens: [], spicy: false, featured: false, available: true },
+        ],
+    };
+}
+// Categories can optionally be scheduled (Breakfast/Lunch/Dinner-style) — entirely optional,
+// a category with no schedule is just always visible. `now` is a parameter (not read from
+// `new Date()` internally) so this stays pure and directly unit-testable.
+function menuCategoryActiveNow(cat, now) {
+    if (!cat.schedule || !cat.schedule.enabled)
+        return true;
+    if (cat.schedule.days && cat.schedule.days.length && !cat.schedule.days.includes(now.getDay()))
+        return false;
+    const mins = now.getHours() * 60 + now.getMinutes();
+    return mins >= cat.schedule.startMin && mins <= cat.schedule.endMin;
+}
+function getVisibleMenuCategories(menu, now) {
+    if (!menu)
+        return [];
+    return (menu.categories || []).filter((c) => !c.hidden && menuCategoryActiveNow(c, now || new Date()));
+}
+function getMenuItemsForCategory(menu, categoryId) {
+    if (!menu)
+        return [];
+    return (menu.items || []).filter((i) => i.categoryId === categoryId);
+}
+// Featured dishes only surface when both the item AND its category are actually visible —
+// a dish featured under a hidden or out-of-schedule category should never show on Overview.
+function getFeaturedMenuItems(menu, now) {
+    if (!menu)
+        return [];
+    const visibleCatIds = new Set(getVisibleMenuCategories(menu, now).map((c) => c.id));
+    return (menu.items || []).filter((i) => i.featured && i.available !== false && visibleCatIds.has(i.categoryId)).slice(0, MENU_FEATURED_LIMIT);
 }
 // ACTIVITIES booking model: Activity -> Party Size -> Date -> Session -> Space capacity -> Booking.
 // A "session" is a recurring weekly time slot tied to a specific space. Remaining capacity is never
@@ -1709,6 +1792,7 @@ const FEED = [
         businessType: 'restaurant', address: '418 Bedford Ave, Brooklyn, NY 11249', phone: '(718) 555-0198', priceTier: '$$$', cuisine: 'Japanese Restaurant',
         areas: makeDefaultRestaurantAreas(), tables: makeDefaultRestaurantTables(), combinations: makeDefaultRestaurantCombinations(),
         hours: makeDefaultRestaurantHours(), durationRules: DEFAULT_RESTAURANT_DURATION_RULES, bufferMinutes: 15, intervalMinutes: 30, maxPartySize: 10, minAdvanceHours: 1, advanceDays: 60,
+        menu: makeBellaVistaMenu(),
     },
     { id: 't-fadedistrict', category: 'Beauty', name: 'Fade District', location: 'Brooklyn, NY', rating: 4.9, price: 32, likes: '1.6K', comments: 49, saves: '1.1K', blurb: 'Lining up the details that matter.', verified: true, distance: '0.9 mi', openStatus: 'Open Now · Closes 9PM', hashtags: ['#barbershop', '#brooklyn', '#fade'], friendsBooked: 15, avatarColor: '#000000', locationMode: 'At my business location', image: 'assets/shorts/thumbs/barber-1.jpg', video: 'assets/shorts/biz/barber-1',
         staff: [{ id: 't-fadedistrict-jc', name: 'JC', customHours: null }, { id: 't-fadedistrict-marco', name: 'Marco', customHours: null }],
@@ -3423,7 +3507,22 @@ function App() {
     const nearbyClusterGroupRef = useRef(null);
     const nearbyUserMarkerRef = useRef(null);
     const nearbyCommittedCenterRef = useRef(null);
-    const [feed, setFeed] = useState(() => [...FEED, ...CREATOR_SEED_POSTS]);
+    // The rest of `feed` (bookings, tables, hours, etc.) is deliberately in-memory-only in
+    // this demo and doesn't survive a refresh — but a restaurant's menu specifically needs
+    // to, so it gets its own persisted slice merged back in at load, the same loadLS/saveLS
+    // pattern the rest of the app already uses for durable per-account data.
+    const [feed, setFeed] = useState(() => {
+        const base = [...FEED, ...CREATOR_SEED_POSTS];
+        const savedMenu = loadLS('avio_restaurant_menu_' + RESTAURANT_ID, null);
+        return savedMenu ? base.map((f) => f.id === RESTAURANT_ID ? { ...f, menu: savedMenu } : f) : base;
+    });
+    // Menu edits specifically survive a refresh/re-login (unlike the rest of `feed`) —
+    // persisted as its own slice rather than the whole feed, keyed to this one restaurant.
+    useEffect(() => {
+        const r = feed.find((f) => f.id === RESTAURANT_ID);
+        if (r && r.menu)
+            saveLS('avio_restaurant_menu_' + RESTAURANT_ID, r.menu);
+    }, [feed]);
     const shortsHydratedRef = useRef(false);
     useEffect(() => {
         if (!shortsHydratedRef.current)
@@ -4812,6 +4911,11 @@ function App() {
     const [rsvPickerArea, setRsvPickerArea] = useState('no-preference');
     const [rsvPickerError, setRsvPickerError] = useState(null);
     const [areaFormDraft, setAreaFormDraft] = useState(null);
+    const [menuCategoryFormDraft, setMenuCategoryFormDraft] = useState(null);
+    const [menuItemFormDraft, setMenuItemFormDraft] = useState(null);
+    const menuItemPhotoInputRef = useRef(null);
+    const menuSectionRefs = useRef({});
+    const [menuItemDetailTarget, setMenuItemDetailTarget] = useState(null);
     const [filterSheetOpen, setFilterSheetOpen] = useState(false);
     const [filterPopoverOpen, setFilterPopoverOpen] = useState(null);
     const [selectedFilterCategories, setSelectedFilterCategories] = useState(() => new Set());
@@ -7848,6 +7952,134 @@ function App() {
     function removeRestaurantDurationRule(index) {
         updateMyRestaurant((r) => ({ durationRules: r.durationRules.filter((_, i) => i !== index) }));
     }
+    // ---- Restaurant menu management (business dashboard side) ----
+    function saveMenuCategoryDraft() {
+        const d = menuCategoryFormDraft;
+        if (!d || !d.name.trim())
+            return;
+        updateMyRestaurant((r) => {
+            const menu = r.menu || emptyRestaurantMenu();
+            const categories = d.originalId
+                ? menu.categories.map((c) => c.id === d.originalId ? { ...c, name: d.name.trim(), schedule: d.schedule } : c)
+                : [...menu.categories, { id: 'menucat' + Date.now(), name: d.name.trim(), hidden: false, schedule: d.schedule }];
+            return { menu: { ...menu, categories } };
+        });
+        setMenuCategoryFormDraft(null);
+        flashToast(d.originalId ? 'Category updated' : 'Category added');
+    }
+    function toggleMenuCategoryHidden(catId) {
+        updateMyRestaurant((r) => { const menu = r.menu || emptyRestaurantMenu(); return { menu: { ...menu, categories: menu.categories.map((c) => c.id === catId ? { ...c, hidden: !c.hidden } : c) } }; });
+    }
+    function deleteMenuCategory(catId) {
+        updateMyRestaurant((r) => {
+            const menu = r.menu || emptyRestaurantMenu();
+            return { menu: { ...menu, categories: menu.categories.filter((c) => c.id !== catId), items: menu.items.filter((i) => i.categoryId !== catId) } };
+        });
+        flashToast('Category and its items removed');
+    }
+    function moveMenuCategory(catId, dir) {
+        updateMyRestaurant((r) => {
+            const menu = r.menu || emptyRestaurantMenu();
+            const a = menu.categories.findIndex((c) => c.id === catId);
+            const b = a + dir;
+            if (a < 0 || b < 0 || b >= menu.categories.length)
+                return {};
+            const categories = [...menu.categories];
+            [categories[a], categories[b]] = [categories[b], categories[a]];
+            return { menu: { ...menu, categories } };
+        });
+    }
+    // Only ever called from the form's Save (validated against the live limit right before
+    // saving) and from the standalone row toggle below (pre-checked before it ever touches
+    // state) — never from inside an updater function itself, so the cap-exceeded toast is
+    // never fired more than once per real user action.
+    function canFeatureAnotherMenuItem(menu, excludeId) {
+        return menu.items.filter((i) => i.featured && i.id !== excludeId).length < MENU_FEATURED_LIMIT;
+    }
+    function saveMenuItemDraft() {
+        const d = menuItemFormDraft;
+        if (!d || !d.name.trim() || !d.categoryId)
+            return;
+        const restaurant = getMyRestaurant();
+        const menu = (restaurant && restaurant.menu) || emptyRestaurantMenu();
+        if (d.featured && !canFeatureAnotherMenuItem(menu, d.originalId)) {
+            flashToast(`You can feature up to ${MENU_FEATURED_LIMIT} dishes — remove one first`);
+            return;
+        }
+        const price = Math.max(0, Number(d.price) || 0);
+        const payload = { name: d.name.trim(), description: d.description.trim(), price, categoryId: d.categoryId, photo: d.photo, dietary: d.dietary, allergens: d.allergens, spicy: d.spicy, featured: d.featured, available: d.available };
+        updateMyRestaurant((r) => {
+            const m = r.menu || emptyRestaurantMenu();
+            const items = d.originalId
+                ? m.items.map((i) => i.id === d.originalId ? { ...i, ...payload } : i)
+                : [...m.items, { id: 'menuitem' + Date.now(), ...payload }];
+            return { menu: { ...m, items } };
+        });
+        setMenuItemFormDraft(null);
+        flashToast(d.originalId ? 'Item updated' : 'Item added');
+    }
+    function deleteMenuItem(itemId) {
+        updateMyRestaurant((r) => { const menu = r.menu || emptyRestaurantMenu(); return { menu: { ...menu, items: menu.items.filter((i) => i.id !== itemId) } }; });
+        flashToast('Item removed');
+    }
+    function toggleMenuItemAvailable(itemId) {
+        updateMyRestaurant((r) => { const menu = r.menu || emptyRestaurantMenu(); return { menu: { ...menu, items: menu.items.map((i) => i.id === itemId ? { ...i, available: i.available === false } : i) } }; });
+    }
+    function toggleMenuItemFeatured(itemId) {
+        const restaurant = getMyRestaurant();
+        const menu = (restaurant && restaurant.menu) || emptyRestaurantMenu();
+        const item = menu.items.find((i) => i.id === itemId);
+        if (!item)
+            return;
+        if (!item.featured && !canFeatureAnotherMenuItem(menu, itemId)) {
+            flashToast(`You can feature up to ${MENU_FEATURED_LIMIT} dishes — remove one first`);
+            return;
+        }
+        updateMyRestaurant((r) => { const m = r.menu || emptyRestaurantMenu(); return { menu: { ...m, items: m.items.map((i) => i.id === itemId ? { ...i, featured: !i.featured } : i) } }; });
+    }
+    function moveMenuItem(itemId, dir) {
+        updateMyRestaurant((r) => {
+            const menu = r.menu || emptyRestaurantMenu();
+            const item = menu.items.find((i) => i.id === itemId);
+            if (!item)
+                return {};
+            const siblingIds = menu.items.filter((i) => i.categoryId === item.categoryId).map((i) => i.id);
+            const pos = siblingIds.indexOf(itemId);
+            const swapId = siblingIds[pos + dir];
+            if (!swapId)
+                return {};
+            const a = menu.items.findIndex((i) => i.id === itemId);
+            const b = menu.items.findIndex((i) => i.id === swapId);
+            const items = [...menu.items];
+            [items[a], items[b]] = [items[b], items[a]];
+            return { menu: { ...menu, items } };
+        });
+    }
+    function handleMenuItemPhotoFile(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file)
+            return;
+        const reader = new FileReader();
+        reader.onload = () => setMenuItemFormDraft((prev) => prev && ({ ...prev, photo: reader.result }));
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    }
+    function openMenuItemForm(categoryId, item) {
+        setMenuItemFormDraft(item ? {
+            originalId: item.id, name: item.name, description: item.description || '', price: String(item.price || ''), categoryId: item.categoryId,
+            photo: item.photo || null, dietary: item.dietary || [], allergens: item.allergens || [], spicy: !!item.spicy, featured: !!item.featured, available: item.available !== false,
+        } : {
+            originalId: null, name: '', description: '', price: '', categoryId: categoryId || '', photo: null, dietary: [], allergens: [], spicy: false, featured: false, available: true,
+        });
+    }
+    function previewCustomerMenu() {
+        const restaurant = getMyRestaurant();
+        if (!restaurant)
+            return;
+        setRestaurantDashboardOpen(false);
+        setRestaurantProfileTab('menu');
+        openBusinessProfile(restaurant);
+    }
     // Resolves the restaurant a reservation-flow object refers to, always falling back to the demo
     // restaurant rather than ever returning undefined mid-render.
     function getReservationRestaurant(f) {
@@ -7974,7 +8206,7 @@ function App() {
             React.createElement(Icon, { name: "star", size: 14, color: THEME.gold, fill: THEME.gold }),
             React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: RP.text } }, item.rating.toFixed(1)),
             React.createElement("span", { style: { fontSize: 12.5, color: RP.sub } }, `(326 reviews) · ${item.openStatus}`));
-        const RESTAURANT_TABS = [{ id: 'overview', label: 'Overview' }, { id: 'reviews', label: 'Reviews' }, { id: 'info', label: 'Info' }];
+        const RESTAURANT_TABS = [{ id: 'overview', label: 'Overview' }, { id: 'reviews', label: 'Reviews' }, { id: 'menu', label: 'Menu' }, { id: 'info', label: 'Info' }];
         const tabsRow = React.createElement("div", { style: { display: 'flex', gap: 22, padding: '18px 18px 0', borderBottom: `1px solid ${RP.border}` } }, RESTAURANT_TABS.map((t) => {
             const active = restaurantProfileTab === t.id;
             return React.createElement("button", { key: t.id, onClick: () => setRestaurantProfileTab(t.id), style: { paddingBottom: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 } },
@@ -8032,12 +8264,94 @@ function App() {
                     React.createElement("span", { style: { fontSize: 12.5, color: RP.text, fontWeight: dow === new Date().getDay() ? 700 : 500 } }, WEEKDAY_LABELS[dow]),
                     React.createElement("span", { style: { fontSize: 12.5, color: h ? RP.text : RP.sub } }, h ? `${hhmmToLabel(h.start)} – ${h.end === '23:59' ? '12:00 AM' : hhmmToLabel(h.end)}` : 'Closed'));
             }));
-        const tabBody = restaurantProfileTab === 'overview' ? React.createElement(React.Fragment, null, reservationCard, aboutSection, renderCommunityVideos(item))
+        // Small, relevant-only tags — never every field at once. Spicy + dietary are quick
+        // visual pills; allergens are a plain "Contains" line, since they read as a warning
+        // rather than a feature and don't belong styled the same as a selling point.
+        const menuItemBadges = (mi) => {
+            const pills = [];
+            if (mi.spicy)
+                pills.push(React.createElement("span", { key: "spicy", style: { fontSize: 10, fontWeight: 700, color: '#D0304A', background: 'rgba(208,48,74,0.08)', borderRadius: 8, padding: '2px 7px' } }, "🌶️ Spicy"));
+            (mi.dietary || []).forEach((d) => {
+                const meta = MENU_DIETARY_TAGS.find((t) => t.id === d);
+                if (meta)
+                    pills.push(React.createElement("span", { key: d, style: { fontSize: 10, fontWeight: 700, color: THEME.coral, background: 'rgba(166,124,82,0.08)', borderRadius: 8, padding: '2px 7px' } }, meta.label));
+            });
+            return pills;
+        };
+        const menuItemAllergenLine = (mi) => {
+            if (!mi.allergens || !mi.allergens.length)
+                return null;
+            const labels = mi.allergens.map((a) => (MENU_ALLERGEN_TAGS.find((t) => t.id === a) || {}).label).filter(Boolean);
+            return labels.length ? React.createElement("p", { style: { fontSize: 10.5, color: RP.sub, marginTop: 3, fontStyle: 'italic' } }, `Contains: ${labels.join(', ')}`) : null;
+        };
+        // Photos are optional — a missing one is a clean text-only row, never a broken
+        // image or a generic placeholder box.
+        const menuItemPhoto = (mi, size) => mi.photo && React.createElement("div", { style: { width: size, height: size, borderRadius: 12, overflow: 'hidden', flexShrink: 0, backgroundImage: `url(${mi.photo})`, backgroundSize: 'cover', backgroundPosition: 'center' } });
+        const menuHighlightCard = (mi) => React.createElement("button", { key: mi.id, onClick: () => setMenuItemDetailTarget(mi.id), style: { flexShrink: 0, width: 160, textAlign: 'left', borderRadius: 18, overflow: 'hidden', border: `1px solid ${RP.border}`, background: T.surface } },
+            mi.photo
+                ? React.createElement("div", { style: { width: '100%', aspectRatio: '4 / 3', backgroundImage: `url(${mi.photo})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
+                : React.createElement("div", { style: { width: '100%', aspectRatio: '4 / 3', background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "utensils", size: 20, color: '#C7C0B8' })),
+            React.createElement("div", { style: { padding: '10px 12px 12px' } },
+                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: RP.text, margin: 0, fontFamily: 'Space Grotesk, sans-serif' } }, mi.name),
+                mi.description && React.createElement("p", { style: { fontSize: 11, color: RP.sub, marginTop: 3, lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, mi.description),
+                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: THEME.coral, marginTop: 6, fontFamily: 'Space Grotesk, sans-serif' } }, money(mi.price))));
+        const menuFeatured = getFeaturedMenuItems(r.menu);
+        const menuHighlightsSection = menuFeatured.length > 0 && React.createElement("div", { style: { padding: '20px 0 0' } },
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px' } },
+                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: RP.text, margin: 0, textTransform: 'uppercase', letterSpacing: 0.3 } }, "Menu Highlights"),
+                React.createElement("button", { onClick: () => setRestaurantProfileTab('menu'), style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, "View Full Menu")),
+            React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 10, overflowX: 'auto', padding: '12px 18px 2px' } }, menuFeatured.map(menuHighlightCard)));
+        const menuItemRow = (mi) => React.createElement("button", { key: mi.id, onClick: () => setMenuItemDetailTarget(mi.id), style: { display: 'flex', gap: 12, width: '100%', textAlign: 'left', padding: '12px 0', borderBottom: `1px solid ${RP.border}`, opacity: mi.available === false ? 0.55 : 1 } },
+            menuItemPhoto(mi, 64),
+            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 } },
+                    React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: RP.text, fontFamily: 'Space Grotesk, sans-serif' } }, mi.name),
+                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: RP.text, flexShrink: 0 } }, money(mi.price))),
+                mi.description && React.createElement("p", { style: { fontSize: 12, color: RP.sub, marginTop: 3, lineHeight: 1.4 } }, mi.description),
+                menuItemAllergenLine(mi),
+                menuItemBadges(mi).length > 0 && React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 } }, menuItemBadges(mi)),
+                mi.available === false && React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, color: '#D0304A', marginTop: 5 } }, "Currently Unavailable")));
+        const menuVisibleCategories = getVisibleMenuCategories(r.menu);
+        const fullMenuSection = React.createElement("div", { style: { padding: '18px 0 0' } },
+            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 20, color: RP.text, margin: '0 18px' } }, "Menu"),
+            menuVisibleCategories.length === 0
+                ? React.createElement("p", { style: { fontSize: 12.5, color: RP.sub, padding: '30px 18px', textAlign: 'center' } }, "This restaurant hasn't added a menu yet.")
+                : React.createElement(React.Fragment, null,
+                    React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, padding: '14px 18px', overflowX: 'auto' } }, menuVisibleCategories.map((c) => React.createElement("button", { key: c.id, className: "avio-pill", onClick: () => { const el = menuSectionRefs.current[c.id]; if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, style: { flexShrink: 0, padding: '8px 14px', borderRadius: 16, background: '#F5F5F5', border: '1px solid #F0F0F0' } }, React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: '#484848' } }, c.name)))),
+                    menuVisibleCategories.map((c) => {
+                        const items = getMenuItemsForCategory(r.menu, c.id);
+                        if (!items.length)
+                            return null;
+                        return React.createElement("div", { key: c.id, ref: (el) => { menuSectionRefs.current[c.id] = el; }, style: { padding: '10px 18px 0' } },
+                            React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: RP.sub, textTransform: 'uppercase', letterSpacing: 0.4, margin: 0 } }, c.name),
+                            items.map(menuItemRow));
+                    })));
+        const menuItemDetail = menuItemDetailTarget && (() => {
+            const mi = (r.menu && r.menu.items || []).find((i) => i.id === menuItemDetailTarget);
+            if (!mi)
+                return null;
+            return React.createElement("div", { onClick: () => setMenuItemDetailTarget(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 14 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `0 0 calc(env(safe-area-inset-bottom) + 20px)`, maxHeight: '85vh', overflowY: 'auto' } },
+                    mi.photo
+                        ? React.createElement("div", { style: { width: '100%', aspectRatio: '16 / 9', backgroundImage: `url(${mi.photo})`, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: '20px 20px 0 0' } })
+                        : React.createElement("div", { style: { height: 14 } }),
+                    React.createElement("div", { style: { padding: '16px 20px 0' } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 } },
+                            React.createElement("span", { style: { fontSize: 18, fontWeight: 700, color: RP.text, fontFamily: 'Space Grotesk, sans-serif' } }, mi.name),
+                            React.createElement("span", { style: { fontSize: 17, fontWeight: 700, color: THEME.coral, flexShrink: 0 } }, money(mi.price))),
+                        mi.description && React.createElement("p", { style: { fontSize: 13, color: RP.sub, marginTop: 8, lineHeight: 1.5 } }, mi.description),
+                        menuItemAllergenLine(mi),
+                        menuItemBadges(mi).length > 0 && React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 } }, menuItemBadges(mi)),
+                        mi.available === false && React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: '#D0304A', marginTop: 10 } }, "Currently Unavailable"))));
+        })();
+        const tabBody = restaurantProfileTab === 'overview' ? React.createElement(React.Fragment, null, reservationCard, menuHighlightsSection, aboutSection, renderCommunityVideos(item))
             : restaurantProfileTab === 'reviews' ? reviewsSection
-                : infoSection;
+                : restaurantProfileTab === 'menu' ? fullMenuSection
+                    : infoSection;
         return React.createElement("div", { key: "restaurantProfile", className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 11, display: 'flex', flexDirection: 'column' } },
             React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto' } },
-                hero, ratingRow, tabsRow, tabBody, React.createElement("div", { style: { height: 40 } })));
+                hero, ratingRow, tabsRow, tabBody, React.createElement("div", { style: { height: 40 } })),
+            menuItemDetail);
     }
     function openMyBusinessProfile() {
         setProviderDashboardOpen(false);
@@ -8146,6 +8460,7 @@ function App() {
     }
     function closeBusinessProfile() {
         setProfileDrag((prev) => prev ? { ...prev, progress: 0, dragging: false } : null);
+        setMenuItemDetailTarget(null);
         setTimeout(() => { setBusinessProfileTarget(null); setProfileDrag(null); }, 260);
     }
     function handleBizPanelTouchStart(e) {
@@ -11041,6 +11356,7 @@ function App() {
                 { id: 'areas', label: 'Seating Areas' },
                 { id: 'hours', label: 'Operating Hours' },
                 { id: 'settings', label: 'Reservation Settings' },
+                { id: 'menu', label: 'Menu' },
                 { id: 'reservations', label: 'Reservations' },
             ];
             const tabHeader = React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 14px) 18px 0`, borderBottom: `1px solid ${RD.border}` } },
@@ -11069,6 +11385,7 @@ function App() {
                     { id: 'areas', icon: 'house', label: 'Areas', detail: `${(restaurant.areas || []).filter((a) => a.active).length} active areas`, tab: 'areas' },
                     { id: 'hours', icon: 'clock', label: 'Hours', detail: 'Set operating and reservation hours', tab: 'hours' },
                     { id: 'settings', icon: 'sliders', label: 'Reservation Settings', detail: `${restaurant.durationRules.length} duration rules · ${restaurant.bufferMinutes}min buffer`, tab: 'settings' },
+                    { id: 'menu', icon: 'utensils', label: 'Menu', detail: `${(restaurant.menu ? restaurant.menu.items : []).length} items · ${(restaurant.menu ? restaurant.menu.categories : []).length} categories`, tab: 'menu' },
                 ];
                 const cardsGrid = React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 } }, OVERVIEW_CARDS.map((c) => React.createElement("div", { key: c.id, style: { border: `1px solid ${RD.border}`, borderRadius: 16, padding: 14 } },
                     React.createElement(Icon, { name: c.icon, size: 16, color: THEME.coral }),
@@ -11255,6 +11572,58 @@ function App() {
                     numField("Minimum Advance Notice", restaurant.minAdvanceHours, (v) => updateMyRestaurant({ minAdvanceHours: v }), "hours ahead"),
                     numField("Advance Booking Window", restaurant.advanceDays, (v) => updateMyRestaurant({ advanceDays: v }), "days ahead"));
             }
+            else if (restaurantDashTab === 'menu') {
+                const menu = restaurant.menu || emptyRestaurantMenu();
+                const featuredCount = menu.items.filter((i) => i.featured).length;
+                const headerRowM = React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 } },
+                    React.createElement("div", null,
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: RD.text, margin: 0 } }, "Restaurant Menu"),
+                        React.createElement("p", { style: { fontSize: 11, color: RD.sub, marginTop: 2 } }, `${featuredCount}/${MENU_FEATURED_LIMIT} dishes featured on Overview`)),
+                    React.createElement("button", { onClick: previewCustomerMenu, style: { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 16, border: `1px solid ${RD.border}` } },
+                        React.createElement(Icon, { name: "eye", size: 13, color: RD.text }), React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: RD.text } }, "Preview")));
+                const addButtonsRow = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 14 } },
+                    React.createElement("button", { onClick: () => setMenuCategoryFormDraft({ name: '', schedule: null, originalId: null }), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 16, border: `1px solid ${RD.border}` } },
+                        React.createElement(Icon, { name: "plus", size: 13, color: RD.text }), React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: RD.text } }, "Add Category")),
+                    React.createElement("button", { disabled: menu.categories.length === 0, onClick: () => openMenuItemForm(menu.categories[0] && menu.categories[0].id, null), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 16, background: menu.categories.length === 0 ? '#EDEDED' : THEME.coral, opacity: menu.categories.length === 0 ? 0.6 : 1 } },
+                        React.createElement(Icon, { name: "plus", size: 13, color: "#fff" }), React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: "#fff" } }, "Add Item")));
+                const menuItemRowDash = (mi, i, catItems) => React.createElement("div", { key: mi.id, style: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: `1px solid ${RD.border}`, borderRadius: 12, marginTop: 8, opacity: mi.available === false ? 0.55 : 1 } },
+                    mi.photo
+                        ? React.createElement("div", { style: { width: 40, height: 40, borderRadius: 10, flexShrink: 0, backgroundImage: `url(${mi.photo})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
+                        : React.createElement("div", { style: { width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "utensils", size: 15, color: '#C7C0B8' })),
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
+                            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: RD.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, mi.name),
+                            mi.featured && React.createElement(Icon, { name: "star", size: 10, color: THEME.gold, fill: THEME.gold })),
+                        React.createElement("p", { style: { fontSize: 11, color: RD.sub, marginTop: 2 } }, `${money(mi.price)}${mi.available === false ? ' · Unavailable' : ''}`)),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', flexShrink: 0 } },
+                        React.createElement("button", { disabled: i === 0, onClick: () => moveMenuItem(mi.id, -1), style: { opacity: i === 0 ? 0.3 : 1, padding: 2 } }, React.createElement("span", { style: { display: 'flex', transform: 'rotate(180deg)' } }, React.createElement(Icon, { name: "chevrondown", size: 12, color: RD.sub }))),
+                        React.createElement("button", { disabled: i === catItems.length - 1, onClick: () => moveMenuItem(mi.id, 1), style: { opacity: i === catItems.length - 1 ? 0.3 : 1, padding: 2 } }, React.createElement(Icon, { name: "chevrondown", size: 12, color: RD.sub }))),
+                    React.createElement("button", { onClick: () => toggleMenuItemFeatured(mi.id), style: { width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "star", size: 14, color: mi.featured ? THEME.gold : '#D1D1D6', fill: mi.featured ? THEME.gold : 'none' })),
+                    React.createElement("button", { onClick: () => toggleMenuItemAvailable(mi.id), style: { width: 36, height: 20, borderRadius: 10, background: mi.available !== false ? THEME.coral : '#EDEDED', position: 'relative', flexShrink: 0 } }, React.createElement("div", { style: { position: 'absolute', top: 2, left: mi.available !== false ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' } })),
+                    React.createElement("button", { onClick: () => openMenuItemForm(mi.categoryId, mi), style: { width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "pencil", size: 13, color: RD.sub })),
+                    React.createElement("button", { onClick: () => deleteMenuItem(mi.id), style: { width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "trash", size: 13, color: "#D0304A" })));
+                const categorySections = menu.categories.length === 0
+                    ? React.createElement("p", { style: { fontSize: 12.5, color: RD.sub, textAlign: 'center', padding: '30px 0' } }, "No categories yet — add one to start building your menu.")
+                    : React.createElement("div", { style: { marginTop: 18, display: 'flex', flexDirection: 'column', gap: 22 } }, menu.categories.map((c, ci) => {
+                        const catItems = getMenuItemsForCategory(menu, c.id);
+                        return React.createElement("div", { key: c.id },
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: 700, color: RD.text, opacity: c.hidden ? 0.5 : 1 } }, c.name),
+                                    c.hidden && React.createElement("span", { style: { fontSize: 9.5, fontWeight: 700, color: RD.sub, background: T.surfaceSecondary, borderRadius: 7, padding: '2px 6px' } }, "HIDDEN"),
+                                    c.schedule && c.schedule.enabled && React.createElement("span", { style: { fontSize: 9.5, fontWeight: 700, color: THEME.coral, background: 'rgba(166,124,82,0.1)', borderRadius: 7, padding: '2px 6px' } }, `${minutesToTimeLabel(c.schedule.startMin)}–${minutesToTimeLabel(c.schedule.endMin)}`)),
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4 } },
+                                    React.createElement("button", { disabled: ci === 0, onClick: () => moveMenuCategory(c.id, -1), style: { opacity: ci === 0 ? 0.3 : 1, padding: 4 } }, React.createElement("span", { style: { display: 'flex', transform: 'rotate(180deg)' } }, React.createElement(Icon, { name: "chevrondown", size: 13, color: RD.sub }))),
+                                    React.createElement("button", { disabled: ci === menu.categories.length - 1, onClick: () => moveMenuCategory(c.id, 1), style: { opacity: ci === menu.categories.length - 1 ? 0.3 : 1, padding: 4 } }, React.createElement(Icon, { name: "chevrondown", size: 13, color: RD.sub })),
+                                    React.createElement("button", { onClick: () => toggleMenuCategoryHidden(c.id), style: { padding: 4 } }, React.createElement(Icon, { name: c.hidden ? "eyeoff" : "eye", size: 14, color: RD.sub })),
+                                    React.createElement("button", { onClick: () => setMenuCategoryFormDraft({ name: c.name, schedule: c.schedule, originalId: c.id }), style: { padding: 4 } }, React.createElement(Icon, { name: "pencil", size: 13, color: RD.sub })),
+                                    React.createElement("button", { onClick: () => deleteMenuCategory(c.id), style: { padding: 4 } }, React.createElement(Icon, { name: "trash", size: 13, color: "#D0304A" })))),
+                            catItems.length === 0
+                                ? React.createElement("button", { onClick: () => openMenuItemForm(c.id, null), style: { marginTop: 8, fontSize: 11.5, fontWeight: 700, color: THEME.coral } }, "+ Add an item to this category")
+                                : catItems.map((mi, i) => menuItemRowDash(mi, i, catItems)));
+                    }));
+                dashBody = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px calc(env(safe-area-inset-bottom) + 40px)' } }, headerRowM, addButtonsRow, categorySections);
+            }
             else if (restaurantDashTab === 'reservations') {
                 const RSV_STATUS_META = {
                     upcoming: { label: 'Upcoming', bg: 'rgba(46,155,255,0.12)', color: '#2E9BFF' },
@@ -11337,6 +11706,76 @@ function App() {
                     React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 18 } },
                         React.createElement("button", { onClick: () => setAreaFormDraft(null), style: { flex: 1, padding: '13px 0', borderRadius: 22, border: `1px solid ${TD.border}`, fontWeight: 700, fontSize: 13.5, color: TD.text } }, "Cancel"),
                         React.createElement("button", { onClick: saveAreaDraft, style: { flex: 1, padding: '13px 0', borderRadius: 22, background: THEME.coral, fontWeight: 700, fontSize: 13.5, color: '#fff' } }, "Save"))));
+        })(),
+        menuCategoryFormDraft && (() => {
+            const d = menuCategoryFormDraft;
+            const TD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const scheduleOn = !!(d.schedule && d.schedule.enabled);
+            return React.createElement("div", { onClick: () => setMenuCategoryFormDraft(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, marginBottom: 14 } }, d.originalId ? "Edit Category" : "Add Category"),
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase' } }, "Name"),
+                    React.createElement("input", { value: d.name, onChange: (e) => setMenuCategoryFormDraft((prev) => ({ ...prev, name: e.target.value })), placeholder: "Appetizers", style: { width: '100%', marginTop: 6, padding: '11px 12px', borderRadius: 12, border: `1px solid ${TD.border}`, fontSize: 13, color: TD.text, outline: 'none' } }),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 } },
+                        React.createElement("div", null,
+                            React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: TD.text, margin: 0 } }, "Only show at certain times"),
+                            React.createElement("p", { style: { fontSize: 11, color: TD.sub, marginTop: 2 } }, "Optional — e.g. a Breakfast or Brunch category")),
+                        React.createElement("button", { onClick: () => setMenuCategoryFormDraft((prev) => ({ ...prev, schedule: scheduleOn ? { ...prev.schedule, enabled: false } : { enabled: true, startMin: (prev.schedule && prev.schedule.startMin) || 7 * 60, endMin: (prev.schedule && prev.schedule.endMin) || 11 * 60, days: (prev.schedule && prev.schedule.days) || [] } })), style: { width: 40, height: 22, borderRadius: 11, background: scheduleOn ? THEME.coral : '#EDEDED', position: 'relative', flexShrink: 0 } }, React.createElement("div", { style: { position: 'absolute', top: 2, left: scheduleOn ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' } }))),
+                    scheduleOn && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 } },
+                        React.createElement("input", { type: "time", value: minutesToHHMM(d.schedule.startMin), onChange: (e) => setMenuCategoryFormDraft((prev) => ({ ...prev, schedule: { ...prev.schedule, startMin: timeStrToMinutes(e.target.value) } })), style: { flex: 1, padding: '9px 8px', borderRadius: 10, border: `1px solid ${TD.border}`, fontSize: 12.5, color: TD.text } }),
+                        React.createElement("span", { style: { fontSize: 12, color: TD.sub } }, "to"),
+                        React.createElement("input", { type: "time", value: minutesToHHMM(d.schedule.endMin), onChange: (e) => setMenuCategoryFormDraft((prev) => ({ ...prev, schedule: { ...prev.schedule, endMin: timeStrToMinutes(e.target.value) } })), style: { flex: 1, padding: '9px 8px', borderRadius: 10, border: `1px solid ${TD.border}`, fontSize: 12.5, color: TD.text } })),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 18 } },
+                        React.createElement("button", { onClick: () => setMenuCategoryFormDraft(null), style: { flex: 1, padding: '13px 0', borderRadius: 22, border: `1px solid ${TD.border}`, fontWeight: 700, fontSize: 13.5, color: TD.text } }, "Cancel"),
+                        React.createElement("button", { onClick: saveMenuCategoryDraft, style: { flex: 1, padding: '13px 0', borderRadius: 22, background: THEME.coral, fontWeight: 700, fontSize: 13.5, color: '#fff' } }, "Save"))));
+        })(),
+        menuItemFormDraft && (() => {
+            const d = menuItemFormDraft;
+            const restaurant = getMyRestaurant();
+            const menu = (restaurant && restaurant.menu) || emptyRestaurantMenu();
+            const TD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const toggleTagField = (field, tagId) => setMenuItemFormDraft((prev) => ({ ...prev, [field]: prev[field].includes(tagId) ? prev[field].filter((x) => x !== tagId) : [...prev[field], tagId] }));
+            const tagPills = (tags, field) => React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 } }, tags.map((t) => {
+                const active = d[field].includes(t.id);
+                return React.createElement("button", { key: t.id, onClick: () => toggleTagField(field, t.id), style: { padding: '7px 12px', borderRadius: 14, background: active ? 'rgba(166,124,82,0.12)' : '#F5F5F5', border: `1px solid ${active ? THEME.coral : '#F0F0F0'}` } },
+                    React.createElement("span", { style: { fontSize: 11.5, fontWeight: 600, color: active ? THEME.coral : '#484848' } }, t.label));
+            }));
+            const toggleRow = (label, on, onToggle) => React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 } },
+                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: TD.text } }, label),
+                React.createElement("button", { onClick: onToggle, style: { width: 40, height: 22, borderRadius: 11, background: on ? THEME.coral : '#EDEDED', position: 'relative', flexShrink: 0 } }, React.createElement("div", { style: { position: 'absolute', top: 2, left: on ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left 0.15s' } })));
+            return React.createElement("div", { onClick: () => setMenuItemFormDraft(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '85vh', overflowY: 'auto' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, marginBottom: 14 } }, d.originalId ? "Edit Menu Item" : "Add Menu Item"),
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase' } }, "Photo"),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 } },
+                        d.photo
+                            ? React.createElement("div", { style: { width: 64, height: 64, borderRadius: 12, overflow: 'hidden', flexShrink: 0, backgroundImage: `url(${d.photo})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
+                            : React.createElement("div", { style: { width: 64, height: 64, borderRadius: 12, flexShrink: 0, background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "utensils", size: 20, color: '#C7C0B8' })),
+                        React.createElement("button", { onClick: () => menuItemPhotoInputRef.current && menuItemPhotoInputRef.current.click(), style: { padding: '9px 14px', borderRadius: 14, border: `1px solid ${TD.border}`, fontSize: 12, fontWeight: 700, color: TD.text } }, d.photo ? "Replace Photo" : "Upload Photo"),
+                        d.photo && React.createElement("button", { onClick: () => setMenuItemFormDraft((prev) => ({ ...prev, photo: null })), style: { fontSize: 12, fontWeight: 700, color: '#D0304A' } }, "Remove"),
+                        React.createElement("input", { ref: menuItemPhotoInputRef, type: "file", accept: "image/*", onChange: handleMenuItemPhotoFile, style: { display: 'none' } })),
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase', display: 'block', marginTop: 14 } }, "Item Name"),
+                    React.createElement("input", { value: d.name, onChange: (e) => setMenuItemFormDraft((prev) => ({ ...prev, name: e.target.value })), placeholder: "Seared Salmon", style: { width: '100%', marginTop: 6, padding: '11px 12px', borderRadius: 12, border: `1px solid ${TD.border}`, fontSize: 13, color: TD.text, outline: 'none' } }),
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase', display: 'block', marginTop: 12 } }, "Description"),
+                    React.createElement("textarea", { value: d.description, onChange: (e) => setMenuItemFormDraft((prev) => ({ ...prev, description: e.target.value })), rows: 2, style: { width: '100%', marginTop: 6, padding: 12, borderRadius: 12, border: `1px solid ${TD.border}`, fontSize: 13, color: TD.text, outline: 'none', resize: 'none', fontFamily: 'inherit' } }),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 12 } },
+                        React.createElement("div", { style: { flex: 1 } },
+                            React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase' } }, "Price"),
+                            React.createElement("input", { type: "number", value: d.price, onChange: (e) => setMenuItemFormDraft((prev) => ({ ...prev, price: e.target.value })), placeholder: "0", style: { width: '100%', marginTop: 6, padding: '11px 12px', borderRadius: 12, border: `1px solid ${TD.border}`, fontSize: 13, color: TD.text, outline: 'none' } })),
+                        React.createElement("div", { style: { flex: 1.4 } },
+                            React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase' } }, "Category"),
+                            React.createElement("select", { value: d.categoryId, onChange: (e) => setMenuItemFormDraft((prev) => ({ ...prev, categoryId: e.target.value })), style: { width: '100%', marginTop: 6, padding: '11px 12px', borderRadius: 12, border: `1px solid ${TD.border}`, fontSize: 13, color: TD.text } },
+                                menu.categories.map((c) => React.createElement("option", { key: c.id, value: c.id }, c.name))))),
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase', display: 'block', marginTop: 14 } }, "Dietary Information"),
+                    tagPills(MENU_DIETARY_TAGS, 'dietary'),
+                    React.createElement("label", { style: { fontSize: 10.5, fontWeight: 700, color: TD.sub, textTransform: 'uppercase', display: 'block', marginTop: 14 } }, "Allergens"),
+                    tagPills(MENU_ALLERGEN_TAGS, 'allergens'),
+                    toggleRow("Spicy", d.spicy, () => setMenuItemFormDraft((prev) => ({ ...prev, spicy: !prev.spicy }))),
+                    toggleRow("Feature on Profile", d.featured, () => setMenuItemFormDraft((prev) => ({ ...prev, featured: !prev.featured }))),
+                    toggleRow("Currently Available", d.available, () => setMenuItemFormDraft((prev) => ({ ...prev, available: !prev.available }))),
+                    React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 18 } },
+                        React.createElement("button", { onClick: () => setMenuItemFormDraft(null), style: { flex: 1, padding: '13px 0', borderRadius: 22, border: `1px solid ${TD.border}`, fontWeight: 700, fontSize: 13.5, color: TD.text } }, "Cancel"),
+                        React.createElement("button", { disabled: !d.name.trim() || !d.categoryId, onClick: saveMenuItemDraft, style: { flex: 1, padding: '13px 0', borderRadius: 22, background: THEME.coral, fontWeight: 700, fontSize: 13.5, color: '#fff', opacity: !d.name.trim() || !d.categoryId ? 0.6 : 1 } }, "Save Item"))));
         })(),
         comboPickerOpen && (() => {
             const restaurant = getMyRestaurant();
