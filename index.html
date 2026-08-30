@@ -34,8 +34,13 @@
   /* Nearby map (Leaflet): divIcon markup is raw HTML, not React, so it needs real CSS
      classes rather than inline styles. #97C400 is hard-coded to match THEME.coral —
      if that token is ever retinted, update it here too. */
-  .leaflet-container { background: #0A0A0C !important; font-family: 'Inter', sans-serif !important; }
+  .leaflet-container { background: #0A0A0C !important; font-family: 'Inter', sans-serif !important; touch-action: none; }
   .avio-map-cluster-wrap, .avio-map-pin-wrap, .avio-user-dot-wrap { background: none !important; border: none !important; }
+  /* Hit-slop wrappers: the divIcon's own box is the real Leaflet click/tap target, so it's
+     sized to a full >=44x44pt touch area even though the visible circle inside stays the
+     original smaller size — padding is invisible, never changes how the marker looks. */
+  .avio-map-pin-hit { width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; touch-action: manipulation; cursor: pointer; }
+  .avio-map-cluster-hit { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; touch-action: manipulation; cursor: pointer; }
   .avio-map-cluster { width: 44px; height: 44px; border-radius: 50%; background: #97C400; border: 2.5px solid #fff; color: #fff; font-weight: 700; font-family: 'Space Grotesk', sans-serif; font-size: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.45); }
   .avio-map-pin { position: relative; width: 40px; height: 40px; border-radius: 50%; overflow: hidden; border: 2.5px solid #97C400; box-shadow: 0 4px 10px rgba(0,0,0,0.45); background: #161618 center/cover; }
   .avio-map-pin img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -3507,6 +3512,17 @@ function App() {
     const nearbyClusterGroupRef = useRef(null);
     const nearbyUserMarkerRef = useRef(null);
     const nearbyCommittedCenterRef = useRef(null);
+    // Marker lifecycle bookkeeping for the Nearby map: keyed by business id so a tap-driven
+    // selection change only ever restyles the one or two markers involved (setIcon) instead of
+    // tearing down and rebuilding every marker on the map. Rebuilding the whole cluster group on
+    // every tap was the root cause of markers needing multiple taps on real touch devices — a
+    // synchronous rebuild of dozens of DOM nodes mid-gesture could detach the exact node a
+    // second, fast tap landed on before its click ever fired.
+    const nearbyMarkersByIdRef = useRef(new Map());
+    const nearbyPrevSelectedIdRef = useRef(null);
+    const nearbySuppressPendingSearchUntilRef = useRef(0);
+    const nearbyFilteredRef = useRef([]);
+    const selectNearbyBusinessRef = useRef(() => {});
     // The rest of `feed` (bookings, tables, hours, etc.) is deliberately in-memory-only in
     // this demo and doesn't survive a refresh — but a restaurant's menu specifically needs
     // to, so it gets its own persisted slice merged back in at load, the same loadLS/saveLS
@@ -6185,6 +6201,35 @@ function App() {
         commitNearbyCenter(nearbyUserLatLng || DEFAULT_MAP_CENTER, { zoom: 13, key: 'current', label: 'Current Location', source: 'device' });
     }
     function nearbyBookingCta(business) { setNearbySelectedId(null); startBookingFor(business); }
+    // Single choke point for "a marker/list row/carousel card was tapped" — always leaves
+    // exactly one business selected (or none), and always lands on the map so the preview
+    // card is visible right where the tap happened.
+    function selectNearbyBusiness(businessId) {
+        setNearbySelectedId(businessId);
+        setNearbyView('map');
+    }
+    selectNearbyBusinessRef.current = selectNearbyBusiness;
+    nearbyFilteredRef.current = nearbyFiltered;
+    // Builds the two divIcon types used on the Nearby map. Both wrap the actual visible
+    // circle in a full-size flex box (avio-map-pin-hit / avio-map-cluster-hit) so the real
+    // Leaflet tap target is always >=44x44pt even though the circle drawn inside keeps its
+    // original, smaller visual size — the padding is invisible, so this never changes how
+    // the marker looks, only how reliably it can be tapped.
+    function buildNearbyPinIcon(business, isSelected) {
+        const cat = getCategoryDiscovery(business.category);
+        return L.divIcon({
+            className: 'avio-map-pin-wrap',
+            html: `<div class="avio-map-pin-hit"><div class="avio-map-pin${isSelected ? ' avio-map-pin-active' : ''}">${business.image ? `<img src="${business.image}" />` : ''}<span class="avio-map-pin-badge">${cat.icon}</span></div></div>`,
+            iconSize: [48, 56], iconAnchor: [24, 56],
+        });
+    }
+    function buildNearbyClusterIcon(count) {
+        return L.divIcon({
+            html: `<div class="avio-map-cluster-hit"><div class="avio-map-cluster">${count}</div></div>`,
+            className: 'avio-map-cluster-wrap',
+            iconSize: [48, 48],
+        });
+    }
     // If a destination was already established elsewhere (e.g. "barber in LA" typed into AI
     // Search) before Nearby was ever opened this session, arrive already showing it instead
     // of defaulting back to the device location — this is the fix for the map, AI search, and
@@ -6233,7 +6278,13 @@ function App() {
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19 }).addTo(map);
         const cluster = L.markerClusterGroup({
             maxClusterRadius: 52, showCoverageOnHover: false, spiderfyOnMaxZoom: true,
-            iconCreateFunction: (c) => L.divIcon({ html: `<div class="avio-map-cluster">${c.getChildCount()}</div>`, className: 'avio-map-cluster-wrap', iconSize: [44, 44] }),
+            // Explicit (matches the library default) so a cluster circle is never just
+            // decorative: one tap always either zooms smoothly toward its bounds — which
+            // naturally splits it into individual markers once they're far enough apart at
+            // the new zoom — or, if it's already at max zoom and still can't split further,
+            // spiderfies it into a fanned-out ring of tappable individual markers instead.
+            zoomToBoundsOnClick: true,
+            iconCreateFunction: (c) => buildNearbyClusterIcon(c.getChildCount()),
         });
         map.addLayer(cluster);
         nearbyMapInstanceRef.current = map;
@@ -6243,12 +6294,22 @@ function App() {
             setNearbyCommittedCenter(startCenter);
         }
         map.on('moveend', () => {
+            // A tap's own gentle re-center (panInside, below) briefly moves the view away from
+            // the committed search center just like a real drag would — without this guard that
+            // reads as "the user panned," popping up "Search this area" as an unwanted side
+            // effect of simply selecting a marker.
+            if (Date.now() < nearbySuppressPendingSearchUntilRef.current)
+                return;
             const c = map.getCenter();
             const committed = nearbyCommittedCenterRef.current;
             if (!committed)
                 return;
             setNearbyPendingSearch(haversineMi(committed[0], committed[1], c.lat, c.lng) > 1.2);
         });
+        // Markers/clusters call stopPropagation on their own click (Leaflet's default), so this
+        // only ever fires for a genuine tap on open map — exactly "tapping empty space clears
+        // the selection and closes the preview card."
+        map.on('click', () => setNearbySelectedId(null));
         setNearbyMapReady(true);
         setTimeout(() => map.invalidateSize(), 250);
         return () => {
@@ -6256,32 +6317,79 @@ function App() {
             nearbyMapInstanceRef.current = null;
             nearbyClusterGroupRef.current = null;
             nearbyUserMarkerRef.current = null;
+            nearbyMarkersByIdRef.current.clear();
+            nearbyPrevSelectedIdRef.current = null;
             setNearbyMapReady(false);
         };
     }, [shortsFeedTab]);
     // Keeps the map's markers in sync with the filtered/ranked result set — runs on
-    // category/search/filter/region changes (all explicit actions), never on raw panning.
+    // category/search/filter/region changes (all explicit actions), never on raw panning, and
+    // deliberately never on nearbySelectedId — a tap-driven selection change is handled by the
+    // lighter-weight effect just below instead of tearing down and rebuilding every marker.
     useEffect(() => {
         const cluster = nearbyClusterGroupRef.current;
         if (!cluster || typeof L === 'undefined')
             return;
         cluster.clearLayers();
+        const markersById = new Map();
         nearbyFiltered.forEach(({ business, latlng }) => {
             if (!latlng)
                 return;
-            const cat = getCategoryDiscovery(business.category);
             const isSelected = nearbySelectedId === business.id;
-            const marker = L.marker(latlng, {
-                icon: L.divIcon({
-                    className: 'avio-map-pin-wrap',
-                    html: `<div class="avio-map-pin${isSelected ? ' avio-map-pin-active' : ''}">${business.image ? `<img src="${business.image}" />` : ''}<span class="avio-map-pin-badge">${cat.icon}</span></div>`,
-                    iconSize: [40, 48], iconAnchor: [20, 48],
-                }),
-            });
-            marker.on('click', () => { setNearbySelectedId(business.id); setNearbyView('map'); });
+            const marker = L.marker(latlng, { icon: buildNearbyPinIcon(business, isSelected) });
+            // Reads the latest selection handler via a ref instead of closing over it directly,
+            // so this effect's own identity (and therefore whether markers get rebuilt) never
+            // has to depend on it.
+            marker.on('click', () => selectNearbyBusinessRef.current(business.id));
             cluster.addLayer(marker);
+            markersById.set(business.id, marker);
         });
-    }, [nearbyFiltered, nearbySelectedId, nearbyMapReady]);
+        nearbyMarkersByIdRef.current = markersById;
+        nearbyPrevSelectedIdRef.current = nearbySelectedId;
+    }, [nearbyFiltered, nearbyMapReady]);
+    // Cheap, targeted response to a selection change: restyles just the previously- and
+    // newly-selected marker (setIcon on the one or two affected markers) instead of touching
+    // the other 50+ markers on screen, then gently pans the map only far enough to bring the
+    // newly-selected marker back into the area not covered by the header or the preview card.
+    useEffect(() => {
+        if (typeof L === 'undefined')
+            return;
+        const markersById = nearbyMarkersByIdRef.current;
+        const prevId = nearbyPrevSelectedIdRef.current;
+        if (prevId !== nearbySelectedId && prevId != null) {
+            const prevMarker = markersById.get(prevId);
+            const prevEntry = nearbyFilteredRef.current.find((x) => x.business.id === prevId);
+            if (prevMarker && prevEntry)
+                prevMarker.setIcon(buildNearbyPinIcon(prevEntry.business, false));
+        }
+        if (nearbySelectedId != null) {
+            const marker = markersById.get(nearbySelectedId);
+            const entry = nearbyFilteredRef.current.find((x) => x.business.id === nearbySelectedId);
+            if (marker && entry) {
+                marker.setIcon(buildNearbyPinIcon(entry.business, true));
+                const map = nearbyMapInstanceRef.current;
+                // The header/category pills/banner never overlap the map itself (they sit
+                // above it in normal flex flow, shrinking the map's own box instead) — only a
+                // small top margin is needed. The bottom padding is the real constraint: it has
+                // to clear the preview card that's about to appear below the map.
+                if (map && entry.latlng && map.panInside) {
+                    nearbySuppressPendingSearchUntilRef.current = Date.now() + 900;
+                    map.panInside(entry.latlng, { paddingTopLeft: [20, 20], paddingBottomRight: [20, 260], animate: true, duration: 0.4 });
+                }
+            }
+        }
+        nearbyPrevSelectedIdRef.current = nearbySelectedId;
+    }, [nearbySelectedId, nearbyMapReady]);
+    // Defensive re-measure whenever Map becomes visible again (e.g. after List, or a device
+    // rotation that happened while it was hidden) — visibility:hidden keeps layout dimensions
+    // stable so this is normally a no-op, but it's cheap insurance against a stale size cache.
+    useEffect(() => {
+        if (nearbyView !== 'map')
+            return;
+        const map = nearbyMapInstanceRef.current;
+        if (map)
+            map.invalidateSize();
+    }, [nearbyView, nearbyMapReady]);
     // The user's own location dot — separate layer so re-filtering never touches it. When the
     // fix is only approximate (coords.accuracy well above GPS-grade precision), a soft radius
     // circle is drawn around it too, so an approximate location is visibly approximate on the
@@ -6459,7 +6567,13 @@ function App() {
                 React.createElement("p", { style: { fontSize: 10.5, color: 'rgba(255,255,255,0.6)', margin: '1px 0 0' } }, "Leave a review · Add a tip")),
             React.createElement("button", { onClick: () => openTipFlow(postServiceBanner), style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral, flexShrink: 0, padding: '4px 8px' } }, "Review"),
             React.createElement("button", { onClick: () => setNearbyBannerDismissed(true), style: { flexShrink: 0, padding: 4 } }, React.createElement(Icon, { name: "x", size: 13, color: "rgba(255,255,255,0.6)" })));
-        const mapCanvas = nearbyView === 'map' && React.createElement("div", { style: { position: 'absolute', inset: 0 } },
+        // Always mounted (never conditionally rendered on nearbyView) so the div Leaflet was
+        // attached to in the mount effect above never gets torn down by React — switching to
+        // List and back used to swap in a brand-new, empty div that the map-init effect (which
+        // only ever runs once per Nearby visit) had no way to reattach to, silently orphaning
+        // every marker off-screen. Hidden with visibility (not display:none) so its layout size
+        // — and therefore Leaflet's cached container size — never changes either.
+        const mapCanvas = React.createElement("div", { style: { position: 'absolute', inset: 0, visibility: nearbyView === 'map' ? 'visible' : 'hidden', pointerEvents: nearbyView === 'map' ? 'auto' : 'none' } },
             React.createElement("div", { ref: nearbyMapDivRef, style: { position: 'absolute', inset: 0 } }),
             nearbyPendingSearch && React.createElement("button", { onClick: () => { const map = nearbyMapInstanceRef.current; if (map) { const c = map.getCenter(); commitNearbyCenter([c.lat, c.lng], { zoom: map.getZoom(), key: null, label: 'This area', source: 'map' }); } }, style: { position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 20, background: THEME.ink, border: `1px solid ${THEME.coral}`, boxShadow: '0 6px 16px rgba(0,0,0,0.45)', zIndex: 4 } },
                 React.createElement(Icon, { name: "search", size: 13, color: THEME.coral }),
@@ -6489,7 +6603,7 @@ function App() {
                 earliest && React.createElement("p", { key: "next", style: { fontSize: 11, fontWeight: 600, color: T.textSecondary, marginTop: 4 } }, `🕐 Next available: ${earliest.isToday ? earliest.timeLabel : earliest.dayLabel + ' ' + earliest.timeLabel}`),
                 promo && React.createElement("p", { key: "promo", style: { fontSize: 11, fontWeight: 700, color: THEME.gold, marginTop: 4 } }, business.deal.label || 'Limited-time deal')];
         };
-        const previewCard = ({ business, elig, matchingService }, i) => React.createElement("div", { key: business.id, style: { flex: '0 0 88%', scrollSnapAlign: 'center', background: T.modalBackground, borderRadius: 20, border: `1px solid ${T.border}`, overflow: 'hidden', marginRight: 10 } },
+        const previewCard = ({ business, elig, matchingService }, i) => React.createElement("div", { key: business.id, onClick: () => openBusinessProfile(business), role: "button", tabIndex: 0, style: { flex: '0 0 88%', scrollSnapAlign: 'center', background: T.modalBackground, borderRadius: 20, border: `1px solid ${T.border}`, overflow: 'hidden', marginRight: 10, cursor: 'pointer' } },
             React.createElement("div", { style: { display: 'flex', gap: 12, padding: 12 } },
                 React.createElement("div", { style: { width: 68, height: 68, borderRadius: 14, overflow: 'hidden', flexShrink: 0, background: business.avatarColor || T.surfaceSecondary } },
                     business.image && React.createElement("img", { src: business.image, style: { width: '100%', height: '100%', objectFit: 'cover' } })),
@@ -6499,8 +6613,8 @@ function App() {
                         business.verified && React.createElement("div", { style: { width: 13, height: 13, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 7, color: "#fff" }))),
                     ...previewCardBody(business, elig, matchingService))),
             React.createElement("div", { style: { display: 'flex', gap: 8, padding: '0 12px 12px' } },
-                React.createElement("button", { onClick: () => openBusinessProfile(business), style: { flex: 1, padding: '11px 0', borderRadius: 16, border: `1px solid ${T.border}`, fontSize: 12.5, fontWeight: 700, color: T.textPrimary } }, "View"),
-                React.createElement("button", { onClick: () => nearbyBookingCta(business), style: { flex: 1.4, padding: '11px 0', borderRadius: 16, background: THEME.coral, fontSize: 12.5, fontWeight: 700, color: '#fff' } }, cardCta(business))));
+                React.createElement("button", { onClick: (e) => { e.stopPropagation(); openBusinessProfile(business); }, style: { flex: 1, padding: '11px 0', borderRadius: 16, border: `1px solid ${T.border}`, fontSize: 12.5, fontWeight: 700, color: T.textPrimary } }, "View"),
+                React.createElement("button", { onClick: (e) => { e.stopPropagation(); nearbyBookingCta(business); }, style: { flex: 1.4, padding: '11px 0', borderRadius: 16, background: THEME.coral, fontSize: 12.5, fontWeight: 700, color: '#fff' } }, cardCta(business))));
         const carousel = nearbySelectedEntry && React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 'calc(env(safe-area-inset-bottom) + 96px)', zIndex: 6 } },
             React.createElement("div", {
                 ref: nearbyCarouselRef, className: "avio-scroll",
@@ -6524,7 +6638,7 @@ function App() {
                     nearbyView === 'map' && React.createElement("button", { onClick: () => { const map = nearbyMapInstanceRef.current; if (map) { const c = map.getCenter(); commitNearbyCenter([c.lat, c.lng], { zoom: map.getZoom(), key: null, label: 'This area', source: 'map' }); } }, style: { padding: '10px 18px', borderRadius: 18, border: `1px solid rgba(255,255,255,0.3)`, color: '#fff', fontWeight: 700, fontSize: 12.5 } }, "Search This Area"))));
         const listView = nearbyView === 'list' && React.createElement("div", { className: "avio-scroll", style: { position: 'absolute', inset: 0, overflowY: 'auto', padding: '4px 18px calc(env(safe-area-inset-bottom) + 20px)' } },
             React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, margin: '2px 0 12px' } }, `${nearbyFiltered.length} place${nearbyFiltered.length === 1 ? '' : 's'} found`),
-            nearbyFiltered.map(({ business, elig, matchingService }) => React.createElement("button", { key: business.id, onClick: () => { setNearbySelectedId(business.id); setNearbyView('map'); }, style: { width: '100%', display: 'flex', gap: 12, padding: 12, borderRadius: 18, border: `1px solid ${T.border}`, background: T.surface, marginBottom: 12, textAlign: 'left' } },
+            nearbyFiltered.map(({ business, elig, matchingService }) => React.createElement("button", { key: business.id, onClick: () => selectNearbyBusiness(business.id), style: { width: '100%', display: 'flex', gap: 12, padding: 12, borderRadius: 18, border: `1px solid ${T.border}`, background: T.surface, marginBottom: 12, textAlign: 'left' } },
                 React.createElement("div", { style: { width: 64, height: 64, borderRadius: 14, overflow: 'hidden', flexShrink: 0, background: business.avatarColor || T.surfaceSecondary } },
                     business.image && React.createElement("img", { src: business.image, style: { width: '100%', height: '100%', objectFit: 'cover' } })),
                 React.createElement("div", { style: { flex: 1, minWidth: 0 } },
