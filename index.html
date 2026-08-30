@@ -62,6 +62,10 @@
   .avio-map-pin-badge { position: absolute; right: -3px; bottom: -3px; width: 19px; height: 19px; border-radius: 50%; background: #161618; border: 1.5px solid #97C400; display: flex; align-items: center; justify-content: center; font-size: 10.5px; line-height: 1; }
   .avio-map-pin-active { border-color: #fff; box-shadow: 0 0 0 4px rgba(151,196,0,0.5), 0 4px 14px rgba(0,0,0,0.5); transform: scale(1.12); }
   .avio-user-dot { width: 16px; height: 16px; border-radius: 50%; background: #2E9BFF; border: 3px solid #fff; box-shadow: 0 0 0 5px rgba(46,155,255,0.28); }
+  /* Business profile's compact location map: a single plain lime dot, deliberately NOT the
+     Nearby photo-pin style, so it never reads as a discovery marker. */
+  .avio-biz-location-pin-wrap { background: none !important; border: none !important; }
+  .avio-biz-location-pin { width: 18px; height: 18px; border-radius: 50%; background: #97C400; border: 3px solid #fff; box-shadow: 0 0 0 5px rgba(151,196,0,0.3), 0 2px 8px rgba(0,0,0,0.4); }
   .avio-scroll { -ms-overflow-style: none; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   button { font-family: inherit; cursor: pointer; border: none; background: none; }
   #fallback { display:none; color:#F8F4EC; font-family: sans-serif; padding: 24px; text-align:center; }
@@ -3537,6 +3541,13 @@ function App() {
     const nearbySuppressPendingSearchUntilRef = useRef(0);
     const nearbyFilteredRef = useRef([]);
     const selectNearbyBusinessRef = useRef(() => {});
+    // ---- Business profile: compact, single-marker location map ----
+    // Deliberately its own Leaflet instance/refs, entirely separate from the Nearby discovery
+    // map above — never shares center, zoom, markers, clusters, filters, or selection state
+    // with it. A business profile only ever needs to show where THAT one business is.
+    const bizLocationMapDivRef = useRef(null);
+    const bizLocationMapInstanceRef = useRef(null);
+    const bizLocationMarkerRef = useRef(null);
     // The rest of `feed` (bookings, tables, hours, etc.) is deliberately in-memory-only in
     // this demo and doesn't survive a refresh — but a restaurant's menu specifically needs
     // to, so it gets its own persisted slice merged back in at load, the same loadLS/saveLS
@@ -6420,6 +6431,41 @@ function App() {
         if (map)
             map.invalidateSize();
     }, [nearbyView, nearbyMapReady]);
+    // Mounts/tears down a small, fully independent Leaflet map for the business profile's
+    // Overview tab. Unlike the Nearby map above, this one is deliberately rebuilt from scratch
+    // every time it's needed instead of kept mounted — it only ever holds one static marker for
+    // one business, so recreating it is cheap, and doing so guarantees this map's lifecycle can
+    // never couple with Nearby's (no shared instance, container, center, zoom, or marker state).
+    useEffect(() => {
+        const isRestaurantOverview = businessProfileTarget && businessProfileTarget.businessType === 'restaurant' && restaurantProfileTab === 'overview';
+        if (!isRestaurantOverview || typeof L === 'undefined' || !bizLocationMapDivRef.current)
+            return;
+        const latlng = getBusinessLatLng(businessProfileTarget) || DEFAULT_MAP_CENTER;
+        // Locked down (no drag/zoom/tap handlers) — this is a small static preview, not a
+        // second interactive map; the card around it is what's tappable, for "open a larger
+        // map/directions experience" elsewhere.
+        const map = L.map(bizLocationMapDivRef.current, {
+            zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false,
+            touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false,
+            zoomAnimation: false, fadeAnimation: false,
+        }).setView(latlng, 16);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19 }).addTo(map);
+        // Exactly one marker, never clustered, no count badge — exists purely to point at this
+        // one business, styled as a plain lime dot rather than reusing the Nearby photo pin so
+        // it's never mistaken for a discovery marker.
+        const marker = L.marker(latlng, {
+            icon: L.divIcon({ className: 'avio-biz-location-pin-wrap', html: '<div class="avio-biz-location-pin"></div>', iconSize: [22, 22] }),
+            interactive: false,
+        }).addTo(map);
+        bizLocationMapInstanceRef.current = map;
+        bizLocationMarkerRef.current = marker;
+        setTimeout(() => map.invalidateSize(), 60);
+        return () => {
+            map.remove();
+            bizLocationMapInstanceRef.current = null;
+            bizLocationMarkerRef.current = null;
+        };
+    }, [businessProfileTarget, restaurantProfileTab]);
     // The user's own location dot — separate layer so re-filtering never touches it. When the
     // fix is only approximate (coords.accuracy well above GPS-grade precision), a soft radius
     // circle is drawn around it too, so an approximate location is visibly approximate on the
@@ -6674,7 +6720,18 @@ function App() {
                 React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                     React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: T.textPrimary, margin: 0 } }, business.name),
                     ...previewCardBody(business, elig, matchingService)))));
-        return React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#0A0A0C', display: 'flex', flexDirection: 'column', overflow: 'hidden' } },
+        // isolation:'isolate' forces a brand-new stacking context for the WHOLE Nearby screen.
+        // Without it, Leaflet's internal panes (marker pane alone is z-index:600 by design,
+        // used to keep markers above tiles) have no local ceiling to stop at — an absolutely
+        // positioned ancestor with z-index:auto does not itself create a stacking context, so
+        // those high z-index values compare directly against unrelated siblings elsewhere in
+        // the app (e.g. a business profile screen sitting at z-index 11), and the map wins.
+        // That's the actual cause of the discovery map/clusters bleeding on top of whatever
+        // opens over Nearby: it was never confined to begin with. Isolating it here means
+        // everything Leaflet does internally is trapped inside this one boundary, and simple
+        // DOM order (this screen renders before any profile/modal that can open above it)
+        // decides the real stacking from here on, same as any other screen in the app.
+        return React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#0A0A0C', display: 'flex', flexDirection: 'column', overflow: 'hidden', isolation: 'isolate' } },
             header,
             compactBanner,
             React.createElement("div", { style: { flex: 1, position: 'relative' } }, mapCanvas, listView, emptyState, carousel),
@@ -8382,8 +8439,20 @@ function App() {
             React.createElement("button", { className: "avio-press", onClick: () => openReservationFlow(item), style: { width: '100%', marginTop: 16, padding: '14px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Find a Table"));
         const aboutSection = React.createElement("div", { style: { padding: '20px 18px 0' } },
             React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: RP.text, margin: 0 } }, "About"),
-            React.createElement("p", { style: { fontSize: 12.5, color: RP.sub, marginTop: 6, lineHeight: 1.5 } }, item.blurb),
-            React.createElement("p", { style: { fontSize: 12, color: RP.sub, marginTop: 10 } }, r.address));
+            React.createElement("p", { style: { fontSize: 12.5, color: RP.sub, marginTop: 6, lineHeight: 1.5 } }, item.blurb));
+        const openDirections = () => flashToast('Opening directions to ' + r.address);
+        // Compact (~200px) preview of ONLY this business's location — a single lime dot on its
+        // own tiny, non-interactive Leaflet map (built by the effect above), never the Nearby
+        // discovery map. Tapping the card or "Get Directions" is where a real larger map/turn-
+        // by-turn experience would hang off; this demo has no live routing backend to open.
+        const locationSection = React.createElement("div", { style: { padding: '20px 18px 0' } },
+            React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: RP.text, margin: '0 0 10px' } }, "Location"),
+            React.createElement("button", { onClick: openDirections, style: { display: 'block', width: '100%', height: 200, borderRadius: 18, overflow: 'hidden', border: `1px solid ${RP.border}`, position: 'relative', background: '#0A0A0C' } },
+                React.createElement("div", { ref: bizLocationMapDivRef, style: { position: 'absolute', inset: 0, pointerEvents: 'none' } })),
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10 } },
+                React.createElement("span", { style: { fontSize: 12.5, color: RP.sub, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, r.address),
+                React.createElement("button", { onClick: openDirections, style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5, padding: '8px 14px', borderRadius: 14, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 12 } },
+                    React.createElement(Icon, { name: "send", size: 12, color: "#fff" }), "Get Directions")));
         const SAMPLE_REVIEWS = [
             { name: 'Jordan M.', rating: 5, text: 'Best pasta in Brooklyn, hands down. The tagliatelle was perfect and service was warm without being slow.' },
             { name: 'Casey R.', rating: 5, text: 'Cozy date-night spot. We sat outdoors and the patio heaters made it comfortable even in fall.' },
@@ -8488,7 +8557,7 @@ function App() {
                         menuItemBadges(mi).length > 0 && React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 } }, menuItemBadges(mi)),
                         mi.available === false && React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: '#D0304A', marginTop: 10 } }, "Currently Unavailable"))));
         })();
-        const tabBody = restaurantProfileTab === 'overview' ? React.createElement(React.Fragment, null, reservationCard, menuHighlightsSection, aboutSection, renderCommunityVideos(item))
+        const tabBody = restaurantProfileTab === 'overview' ? React.createElement(React.Fragment, null, reservationCard, menuHighlightsSection, aboutSection, locationSection, renderCommunityVideos(item))
             : restaurantProfileTab === 'reviews' ? reviewsSection
                 : restaurantProfileTab === 'menu' ? fullMenuSection
                     : infoSection;
