@@ -2064,6 +2064,19 @@ const AI_SEARCH_SERVICE_KEYWORDS = [
 ];
 const AI_SEARCH_EVENT_WORDS = ['birthday', 'wedding', 'anniversary', 'graduation', 'corporate', 'baby shower', 'engagement', 'bachelorette', 'bachelor party'];
 const AI_SEARCH_CITY_NAMES = ['miami', 'denver', 'austin', 'brooklyn', 'chicago', 'new orleans', 'los angeles', 'phoenix'];
+// Short-form ways people actually name a destination ("go to LA", "need it in NYC") — kept
+// as a separate alias map (rather than folded into AI_SEARCH_CITY_NAMES) because these are
+// short enough that naive substring matching would false-positive inside unrelated words
+// (e.g. "la" inside "massage") — findAiSearchCityMention below always matches on a real word
+// boundary, which is what makes a 2-letter alias safe to include at all.
+const AI_SEARCH_CITY_ALIASES = { la: 'los angeles', nyc: 'new york', vegas: 'las vegas' };
+function findAiSearchCityMention(text) {
+    for (const alias in AI_SEARCH_CITY_ALIASES) {
+        if (new RegExp(`\\b${alias}\\b`).test(text))
+            return AI_SEARCH_CITY_ALIASES[alias];
+    }
+    return AI_SEARCH_CITY_NAMES.find((c) => new RegExp(`\\b${c}\\b`).test(text)) || null;
+}
 const AI_SEARCH_WEEKDAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const AI_SEARCH_STOPWORDS = new Set(['find', 'me', 'a', 'an', 'the', 'for', 'near', 'nearby', 'my', 'that', 'who', 'comes', 'to', 'house', 'home', 'today', 'tomorrow', 'tonight', 'under', 'below', 'less', 'than', 'best', 'good', 'available', 'this', 'weekend', 'afternoon', 'evening', 'morning', 'after', 'before', 'with', 'and', 'only', 'show', 'ones', 'some', 'i', 'need', 'someone', 'something', 'fun', 'do', 'looking', 'want', 'is', 'are', 'of', 'in', 'on', 'at', 'nice', 'next', 'within', 'miles', 'mile', 'mi', 'over', 'above', 'least', 'minimum', 'closest', 'cheapest', 'lowest', 'price', 'rated', 'highly', 'top', 'actually',
     'hours', 'hour', 'minutes', 'minute', 'mins', 'min', 'right', 'now', 'asap', 'immediately', 'work', 'about', 'around', 'cheaper', 'affordable', 'instead', 'people', 'person', 'party', 'guests']);
@@ -2074,6 +2087,23 @@ const AI_SEARCH_STOPWORDS = new Set(['find', 'me', 'a', 'an', 'the', 'for', 'nea
 // 'radius', and the explicit "10 miles / 25 miles / Change location" recovery UI).
 const AI_SEARCH_DEFAULT_NEARBY_RADIUS_MI = 5;
 const AI_SEARCH_DEFAULT_CITY_RADIUS_MI = 25;
+// A provider who travels to the customer needs real time to get there — this is the
+// minimum window before "now" that a mobile match's earliest slot can be. Deliberately
+// modest (not a real routing estimate, which this demo has no data for) so "in 2 hours"
+// still comfortably clears it while "right now" correctly filters out mobile-only matches.
+const AI_SEARCH_MOBILE_ARRIVAL_BUFFER_MIN = 30;
+// A query that doesn't name a location at all isn't a query with "no location intent" —
+// it's a query that means whatever the customer's currently active context already is
+// (their real location once known, or a city they've already set). Only ever a fallback:
+// an explicit mention in the text itself (handled inside parseAiSearchQuery) always wins.
+function applyAiSearchLocationDefault(ctx, activeLocation) {
+    if (ctx.location || !activeLocation)
+        return ctx;
+    ctx.location = activeLocation;
+    if (ctx.radius == null)
+        ctx.radius = activeLocation === 'current' ? AI_SEARCH_DEFAULT_NEARBY_RADIUS_MI : AI_SEARCH_DEFAULT_CITY_RADIUS_MI;
+    return ctx;
+}
 function aiCapitalize(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
 function aiStartOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function aiEndOfDay(d) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
@@ -2246,20 +2276,22 @@ function parseAiSearchQuery(rawText, prevContext) {
     }
     if (/\bavailable\b|\bavailability\b/.test(text))
         ctx.availabilityRequired = true;
-    const cityHit = AI_SEARCH_CITY_NAMES.find((c) => text.includes(c));
-    if (/near me|nearby|around me|close to me/.test(text))
+    const cityHit = findAiSearchCityMention(text);
+    const nearMePhrase = /near me|nearby|around me|close to me/.test(text);
+    // A location mentioned THIS turn always wins — an explicit destination overrides
+    // whatever was active before (including "near me" from an earlier turn), and "near me"
+    // said again snaps back to the customer's real location. Saying nothing about location
+    // this turn leaves whatever was already active alone (the compounding follow-up case).
+    // Either way, a fresh location mention resets the radius to a sane default for its kind
+    // UNLESS this same utterance also gave an explicit "within X miles" — that always wins.
+    if (nearMePhrase) {
         ctx.location = 'current';
-    else if (cityHit)
-        ctx.location = cityHit;
-    // "Near me" (or a named city) is meaningless as a hard requirement without an actual
-    // radius to enforce it — default to a real, sane distance rather than letting it sit
-    // there as decoration. Never overwrites a radius the customer (or a prior turn) already
-    // set, and never re-applies once the customer has actively cleared it (that happens via
-    // updateAiContextFields, which calls applyAiSearchResult directly and skips this parser).
-    if (ctx.radius == null) {
-        if (ctx.location === 'current')
+        if (!radiusMatch)
             ctx.radius = AI_SEARCH_DEFAULT_NEARBY_RADIUS_MI;
-        else if (ctx.location)
+    }
+    else if (cityHit) {
+        ctx.location = cityHit;
+        if (!radiusMatch)
             ctx.radius = AI_SEARCH_DEFAULT_CITY_RADIUS_MI;
     }
     // "for 4", "for four people", "party of 4", "table for 4" — only meaningful for
@@ -2302,14 +2334,21 @@ function aiItemMatchesService(item, service) {
     const hay = `${item.name} ${item.category} ${item.blurb || ''} ${(item.hashtags || []).join(' ')}`.toLowerCase();
     return group.words.some((w) => hay.includes(w));
 }
+// The price a customer actually pays, mandatory travel fee included — annotateAiSearchGeo
+// sets _totalPrice once a location context makes a travel fee computable. Budget filtering
+// and ranking must both use this, never the bare service price alone, or a $40 haircut with
+// a mandatory $20 travel fee would get advertised as fitting a $40 budget.
+function aiEffectivePrice(item) {
+    return item._totalPrice != null ? item._totalPrice : item.price;
+}
 function matchesAiSearchContext(item, ctx) {
     if (ctx.category && item.category !== ctx.category)
         return false;
     if (ctx.service && !aiItemMatchesService(item, ctx.service))
         return false;
-    if (ctx.maxPrice != null && (item.price || 0) > ctx.maxPrice)
+    if (ctx.maxPrice != null && (aiEffectivePrice(item) || 0) > ctx.maxPrice)
         return false;
-    if (ctx.minPrice != null && (item.price || 0) < ctx.minPrice)
+    if (ctx.minPrice != null && (aiEffectivePrice(item) || 0) < ctx.minPrice)
         return false;
     if (ctx.minRating != null && (item.rating || 0) < ctx.minRating)
         return false;
@@ -2357,12 +2396,16 @@ function scoreAiSearchCandidate(item, ctx) {
         else if (item._availability.available)
             score += 1000;
     }
-    const distanceMi = item._realDistanceMi != null ? item._realDistanceMi : parseFloat(item.distance);
+    // A traveling provider removes the distance friction entirely (they come to you), so
+    // their own base distance — which isn't even shown to the customer — shouldn't count
+    // against them the way it would for a business the customer has to go visit.
+    const distanceMi = item._travelsToYou ? 1 : (item._realDistanceMi != null ? item._realDistanceMi : parseFloat(item.distance));
     score += Math.max(0, 200 - (isNaN(distanceMi) ? 100 : distanceMi) * 15);
     score += (item.rating || 4.5) * 20;
     score += Math.min(50, Math.log10((item.comments || 0) + 1) * 20);
     if (ctx.maxPrice != null && item.price != null) {
-        const fit = 1 - Math.min(1, Math.abs(ctx.maxPrice - item.price) / Math.max(ctx.maxPrice, 1));
+        const effectivePrice = aiEffectivePrice(item);
+        const fit = 1 - Math.min(1, Math.abs(ctx.maxPrice - effectivePrice) / Math.max(ctx.maxPrice, 1));
         score += fit * 30;
     }
     if (ctx.keywords && ctx.keywords.length) {
@@ -2451,10 +2494,13 @@ function runAiSearch(candidates, ctx) {
 }
 function aiSortResults(results, ctx, scoreCtx) {
     return [...results].sort((a, b) => {
-        if (ctx.sortBy === 'distance')
-            return (parseFloat(a.distance) || 99) - (parseFloat(b.distance) || 99);
+        if (ctx.sortBy === 'distance') {
+            const da = a._travelsToYou ? 1 : (a._realDistanceMi != null ? a._realDistanceMi : parseFloat(a.distance));
+            const db = b._travelsToYou ? 1 : (b._realDistanceMi != null ? b._realDistanceMi : parseFloat(b.distance));
+            return (isNaN(da) ? 99 : da) - (isNaN(db) ? 99 : db);
+        }
         if (ctx.sortBy === 'price')
-            return (a.price || 0) - (b.price || 0);
+            return (aiEffectivePrice(a) || 0) - (aiEffectivePrice(b) || 0);
         if (ctx.sortBy === 'rating')
             return (b.rating || 0) - (a.rating || 0);
         return scoreAiSearchCandidate(b, scoreCtx || ctx) - scoreAiSearchCandidate(a, scoreCtx || ctx);
@@ -2475,10 +2521,11 @@ function computeAiSearchBadges(results, ctx) {
     const distances = results.map((r) => { const d = r._realDistanceMi != null ? r._realDistanceMi : parseFloat(r.distance); return isNaN(d) ? Infinity : d; });
     const minDistance = Math.min(...distances);
     const maxRating = Math.max(...results.map((r) => r.rating || 0));
-    const prices = results.map((r) => r.price != null ? r.price : Infinity);
+    const prices = results.map((r) => aiEffectivePrice(r) != null ? aiEffectivePrice(r) : Infinity);
     const minPrice = Math.min(...prices);
     results.forEach((item, i) => {
         const d = item._realDistanceMi != null ? item._realDistanceMi : parseFloat(item.distance);
+        const effPrice = aiEffectivePrice(item);
         if (item._availability && item._availability.availableToday) {
             badges[item.id] = { icon: '⚡', label: 'Available today', bg: 'rgba(46,155,255,0.12)', color: '#2E9BFF' };
         }
@@ -2488,7 +2535,7 @@ function computeAiSearchBadges(results, ctx) {
         else if ((item.rating || 0) === maxRating && maxRating >= 4.8) {
             badges[item.id] = { icon: '⭐', label: 'Top rated', bg: 'rgba(245,166,35,0.14)', color: THEME.gold };
         }
-        else if (item.price != null && item.price === minPrice && minPrice !== Infinity) {
+        else if (effPrice != null && effPrice === minPrice && minPrice !== Infinity) {
             badges[item.id] = { icon: '💰', label: 'Best price', bg: 'rgba(63,191,138,0.12)', color: '#3FBF8A' };
         }
         else if (item.deal && item.deal.enabled) {
@@ -3188,7 +3235,7 @@ const CITY_COORDS = {
     chicago: [41.8781, -87.6298], 'los angeles': [34.0522, -118.2437], 'las vegas': [36.1699, -115.1398],
     portland: [45.5152, -122.6784], 'san diego': [32.7157, -117.1611], dallas: [32.7767, -96.7970],
     'fort lauderdale': [26.1224, -80.1373], scottsdale: [33.4942, -111.9261], newark: [40.7357, -74.1724],
-    orlando: [28.5383, -81.3792],
+    orlando: [28.5383, -81.3792], 'new orleans': [29.9511, -90.0715], phoenix: [33.4484, -112.0740],
 };
 const DEFAULT_MAP_CENTER = CITY_COORDS['new york'];
 function cityKeyFromLocation(location) {
@@ -5447,14 +5494,18 @@ function App() {
         let availableToday = false;
         const todayKey = dateKey(new Date());
         const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+        // A provider who has to travel to the customer can't realistically show up
+        // instantly — a slot inside the next AI_SEARCH_MOBILE_ARRIVAL_BUFFER_MIN isn't a
+        // real option for them the way it is for a business the customer walks into.
+        const arrivalFloor = item._travelsToYou ? nowMin + AI_SEARCH_MOBILE_ARRIVAL_BUFFER_MIN : nowMin;
         for (const day of days) {
             let slots = aiSlotsForDay(item, day, ctx);
             if (ctx.timeFrom != null)
                 slots = slots.filter((s) => s.minutes >= ctx.timeFrom);
             if (ctx.timeTo != null)
                 slots = slots.filter((s) => s.minutes <= ctx.timeTo);
-            if (ctx.openNow && dateKey(day) === todayKey)
-                slots = slots.filter((s) => s.minutes >= nowMin);
+            if (dateKey(day) === todayKey && (ctx.openNow || item._travelsToYou))
+                slots = slots.filter((s) => s.minutes >= arrivalFloor);
             if (slots.length > 0) {
                 available = true;
                 if (dateKey(day) === todayKey)
@@ -5466,12 +5517,13 @@ function App() {
     function aiEarliestAvailability(item, ctx) {
         const now = new Date();
         const nowMin = now.getHours() * 60 + now.getMinutes();
+        const arrivalFloor = item._travelsToYou ? nowMin + AI_SEARCH_MOBILE_ARRIVAL_BUFFER_MIN : nowMin;
         const todayStart = aiStartOfDay(now);
         for (let dayOffset = 0; dayOffset < 3; dayOffset++) {
             const day = aiAddDays(todayStart, dayOffset);
             let slots = aiSlotsForDay(item, day, ctx || {});
             if (dayOffset === 0)
-                slots = slots.filter((s) => s.minutes >= nowMin);
+                slots = slots.filter((s) => s.minutes >= arrivalFloor);
             const earliest = slots.length ? slots.reduce((a, b) => a.minutes < b.minutes ? a : b) : null;
             if (earliest) {
                 const dayLabel = dayOffset === 0 ? 'Today' : dayOffset === 1 ? 'Tomorrow' : day.toLocaleDateString('en-US', { weekday: 'short' });
@@ -5518,12 +5570,23 @@ function App() {
             const travel = getBusinessTravelInfo(item);
             const elig = getNearbyEligibility(item, distanceMi, travel);
             const showsRealDistance = !!(elig.showsDistance && distanceMi != null);
+            const withinRadius = distanceMi != null && distanceMi <= radius;
+            // A provider whose configured service area covers this location can serve the
+            // customer regardless of how far their own base sits — that's the entire point of
+            // "travels to you." The search radius bounds a fixed-location business (the
+            // customer has to go there); it never excludes a traveling provider who has
+            // chosen to cover this address, even if their base is outside that radius.
+            const travelsToYou = (elig.mode === 'mobile' || elig.mode === 'both') && elig.eligible;
+            const travelFeeInfo = travelsToYou ? elig.travelFeeInfo : null;
             return {
                 ...item,
                 distance: showsRealDistance ? `${distanceMi < 0.1 ? '<0.1' : distanceMi.toFixed(1)} mi` : item.distance,
                 _realDistanceMi: distanceMi,
                 _showsRealDistance: showsRealDistance,
-                _locationEligible: elig.eligible && distanceMi != null && distanceMi <= radius,
+                _travelsToYou: travelsToYou,
+                _travelFeeInfo: travelFeeInfo,
+                _totalPrice: item.price != null ? item.price + (travelFeeInfo ? travelFeeInfo.fee : 0) : item.price,
+                _locationEligible: withinRadius || travelsToYou,
             };
         });
     }
@@ -5562,8 +5625,13 @@ function App() {
         recordAiRecentSearch(text);
         setTimeout(() => {
             const parsed = parseAiSearchQuery(text, null);
-            if (aiSearchFilters.location)
-                parsed.location = aiSearchFilters.location;
+            // An explicit destination named in the text always wins (already resolved inside
+            // parseAiSearchQuery). Only when the text didn't name one does the active search
+            // location context — the pre-search pill, or the customer's already-known real
+            // location — apply as a default, so a stale "near me" pill can never silently
+            // override a "restaurants in Miami" the customer just typed.
+            if (!parsed.location)
+                applyAiSearchLocationDefault(parsed, activeSearchLocation);
             if (aiSearchFilters.date) {
                 const dateInfo = resolveAiDatePhrase(aiSearchFilters.date, new Date());
                 if (dateInfo) {
@@ -5591,6 +5659,8 @@ function App() {
         setExploreSearchQuery(text);
         recordAiRecentSearch(text);
         const parsed = parseAiSearchQuery(text, null);
+        if (!parsed.location)
+            applyAiSearchLocationDefault(parsed, activeSearchLocation);
         applyAiSearchResult(parsed);
     }
     function submitAiRefine() {
@@ -5743,6 +5813,11 @@ function App() {
         return list;
     }, [feed]);
     const aiSearchHasDeals = useMemo(() => aiSearchCandidates.some((i) => i.deal && i.deal.enabled), [aiSearchCandidates]);
+    // The one active Search Location Context every AI-search-adjacent surface (AI Picks,
+    // a query that doesn't name its own destination, an opened Trending search) reads from
+    // — a manually set city/near-me pill wins, otherwise the customer's already-known real
+    // location, otherwise no location context at all (nothing has been established yet).
+    const activeSearchLocation = aiSearchFilters.location || (nearbyUserLatLng ? 'current' : null);
     function itemCreatedAt(item) {
         if (item.uploadedAt)
             return item.uploadedAt;
@@ -9542,7 +9617,16 @@ function App() {
                     React.createElement("div", { style: { position: 'absolute', left: 10, right: 10, bottom: 10 } },
                         React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: '#fff', margin: 0, lineHeight: 1.25 } }, t.label),
                         React.createElement("p", { style: { fontSize: 10.5, color: 'rgba(255,255,255,0.75)', marginTop: 3 } }, t.count))))));
-            const aiPicksItems = [...aiSearchCandidates].sort((a, b) => scoreAiSearchCandidate(b, {}) - scoreAiSearchCandidate(a, {})).slice(0, 8);
+            // AI Picks reads from the same active Search Location Context as everything else
+            // in AI Search — once any location is established, picks are hard-filtered to it
+            // (real geography + travel eligibility, exactly like a search) so this section can
+            // never mix in unrelated businesses from a different city. Falls back to the
+            // unfiltered pool only in the edge case where literally nothing is eligible yet.
+            const aiPicksLocCtx = activeSearchLocation ? { location: activeSearchLocation, radius: activeSearchLocation === 'current' ? AI_SEARCH_DEFAULT_NEARBY_RADIUS_MI : AI_SEARCH_DEFAULT_CITY_RADIUS_MI } : null;
+            const aiPicksAnnotated = aiPicksLocCtx ? annotateAiSearchGeo(aiSearchCandidates, aiPicksLocCtx) : aiSearchCandidates;
+            const aiPicksEligible = aiPicksLocCtx ? aiPicksAnnotated.filter((i) => i._locationEligible !== false) : aiPicksAnnotated;
+            const aiPicksPool = aiPicksEligible.length > 0 ? aiPicksEligible : aiPicksAnnotated;
+            const aiPicksItems = [...aiPicksPool].sort((a, b) => scoreAiSearchCandidate(b, aiPicksLocCtx || {}) - scoreAiSearchCandidate(a, aiPicksLocCtx || {})).slice(0, 8);
             const aiPicksBadges = computeAiSearchBadges(aiPicksItems, null);
             const renderAiPickCard = (item) => {
                 const badge = aiPicksBadges[item.id];
@@ -9718,6 +9802,24 @@ function App() {
                         const reviewCount = item.comments || 0;
                         const isOpen = (item.openStatus || '').startsWith('Open Now') || (item.openStatus || '').startsWith('Available');
                         const earliest = aiEarliestAvailability(item, ctx);
+                        // Small contextual labels that make the AI's decision legible — why THIS
+                        // result, not just that it matched. A destination search (a named city,
+                        // not "near me") shows the city instead of a distance number, since the
+                        // customer isn't there right now; a travel fee only shows once it's
+                        // actually part of the price, never a bare "travels to you" with no cost.
+                        const isDestinationSearch = !!(ctx && ctx.location && ctx.location !== 'current');
+                        const effPrice = aiEffectivePrice(item);
+                        const matchReasons = [];
+                        if (isDestinationSearch)
+                            matchReasons.push({ icon: '📍', label: item.location || aiCapitalize(ctx.location) });
+                        else if (item._showsRealDistance && item._realDistanceMi != null)
+                            matchReasons.push({ icon: '📍', label: `${item._realDistanceMi < 0.1 ? '<0.1' : item._realDistanceMi.toFixed(1)} mi away` });
+                        if (item._travelsToYou)
+                            matchReasons.push({ icon: '🚗', label: item._travelFeeInfo && item._travelFeeInfo.fee > 0 ? `Travels to you · +$${item._travelFeeInfo.fee}` : 'Travels to you' });
+                        if (effPrice != null)
+                            matchReasons.push({ icon: '💵', label: item._travelFeeInfo && item._travelFeeInfo.fee > 0 ? `$${effPrice} total` : `$${effPrice}` });
+                        if (isDestinationSearch)
+                            matchReasons.push({ icon: '✨', label: `Matches your ${aiCapitalize(ctx.location)} search` });
                         return React.createElement("button", { key: item.id, onClick: () => openBusinessProfile(item), className: "avio-results-in avio-press", style: { animationDelay: `${Math.min(i, 6) * 0.04}s`, display: 'flex', gap: 12, width: '100%', textAlign: 'left', padding: 12, borderRadius: 18, border: `1px solid ${T.border}`, background: T.surface, marginBottom: 10, boxShadow: '0 2px 10px rgba(0,0,0,0.04)' } },
                             item.image
                                 ? React.createElement("div", { style: { width: 76, height: 76, borderRadius: 14, flexShrink: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
@@ -9735,9 +9837,7 @@ function App() {
                                 React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 } },
                                     React.createElement("span", { style: { width: 6, height: 6, borderRadius: '50%', background: isOpen ? THEME.coral : '#B5B5B8', flexShrink: 0 } }),
                                     React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: isOpen ? THEME.coral : '#8A8A8E' } }, item.openStatus || (isOpen ? 'Open Now' : 'Closed'))),
-                                item._showsRealDistance && item._realDistanceMi != null && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 } },
-                                    React.createElement(Icon, { name: "mappin", size: 11, color: T.textSecondary }),
-                                    React.createElement("span", { style: { fontSize: 11, color: T.textSecondary } }, `${item._realDistanceMi < 0.1 ? '<0.1' : item._realDistanceMi.toFixed(1)} mi away`)),
+                                matchReasons.length > 0 && React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 5 } }, matchReasons.map((r, ri) => React.createElement("span", { key: ri, style: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, color: T.textSecondary } }, React.createElement("span", null, r.icon), r.label))),
                                 earliest && React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 } },
                                     React.createElement(Icon, { name: "clock", size: 11, color: THEME.coral }),
                                     React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: T.textPrimary } }, `Next available: ${earliest.dayLabel} ${earliest.timeLabel}`)),
