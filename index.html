@@ -6343,8 +6343,34 @@ function App() {
         // the selection and closes the preview card."
         map.on('click', () => setNearbySelectedId(null));
         setNearbyMapReady(true);
-        setTimeout(() => map.invalidateSize(), 250);
+        // A single fixed-delay invalidateSize() after mount is a guess about when layout has
+        // settled — on a real phone, fonts finishing, the address bar collapsing, or a safe-area
+        // recalculation can all resize this container well after any hardcoded delay, and
+        // Leaflet has no way to know its own container changed size unless told. Its internal
+        // pixel/tile math then stays keyed to whatever size it saw first, which paints tiles
+        // (and positions markers) for a too-small box while every plain CSS/DOM element around
+        // it — cards, buttons, "Search this area" — correctly reflows to the real, full width.
+        // That mismatch is exactly "the map is stuck in a narrow column while everything else
+        // is full width": the container was never actually narrow, Leaflet just never re-measured
+        // it. A ResizeObserver reacts to the container's real size whenever it changes, for any
+        // reason, without guessing; window resize/orientation listeners are added too as a
+        // defense-in-depth for engines where ResizeObserver support is spotty.
+        map.invalidateSize();
+        const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => map.invalidateSize()) : null;
+        if (resizeObserver)
+            resizeObserver.observe(nearbyMapDivRef.current);
+        const handleWindowResize = () => map.invalidateSize();
+        window.addEventListener('resize', handleWindowResize);
+        window.addEventListener('orientationchange', handleWindowResize);
+        // Also re-check shortly after mount and after the CartoDB tile CSS/webfonts finish
+        // loading, in case the very first layout pass (before either) under-measured it.
+        const settleTimer = setTimeout(() => map.invalidateSize(), 300);
         return () => {
+            if (resizeObserver)
+                resizeObserver.disconnect();
+            window.removeEventListener('resize', handleWindowResize);
+            window.removeEventListener('orientationchange', handleWindowResize);
+            clearTimeout(settleTimer);
             map.remove();
             nearbyMapInstanceRef.current = null;
             nearbyClusterGroupRef.current = null;
@@ -6459,8 +6485,15 @@ function App() {
         }).addTo(map);
         bizLocationMapInstanceRef.current = map;
         bizLocationMarkerRef.current = marker;
-        setTimeout(() => map.invalidateSize(), 60);
+        map.invalidateSize();
+        const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => map.invalidateSize()) : null;
+        if (resizeObserver)
+            resizeObserver.observe(bizLocationMapDivRef.current);
+        const settleTimer = setTimeout(() => map.invalidateSize(), 60);
         return () => {
+            if (resizeObserver)
+                resizeObserver.disconnect();
+            clearTimeout(settleTimer);
             map.remove();
             bizLocationMapInstanceRef.current = null;
             bizLocationMarkerRef.current = null;
