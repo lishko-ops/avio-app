@@ -1836,7 +1836,7 @@ const FEED = [
     { id: 'bella-vista-demo', category: 'Restaurants', name: 'Ren Sushi & Sake', location: 'Brooklyn, NY', rating: 4.9, price: 78, likes: '2.6K', comments: 59, saves: '2.3K', blurb: 'Fresh salmon, sharp knife, zero rush.', verified: true, distance: '0.9 mi', openStatus: 'Open Now · Closes 9PM', hashtags: ['#sushi', '#brooklyn', '#omakase'], friendsBooked: 15, avatarColor: '#000000', locationMode: 'At my business location', image: 'assets/shorts/thumbs/sushi-1.jpg', video: 'assets/shorts/biz/sushi-1',
         businessType: 'restaurant', address: '418 Bedford Ave, Brooklyn, NY 11249', phone: '(718) 555-0198', priceTier: '$$$', cuisine: 'Japanese Restaurant',
         areas: makeDefaultRestaurantAreas(), tables: makeDefaultRestaurantTables(), combinations: makeDefaultRestaurantCombinations(),
-        hours: makeDefaultRestaurantHours(), durationRules: DEFAULT_RESTAURANT_DURATION_RULES, bufferMinutes: 15, intervalMinutes: 30, maxPartySize: 10, minAdvanceHours: 1, advanceDays: 60,
+        hours: makeDefaultRestaurantHours(), durationRules: DEFAULT_RESTAURANT_DURATION_RULES, bufferMinutes: 15, intervalMinutes: 30, maxPartySize: 10, minAdvanceHours: 1, advanceDays: 60, cancellationNoticeHours: 2,
         menu: makeBellaVistaMenu(),
     },
     { id: 't-fadedistrict', category: 'Beauty', name: 'Fade District', location: 'Brooklyn, NY', rating: 4.9, price: 32, likes: '1.6K', comments: 49, saves: '1.1K', blurb: 'Lining up the details that matter.', verified: true, distance: '0.9 mi', openStatus: 'Open Now · Closes 9PM', hashtags: ['#barbershop', '#brooklyn', '#fade'], friendsBooked: 15, avatarColor: '#000000', locationMode: 'At my business location', image: 'assets/shorts/thumbs/barber-1.jpg', video: 'assets/shorts/biz/barber-1',
@@ -1968,7 +1968,7 @@ const FEED = [
     { id: 't-nonnarosas', category: 'Restaurants', name: 'Nonna Rosa\'s Kitchen', location: 'Austin, TX', rating: 4.6, price: 42, likes: '640', comments: 12, saves: '635', blurb: 'Stretching dough the old-fashioned way.', verified: false, distance: '1.4 mi', openStatus: 'Booking Fast · 5 slots left', hashtags: ['#pizza', '#austin', '#doughtherapy'], friendsBooked: 15, avatarColor: '#97C400', locationMode: 'At my business location', image: 'assets/shorts/thumbs/italian-1.jpg', video: 'assets/shorts/biz/italian-1',
         businessType: 'restaurant', address: '2114 Rio Grande St, Austin, TX 78705', phone: '(512) 555-0142', priceTier: '$$', cuisine: 'Italian Restaurant',
         areas: makeDefaultRestaurantAreas(), tables: makeDefaultRestaurantTables(), combinations: makeDefaultRestaurantCombinations(),
-        hours: makeDefaultRestaurantHours(), durationRules: DEFAULT_RESTAURANT_DURATION_RULES, bufferMinutes: 15, intervalMinutes: 30, maxPartySize: 10, minAdvanceHours: 1, advanceDays: 60,
+        hours: makeDefaultRestaurantHours(), durationRules: DEFAULT_RESTAURANT_DURATION_RULES, bufferMinutes: 15, intervalMinutes: 30, maxPartySize: 10, minAdvanceHours: 1, advanceDays: 60, cancellationNoticeHours: 2,
     },
     { id: 't-bluewater', category: 'Rentals', name: 'Blue Water Charters', location: 'Fort Lauderdale, FL', rating: 4.8, price: 350, likes: '1.5K', comments: 58, saves: '862', blurb: 'Lines in the water before sunrise.', verified: true, distance: '2.3 mi', openStatus: 'Open Now · Closes 6PM', hashtags: ['#fishingcharter', '#fortlauderdale', '#earlybird'], friendsBooked: 24, avatarColor: '#000000', locationMode: 'At my business location', image: 'assets/shorts/thumbs/boat-1.jpg', video: 'assets/shorts/biz/boat-1',
         services: [
@@ -1987,7 +1987,7 @@ const FEED = [
     { id: 't-oliveandsage', category: 'Restaurants', name: 'Olive & Sage Bistro', location: 'San Diego, CA', rating: 4.6, price: 48, likes: '720', comments: 23, saves: '476', blurb: 'Sunday brunch crowd is already here.', verified: true, distance: '3.0 mi', openStatus: 'Open Now · Closes 10PM', hashtags: ['#brunch', '#sandiego', '#bistro'], friendsBooked: 20, avatarColor: '#3FBF8A', locationMode: 'At my business location', image: 'assets/shorts/thumbs/bistro-1.jpg', video: 'assets/shorts/biz/bistro-1',
         businessType: 'restaurant', address: '1027 University Ave, San Diego, CA 92103', phone: '(619) 555-0176', priceTier: '$$', cuisine: 'Mediterranean Bistro',
         areas: makeDefaultRestaurantAreas(), tables: makeDefaultRestaurantTables(), combinations: makeDefaultRestaurantCombinations(),
-        hours: makeDefaultRestaurantHours(), durationRules: DEFAULT_RESTAURANT_DURATION_RULES, bufferMinutes: 15, intervalMinutes: 30, maxPartySize: 10, minAdvanceHours: 1, advanceDays: 60,
+        hours: makeDefaultRestaurantHours(), durationRules: DEFAULT_RESTAURANT_DURATION_RULES, bufferMinutes: 15, intervalMinutes: 30, maxPartySize: 10, minAdvanceHours: 1, advanceDays: 60, cancellationNoticeHours: 2,
     },
     { id: 't-frostpoint', category: 'Rentals', name: 'Frost Point Ice Rink', location: 'Chicago, IL', rating: 4.5, price: 18, likes: '430', comments: 8, saves: '423', blurb: 'Open skate is packed tonight.', verified: false, distance: '0.7 mi', openStatus: 'Open Now · Closes 8PM', hashtags: ['#iceskating', '#chicago', '#winterfun'], friendsBooked: 9, avatarColor: '#2E9BFF', locationMode: 'At my business location', image: 'assets/shorts/thumbs/icerink-1.jpg', video: 'assets/shorts/biz/icerink-1',
         businessType: 'activities', ticketingMode: 'partner',
@@ -4207,6 +4207,18 @@ function App() {
     const [pinnedIds, setPinnedIds] = useState(() => new Set());
     const [swipedRowId, setSwipedRowId] = useState(null);
     const connectTouchRef = useRef(null);
+    // Shared debounce guard for one-tap native/external actions (directions, call, calendar,
+    // message) — a fast double-tap on a real device should never fire the handler twice.
+    const lastQuickActionRef = useRef(0);
+    function guardedTap(fn) {
+        return (...args) => {
+            const now = Date.now();
+            if (now - lastQuickActionRef.current < 600)
+                return;
+            lastQuickActionRef.current = now;
+            fn(...args);
+        };
+    }
     // A tapped time from an in-chat availability card, pending confirmation — { message, minutes,
     // dateObj } | null. Holding the whole message (not just an id) means the confirm sheet always
     // reflects exactly the offer that was tapped, even if the underlying conversation state
@@ -5100,6 +5112,17 @@ function App() {
     const [restaurantProfileTab, setRestaurantProfileTab] = useState('overview');
     const [rsvFlow, setRsvFlow] = useState(null);
     const [manageReservationOpen, setManageReservationOpen] = useState(false);
+    // Reservation the customer is being asked to confirm cancelling — holds the actual
+    // reservation record (not just an id) so the confirm sheet always reflects exactly what's
+    // about to be cancelled, and null once dismissed or resolved.
+    const [reservationCancelPending, setReservationCancelPending] = useState(null);
+    // Which reservations already produced a downloaded calendar event, keyed by reservation id —
+    // guards against a rapid double-tap (or a re-render) silently generating a second .ics file.
+    const [calendarAddedReservationIds, setCalendarAddedReservationIds] = useState(() => new Set());
+    // Destination address for the reservation-screen's own "Get Directions" sheet — kept separate
+    // from directionsSheetBooking (used by service bookings) since a restaurant reservation has no
+    // `booking` record to look up, only a restaurant address.
+    const [reservationDirectionsAddress, setReservationDirectionsAddress] = useState(null);
     const [rsvPickerPartySize, setRsvPickerPartySize] = useState(2);
     const [rsvPickerDate, setRsvPickerDate] = useState(() => dateKey(new Date()));
     const [rsvPickerArea, setRsvPickerArea] = useState('no-preference');
@@ -8136,6 +8159,123 @@ function App() {
     function openAppleMapsDirections(address) { window.location.href = buildAppleMapsUrl(address); }
     function openGoogleMapsDirections(address) { openWithAppFallback(buildGoogleMapsAppUrl(address), buildGoogleMapsWebUrl(address)); }
     function openWazeDirections(address) { openWithAppFallback(buildWazeAppUrl(address), buildWazeWebUrl(address)); }
+    // Same app-picker sheet body used by both the service-booking "Get Directions" sheet and the
+    // restaurant-reservation one below — one implementation, one place to fix, regardless of which
+    // record (booking vs. reservation/restaurant) the destination address came from.
+    function renderDirectionsSheet(destination, onClose) {
+        const showApple = shouldShowAppleMapsOption(navigator.userAgent);
+        const appRow = (id, label, bg, iconColor, iconName, onPick) => React.createElement("button", { key: id, className: "avio-press", onClick: () => { onPick(); onClose(); }, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '15px 4px' } },
+            React.createElement("div", { style: { width: 42, height: 42, borderRadius: 12, background: bg, border: bg === '#fff' ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                React.createElement(Icon, { name: iconName, size: 19, color: iconColor })),
+            React.createElement("span", { style: { fontSize: 15.5, fontWeight: 600, color: T.textPrimary } }, label));
+        const rows = [];
+        // Apple Maps never needs to appear on Android — there's no app for the link to open.
+        if (showApple)
+            rows.push(appRow('apple', 'Apple Maps', '#000', '#fff', 'compass', () => openAppleMapsDirections(destination)));
+        rows.push(appRow('google', 'Google Maps', '#fff', '#EA4335', 'mappin', () => openGoogleMapsDirections(destination)));
+        rows.push(appRow('waze', 'Waze', '#33CCFF', '#fff', 'send', () => openWazeDirections(destination)));
+        return React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '24px 24px 0 0', padding: `14px 18px calc(env(safe-area-inset-bottom) + 14px)` } },
+            React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: T.border, margin: '0 auto 14px' } }),
+            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: T.textPrimary, textAlign: 'center', margin: 0 } }, "Get Directions"),
+            React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, textAlign: 'center', margin: '4px 0 12px' } }, "Choose how you want to navigate."),
+            React.createElement("div", { style: { display: 'flex', flexDirection: 'column' } },
+                rows.map((r, i) => React.createElement(React.Fragment, { key: i }, i > 0 && React.createElement("div", { style: { height: 1, background: T.border, marginLeft: 56 } }), r))),
+            React.createElement("button", { className: "avio-press", onClick: onClose, style: { width: '100%', marginTop: 10, padding: '14px 0', textAlign: 'center', borderRadius: 16, background: T.surfaceSecondary, fontSize: 15.5, fontWeight: 700, color: T.textPrimary } }, "Cancel"));
+    }
+    // Opens the reservation screen's own directions sheet using the RESTAURANT's real address —
+    // a dine-in reservation always navigates to the business location, never a customer address.
+    function openReservationDirections(restaurant) {
+        const destination = restaurant && restaurant.address;
+        if (!destination) {
+            flashToast('Business location unavailable.');
+            return;
+        }
+        if (!isPlausibleAddress(destination)) {
+            flashToast("This business's address looks incomplete — can't open directions.");
+            return;
+        }
+        setReservationDirectionsAddress(destination);
+    }
+    function isPlausiblePhone(phone) {
+        if (typeof phone !== 'string')
+            return false;
+        return phone.replace(/\D/g, '').length >= 7;
+    }
+    // Dials the REAL phone number stored on the restaurant's business profile — never a hardcoded
+    // number — via the device's native tel: handler. Non-digit characters (except a leading +) are
+    // stripped since some Android dialers mishandle spaces/parens in a tel: URI.
+    function callRestaurant(restaurant) {
+        const phone = restaurant && restaurant.phone;
+        if (!isPlausiblePhone(phone)) {
+            flashToast('Phone number unavailable.');
+            return;
+        }
+        window.location.href = 'tel:' + phone.replace(/[^\d+]/g, '');
+    }
+    // A reservation's cancellation terms, computed live off the actual reservation time and the
+    // restaurant's own configured notice window — never a fabricated flat fee. Dine-in reservations
+    // take no payment up front (see the "No payment required" reservation summary), so there's
+    // nothing to charge; a late cancellation is flagged as a courtesy notice, not a dollar penalty.
+    function reservationCancellationQuote(reservation, restaurant) {
+        const startMs = new Date(reservation.date + 'T00:00:00').getTime() + reservation.time * 60000;
+        const hoursUntil = (startMs - Date.now()) / 36e5;
+        const noticeHours = (restaurant && restaurant.cancellationNoticeHours) || 2;
+        const isLate = hoursUntil < noticeHours;
+        return {
+            hoursUntil, noticeHours, isLate,
+            policyText: isLate
+                ? `This is within ${restaurant.name}'s ${noticeHours}-hour cancellation notice window. No fee applies — reservations aren't charged upfront — but frequent late cancellations may limit your ability to book here again.`
+                : `Free to cancel — ${restaurant.name} asks for at least ${noticeHours} hour${noticeHours === 1 ? '' : 's'}' notice, and you're well within that window.`,
+        };
+    }
+    // Guards against a rapid double-tap silently downloading a second .ics file for the same
+    // reservation — once added, the button itself flips to a disabled "Added" state.
+    function addReservationToCalendar(reservation, restaurant) {
+        if (!reservation || !restaurant)
+            return;
+        if (calendarAddedReservationIds.has(reservation.id)) {
+            flashToast('Already added to your calendar.');
+            return;
+        }
+        const dateObj = new Date(reservation.date + 'T00:00:00');
+        if (isNaN(dateObj.getTime())) {
+            flashToast('Unable to add to calendar — this reservation has no valid date.');
+            return;
+        }
+        const pad = (n) => String(n).padStart(2, '0');
+        const stampFor = (minutes) => {
+            const dt = new Date(dateObj);
+            dt.setHours(0, minutes, 0, 0);
+            return `${dt.getFullYear()}${pad(dt.getMonth() + 1)}${pad(dt.getDate())}T${pad(dt.getHours())}${pad(dt.getMinutes())}00`;
+        };
+        const durationMinutes = reservation.duration || 90;
+        const descriptionParts = [`${reservation.partySize} Guest${reservation.partySize === 1 ? '' : 's'}`, `${reservation.area} Seating`, `Confirmation #${reservation.confirmationCode}`];
+        if (reservation.notes)
+            descriptionParts.push(reservation.notes);
+        const ics = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nUID:${reservation.id}@avio.app\nDTSTART:${stampFor(reservation.time)}\nDTEND:${stampFor(reservation.time + durationMinutes)}\nSUMMARY:${restaurant.name} Reservation\nLOCATION:${restaurant.address || ''}\nDESCRIPTION:${descriptionParts.join(' · ')}\nEND:VEVENT\nEND:VCALENDAR`;
+        const a = document.createElement('a');
+        a.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+        a.download = `${restaurant.name.replace(/\s+/g, '-')}-Reservation.ics`;
+        a.click();
+        setCalendarAddedReservationIds((prev) => new Set(prev).add(reservation.id));
+        flashToast('Added to calendar');
+    }
+    // Opens (or creates) the REAL Connect conversation with this reservation's restaurant — the
+    // exact same conversations list/dedup logic the business-profile Message button already uses,
+    // so this never spins up a disconnected fake chat screen. The reservation's own confirmation
+    // code and date/time are folded into a pre-filled draft so the business sees which booking the
+    // customer means without the customer having to look it up and retype it.
+    function openReservationMessage(reservation, restaurant) {
+        if (!restaurant) {
+            flashToast('Messaging is temporarily unavailable.');
+            return;
+        }
+        closeReservationFlow();
+        openBusinessConversation(restaurant);
+        const dateObj = new Date(reservation.date + 'T00:00:00');
+        const dateLabel = !isNaN(dateObj.getTime()) ? dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : reservation.date;
+        setConnectDraft(`Hi — I have a question about my reservation (Confirmation #${reservation.confirmationCode}, ${dateLabel} · ${minutesToTimeLabel(reservation.time)} · ${reservation.partySize} guest${reservation.partySize === 1 ? '' : 's'}). `);
+    }
     function toggleLike(id) {
         setLikedIds((prev) => {
             const next = new Set(prev);
@@ -11768,6 +11908,18 @@ function App() {
                     return page(body);
                 }
                 const confDateObj = new Date(confirmed.date + 'T00:00:00');
+                // Every action below is derived from THIS confirmed reservation and the restaurant
+                // record it points to — never a hardcoded name/address/phone — so disabling one
+                // (and explaining why) is a real reflection of missing data, not a fake state.
+                const directionsUsable = !!restaurant.address && isPlausibleAddress(restaurant.address);
+                const phoneUsable = isPlausiblePhone(restaurant.phone);
+                const calendarAdded = calendarAddedReservationIds.has(confirmed.id);
+                const confirmedActions = [
+                    { icon: 'send', label: 'Directions', disabled: !directionsUsable, onClick: guardedTap(() => openReservationDirections(restaurant)) },
+                    { icon: 'phone', label: 'Call', disabled: !phoneUsable, onClick: guardedTap(() => callRestaurant(restaurant)) },
+                    { icon: 'calendar', label: calendarAdded ? 'Added' : 'Add to Calendar', onClick: guardedTap(() => addReservationToCalendar(confirmed, restaurant)) },
+                    { icon: 'message', label: 'Message', onClick: guardedTap(() => openReservationMessage(confirmed, restaurant)) },
+                ];
                 const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 24px calc(env(safe-area-inset-bottom) + 24px)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' } },
                     React.createElement("div", { style: { position: 'relative', width: 96, height: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 'calc(env(safe-area-inset-top) + 32px)' } },
                         [[-36, -30, 0], [34, -22, 0.15], [-30, 28, 0.3], [38, 26, 0.45], [0, -44, 0.6], [4, 44, 0.75]].map(([dx, dy, delay], i) => React.createElement("span", { key: i, className: "avio-check-pop", style: { position: 'absolute', left: `calc(50% + ${dx}px)`, top: `calc(50% + ${dy}px)`, width: i % 2 ? 5 : 3, height: i % 2 ? 5 : 3, borderRadius: '50%', background: THEME.coral, opacity: 0.55, animationDelay: `${delay}s`, animationFillMode: 'backwards' } })),
@@ -11786,9 +11938,9 @@ function App() {
                             React.createElement(Icon, { name: icon, size: 13, color: RF.sub }),
                             React.createElement("span", { style: { fontSize: 12.5, color: RF.text, fontWeight: 600 } }, label))))),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', width: '100%', marginTop: 22 } },
-                        [['send', 'Directions', () => flashToast('Opening directions to ' + restaurant.address)], ['phone', 'Call', () => flashToast('Calling ' + restaurant.name)], ['calendar', 'Add to Calendar', () => flashToast('Added to calendar')], ['message', 'Message', () => flashToast('Messaging ' + restaurant.name)]].map(([icon, label, onClick]) => React.createElement("button", { key: label, onClick: onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 } },
-                            React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: icon, size: 17, color: RF.text })),
-                            React.createElement("span", { style: { fontSize: 10, color: RF.sub } }, label)))),
+                        confirmedActions.map((a) => React.createElement("button", { key: a.label, className: "avio-press", onClick: a.onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 44, minHeight: 44, padding: '2px 6px', opacity: a.disabled ? 0.4 : 1 } },
+                            React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: a.icon, size: 17, color: RF.text })),
+                            React.createElement("span", { style: { fontSize: 10, color: RF.sub } }, a.label)))),
                     React.createElement("button", { onClick: () => setManageReservationOpen(true), style: { width: '100%', height: 48, borderRadius: 24, border: `1px solid ${RF.border}`, color: RF.text, fontWeight: 700, fontSize: 13.5, marginTop: 24 } }, "Manage Reservation"),
                     React.createElement("button", { onClick: closeReservationFlow, style: { width: '100%', height: 54, borderRadius: 27, background: THEME.coral, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', marginTop: 10 } }, "Done"));
                 return React.createElement(React.Fragment, null,
@@ -11798,8 +11950,25 @@ function App() {
                             React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, marginBottom: 14 } }, "Manage Reservation"),
                             React.createElement("button", { onClick: () => startModifyReservation(confirmed), style: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '13px 4px', borderBottom: `1px solid ${T.border}` } },
                                 React.createElement(Icon, { name: "pencil", size: 16, color: "#161616" }), React.createElement("span", { style: { fontSize: 14, color: T.textPrimary, fontWeight: 600 } }, "Modify Reservation")),
-                            React.createElement("button", { onClick: () => { cancelReservationById(confirmed.id); setManageReservationOpen(false); closeReservationFlow(); }, style: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '13px 4px' } },
-                                React.createElement(Icon, { name: "trash", size: 16, color: "#D0304A" }), React.createElement("span", { style: { fontSize: 14, color: '#D0304A', fontWeight: 600 } }, "Cancel Reservation")))));
+                            React.createElement("button", { onClick: () => { setManageReservationOpen(false); setReservationCancelPending(confirmed); }, style: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '13px 4px' } },
+                                React.createElement(Icon, { name: "trash", size: 16, color: "#D0304A" }), React.createElement("span", { style: { fontSize: 14, color: '#D0304A', fontWeight: 600 } }, "Cancel Reservation")))),
+                    reservationCancelPending && (() => {
+                        const rc = reservationCancelPending;
+                        const rcDateObj = new Date(rc.date + 'T00:00:00');
+                        const quote = reservationCancellationQuote(rc, restaurant);
+                        return React.createElement("div", { onClick: () => setReservationCancelPending(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-end', zIndex: 14 } },
+                            React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: T.border, margin: '0 auto 14px' } }),
+                                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: T.textPrimary, textAlign: 'center', margin: 0 } }, "Cancel reservation?"),
+                                React.createElement("div", { style: { marginTop: 16, background: T.surfaceSecondary, borderRadius: 14, padding: 14, textAlign: 'center' } },
+                                    React.createElement("p", { style: { fontSize: 14.5, fontWeight: 700, color: T.textPrimary, margin: 0 } }, restaurant.name),
+                                    React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 4 } }, `${rcDateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} · ${minutesToTimeLabel(rc.time)}`),
+                                    React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 2 } }, `${rc.partySize} Guest${rc.partySize === 1 ? '' : 's'}`)),
+                                React.createElement("div", { style: { marginTop: 14, padding: '10px 12px', borderRadius: 12, background: quote.isLate ? 'rgba(208,48,74,0.08)' : 'rgba(151,196,0,0.08)' } },
+                                    React.createElement("p", { style: { fontSize: 11.5, color: quote.isLate ? '#D0304A' : '#5c7a2b', margin: 0, lineHeight: 1.45 } }, quote.policyText)),
+                                React.createElement("button", { className: "avio-press", onClick: () => { cancelReservationById(rc.id); setReservationCancelPending(null); closeReservationFlow(); }, style: { width: '100%', marginTop: 18, padding: '14px 0', borderRadius: 24, background: '#D0304A', color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Cancel Reservation"),
+                                React.createElement("button", { className: "avio-press", onClick: () => setReservationCancelPending(null), style: { width: '100%', marginTop: 10, padding: '14px 0', borderRadius: 24, background: T.surfaceSecondary, color: T.textPrimary, fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Keep Reservation")));
+                    })());
             }
             catch (err) {
                 console.error('Reservation flow render error:', err);
@@ -15259,25 +15428,13 @@ function App() {
         // other "sheet opened from within a sheet" in this app already uses.
         directionsSheetBooking && (React.createElement("div", { onClick: () => setDirectionsSheetBooking(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 21 } }, (() => {
             const destination = getBookingNavigationDestination(directionsSheetBooking);
-            const showApple = shouldShowAppleMapsOption(navigator.userAgent);
-            const appRow = (id, label, bg, iconColor, iconName, onPick) => React.createElement("button", { key: id, onClick: () => { onPick(); setDirectionsSheetBooking(null); }, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '15px 4px' } },
-                React.createElement("div", { style: { width: 42, height: 42, borderRadius: 12, background: bg, border: bg === '#fff' ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                    React.createElement(Icon, { name: iconName, size: 19, color: iconColor })),
-                React.createElement("span", { style: { fontSize: 15.5, fontWeight: 600, color: T.textPrimary } }, label));
-            const rows = [];
-            // Apple Maps never needs to appear on Android — there's no app for the link to open.
-            if (showApple)
-                rows.push(appRow('apple', 'Apple Maps', '#000', '#fff', 'compass', () => openAppleMapsDirections(destination)));
-            rows.push(appRow('google', 'Google Maps', '#fff', '#EA4335', 'mappin', () => openGoogleMapsDirections(destination)));
-            rows.push(appRow('waze', 'Waze', '#33CCFF', '#fff', 'send', () => openWazeDirections(destination)));
-            return React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '24px 24px 0 0', padding: `14px 18px calc(env(safe-area-inset-bottom) + 14px)` } },
-                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: T.border, margin: '0 auto 14px' } }),
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: T.textPrimary, textAlign: 'center', margin: 0 } }, "Get Directions"),
-                React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, textAlign: 'center', margin: '4px 0 12px' } }, "Choose how you want to navigate."),
-                React.createElement("div", { style: { display: 'flex', flexDirection: 'column' } },
-                    rows.map((r, i) => React.createElement(React.Fragment, { key: i }, i > 0 && React.createElement("div", { style: { height: 1, background: T.border, marginLeft: 56 } }), r))),
-                React.createElement("button", { onClick: () => setDirectionsSheetBooking(null), style: { width: '100%', marginTop: 10, padding: '14px 0', textAlign: 'center', borderRadius: 16, background: T.surfaceSecondary, fontSize: 15.5, fontWeight: 700, color: T.textPrimary } }, "Cancel"));
+            return renderDirectionsSheet(destination, () => setDirectionsSheetBooking(null));
         })())),
+        // The Reservation Confirmed screen's own "Get Directions" — same sheet, but the destination
+        // is always the restaurant's real address (there's no customer-location option for a
+        // dine-in reservation), resolved once when the sheet is opened, not re-derived here.
+        reservationDirectionsAddress && (React.createElement("div", { onClick: () => setReservationDirectionsAddress(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 21 } },
+            renderDirectionsSheet(reservationDirectionsAddress, () => setReservationDirectionsAddress(null)))),
         businessBookingDetail && (React.createElement("div", { onClick: () => setBusinessBookingDetail(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } }, (() => {
             const b = businessBookingDetail;
             const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
