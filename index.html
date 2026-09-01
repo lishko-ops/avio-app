@@ -12504,6 +12504,12 @@ function App() {
                         React.createElement("button", { onClick: () => deleteDraft(f.id), style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "trash", size: 15, color: "#B5B5B8" }))))))),
         settingsOpen && renderSettings(),
         bookingTarget && (() => {
+            // The booking flow reads a lot of business/service-shaped data (services, staff,
+            // travel info, promo pricing) computed fresh on every render. Any of it being
+            // unexpectedly missing or malformed for a particular business must never blank the
+            // whole app — caught here and shown as a recoverable in-flow error instead, the same
+            // pattern the reservation flow already uses below.
+            try {
             const BF = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
             const inputStyle2 = { width: '100%', border: `1px solid ${BF.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: BF.text, outline: 'none', background: T.inputBackground, fontFamily: 'inherit' };
             function fieldWrap2(label, node) {
@@ -13030,6 +13036,20 @@ function App() {
             else if (bookingStep === 'review')
                 footer = footerWrap(React.createElement("button", { onClick: finalizeBooking, style: ctaStyle(true) }, isQuoteBooking ? "Send Request" : `Pay ${money(total)}`));
             return React.createElement("div", { className: "avio-upload-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 10, display: 'flex', flexDirection: 'column' } }, header, body, footer);
+            }
+            catch (err) {
+                console.error('Booking flow render error:', err);
+                return React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 10, display: 'flex', flexDirection: 'column' } },
+                    React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, display: 'flex', justifyContent: 'flex-start' } },
+                        React.createElement("button", { onClick: closeBookingFlow }, React.createElement(Icon, { name: "arrowleft", size: 20, color: "#161616" }))),
+                    React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 28px', textAlign: 'center' } },
+                        React.createElement("div", { style: { width: 56, height: 56, borderRadius: '50%', background: 'rgba(208,48,74,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                            React.createElement(Icon, { name: "warningtriangle", size: 24, color: "#D0304A" })),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#161616', marginTop: 18 } }, "We couldn't open this booking"),
+                        React.createElement("p", { style: { fontSize: 13, color: '#8A8A8E', marginTop: 8, lineHeight: 1.45 } }, "Something went wrong loading this business's booking details. Please go back and try again."),
+                        React.createElement("button", { className: "avio-press", onClick: closeBookingFlow, style: { width: '100%', maxWidth: 280, marginTop: 26, padding: '14px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Back"),
+                        React.createElement("button", { className: "avio-press", onClick: () => { closeBookingFlow(); setTab('bookings'); }, style: { width: '100%', maxWidth: 280, marginTop: 10, padding: '14px 0', borderRadius: 24, background: '#F5F5F5', color: '#161616', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Go to Bookings")));
+            }
         })(),
         activityBookingTarget && (() => {
             const AF = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
@@ -16841,7 +16861,37 @@ function App() {
         creatorProfileTarget && renderCreatorProfile(),
         toast && (React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 54px)', left: 12, right: 12, background: THEME.surface, border: `1px solid ${THEME.inkLine}`, color: '#fff', fontSize: 12, padding: '10px 14px', borderRadius: 12, zIndex: 20, boxShadow: '0 8px 20px rgba(0,0,0,0.4)' } }, toast))));
 }
-ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App, null));
+// Last-resort safety net for the whole app. React 18 unmounts the entire tree on an uncaught
+// render error with nothing rendered in its place — a genuinely blank white page, with no way
+// back short of a hard reload. This guarantees SOMETHING useful shows instead, and — unlike
+// letting the browser's own opaque top-level "Script error." message (the generic string a
+// browser reports for an error it can't get real details on) be the only trace — logs the real
+// error and component stack to the console first, so it's never just silently hidden.
+class AppErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { error: null };
+    }
+    static getDerivedStateFromError(error) {
+        return { error };
+    }
+    componentDidCatch(error, info) {
+        console.error('Bookvado crashed while rendering:', error, info && info.componentStack);
+    }
+    render() {
+        if (this.state.error) {
+            return React.createElement("div", { style: { position: 'fixed', inset: 0, background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', textAlign: 'center', zIndex: 999999 } },
+                React.createElement("div", { style: { width: 56, height: 56, borderRadius: '50%', background: 'rgba(208,48,74,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement("span", { style: { fontSize: 26, lineHeight: 1 } }, "⚠️")),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: '#161616', marginTop: 18 } }, "Something went wrong"),
+                React.createElement("p", { style: { fontSize: 13, color: '#8A8A8E', marginTop: 8, lineHeight: 1.5 } }, "We couldn't load this screen. Your bookings and account data are safe."),
+                React.createElement("button", { onClick: () => this.setState({ error: null }), style: { width: '100%', maxWidth: 280, marginTop: 24, padding: '14px 0', borderRadius: 24, background: '#97C400', color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Try Again"),
+                React.createElement("button", { onClick: () => window.location.reload(), style: { width: '100%', maxWidth: 280, marginTop: 10, padding: '14px 0', borderRadius: 24, background: '#F5F5F5', color: '#161616', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Reload Bookvado"));
+        }
+        return this.props.children;
+    }
+}
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(AppErrorBoundary, null, React.createElement(App, null)));
 
 </script>
 </body>
