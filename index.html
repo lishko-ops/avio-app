@@ -172,6 +172,7 @@
   });
 </script>
 <script src="promotions.js"></script>
+<script src="directions.js"></script>
 <script>
 "use strict";
 const { useState, useMemo, useEffect, useLayoutEffect, useRef, useContext } = React;
@@ -4177,6 +4178,10 @@ function App() {
     const [calView, setCalView] = useState('month');
     const [dailyExpanded, setDailyExpanded] = useState(true);
     const [bookingDetail, setBookingDetail] = useState(null);
+    // The specific booking whose "Get Directions" was tapped, captured whole (not just an id or
+    // address string) so the sheet always reflects exactly that booking's own destination — never
+    // a stale reference left over from a previously opened booking.
+    const [directionsSheetBooking, setDirectionsSheetBooking] = useState(null);
     const calTouchRef = useRef(null);
     function handleCalTouchStart(e) { calTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
     function handleCalTouchEnd(e) {
@@ -8094,6 +8099,43 @@ function App() {
         a.click();
         flashToast('Added to Apple Calendar');
     }
+    // Opens Get Directions' app-picker sheet for a specific booking — validates the destination
+    // FIRST (never opens the sheet just to show empty/broken options), and always re-derives the
+    // address from this exact booking object, never a value cached from whichever booking was
+    // last viewed.
+    function openDirectionsSheet(booking) {
+        const destination = getBookingNavigationDestination(booking);
+        if (!destination) {
+            flashToast('Location unavailable.');
+            return;
+        }
+        if (!isPlausibleAddress(destination)) {
+            flashToast("This booking's address looks incomplete — can't open directions.");
+            return;
+        }
+        setDirectionsSheetBooking(booking);
+    }
+    // A web page has no reliable way to ask "is this app installed" — the standard technique is
+    // to try the app's own URL scheme and, if the OS had nothing registered to handle it, the
+    // page never actually loses visibility; after a short grace period, fall back to opening the
+    // app's web navigation page instead of leaving the customer stuck on a dead link.
+    function openWithAppFallback(appUrl, webFallbackUrl) {
+        let left = false;
+        const onHide = () => { if (document.hidden) left = true; };
+        document.addEventListener('visibilitychange', onHide);
+        window.location.href = appUrl;
+        setTimeout(() => {
+            document.removeEventListener('visibilitychange', onHide);
+            if (!left)
+                window.open(webFallbackUrl, '_blank');
+        }, 1200);
+    }
+    // Apple Maps' universal link always opens the system Maps app directly on iOS — no app-vs-
+    // web fallback needed, unlike Google Maps/Waze which are third-party apps that may or may
+    // not be installed.
+    function openAppleMapsDirections(address) { window.location.href = buildAppleMapsUrl(address); }
+    function openGoogleMapsDirections(address) { openWithAppFallback(buildGoogleMapsAppUrl(address), buildGoogleMapsWebUrl(address)); }
+    function openWazeDirections(address) { openWithAppFallback(buildWazeAppUrl(address), buildWazeWebUrl(address)); }
     function toggleLike(id) {
         setLikedIds((prev) => {
             const next = new Set(prev);
@@ -15085,10 +15127,15 @@ function App() {
         bookingDetail && (React.createElement("div", { onClick: () => setBookingDetail(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } }, (() => {
             const b = bookingDetail;
             const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
+            // Only ever reads THIS booking's own address — a mobile appointment resolves to its
+            // customer/service location, a business-location one to the booked business address,
+            // and a booking with no usable address at all disables the row rather than opening a
+            // sheet full of dead options.
+            const directionsDestination = getBookingNavigationDestination(b);
             const plainActions = [
                 { icon: 'message', label: 'Message Business', onClick: () => flashToast('Messaging ' + (b.business || b.name)) },
                 { icon: 'phone', label: 'Call Business', onClick: () => flashToast('Calling ' + (b.business || b.name)) },
-                { icon: 'send', label: 'Get Directions', onClick: () => flashToast('Opening directions to ' + b.address) },
+                { icon: 'send', label: 'Get Directions', sub: directionsDestination ? null : 'Location unavailable', disabled: !directionsDestination, onClick: () => openDirectionsSheet(b) },
             ];
             const managementRows = [];
             if ((b.status === 'confirmed' || b.status === 'pending') && b.serviceAddress)
@@ -15100,9 +15147,11 @@ function App() {
             }
             trailingActions.push({ icon: 'share', label: 'Share Booking', onClick: () => flashToast('Share link copied') });
             trailingActions.push({ icon: 'calendar', label: 'Add to Apple Calendar', onClick: () => addToAppleCalendar(b) });
-            const flatRow = (a, i, arr) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px 4px', borderBottom: i < arr.length - 1 ? `1px solid ${T.border}` : 'none' } },
+            const flatRow = (a, i, arr) => React.createElement("button", { key: a.label, disabled: a.disabled, onClick: a.disabled ? undefined : a.onClick, style: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px 4px', borderBottom: i < arr.length - 1 ? `1px solid ${T.border}` : 'none', opacity: a.disabled ? 0.45 : 1 } },
                 React.createElement(Icon, { name: a.icon, size: 16, color: a.danger ? '#D0304A' : T.textPrimary }),
-                React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: a.danger ? '#D0304A' : T.textPrimary } }, a.label));
+                React.createElement("div", { style: { textAlign: 'left' } },
+                    React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: a.danger ? '#D0304A' : T.textPrimary } }, a.label),
+                    a.sub && React.createElement("p", { style: { fontSize: 11, color: T.textSecondary, margin: '1px 0 0' } }, a.sub)));
             const managementGroup = managementRows.length > 0 && React.createElement("div", { style: { marginTop: 12, border: `1px solid ${T.border}`, borderRadius: 16, overflow: 'hidden' } },
                 managementRows.map((r, i) => React.createElement(React.Fragment, { key: r.label },
                     i > 0 && React.createElement("div", { style: { height: 1, background: T.border, marginLeft: 50 } }),
@@ -15204,6 +15253,30 @@ function App() {
                 managementGroup,
                 tipSection,
                 React.createElement("div", { style: { marginTop: 10, display: 'flex', flexDirection: 'column' } }, trailingActions.map(flatRow)));
+        })())),
+        // Its own top-level overlay (not nested inside bookingDetail's IIFE above) so it stacks
+        // cleanly on top of the booking detail sheet at a higher zIndex, the same pattern every
+        // other "sheet opened from within a sheet" in this app already uses.
+        directionsSheetBooking && (React.createElement("div", { onClick: () => setDirectionsSheetBooking(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 21 } }, (() => {
+            const destination = getBookingNavigationDestination(directionsSheetBooking);
+            const showApple = shouldShowAppleMapsOption(navigator.userAgent);
+            const appRow = (id, label, bg, iconColor, iconName, onPick) => React.createElement("button", { key: id, onClick: () => { onPick(); setDirectionsSheetBooking(null); }, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '15px 4px' } },
+                React.createElement("div", { style: { width: 42, height: 42, borderRadius: 12, background: bg, border: bg === '#fff' ? `1px solid ${T.border}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement(Icon, { name: iconName, size: 19, color: iconColor })),
+                React.createElement("span", { style: { fontSize: 15.5, fontWeight: 600, color: T.textPrimary } }, label));
+            const rows = [];
+            // Apple Maps never needs to appear on Android — there's no app for the link to open.
+            if (showApple)
+                rows.push(appRow('apple', 'Apple Maps', '#000', '#fff', 'compass', () => openAppleMapsDirections(destination)));
+            rows.push(appRow('google', 'Google Maps', '#fff', '#EA4335', 'mappin', () => openGoogleMapsDirections(destination)));
+            rows.push(appRow('waze', 'Waze', '#33CCFF', '#fff', 'send', () => openWazeDirections(destination)));
+            return React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '24px 24px 0 0', padding: `14px 18px calc(env(safe-area-inset-bottom) + 14px)` } },
+                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: T.border, margin: '0 auto 14px' } }),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: T.textPrimary, textAlign: 'center', margin: 0 } }, "Get Directions"),
+                React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, textAlign: 'center', margin: '4px 0 12px' } }, "Choose how you want to navigate."),
+                React.createElement("div", { style: { display: 'flex', flexDirection: 'column' } },
+                    rows.map((r, i) => React.createElement(React.Fragment, { key: i }, i > 0 && React.createElement("div", { style: { height: 1, background: T.border, marginLeft: 56 } }), r))),
+                React.createElement("button", { onClick: () => setDirectionsSheetBooking(null), style: { width: '100%', marginTop: 10, padding: '14px 0', textAlign: 'center', borderRadius: 16, background: T.surfaceSecondary, fontSize: 15.5, fontWeight: 700, color: T.textPrimary } }, "Cancel"));
         })())),
         businessBookingDetail && (React.createElement("div", { onClick: () => setBusinessBookingDetail(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } }, (() => {
             const b = businessBookingDetail;
