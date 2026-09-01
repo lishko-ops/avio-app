@@ -35,6 +35,14 @@
      classes rather than inline styles. #97C400 is hard-coded to match THEME.coral —
      if that token is ever retinted, update it here too. */
   .leaflet-container { background: #0A0A0C !important; font-family: 'Inter', sans-serif !important; touch-action: none; }
+  /* Standard OpenStreetMap tiles are light by design — this inverts them into Bookvado's dark
+     look (lime accents/markers live in their own layer above this pane and are untouched,
+     since the filter only applies to the raster tile images themselves, not the whole map). */
+  .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.92) saturate(0.85); }
+  /* OpenStreetMap's usage policy requires visible attribution; kept, just small/quiet so it
+     doesn't compete with the map UI the way a full-size default control would. */
+  .leaflet-control-attribution { background: rgba(0,0,0,0.55) !important; color: rgba(255,255,255,0.55) !important; font-size: 9px !important; padding: 1px 5px !important; border-radius: 6px 0 0 0; line-height: 1.4; }
+  .leaflet-control-attribution a { color: rgba(255,255,255,0.75) !important; }
   .avio-map-cluster-wrap, .avio-map-pin-wrap, .avio-user-dot-wrap { background: none !important; border: none !important; }
   /* The marker wrapper (Leaflet's own icon element, the thing its click/tap listener is
      actually attached to) must always be able to receive the tap — explicit rather than
@@ -1211,7 +1219,20 @@ const CONVERSATIONS_SEED = [
             { id: 'm4', from: 'them', text: 'See you then 💪', time: '9:41 AM' },
         ] },
     { id: 'c2', name: 'Glam Studio', category: 'Nails', rating: 5.0, verified: false, online: true, unread: 1, initials: 'GS', responseTime: '~10 min', hasBookingThread: true,
-        messages: [{ id: 'm1', from: 'them', text: 'Can we move it to 3PM?', time: '9:32 AM' }] },
+        messages: [
+            { id: 'm1', from: 'them', text: 'Can we move it to 3PM?', time: '9:32 AM' },
+            // `type: 'availability'` — a real, tappable time-slot card (not the older, static
+            // `type: 'booking'` snapshot above it in this file). `bookingId: 'b7'` is what makes
+            // this a RESCHEDULE offer for that seeded booking (bookings array below) — the exact
+            // same card shape with `bookingId: null` is a plain new-booking offer instead. Dated
+            // tomorrow, matching b7's own date exactly (see its comment for why "today" isn't
+            // safe for a seed that has to survive being demoed at any time of day).
+            { id: 'm2', from: 'them', type: 'availability', businessId: 'c2', businessName: 'Glam Studio', category: 'Nails',
+                serviceName: 'Gel Manicure', price: 45, durationMinutes: 45, location: '214 Bedford Ave, Brooklyn, NY',
+                dateISO: (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString(); })(),
+                times: [870, 900, 975], bookingId: 'b7',
+                text: 'Sent available times', time: '9:33 AM' },
+        ] },
     { id: 'c3', name: 'Luxe Beauty', category: 'Makeup', rating: 4.8, verified: false, online: true, unread: 0, initials: 'LB', responseTime: '~15 min',
         messages: [{ id: 'm1', from: 'me', text: 'Thank you so much!', time: 'Yesterday' }] },
     { id: 'c4', name: 'DJ Prime', category: 'DJ', rating: 4.9, verified: false, online: true, unread: 0, initials: 'DP', responseTime: '~20 min',
@@ -3608,6 +3629,12 @@ function App() {
         { id: 'b4', name: 'John Barber', service: 'Haircut', business: 'John Barber', category: 'Beauty', date: 'Aug 21', day: 21, month: 7, year: 2026, time: '2:00 PM', total: 45, status: 'confirmed', address: '123 Main St, New York, NY', duration: '45 min', durationMinutes: 45, logoText: 'JB' },
         { id: 'b5', name: 'Zen Spa', service: 'Massage', business: 'Zen Spa', category: 'Beauty', date: 'Aug 3', day: 3, month: 7, year: 2026, time: '4:00 PM', total: 120, status: 'completed', address: '22 Wellness Way, New York, NY', duration: '1h', durationMinutes: 60, logoText: 'ZS' },
         { id: 'b6', name: 'FitLife Coach', service: 'Personal Training', business: 'FitLife Coach', category: 'Educational', date: 'Aug 23', day: 23, month: 7, year: 2026, time: '8:00 AM', total: 80, status: 'pending', address: '10 Fit St, New York, NY', duration: '1h', durationMinutes: 60, logoText: 'FL' },
+        // providerId: 'c2' links this to the Glam Studio chat thread's availability/reschedule
+        // card (CONVERSATIONS_SEED) — tapping a new time there offers to move THIS booking.
+        // Dated tomorrow rather than today so it can never auto-flip to 'completed' (the real
+        // lifecycle reconciliation this app runs on mount/focus) before someone actually gets to
+        // try the reschedule demo, regardless of what time of day that happens to be.
+        (() => { const d = new Date(); d.setDate(d.getDate() + 1); return { id: 'b7', name: 'Glam Studio', service: 'Gel Manicure', business: 'Glam Studio', category: 'Nails', providerId: 'c2', date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), dateKey: dateKey(d), day: d.getDate(), month: d.getMonth(), year: d.getFullYear(), time: '11:00 AM', timeMinutes: 660, total: 45, status: 'confirmed', address: '214 Bedford Ave, Brooklyn, NY', duration: '45 min', durationMinutes: 45, logoText: 'GS' }; })(),
         { id: 'ab-seed1', bookingType: 'activity', name: 'Wave Kingdom Water Park', service: 'Day Pass', business: 'Wave Kingdom Water Park', category: 'Rentals',
             providerId: 't-wavekingdom', activityId: 'act-daypass', spaceId: 'space-park', spaceName: 'Park Entry', partySize: 4, durationMinutes: 480,
             date: 'Aug 25, 2026', dateKey: dateKey(new Date(2026, 7, 25)), day: 25, month: 7, year: 2026, time: '9:30 AM', timeMinutes: 570, timeRange: '9:30 AM – 5:30 PM',
@@ -4175,6 +4202,11 @@ function App() {
     const [pinnedIds, setPinnedIds] = useState(() => new Set());
     const [swipedRowId, setSwipedRowId] = useState(null);
     const connectTouchRef = useRef(null);
+    // A tapped time from an in-chat availability card, pending confirmation — { message, minutes,
+    // dateObj } | null. Holding the whole message (not just an id) means the confirm sheet always
+    // reflects exactly the offer that was tapped, even if the underlying conversation state
+    // changes shape later.
+    const [chatBookingSheet, setChatBookingSheet] = useState(null);
     function openConversation(id) {
         setActiveConversationId(id);
         const setter = accountType === 'business' ? setBusinessConversations : setConversations;
@@ -4226,6 +4258,122 @@ function App() {
         const setter = accountType === 'business' ? setBusinessConversations : setConversations;
         setter((prev) => prev.map((c) => c.id === activeConversationId ? { ...c, messages: [...c.messages, { id: 'm' + Date.now(), from: 'me', type: 'booking', service: c.category, price: 65, duration: '45 min', date: 'Sat · 12:00 PM', time: 'Just now' }] } : c));
         flashToast('Booking card sent');
+    }
+    // A business-sent "pick a time" card — unlike insertBookingCard's single fixed slot above,
+    // every time here is a real, live-checked offer: generated from the SAME availability engine
+    // Nearby/booking screens use (generateAvailableSlots), so it's never possible to send a time
+    // that's already taken. Always a NEW-booking offer (bookingId: null); an existing booking
+    // gets a reschedule offer by attaching one directly to a message the same way the seeded
+    // Glam Studio example does (see CONVERSATIONS_SEED) — there's no UI here to pick which
+    // existing booking to reschedule, since that's a business-owner feature beyond this demo's
+    // customer-facing scope.
+    function insertAvailabilityCard() {
+        if (!activeConversationId)
+            return;
+        const conv = (accountType === 'business' ? businessConversations : conversations).find((c) => c.id === activeConversationId);
+        if (!conv)
+            return;
+        const providerId = conv.providerId || conv.id;
+        const durationMinutes = 45;
+        // Offer today's remaining slots only if they're still a reasonable amount of notice away
+        // right now — otherwise a "9:00 AM" card sent at 6:00 PM would create a booking that's
+        // already effectively in the past the instant it's confirmed (the same lifecycle
+        // reconciliation that flips a booking to 'completed' once its time passes doesn't care
+        // that it was JUST created). Roll to tomorrow instead whenever that's the case.
+        let offerDate = new Date();
+        const nowMinutes = offerDate.getHours() * 60 + offerDate.getMinutes();
+        let slots = generateAvailableSlots(providerId, offerDate, durationMinutes)
+            .map((s) => s.minutes)
+            .filter((m) => m > nowMinutes + 30)
+            .slice(0, 3);
+        if (!slots.length) {
+            offerDate = new Date();
+            offerDate.setDate(offerDate.getDate() + 1);
+            slots = generateAvailableSlots(providerId, offerDate, durationMinutes).map((s) => s.minutes).slice(0, 3);
+        }
+        if (!slots.length) {
+            flashToast('No open times to offer.');
+            return;
+        }
+        const setter = accountType === 'business' ? setBusinessConversations : setConversations;
+        setter((prev) => prev.map((c) => c.id === activeConversationId ? { ...c, messages: [...c.messages, {
+            id: 'm' + Date.now(), from: accountType === 'business' ? 'me' : 'them', type: 'availability',
+            businessId: providerId, businessName: conv.name, category: conv.category || 'Beauty',
+            serviceName: conv.category || 'Appointment', price: 65, durationMinutes,
+            location: null, dateISO: offerDate.toISOString(), times: slots, bookingId: null,
+            text: 'Sent available times', time: 'Just now',
+        }] } : c));
+        flashToast('Availability sent');
+    }
+    // Tapping a time in an availability card. Live re-checks the exact slot right before showing
+    // the confirm sheet — never trusts the list the card was built with, since that could be
+    // stale by the time the customer actually taps (another customer could have taken it, or
+    // — for a reschedule offer — the underlying booking could have been cancelled since).
+    function tapAvailabilityTime(message, minutes) {
+        const dateObj = new Date(message.dateISO);
+        const now = new Date();
+        // generateAvailableSlots only checks business hours + conflicts, not whether a same-day
+        // time has already gone by — a card left unread since this morning could still list
+        // "9:00 AM" as conflict-free at 2:00 PM. Catch that here rather than letting it silently
+        // create a booking that's already in the past the moment it's confirmed.
+        if (dateKey(dateObj) === dateKey(now) && minutes <= now.getHours() * 60 + now.getMinutes()) {
+            flashToast('That time has already passed. Please choose another available time.');
+            return;
+        }
+        if (message.bookingId) {
+            const existing = bookings.find((b) => b.id === message.bookingId);
+            if (!existing || !bookingIsRescheduleEligible(existing)) {
+                flashToast('This booking can no longer be rescheduled.');
+                return;
+            }
+        }
+        const freshSlots = generateAvailableSlots(message.businessId, dateObj, message.durationMinutes, null, message.bookingId || undefined);
+        const stillOpen = freshSlots.some((s) => s.minutes === minutes);
+        if (!stillOpen) {
+            flashToast('That time was just booked. Please choose another available time.');
+            return;
+        }
+        setChatBookingSheet({ message, minutes, dateObj });
+    }
+    // Creates the booking (or moves the existing one, for a reschedule offer) after the customer
+    // taps Confirm on the sheet. Reschedule goes through the real commitReschedule — the same,
+    // already-correct, price-neutral in-place move the Bookings tab's own reschedule flow uses.
+    // A brand new booking gets a smaller, honest booking object (service price + no promo/travel-
+    // fee/insurance machinery) rather than trying to replicate every branch of the full checkout
+    // wizard's finalizeBooking() — chat is a fast-confirm surface, not the full booking flow.
+    function confirmChatBooking() {
+        if (!chatBookingSheet)
+            return;
+        const { message, minutes, dateObj } = chatBookingSheet;
+        const isReschedule = !!message.bookingId;
+        if (isReschedule) {
+            const existing = bookings.find((b) => b.id === message.bookingId);
+            if (!existing || !bookingIsRescheduleEligible(existing)) {
+                flashToast('This booking can no longer be rescheduled.');
+                setChatBookingSheet(null);
+                return;
+            }
+            commitReschedule(existing, dateObj, minutes);
+            flashToast('Reschedule confirmed');
+        }
+        else {
+            const label = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const booking = {
+                id: 'b' + Date.now(), name: message.businessName, service: message.serviceName, business: message.businessName,
+                category: message.category || 'Beauty', providerId: message.businessId, bookingType: 'APPOINTMENT', durationMinutes: message.durationMinutes,
+                date: label, day: dateObj.getDate(), month: dateObj.getMonth(), year: dateObj.getFullYear(),
+                time: minutesToTimeLabel(minutes), timeMinutes: minutes, timeRange: formatTimeRange(minutes, message.durationMinutes),
+                total: message.price, status: 'confirmed', address: message.location || 'Address shared after booking',
+                duration: formatDuration(message.durationMinutes), logoText: (message.businessName || '??').slice(0, 2).toUpperCase(),
+                dateKey: dateKey(dateObj), confirmationNumber: 'BVK' + Math.random().toString(36).slice(2, 8).toUpperCase(),
+            };
+            setBookings((prev) => [booking, ...prev]);
+            flashToast('Booking confirmed');
+        }
+        const confirmText = `${isReschedule ? 'Rescheduled to' : 'Booked for'} ${dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${minutesToTimeLabel(minutes)} ✅`;
+        const setter = accountType === 'business' ? setBusinessConversations : setConversations;
+        setter((prev) => prev.map((c) => c.id === activeConversationId ? { ...c, messages: [...c.messages, { id: 'm' + Date.now(), from: 'me', text: confirmText, time: 'Just now' }] } : c));
+        setChatBookingSheet(null);
     }
     function togglePin(id) {
         setPinnedIds((prev) => {
@@ -6299,8 +6447,14 @@ function App() {
         if (typeof L === 'undefined' || !nearbyMapDivRef.current || nearbyMapInstanceRef.current)
             return;
         const startCenter = nearbyCommittedCenterRef.current || (activeSearchLocation && activeSearchLocation.latlng) || nearbyUserLatLng || DEFAULT_MAP_CENTER;
-        const map = L.map(nearbyMapDivRef.current, { zoomControl: false, attributionControl: false, minZoom: 3, maxZoom: 18 }).setView(startCenter, 13);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19 }).addTo(map);
+        // CARTO's free dark_all raster tiles now require an API key and are being retired —
+        // an anonymous request just gets back tile-sized "API KEY REQUIRED" placeholder images,
+        // which is what actually put that text plastered across the map. Standard OpenStreetMap
+        // tiles are the one raster source that's stayed genuinely free/keyless; the dark look
+        // comes back via a CSS invert filter on the tile pane (see .leaflet-tile-pane below)
+        // instead of depending on any particular provider's dark styling staying free forever.
+        const map = L.map(nearbyMapDivRef.current, { zoomControl: false, attributionControl: true, minZoom: 3, maxZoom: 18 }).setView(startCenter, 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
         const cluster = L.markerClusterGroup({
             maxClusterRadius: 52, showCoverageOnHover: false, spiderfyOnMaxZoom: true,
             // Explicit (matches the library default) so a cluster circle is never just
@@ -6310,13 +6464,6 @@ function App() {
             // spiderfies it into a fanned-out ring of tappable individual markers instead.
             zoomToBoundsOnClick: true,
             iconCreateFunction: (c) => buildNearbyClusterIcon(c.getChildCount()),
-        });
-        // TEMPORARY debug proof that a cluster tap is actually reaching Leaflet — check
-        // Safari's remote Web Inspector console on a real device. Purely observational:
-        // added alongside (not instead of) zoomToBoundsOnClick above, so it never changes
-        // what a cluster tap actually does.
-        cluster.on('clusterclick', (e) => {
-            console.log('MAP CLUSTER TAP', e.layer.getAllChildMarkers().map((m) => m.options.businessId));
         });
         map.addLayer(cluster);
         nearbyMapInstanceRef.current = map;
@@ -6396,18 +6543,12 @@ function App() {
             const isSelected = nearbySelectedId === business.id;
             // businessId travels on the marker's own options (not just the closure) so a
             // cluster's getAllChildMarkers() can always be traced back to the exact
-            // businesses it contains — e.g. for the debug log on cluster taps below.
+            // businesses it contains.
             const marker = L.marker(latlng, { icon: buildNearbyPinIcon(business, isSelected), businessId: business.id });
             // Reads the latest selection handler via a ref instead of closing over it directly,
             // so this effect's own identity (and therefore whether markers get rebuilt) never
             // has to depend on it.
-            marker.on('click', () => {
-                // TEMPORARY debug proof that the tap is actually reaching this handler on a
-                // real device — check Safari's remote Web Inspector console. Safe to remove
-                // once confirmed; it has no effect on behavior either way.
-                console.log('MAP MARKER TAP', business.id);
-                selectNearbyBusinessRef.current(business.id);
-            });
+            marker.on('click', () => selectNearbyBusinessRef.current(business.id));
             cluster.addLayer(marker);
             markersById.set(business.id, marker);
         });
@@ -6471,11 +6612,13 @@ function App() {
         // second interactive map; the card around it is what's tappable, for "open a larger
         // map/directions experience" elsewhere.
         const map = L.map(bizLocationMapDivRef.current, {
-            zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false,
+            zoomControl: false, attributionControl: true, dragging: false, scrollWheelZoom: false,
             touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false,
             zoomAnimation: false, fadeAnimation: false,
         }).setView(latlng, 16);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19 }).addTo(map);
+        // Same OpenStreetMap + CSS-invert-to-dark approach as the Nearby map — see its mount
+        // effect above for why CARTO's dark tiles were dropped.
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
         // Exactly one marker, never clustered, no count badge — exists purely to point at this
         // one business, styled as a plain lime dot rather than reusing the Nearby photo pin so
         // it's never mistaken for a discovery marker.
@@ -10737,6 +10880,18 @@ function App() {
                         React.createElement("button", { onClick: () => { setTab('bookings'); }, style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', borderRadius: 18, border: `1px solid ${CN.border}` } }, React.createElement(Icon, { name: "calendar", size: 13, color: CN.text }), React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: CN.text } }, "View booking"))));
                 const bubbles = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 } },
                     c.messages.map((m) => {
+                        if (m.type === 'availability') {
+                            const msgDate = new Date(m.dateISO);
+                            const dayLabel = dateKey(msgDate) === dateKey(new Date()) ? 'Today' : msgDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                            const isReschedule = !!m.bookingId;
+                            return React.createElement("div", { key: m.id, style: { alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start', maxWidth: '82%', background: T.surfaceSecondary, border: `1px solid ${CN.border}`, borderRadius: 16, padding: 12 } },
+                                React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: CN.text, margin: 0 } }, `Available times from ${m.businessName}`),
+                                React.createElement("p", { style: { fontSize: 11, color: CN.sub, marginTop: 2 } }, `${dayLabel} · ${m.serviceName}`),
+                                React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 } },
+                                    m.times.map((t) => React.createElement("button", { key: t, onClick: () => tapAvailabilityTime(m, t), style: { padding: '8px 14px', borderRadius: 14, border: `1px solid ${THEME.coral}`, background: 'rgba(151,196,0,0.1)' } },
+                                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, minutesToTimeLabel(t))))),
+                                React.createElement("p", { style: { fontSize: 10.5, color: CN.sub, marginTop: 8 } }, isReschedule ? 'Tap a time to reschedule' : 'Tap a time to book'));
+                        }
                         if (m.type === 'booking') {
                             return React.createElement("div", { key: m.id, style: { alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start', maxWidth: '78%', background: T.surfaceSecondary, border: `1px solid ${CN.border}`, borderRadius: 16, padding: 12 } },
                                 React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: CN.text, margin: 0 } }, m.service),
@@ -10756,8 +10911,36 @@ function App() {
                     { icon: 'image', label: 'Photos', onClick: () => flashToast('Photos — coming soon') },
                     { icon: 'mappin', label: 'Location', onClick: () => flashToast('Location shared') },
                     { icon: 'calendar', label: 'Booking', onClick: insertBookingCard },
+                    { icon: 'clock', label: 'Times', onClick: insertAvailabilityCard },
                     { icon: 'wallet', label: 'Payment', onClick: () => flashToast('Payment — coming soon') },
                 ];
+                // Bottom sheet for the tapped availability time — service/provider/date-time/
+                // location/price (or "no change" for a reschedule, matching commitReschedule
+                // being price-neutral by design), then one Confirm that actually creates or
+                // moves the booking. This never leaves the conversation: no re-navigating to
+                // the business, no re-entering the date/time by hand.
+                const chatBookingSheetOverlay = chatBookingSheet && (() => {
+                    const { message, minutes, dateObj } = chatBookingSheet;
+                    const isReschedule = !!message.bookingId;
+                    const existingBooking = isReschedule ? bookings.find((b) => b.id === message.bookingId) : null;
+                    const dateLabel = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+                    const row = (label, value) => React.createElement("div", { key: label, style: { display: 'flex', justifyContent: 'space-between', gap: 10, padding: '9px 0', borderBottom: `1px solid ${CN.border}` } },
+                        React.createElement("span", { style: { fontSize: 12, color: CN.sub } }, label),
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: CN.text, textAlign: 'right' } }, value));
+                    return React.createElement("div", { onClick: () => setChatBookingSheet(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-end', zIndex: 20 } },
+                        React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `16px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                            React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: CN.border, margin: '0 auto 14px' } }),
+                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: CN.text, margin: 0 } }, isReschedule ? 'Confirm Reschedule' : 'Confirm Booking'),
+                            React.createElement("div", { style: { marginTop: 12, borderRadius: 16, border: `1px solid ${CN.border}`, padding: '2px 14px' } },
+                                row('Service', message.serviceName),
+                                row('Provider', message.businessName),
+                                row('Date & Time', `${dateLabel} · ${minutesToTimeLabel(minutes)}`),
+                                row('Location', message.location || 'Address shared after booking'),
+                                isReschedule && existingBooking && row('Previous Time', existingBooking.time),
+                                row(isReschedule ? 'Price Change' : 'Total', isReschedule ? 'No change' : money(message.price))),
+                            React.createElement("button", { onClick: confirmChatBooking, style: { width: '100%', marginTop: 16, padding: '14px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, isReschedule ? 'Confirm Reschedule' : 'Confirm'),
+                            React.createElement("button", { onClick: () => setChatBookingSheet(null), style: { width: '100%', marginTop: 6, padding: '10px 0', textAlign: 'center', fontSize: 13, fontWeight: 600, color: CN.sub } }, "Cancel")));
+                })();
                 const inputArea = React.createElement("div", { style: { flexShrink: 0, borderTop: `1px solid ${CN.border}`, padding: `10px 18px calc(env(safe-area-inset-bottom) + 10px)` } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
                         React.createElement("button", { onClick: () => flashToast('Attach — coming soon'), style: { width: 30, height: 30, borderRadius: '50%', background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "plus", size: 15, color: T.background })),
@@ -10768,7 +10951,7 @@ function App() {
                     React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 20, overflowX: 'auto', marginTop: 12 } }, quickActions.map((a) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
                         React.createElement(Icon, { name: a.icon, size: 18, color: CN.sub }),
                         React.createElement("span", { style: { fontSize: 9, color: CN.sub } }, a.label)))));
-                return React.createElement("div", { style: { height: '100%', display: 'flex', flexDirection: 'column' } }, chatHeader, bubbles, inputArea);
+                return React.createElement("div", { style: { height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' } }, chatHeader, bubbles, inputArea, chatBookingSheetOverlay);
             }
             const q = connectSearch.trim().toLowerCase();
             const filteredConversations = conversations.filter((c) => {
