@@ -5380,19 +5380,81 @@ function App() {
     // instant playback, instead of every one of the 65 shorts fighting for
     // bandwidth at once.
     const [activeShortId, setActiveShortId] = useState(null);
+    // WhatsApp-style press-and-hold speed control for Thrillz videos. Pointer Events (not raw
+    // touch events, which the existing swipe/double-tap-like/scrub gesture system on the card
+    // already owns) so the same code path covers iOS Safari/PWA, Android, and desktop mouse —
+    // and since it only ever reads position and sets playbackRate, it can never interfere with
+    // (or be blamed for triggering) the like/swipe/booking gestures living alongside it.
+    const [shortsSpeedItemId, setShortsSpeedItemId] = useState(null);
+    const shortsHoldTimerRef = useRef(null);
+    const shortsHoldStartRef = useRef(null); // { x, y, itemId } while a press is pending, else null
+    const shortsSuppressClickRef = useRef(false);
+    function clearShortsHoldTimer() {
+        if (shortsHoldTimerRef.current) { clearTimeout(shortsHoldTimerRef.current); shortsHoldTimerRef.current = null; }
+    }
+    function endShortsHoldSpeed(itemId) {
+        clearShortsHoldTimer();
+        shortsHoldStartRef.current = null;
+        const vid = shortVideoRefs.current[itemId];
+        if (vid) vid.playbackRate = 1.0;
+        setShortsSpeedItemId((cur) => cur === itemId ? null : cur);
+    }
+    // The hold threshold is what keeps an ordinary tap from ever visibly flashing into 2x — 2x
+    // only engages once the timer actually fires, and release-before-then (a normal tap) clears
+    // it first via clearShortsHoldTimer() in the pointerup/pointercancel handlers below.
+    function handleShortHoldStart(e, itemId) {
+        clearShortsHoldTimer();
+        shortsSuppressClickRef.current = false;
+        shortsHoldStartRef.current = { x: e.clientX, y: e.clientY, itemId };
+        shortsHoldTimerRef.current = setTimeout(() => {
+            shortsHoldTimerRef.current = null;
+            shortsSuppressClickRef.current = true;
+            const vid = shortVideoRefs.current[itemId];
+            if (vid) vid.playbackRate = 2.0;
+            if (navigator.vibrate) navigator.vibrate(10);
+            setShortsSpeedItemId(itemId);
+        }, 180);
+    }
+    function handleShortHoldMove(e, itemId) {
+        const start = shortsHoldStartRef.current;
+        if (!start || start.itemId !== itemId) return;
+        // Movement past a small threshold means this touch is turning into a swipe (changing
+        // videos, restarting, revealing a profile) rather than a hold — bail out completely and
+        // let that gesture proceed untouched instead of fighting it.
+        if (Math.abs(e.clientX - start.x) > 10 || Math.abs(e.clientY - start.y) > 10)
+            endShortsHoldSpeed(itemId);
+    }
+    function handleShortVideoClick(e) {
+        if (shortsSuppressClickRef.current) { shortsSuppressClickRef.current = false; return; }
+        const v = e.currentTarget;
+        if (v.paused) v.play().catch(() => { }); else v.pause();
+    }
     useEffect(() => {
-        if (tab !== 'discover')
-            Object.values(shortVideoRefs.current).forEach((v) => { if (v) v.pause(); });
+        if (tab !== 'discover') {
+            Object.values(shortVideoRefs.current).forEach((v) => { if (v) { v.pause(); v.playbackRate = 1.0; } });
+            if (shortsSpeedItemId) endShortsHoldSpeed(shortsSpeedItemId);
+        }
     }, [tab]);
     useEffect(() => {
-        const pauseAll = () => { if (document.hidden) Object.values(shortVideoRefs.current).forEach((v) => { if (v) v.pause(); }); };
+        const pauseAll = () => {
+            if (document.hidden) {
+                Object.values(shortVideoRefs.current).forEach((v) => { if (v) { v.pause(); v.playbackRate = 1.0; } });
+                if (shortsSpeedItemId) endShortsHoldSpeed(shortsSpeedItemId);
+            }
+        };
         document.addEventListener('visibilitychange', pauseAll);
         window.addEventListener('pagehide', pauseAll);
         return () => {
             document.removeEventListener('visibilitychange', pauseAll);
             window.removeEventListener('pagehide', pauseAll);
         };
-    }, []);
+    }, [shortsSpeedItemId]);
+    // The active short changing means whatever was mid-hold just scrolled away — never leave a
+    // stale 2x badge (or an off-screen video quietly stuck at 2x) behind.
+    useEffect(() => {
+        if (shortsSpeedItemId && shortsSpeedItemId !== activeShortId)
+            endShortsHoldSpeed(shortsSpeedItemId);
+    }, [activeShortId]);
     const bizPanelTouchRef = useRef(null);
     const lastTapRef = useRef({ time: 0, id: null });
     const [accountType, setAccountType] = useState(() => loadLS('avio_account_type_v2', null) || (() => { try { return localStorage.getItem('avio_account_type'); } catch (e) { return null; } })() || 'personal');
@@ -10476,12 +10538,12 @@ function App() {
                 : React.createElement("div", { style: { position: 'absolute', inset: 0, background: item.avatarColor || '#000' } });
             const backdrop = item.customVideoUrl
                 ? (inMountWindow
-                    ? React.createElement("video", { key: item.id + '-video', ref: getShortVideoRefCallback(item.id), src: item.customVideoUrl, muted: false, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000', cursor: 'pointer' } })
+                    ? React.createElement("video", { key: item.id + '-video', ref: getShortVideoRefCallback(item.id), src: item.customVideoUrl, muted: false, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onClick: handleShortVideoClick, onPointerDown: (e) => handleShortHoldStart(e, item.id), onPointerMove: (e) => handleShortHoldMove(e, item.id), onPointerUp: () => endShortsHoldSpeed(item.id), onPointerCancel: () => endShortsHoldSpeed(item.id), onPointerLeave: () => endShortsHoldSpeed(item.id), style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000', cursor: 'pointer' } })
                     : posterOnly)
                 : item.video
                     ? (inMountWindow
                         ? React.createElement(React.Fragment, { key: item.id + '-videowrap' },
-                            React.createElement("video", { key: item.id + '-video', ref: getShortVideoRefCallback(item.id), muted: false, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onPlaying: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = 'none'; }, onWaiting: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = ''; }, onClick: (e) => { const v = e.currentTarget; if (v.paused) v.play().catch(() => { }); else v.pause(); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
+                            React.createElement("video", { key: item.id + '-video', ref: getShortVideoRefCallback(item.id), muted: false, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onPlaying: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = 'none'; }, onWaiting: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = ''; }, onClick: handleShortVideoClick, onPointerDown: (e) => handleShortHoldStart(e, item.id), onPointerMove: (e) => handleShortHoldMove(e, item.id), onPointerUp: () => endShortsHoldSpeed(item.id), onPointerCancel: () => endShortsHoldSpeed(item.id), onPointerLeave: () => endShortsHoldSpeed(item.id), style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
                                 React.createElement("source", { src: item.video + '.webm', type: "video/webm" }),
                                 React.createElement("source", { src: item.video + '.mp4', type: "video/mp4" })),
                             item.image && React.createElement("img", { key: item.id + '-poster', ref: getShortPosterRefCallback(item.id), src: item.image, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }))
@@ -10615,6 +10677,15 @@ function App() {
                         ref: (el) => { if (el) { scrubBarRefs.current[item.id] = scrubBarRefs.current[item.id] || {}; scrubBarRefs.current[item.id].dot = el; } },
                         style: { position: 'absolute', top: '50%', left: scrubInitialPct + '%', width: 7, height: 7, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.45)', transform: 'translate(-50%, -50%)' },
                     })));
+            // Small floating pill confirming the press-and-hold 2x speed is active — sits under
+            // the Thrillz/People/Following/search row on the right, well clear of both the top
+            // nav above it and the like/comment/save/share rail (which is bottom-anchored, not
+            // top-anchored — see actionStack above) so it never collides with either.
+            // Positioned low enough to clear the dismissible "leave a review/tip" banner (a
+            // separate top-level overlay at a much higher z-index that would otherwise sit right
+            // on top of a badge placed any closer to the search/filter row above it).
+            const speedBadge = shortsSpeedItemId === item.id && React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 190px)', right: 16, zIndex: 2, pointerEvents: 'none', padding: '5px 12px', borderRadius: 14, background: 'rgba(0,0,0,0.55)', border: `1px solid ${THEME.coral}` } },
+                React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontSize: 12, fontWeight: 700, color: THEME.coral } }, "2×"));
             // `contain` lets the browser skip layout/paint work for the ~60 other cards
             // sitting off-screen in this scroll-snap list instead of tracking them as if
             // they might affect the page outside their own box — a big part of what made
@@ -10622,7 +10693,7 @@ function App() {
             return React.createElement("div", { key: item.id, ref: getShortItemRefCallback(item.id), "data-short-id": item.id, onTouchStart: (e) => handleShortTouchStart(e, item), onTouchMove: (e) => handleShortTouchMove(e, item), onTouchEnd: (e) => handleShortTouchEnd(e, item), style: { height: '100%', scrollSnapAlign: 'start', position: 'relative', background: THEME.ink, overflow: 'hidden', contain: 'content' } },
                 React.createElement("div", { style: { position: 'absolute', inset: 0, transform: `translateX(${-dragProgress * 46}px)`, opacity: 1 - dragProgress * 0.35, transition: innerTransition } },
                     backdrop, scrim, brand, actionStack, infoBlock, bookCta),
-                arrowOverlay, burstOverlay, scrubBarOverlay);
+                arrowOverlay, burstOverlay, scrubBarOverlay, speedBadge);
     }
     return React.createElement(AppThemeContext.Provider, { value: T }, React.createElement("div", { style: { width: '100%', margin: '0 auto', position: 'fixed', top: 0, bottom: 0, left: 0, right: 0, overflow: 'hidden', background: T.background } },
         React.createElement("input", { ref: fileInputRef, type: "file", accept: "video/*", style: { display: 'none' }, onChange: handleFileChosen }),
