@@ -5123,6 +5123,11 @@ function App() {
     // from directionsSheetBooking (used by service bookings) since a restaurant reservation has no
     // `booking` record to look up, only a restaurant address.
     const [reservationDirectionsAddress, setReservationDirectionsAddress] = useState(null);
+    // Draft for the "Edit contact information" sheet on the reservation review step — holds
+    // { name, phone, email, saveToProfile } while open, null when closed. Editing here only ever
+    // changes THIS reservation's own copy in rsvFlow; saveToProfile additionally writes it back to
+    // the customer's real Bookvado profile.
+    const [rsvContactEditDraft, setRsvContactEditDraft] = useState(null);
     const [rsvPickerPartySize, setRsvPickerPartySize] = useState(2);
     const [rsvPickerDate, setRsvPickerDate] = useState(() => dateKey(new Date()));
     const [rsvPickerArea, setRsvPickerArea] = useState('no-preference');
@@ -8654,13 +8659,20 @@ function App() {
             return;
         }
         setRsvPickerError(null);
+        // Logged-in customers (the only kind this app currently has — the whole app sits behind
+        // `session`) get their real saved contact info attached automatically; a future guest-
+        // checkout path would fall through to the authDraft-identifier guess below instead.
+        const loggedIn = !!session;
         setRsvFlow({ stage: 'loading', restaurantId: restaurant.id, partySize: rsvPickerPartySize, date: rsvPickerDate, area: rsvPickerArea, time: null, duration: null, tableIds: null, isCombo: false, slots: null,
-            name: customerProfile.fullName || '', phone: isPhoneLikeIdentifier(authDraft.identifier || '') ? authDraft.identifier : '', email: !isPhoneLikeIdentifier(authDraft.identifier || '') ? (authDraft.identifier || '') : '',
+            name: loggedIn ? (customerProfile.fullName || '') : '',
+            phone: loggedIn ? (customerProfile.phone || '') : (isPhoneLikeIdentifier(authDraft.identifier || '') ? authDraft.identifier : ''),
+            email: loggedIn ? (customerProfile.email || '') : (!isPhoneLikeIdentifier(authDraft.identifier || '') ? (authDraft.identifier || '') : ''),
             notes: '', editingId: null });
     }
     function closeReservationFlow() {
         setRsvFlow(null);
         setManageReservationOpen(false);
+        setRsvContactEditDraft(null);
     }
     function retryReservationSearch() {
         setRsvFlow((f) => f ? { ...f, stage: 'loading', slots: null } : f);
@@ -8669,6 +8681,23 @@ function App() {
         // Same destination as the back arrow: return to the restaurant page without losing
         // the party size / date / seating the customer already chose (those live outside rsvFlow).
         setRsvFlow(null);
+    }
+    function openRsvContactEdit(f) {
+        setRsvContactEditDraft({ name: f.name, phone: f.phone, email: f.email, saveToProfile: false });
+    }
+    function saveRsvContactEdit() {
+        const d = rsvContactEditDraft;
+        if (!d)
+            return;
+        setRsvFlow((prev) => prev ? { ...prev, name: d.name, phone: d.phone, email: d.email } : prev);
+        // "This reservation and my profile" writes back to the customer's real account record —
+        // never a fake local-only copy — so it's what every other screen reading customerProfile
+        // sees too, not just this one reservation.
+        if (d.saveToProfile) {
+            setCustomerProfile((p) => ({ ...p, fullName: d.name.trim() || p.fullName, phone: d.phone.trim() || p.phone, email: d.email.trim() || p.email }));
+        }
+        setRsvContactEditDraft(null);
+        flashToast(d.saveToProfile ? 'Contact info updated' : 'Updated for this reservation');
     }
     function selectReservationTime(slot) {
         // Stays on the times screen so the customer sees the selected-time checkmark and the
@@ -11861,6 +11890,32 @@ function App() {
                 // ---------- Review / confirm ----------
                 if (f.stage === 'review') {
                     const ready = f.name.trim() && f.phone.trim() && f.email.trim();
+                    // The whole app sits behind a session — every customer reaching this screen is
+                    // logged in today — but this still checks `session` rather than assuming, so a
+                    // future guest-checkout path falls straight through to the full form below.
+                    const loggedIn = !!session;
+                    const missingPhone = loggedIn && !f.phone.trim();
+                    const missingEmail = loggedIn && !f.email.trim();
+                    const contactSection = loggedIn
+                        ? React.createElement(React.Fragment, null,
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, border: `1px solid ${RF.border}` } },
+                                React.createElement("div", { style: { width: 38, height: 38, borderRadius: '50%', background: T.surfaceSecondary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                                    React.createElement(Icon, { name: "user", size: 16, color: RF.sub })),
+                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                    React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, color: RF.sub, textTransform: 'uppercase', letterSpacing: 0.3, margin: 0 } }, "Booking For"),
+                                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: RF.text, margin: '2px 0 0' } }, f.name.trim() || 'Add your name'),
+                                    (f.phone.trim() || f.email.trim()) && React.createElement("p", { style: { fontSize: 11.5, color: RF.sub, marginTop: 2 } }, [f.phone.trim(), f.email.trim()].filter(Boolean).join(' · '))),
+                                React.createElement("button", { onClick: () => openRsvContactEdit(f) }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral } }, "Edit"))),
+                            // Only ever asks for whatever's actually missing from the profile — a
+                            // customer with a saved phone but no email sees just an email field,
+                            // never the full name/phone/email form all over again.
+                            (missingPhone || missingEmail) && React.createElement("div", { style: { marginTop: 10 } },
+                                missingPhone && fieldRow("Phone Number", f.phone, (v) => setRsvFlow((p) => ({ ...p, phone: v }))),
+                                missingEmail && fieldRow("Email", f.email, (v) => setRsvFlow((p) => ({ ...p, email: v })))))
+                        : React.createElement(React.Fragment, null,
+                            fieldRow("Full Name", f.name, (v) => setRsvFlow((p) => ({ ...p, name: v }))),
+                            fieldRow("Phone Number", f.phone, (v) => setRsvFlow((p) => ({ ...p, phone: v }))),
+                            fieldRow("Email", f.email, (v) => setRsvFlow((p) => ({ ...p, email: v }))));
                     const header = React.createElement("div", { style: { flexShrink: 0, position: 'relative', padding: `calc(env(safe-area-inset-top) + 14px) 50px 14px`, textAlign: 'center', borderBottom: `1px solid ${RF.border}` } },
                         React.createElement("button", { onClick: () => setRsvFlow((prev) => ({ ...prev, stage: 'times' })), style: { position: 'absolute', left: 16, top: 'calc(env(safe-area-inset-top) + 12px)', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                             React.createElement(Icon, { name: "arrowleft", size: 20, color: "#161616" })),
@@ -11886,13 +11941,29 @@ function App() {
                             React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: THEME.coral, margin: 0 } }, "No payment required"),
                             React.createElement("p", { style: { fontSize: 11, color: '#5c7a2b', marginTop: 2 } }, "You can modify or cancel later.")),
                         React.createElement("div", { style: { marginTop: 18 } },
-                            fieldRow("Full Name", f.name, (v) => setRsvFlow((p) => ({ ...p, name: v }))),
-                            fieldRow("Phone Number", f.phone, (v) => setRsvFlow((p) => ({ ...p, phone: v }))),
-                            fieldRow("Email", f.email, (v) => setRsvFlow((p) => ({ ...p, email: v }))),
+                            contactSection,
                             React.createElement("label", { style: { fontSize: 11, fontWeight: 700, color: RF.sub, textTransform: 'uppercase', display: 'block', marginTop: 12, marginBottom: 6 } }, "Special Requests (Optional)"),
                             React.createElement("textarea", { value: f.notes, onChange: (e) => setRsvFlow((p) => ({ ...p, notes: e.target.value })), rows: 3, placeholder: "e.g. Birthday dinner, high chair needed", style: { width: '100%', border: `1px solid ${RF.border}`, borderRadius: 12, padding: 12, fontSize: 13, color: RF.text, outline: 'none', resize: 'none', fontFamily: 'inherit' } })),
                         React.createElement("button", { className: "avio-press", disabled: !ready, onClick: confirmReservation, style: { width: '100%', marginTop: 20, padding: '15px 0', borderRadius: 26, background: ready ? THEME.coral : '#EDEDED', color: ready ? '#fff' : '#B5B5B8', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Confirm Reservation"));
-                    return React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 12, display: 'flex', flexDirection: 'column' } }, header, body);
+                    const contactEditModal = rsvContactEditDraft && React.createElement("div", { onClick: () => setRsvContactEditDraft(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
+                        React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '85%', overflowY: 'auto' } },
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 } },
+                                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, margin: 0 } }, "Edit Contact Information"),
+                                React.createElement("button", { onClick: () => setRsvContactEditDraft(null) }, React.createElement(Icon, { name: "x", size: 18, color: "#8A8A8E" }))),
+                            fieldRow("Full Name", rsvContactEditDraft.name, (v) => setRsvContactEditDraft((d) => ({ ...d, name: v }))),
+                            fieldRow("Phone Number", rsvContactEditDraft.phone, (v) => setRsvContactEditDraft((d) => ({ ...d, phone: v }))),
+                            fieldRow("Email", rsvContactEditDraft.email, (v) => setRsvContactEditDraft((d) => ({ ...d, email: v }))),
+                            React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: RF.sub, textTransform: 'uppercase', letterSpacing: 0.3, marginTop: 14, marginBottom: 4 } }, "Use This Change For"),
+                            [{ id: false, label: 'This reservation only', sub: "Don't update my profile" }, { id: true, label: 'This reservation and my profile', sub: 'Update my saved information' }].map((opt) => React.createElement("button", { key: String(opt.id), onClick: () => setRsvContactEditDraft((d) => ({ ...d, saveToProfile: opt.id })), style: { display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', padding: '10px 4px', textAlign: 'left' } },
+                                React.createElement("div", { style: { width: 18, height: 18, borderRadius: '50%', border: `1.5px solid ${rsvContactEditDraft.saveToProfile === opt.id ? THEME.coral : RF.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 } },
+                                    rsvContactEditDraft.saveToProfile === opt.id && React.createElement("div", { style: { width: 10, height: 10, borderRadius: '50%', background: THEME.coral } })),
+                                React.createElement("div", null,
+                                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: RF.text, margin: 0 } }, opt.label),
+                                    React.createElement("p", { style: { fontSize: 11, color: RF.sub, marginTop: 1 } }, opt.sub)))),
+                            React.createElement("button", { className: "avio-press", onClick: saveRsvContactEdit, style: { width: '100%', marginTop: 16, padding: '14px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Save Changes")));
+                    return React.createElement(React.Fragment, null,
+                        React.createElement("div", { className: "avio-auth-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 12, display: 'flex', flexDirection: 'column' } }, header, body),
+                        contactEditModal);
                 }
 
                 // ---------- Confirmed ----------
