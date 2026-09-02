@@ -1385,6 +1385,31 @@ function saveLS(key, value) {
     }
     catch (e) { }
 }
+// Shared by the chat Photos picker (and reusable anywhere else a picked image needs to become a
+// storable data URL): downscales to a sane max dimension and re-encodes as JPEG so a full-
+// resolution phone photo doesn't blow past localStorage's quota after a handful of sends.
+function resizeImageFileToDataUrl(file, maxDim, quality) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error);
+        reader.onload = () => {
+            const img = new Image();
+            img.onerror = () => resolve(reader.result);
+            img.onload = () => {
+                const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+                const w = Math.max(1, Math.round(img.width * scale));
+                const h = Math.max(1, Math.round(img.height * scale));
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
 function idbOpen() {
     return new Promise((resolve, reject) => {
         const req = indexedDB.open('avio-media', 1);
@@ -4198,8 +4223,12 @@ function App() {
             setCalView(dy > 0 ? 'week' : 'month');
         }
     }
-    const [conversations, setConversations] = useState(() => CONVERSATIONS_SEED.map((c) => ({ ...c, messages: c.messages.map((m) => ({ ...m })) })));
-    const [businessConversations, setBusinessConversations] = useState(() => BUSINESS_CONVERSATIONS_SEED.map((c) => ({ ...c, messages: c.messages.map((m) => ({ ...m })) })));
+    const [conversations, setConversations] = useState(() => loadLS('avio_conversations', null) || CONVERSATIONS_SEED.map((c) => ({ ...c, messages: c.messages.map((m) => ({ ...m })) })));
+    const [businessConversations, setBusinessConversations] = useState(() => loadLS('avio_business_conversations', null) || BUSINESS_CONVERSATIONS_SEED.map((c) => ({ ...c, messages: c.messages.map((m) => ({ ...m })) })));
+    // Chat messages (including sent photos) previously vanished on every reload — nothing here was
+    // ever written to localStorage. Persisted the same way customerProfile is.
+    useEffect(() => { saveLS('avio_conversations', conversations); }, [conversations]);
+    useEffect(() => { saveLS('avio_business_conversations', businessConversations); }, [businessConversations]);
     const [activeConversationId, setActiveConversationId] = useState(null);
     const [connectFilter, setConnectFilter] = useState('all');
     const [connectSearch, setConnectSearch] = useState('');
@@ -4218,6 +4247,128 @@ function App() {
             lastQuickActionRef.current = now;
             fn(...args);
         };
+    }
+    // In-chat camera: { status: 'requesting'|'active'|'denied'|'unavailable'|'unsupported'|'error',
+    // error, facing: 'environment'|'user', captured: dataUrl|null, retryToken } | null when closed.
+    // A real getUserMedia camera (not a placeholder) so permission denial is actually detectable —
+    // unlike a plain <input type="file" capture>, which gives no signal at all when the customer
+    // denies access, this mirrors the ticket QR scanner's already-proven permission-state handling.
+    const [chatCamera, setChatCamera] = useState(null);
+    const chatCameraVideoRef = useRef(null);
+    const chatCameraStreamRef = useRef(null);
+    const chatPhotoLibraryInputRef = useRef(null);
+    const [chatImageViewer, setChatImageViewer] = useState(null); // dataUrl | null — full-screen tap-to-view
+    function openChatCamera() {
+        setChatCamera({ status: 'requesting', error: '', facing: 'environment', captured: null, retryToken: 0 });
+    }
+    function closeChatCamera() {
+        if (chatCameraStreamRef.current) {
+            chatCameraStreamRef.current.getTracks().forEach((t) => t.stop());
+            chatCameraStreamRef.current = null;
+        }
+        setChatCamera(null);
+    }
+    function retryChatCamera() {
+        setChatCamera((s) => s ? { ...s, status: 'requesting', error: '', retryToken: s.retryToken + 1 } : s);
+    }
+    function flipChatCamera() {
+        setChatCamera((s) => s ? { ...s, facing: s.facing === 'environment' ? 'user' : 'environment', status: 'requesting', retryToken: s.retryToken + 1 } : s);
+    }
+    // Same "no scriptable way to open OS Settings" reality as the QR scanner's openCameraSettings —
+    // this re-attempts (free, instant, if the customer already flipped the toggle) and otherwise
+    // tells them exactly where to go fix it, rather than pretending to deep-link into Settings.
+    function openChatCameraSettings() {
+        retryChatCamera();
+        flashToast('If prompted, allow camera access. Already blocked? Enable it in your browser or device Settings → Privacy → Camera, then come back.');
+    }
+    useEffect(() => {
+        if (!chatCamera || chatCamera.status !== 'requesting')
+            return;
+        if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+            setChatCamera((s) => s ? { ...s, status: 'unsupported', error: '' } : s);
+            return;
+        }
+        if (!(location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+            setChatCamera((s) => s ? { ...s, status: 'unsupported', error: 'Camera access requires a secure (HTTPS) connection.' } : s);
+            return;
+        }
+        let cancelled = false;
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: chatCamera.facing } }, audio: false })
+            .then((stream) => {
+                if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+                chatCameraStreamRef.current = stream;
+                if (chatCameraVideoRef.current) {
+                    chatCameraVideoRef.current.srcObject = stream;
+                    chatCameraVideoRef.current.play().catch(() => {});
+                }
+                setChatCamera((s) => s ? { ...s, status: 'active' } : s);
+            })
+            .catch((err) => {
+                if (cancelled) return;
+                const name = err && err.name;
+                const status = (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError') ? 'denied'
+                    : (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'DevicesNotFoundError') ? 'unavailable'
+                        : 'error';
+                setChatCamera((s) => s ? { ...s, status, error: (err && err.message) || '' } : s);
+            });
+        return () => {
+            cancelled = true;
+            if (chatCameraStreamRef.current) { chatCameraStreamRef.current.getTracks().forEach((t) => t.stop()); chatCameraStreamRef.current = null; }
+        };
+        // Deliberately NOT depending on chatCamera.status — this must fire once per open/facing-
+        // flip/retry, not every time the status itself changes to 'active' inside the handler
+        // above (which would immediately tear down the stream it just started).
+    }, [!!chatCamera, chatCamera && chatCamera.facing, chatCamera && chatCamera.retryToken]);
+    function captureChatPhoto() {
+        const video = chatCameraVideoRef.current;
+        if (!video || !video.videoWidth)
+            return;
+        const maxDim = 1280;
+        const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
+        const w = Math.round(video.videoWidth * scale), h = Math.round(video.videoHeight * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        // Mirror the preview back for a front-camera selfie so what's captured matches what the
+        // customer just saw on screen, not a left-right-flipped surprise.
+        if (chatCamera && chatCamera.facing === 'user') {
+            ctx.translate(w, 0);
+            ctx.scale(-1, 1);
+        }
+        ctx.drawImage(video, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        if (chatCameraStreamRef.current) {
+            chatCameraStreamRef.current.getTracks().forEach((t) => t.stop());
+            chatCameraStreamRef.current = null;
+        }
+        setChatCamera((s) => s ? { ...s, captured: dataUrl } : s);
+    }
+    function retakeChatPhoto() {
+        setChatCamera((s) => s ? { ...s, captured: null, status: 'requesting', retryToken: s.retryToken + 1 } : s);
+    }
+    // The one place a captured/picked chat photo actually becomes a message — reused by both the
+    // camera's "Use Photo" and the Photos library picker, so the two attachment paths behave
+    // identically once an image is chosen.
+    function attachChatImageMessage(dataUrl) {
+        if (!activeConversationId)
+            return;
+        const setter = accountType === 'business' ? setBusinessConversations : setConversations;
+        setter((prev) => prev.map((c) => c.id === activeConversationId ? { ...c, messages: [...c.messages, { id: 'm' + Date.now(), from: 'me', type: 'image', imageUrl: dataUrl, time: 'Just now' }] } : c));
+    }
+    function useChatPhoto() {
+        const dataUrl = chatCamera && chatCamera.captured;
+        if (!dataUrl)
+            return;
+        attachChatImageMessage(dataUrl);
+        closeChatCamera();
+    }
+    function handleChatPhotoLibraryFile(e) {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = '';
+        if (!file)
+            return;
+        resizeImageFileToDataUrl(file, 1280, 0.82).then(attachChatImageMessage).catch(() => flashToast("Couldn't load that photo."));
     }
     // A tapped time from an in-chat availability card, pending confirmation — { message, minutes,
     // dateObj } | null. Holding the whole message (not just an id) means the confirm sheet always
@@ -11001,6 +11152,16 @@ function App() {
                         React.createElement("p", { style: { textAlign: 'center', fontSize: 11, color: CN.sub, margin: '0 0 4px' } }, "Today"),
                         c.messages.map((m) => {
                             const mine = m.from === 'me';
+                            if (m.type === 'image') {
+                                return React.createElement("div", { key: m.id, style: { display: 'flex', alignItems: 'flex-end', gap: 8, justifyContent: mine ? 'flex-end' : 'flex-start' } },
+                                    !mine && React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', background: c.avatarColor || '#161616', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(c.avatarColor), fontSize: 8.5, fontWeight: 700 } }, c.initials),
+                                    React.createElement("div", { style: { maxWidth: '62%' } },
+                                        React.createElement("button", { onClick: () => setChatImageViewer(m.imageUrl), style: { display: 'block', borderRadius: 16, overflow: 'hidden', border: `1px solid ${CN.border}`, lineHeight: 0 } },
+                                            React.createElement("img", { src: m.imageUrl, style: { width: '100%', maxHeight: 260, objectFit: 'cover', display: 'block' } })),
+                                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, justifyContent: mine ? 'flex-end' : 'flex-start' } },
+                                            React.createElement("span", { style: { fontSize: 10, color: CN.sub } }, m.time),
+                                            mine && React.createElement("span", { style: { fontSize: 10.5, color: THEME.coral, fontWeight: 700 } }, "✓✓"))));
+                            }
                             return React.createElement("div", { key: m.id, style: { display: 'flex', alignItems: 'flex-end', gap: 8, justifyContent: mine ? 'flex-end' : 'flex-start' } },
                                 !mine && React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', background: c.avatarColor || '#161616', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(c.avatarColor), fontSize: 8.5, fontWeight: 700 } }, c.initials),
                                 React.createElement("div", { style: { maxWidth: '74%' } },
@@ -11010,13 +11171,14 @@ function App() {
                                         mine && React.createElement("span", { style: { fontSize: 10.5, color: THEME.coral, fontWeight: 700 } }, "✓✓"))));
                         }));
                     const quickActions = [
-                        { icon: 'camera', label: 'Camera', onClick: () => flashToast('Camera — coming soon') },
-                        { icon: 'image', label: 'Photos', onClick: () => flashToast('Photos — coming soon') },
+                        { icon: 'camera', label: 'Camera', onClick: openChatCamera },
+                        { icon: 'image', label: 'Photos', onClick: () => chatPhotoLibraryInputRef.current && chatPhotoLibraryInputRef.current.click() },
                         { icon: 'mappin', label: 'Location', onClick: () => flashToast('Location shared') },
                         { icon: 'calendar', label: 'Booking', onClick: insertBookingCard },
                         { icon: 'wallet', label: 'Payment', onClick: () => flashToast('Payment — coming soon') },
                     ];
                     const inputArea = React.createElement("div", { style: { flexShrink: 0, borderTop: `1px solid ${CN.border}`, padding: `10px 18px calc(env(safe-area-inset-bottom) + 10px)` } },
+                        React.createElement("input", { ref: chatPhotoLibraryInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleChatPhotoLibraryFile }),
                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
                             React.createElement("button", { onClick: () => flashToast('Attach — coming soon'), style: { width: 30, height: 30, borderRadius: '50%', background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "plus", size: 15, color: T.background })),
                             React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: T.surfaceSecondary, borderRadius: 20, padding: '9px 14px', minWidth: 0 } },
@@ -11110,6 +11272,15 @@ function App() {
                                 React.createElement("p", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 15, fontWeight: 700, color: CN.text, marginTop: 6 } }, money(m.price)),
                                 React.createElement("button", { onClick: () => flashToast('Booking confirmed'), style: { width: '100%', marginTop: 8, padding: '9px 0', borderRadius: 14, background: THEME.coral, color: '#fff', fontSize: 12.5, fontWeight: 700 } }, "Book Now"));
                         }
+                        if (m.type === 'image') {
+                            const mineImg = m.from === 'me';
+                            return React.createElement("div", { key: m.id, style: { alignSelf: mineImg ? 'flex-end' : 'flex-start', maxWidth: '62%' } },
+                                React.createElement("button", { onClick: () => setChatImageViewer(m.imageUrl), style: { display: 'block', borderRadius: 16, overflow: 'hidden', border: `1px solid ${CN.border}`, lineHeight: 0 } },
+                                    React.createElement("img", { src: m.imageUrl, style: { width: '100%', maxHeight: 260, objectFit: 'cover', display: 'block' } })),
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, justifyContent: mineImg ? 'flex-end' : 'flex-start' } },
+                                    React.createElement("span", { style: { fontSize: 10, color: CN.sub } }, m.time),
+                                    mineImg && React.createElement(Icon, { name: "check", size: 10, color: CN.sub })));
+                        }
                         const mine = m.from === 'me';
                         return React.createElement("div", { key: m.id, style: { alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '78%' } },
                             React.createElement("div", { style: { background: mine ? THEME.coral : T.surfaceSecondary, color: mine ? '#fff' : CN.text, borderRadius: 18, padding: '10px 14px', fontSize: 13.5, lineHeight: 1.35 } }, m.text),
@@ -11118,8 +11289,8 @@ function App() {
                                 mine && React.createElement(Icon, { name: "check", size: 10, color: CN.sub })));
                     }));
                 const quickActions = [
-                    { icon: 'camera', label: 'Camera', onClick: () => flashToast('Camera — coming soon') },
-                    { icon: 'image', label: 'Photos', onClick: () => flashToast('Photos — coming soon') },
+                    { icon: 'camera', label: 'Camera', onClick: openChatCamera },
+                    { icon: 'image', label: 'Photos', onClick: () => chatPhotoLibraryInputRef.current && chatPhotoLibraryInputRef.current.click() },
                     { icon: 'mappin', label: 'Location', onClick: () => flashToast('Location shared') },
                     { icon: 'calendar', label: 'Booking', onClick: insertBookingCard },
                     { icon: 'clock', label: 'Times', onClick: insertAvailabilityCard },
@@ -11153,6 +11324,7 @@ function App() {
                             React.createElement("button", { onClick: () => setChatBookingSheet(null), style: { width: '100%', marginTop: 6, padding: '10px 0', textAlign: 'center', fontSize: 13, fontWeight: 600, color: CN.sub } }, "Cancel")));
                 })();
                 const inputArea = React.createElement("div", { style: { flexShrink: 0, borderTop: `1px solid ${CN.border}`, padding: `10px 18px calc(env(safe-area-inset-bottom) + 10px)` } },
+                    React.createElement("input", { ref: chatPhotoLibraryInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleChatPhotoLibraryFile }),
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
                         React.createElement("button", { onClick: () => flashToast('Attach — coming soon'), style: { width: 30, height: 30, borderRadius: '50%', background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "plus", size: 15, color: T.background })),
                         React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: T.surfaceSecondary, borderRadius: 20, padding: '9px 14px', minWidth: 0 } },
@@ -15526,6 +15698,48 @@ function App() {
         // dine-in reservation), resolved once when the sheet is opened, not re-derived here.
         reservationDirectionsAddress && (React.createElement("div", { onClick: () => setReservationDirectionsAddress(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 21 } },
             renderDirectionsSheet(reservationDirectionsAddress, () => setReservationDirectionsAddress(null)))),
+        // In-chat Camera: a real full-screen getUserMedia capture UI (not a placeholder and not
+        // just an <input capture> — that gives no way to detect a denied permission at all), with
+        // its own top-level overlay so it renders above whichever conversation opened it.
+        chatCamera && React.createElement("div", { style: { position: 'absolute', inset: 0, background: '#000', zIndex: 30, display: 'flex', flexDirection: 'column' } },
+            React.createElement("button", { onClick: closeChatCamera, style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 14, zIndex: 2, width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                React.createElement(Icon, { name: "x", size: 18, color: "#fff" })),
+            // The <video> element stays mounted for the camera's whole open/retry/flip lifetime —
+            // it must exist (and keep its ref) BEFORE getUserMedia resolves, since the stream is
+            // attached to it inside that resolution handler; mounting it only once status becomes
+            // 'active' is a chicken-and-egg bug (the ref is still null when the handler needs it).
+            React.createElement("div", { style: { flex: 1, minHeight: 0, position: 'relative' } },
+                React.createElement("video", { ref: chatCameraVideoRef, autoPlay: true, playsInline: true, muted: true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', transform: chatCamera.facing === 'user' ? 'scaleX(-1)' : 'none', display: (chatCamera.status === 'active' && !chatCamera.captured) ? 'block' : 'none' } }),
+                chatCamera.captured && React.createElement("img", { src: chatCamera.captured, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000' } }),
+                !chatCamera.captured && chatCamera.status === 'requesting' && React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement("div", { className: "avio-spin", style: { width: 34, height: 34, borderRadius: '50%', border: '3px solid rgba(255,255,255,0.25)', borderTopColor: THEME.coral } }),
+                    React.createElement("p", { style: { fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 16 } }, "Starting camera…")),
+                !chatCamera.captured && chatCamera.status === 'denied' && React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', textAlign: 'center' } },
+                    React.createElement("div", { style: { width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: "camera", size: 24, color: "#fff" })),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#fff', marginTop: 18 } }, "Camera Access Required"),
+                    React.createElement("p", { style: { fontSize: 12.5, color: 'rgba(255,255,255,0.65)', marginTop: 8, lineHeight: 1.5 } }, "Bookvado needs camera access to take a photo. Enable it for this site, then try again."),
+                    React.createElement("button", { className: "avio-press", onClick: openChatCameraSettings, style: { marginTop: 22, padding: '13px 28px', borderRadius: 22, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 13.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Open Settings"),
+                    React.createElement("button", { onClick: retryChatCamera, style: { marginTop: 10, padding: '10px 20px' } }, React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,0.7)' } }, "Try Again"))),
+                !chatCamera.captured && (chatCamera.status === 'unavailable' || chatCamera.status === 'unsupported' || chatCamera.status === 'error') && React.createElement("div", { style: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', textAlign: 'center' } },
+                    React.createElement(Icon, { name: "warningtriangle", size: 24, color: "#fff" }),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: '#fff', marginTop: 16 } }, chatCamera.status === 'unavailable' ? 'No Camera Found' : chatCamera.status === 'unsupported' ? 'Camera Not Supported' : "Camera Couldn't Start"),
+                    React.createElement("p", { style: { fontSize: 12.5, color: 'rgba(255,255,255,0.65)', marginTop: 8, lineHeight: 1.5 } }, chatCamera.error || 'Please check your device and try again.'),
+                    React.createElement("button", { className: "avio-press", onClick: retryChatCamera, style: { marginTop: 20, padding: '12px 26px', borderRadius: 22, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 13.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Try Again"))),
+            chatCamera.captured
+                ? React.createElement("div", { style: { flexShrink: 0, display: 'flex', gap: 12, padding: `16px 20px calc(env(safe-area-inset-bottom) + 20px)` } },
+                    React.createElement("button", { className: "avio-press", onClick: retakeChatPhoto, style: { flex: 1, padding: '15px 0', borderRadius: 26, background: 'rgba(255,255,255,0.15)', color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Retake"),
+                    React.createElement("button", { className: "avio-press", onClick: useChatPhoto, style: { flex: 1, padding: '15px 0', borderRadius: 26, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Use Photo"))
+                : chatCamera.status === 'active' && React.createElement("div", { style: { flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: `20px 0 calc(env(safe-area-inset-bottom) + 24px)` } },
+                    React.createElement("button", { onClick: flipChatCamera, style: { position: 'absolute', right: 30, width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                        React.createElement(Icon, { name: "refresh", size: 17, color: "#fff" })),
+                    React.createElement("button", { className: "avio-press", onClick: captureChatPhoto, style: { width: 74, height: 74, borderRadius: '50%', border: '4px solid #fff', background: THEME.coral } }))),
+        // Full-screen tap-to-view for any chat photo — camera-captured or picked from Photos —
+        // so "the recipient can view it" isn't just a thumbnail in the bubble.
+        chatImageViewer && React.createElement("div", { onClick: () => setChatImageViewer(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 31, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+            React.createElement("button", { onClick: () => setChatImageViewer(null), style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', right: 14, width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                React.createElement(Icon, { name: "x", size: 18, color: "#fff" })),
+            React.createElement("img", { src: chatImageViewer, style: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' } })),
         businessBookingDetail && (React.createElement("div", { onClick: () => setBusinessBookingDetail(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } }, (() => {
             const b = businessBookingDetail;
             const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
