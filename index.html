@@ -727,9 +727,10 @@ const BOOKING_STATUS_STYLE = {
     pending: { bg: '#EDEDED', color: '#6B6B6B', border: 'none' },
     completed: { bg: '#4A4A4A', color: '#fff', border: 'none' },
     cancelled: { bg: '#fff', color: '#D0304A', border: '1px solid #D0304A' },
+    no_show: { bg: '#fff', color: '#B5891A', border: '1px solid #E0B84D' },
     quote_requested: { bg: '#EDEDED', color: '#6B6B6B', border: 'none' },
 };
-const BOOKING_STATUS_LABEL = { confirmed: 'Confirmed', pending: 'Pending', completed: 'Completed', cancelled: 'Cancelled', quote_requested: 'Quote Requested' };
+const BOOKING_STATUS_LABEL = { confirmed: 'Confirmed', pending: 'Pending', completed: 'Completed', cancelled: 'Cancelled', no_show: 'No Show', quote_requested: 'Quote Requested' };
 // ============================================================================
 // Shared booking lifecycle engine — the single source of truth for whether a
 // booking/reservation is still active or has actually finished. Every screen that
@@ -1155,13 +1156,13 @@ const BUSINESS_INCOMING_BOOKINGS = [
     // ib1/ib3 also carry a mock `insurance` record so the Insurance & Coverage
     // "before the appointment" attention list (healthcare businesses only) has
     // something real to show — the same shape runMockEligibilityCheck() produces.
-    { id: 'ib1', customerName: 'Michael R.', initials: 'MR', service: "Men's Fade", price: 45, time: '10:00 AM', status: 'confirmed', avatarColor: '#000000', dateGroup: 'today',
+    { id: 'ib1', customerName: 'Michael R.', initials: 'MR', service: "Men's Fade", price: 45, time: '10:00 AM', durationMinutes: 60, status: 'confirmed', avatarColor: '#000000', dateGroup: 'today',
         serviceAddress: { street: '88 Bedford Ave', unit: 'Apt 3', city: 'Brooklyn', state: 'NY', zip: '11249', notes: 'Buzzer is broken — please call on arrival.', full: '88 Bedford Ave, Apt 3, Brooklyn, NY 11249', distanceMi: 6.2 }, travelFee: 10,
         insurance: { verificationStatus: 'verified', active: true, carrierName: 'Aetna', planName: 'Choice POS II', memberId: 'W998877234', copay: 30, deductible: 1000, deductibleRemaining: 400, coinsurance: 20, oopMax: 3000, oopRemaining: 1200, referralRequired: false, priorAuthRequired: false } },
-    { id: 'ib2', customerName: 'Sarah M.', initials: 'SM', service: 'Balayage', price: 180, time: '11:30 AM', status: 'confirmed', avatarColor: '#97C400', dateGroup: 'today' },
-    { id: 'ib3', customerName: 'Jessica T.', initials: 'JT', service: 'Hair Color', price: 120, time: '1:00 PM', status: 'pending', avatarColor: '#FFFFFF', dateGroup: 'today',
+    { id: 'ib2', customerName: 'Sarah M.', initials: 'SM', service: 'Balayage', price: 180, time: '11:00 AM', durationMinutes: 45, status: 'confirmed', avatarColor: '#97C400', dateGroup: 'today' },
+    { id: 'ib3', customerName: 'Jessica T.', initials: 'JT', service: 'Hair Color', price: 120, time: '2:00 PM', durationMinutes: 90, status: 'pending', avatarColor: '#FFFFFF', dateGroup: 'today',
         insurance: { verificationStatus: 'needsReview', active: false, carrierName: 'Horizon NJ Health (Medicaid MCO)', planName: null, memberId: 'M445566', copay: null, deductible: null, deductibleRemaining: null, coinsurance: null, oopMax: null, oopRemaining: null, referralRequired: false, priorAuthRequired: false } },
-    { id: 'ib4', customerName: 'David L.', initials: 'DL', service: 'Beard Trim', price: 30, time: '3:30 PM', status: 'confirmed', avatarColor: '#000000', dateGroup: 'today' },
+    { id: 'ib4', customerName: 'David L.', initials: 'DL', service: 'Beard Trim', price: 30, time: '3:30 PM', durationMinutes: 30, status: 'confirmed', avatarColor: '#000000', dateGroup: 'today' },
     { id: 'ib5', customerName: 'Jessica W.', initials: 'JW', service: 'Highlights', price: 150, time: '12:00 PM', status: 'confirmed', avatarColor: '#97C400', dateGroup: 'tomorrow' },
     { id: 'ib6', customerName: 'Anthony M.', initials: 'AM', service: 'Haircut', price: 35, time: '2:00 PM', status: 'confirmed', avatarColor: '#FFFFFF', dateGroup: 'tomorrow' },
     { id: 'ib7', customerName: 'Brian C.', initials: 'BC', service: "Men's Fade", price: 45, time: '4:00 PM', status: 'completed', avatarColor: '#000000', dateGroup: 'past', dateLabel: 'Aug 10' },
@@ -3133,7 +3134,7 @@ const ACCOUNT_TYPE_CARDS = [
     { id: 'personal', title: "I'm a Customer", subtitle: 'Discover & book', desc: 'Scroll services, discover businesses and book what you love.', words: ['WATCH', 'BOOK', 'SHARE'], icon: 'user' },
     { id: 'business', title: "I'm a Business", subtitle: 'Showcase & grow', desc: 'Show your work and turn views into bookings.', words: ['POST', 'BOOK', 'GROW'], icon: 'grid' },
 ];
-const BIZ_CATEGORIES = ['Barber', 'Hair Salon / Hairstylist', 'Nails', 'Lashes', 'Makeup', 'Beauty', 'Tattoo / Piercing', 'Fitness / Personal Training', 'Healthcare / Medical', 'Photography / Videography', 'DJ / Events', 'Auto Services', 'Cleaning', 'Home Services', 'Real Estate', 'Rentals', 'Other'];
+const BIZ_CATEGORIES = ['Barber', 'Hair Salon / Hairstylist', 'Nails', 'Lashes', 'Makeup', 'Beauty', 'Tattoo / Piercing', 'Fitness / Personal Training', 'Healthcare / Medical', 'Photography / Videography', 'DJ / Events', 'Restaurant', 'Sports Team / Venue', 'Auto Services', 'Cleaning', 'Home Services', 'Real Estate', 'Rentals', 'Other'];
 const HEALTHCARE_CATEGORY = 'Healthcare / Medical';
 const BIZ_SERVICES_BY_CATEGORY = {
     'Barber': ['Haircut', 'Skin Fade', 'Beard Trim', 'Lineup', 'Kids Cut', 'Haircut + Beard', 'Other'],
@@ -3147,6 +3148,8 @@ const BIZ_SERVICES_BY_CATEGORY = {
     'Healthcare / Medical': ['Individual Therapy', 'Couples / Family Therapy', 'Psychiatric Evaluation', 'Medication Management', 'Physical Therapy Session', 'Primary Care Visit', 'Specialist Consultation', 'Telehealth Visit', 'Other'],
     'Photography / Videography': ['Portrait Session', 'Event Coverage', 'Product Shoot', 'Video Edit', 'Other'],
     'DJ / Events': ['Wedding DJ', 'Club Set', 'Private Party', 'MC Services', 'Other'],
+    'Restaurant': ['Dine-In', 'Takeout', 'Catering', 'Private Events', 'Other'],
+    'Sports Team / Venue': ['Ticketed Event', 'Private Booking', 'Group Sales', 'Other'],
     'Auto Services': ['Detailing', 'Oil Change', 'Tire Service', 'Car Wash', 'Other'],
     'Cleaning': ['Standard Clean', 'Deep Clean', 'Move-In / Move-Out', 'Office Cleaning', 'Other'],
     'Home Services': ['Handyman', 'Plumbing', 'Electrical', 'Landscaping', 'Other'],
@@ -3154,6 +3157,69 @@ const BIZ_SERVICES_BY_CATEGORY = {
     'Rentals': ['Equipment Rental', 'Venue Rental', 'Vehicle Rental', 'Other'],
     'Other': ['Other'],
 };
+// ---------------------------------------------------------------------------
+// Business-type capability system — the single source of truth for what a
+// business dashboard shows. Every business maps (via its onboarding category,
+// with an explicit override for the handful that need one) to exactly one
+// underlying dashboard "shape" (`BUSINESS_TYPE_DEFS`), which decides which
+// capabilities are on (menu vs services, tables vs staff, tickets vs
+// appointments, ...) and what to CALL each of those things. A nail salon and
+// a barbershop share the same `appointment` shape but call their people and
+// their offerings different things — that per-category vocabulary layers on
+// top of the shape's base terminology in `BUSINESS_CATEGORY_OVERRIDES`.
+// Nothing in the dashboard should hardcode a business-type check directly
+// against `category` — always go through getBusinessCapabilities/
+// getBusinessTerminology so a new category only ever needs one entry here.
+const BUSINESS_TYPE_DEFS = {
+    appointment: {
+        id: 'appointment', label: 'Service Business',
+        capabilities: { appointments: true, services: true, staff: true, tips: true, menu: false, tables: false, reservations: false, tickets: false, events: false, ticketScanner: false, insurance: false, providers: false },
+        terminology: { services: 'Services', service: 'Service', staff: 'Staff', staffSingular: 'Staff Member', appointments: 'Appointments', appointment: 'Appointment', calendar: 'Calendar' },
+    },
+    restaurant: {
+        id: 'restaurant', label: 'Restaurant',
+        capabilities: { appointments: false, services: false, staff: true, tips: true, menu: true, tables: true, reservations: true, tickets: false, events: false, ticketScanner: false, insurance: false, providers: false },
+        terminology: { services: 'Menu', service: 'Menu Item', staff: 'Staff', staffSingular: 'Staff Member', appointments: 'Reservations', appointment: 'Reservation', calendar: 'Reservations Calendar' },
+    },
+    doctor: {
+        id: 'doctor', label: 'Healthcare Provider',
+        capabilities: { appointments: true, services: true, staff: true, tips: false, menu: false, tables: false, reservations: false, tickets: false, events: false, ticketScanner: false, insurance: true, providers: true },
+        terminology: { services: 'Appointment Types', service: 'Appointment Type', staff: 'Providers', staffSingular: 'Provider', appointments: 'Appointments', appointment: 'Appointment', calendar: 'Calendar' },
+    },
+    venue: {
+        id: 'venue', label: 'Venue / Sports Team',
+        capabilities: { appointments: false, services: false, staff: false, tips: false, menu: false, tables: false, reservations: false, tickets: true, events: true, ticketScanner: true, insurance: false, providers: false },
+        terminology: { services: 'Events', service: 'Event', staff: 'Staff', staffSingular: 'Staff Member', appointments: 'Events', appointment: 'Event', calendar: 'Events Calendar' },
+    },
+};
+// Keyed by the exact BIZ_CATEGORIES string. `typeId` picks the underlying shape (defaults to
+// 'appointment' when omitted); `terminology` layers on top of that shape's base vocabulary.
+const BUSINESS_CATEGORY_OVERRIDES = {
+    'Barber': { terminology: { staff: 'Barbers', staffSingular: 'Barber' } },
+    'Hair Salon / Hairstylist': { terminology: { staff: 'Stylists', staffSingular: 'Stylist' } },
+    'Nails': { terminology: { staff: 'Technicians', staffSingular: 'Technician' } },
+    'Lashes': { terminology: { staff: 'Technicians', staffSingular: 'Technician' } },
+    'Makeup': { terminology: { staff: 'Artists', staffSingular: 'Artist' } },
+    'Tattoo / Piercing': { terminology: { staff: 'Artists', staffSingular: 'Artist' } },
+    'Fitness / Personal Training': { terminology: { staff: 'Trainers', staffSingular: 'Trainer' } },
+    'Photography / Videography': { terminology: { staff: 'Creatives', staffSingular: 'Photographer' } },
+    'DJ / Events': { terminology: { staff: 'Talent', staffSingular: 'Performer' } },
+    'Healthcare / Medical': { typeId: 'doctor' },
+    'Restaurant': { typeId: 'restaurant' },
+    'Sports Team / Venue': { typeId: 'venue' },
+};
+function getBusinessTypeId(category) {
+    const o = BUSINESS_CATEGORY_OVERRIDES[category];
+    return (o && o.typeId) || 'appointment';
+}
+function getBusinessCapabilities(category) {
+    return BUSINESS_TYPE_DEFS[getBusinessTypeId(category)].capabilities;
+}
+function getBusinessTerminology(category) {
+    const base = BUSINESS_TYPE_DEFS[getBusinessTypeId(category)].terminology;
+    const override = (BUSINESS_CATEGORY_OVERRIDES[category] || {}).terminology;
+    return override ? { ...base, ...override } : base;
+}
 const BIZ_LOCATION_MODES = ['At my business location', 'I travel to customers', 'Online / Virtual', 'All'];
 const BIZ_PAYOUT_METHODS = ['Bank Account', 'Debit Card', 'PayPal'];
 const BIZ_PROOF_OPTIONS = [
@@ -3539,7 +3605,7 @@ function App() {
     const [showSplash, setShowSplash] = useState(true);
     const [authView, setAuthView] = useState('welcome');
     const [authDraft, setAuthDraft] = useState({ firstName: '', lastName: '', identifier: '', password: '', otp: ['', '', '', '', '', ''] });
-    const [bizOnboarding, setBizOnboarding] = useState(() => loadLS('avio_biz_onboarding', { businessName: '', category: '', subcategory: '', services: [], locationMode: '', address: '', serviceArea: '', description: '', phone: '', email: '', photo: null, paymentAcceptance: '' }));
+    const [bizOnboarding, setBizOnboarding] = useState(() => loadLS('avio_biz_onboarding', { businessName: '', category: '', subcategory: '', services: [], locationMode: '', address: '', serviceArea: '', description: '', phone: '', email: '', photo: null, coverPhoto: null, gallery: [], website: '', social: { instagram: '', tiktok: '' }, paymentAcceptance: '' }));
     useEffect(() => { saveLS('avio_biz_onboarding', bizOnboarding); }, [bizOnboarding]);
     const [bizCategoryPickerOpen, setBizCategoryPickerOpen] = useState(false);
     const [bizCategorySearch, setBizCategorySearch] = useState('');
@@ -5330,7 +5396,13 @@ function App() {
         const t = setTimeout(() => recordAiRecentSearch(q), 900);
         return () => clearTimeout(t);
     }, [homeSearchDebounced]);
-    const [businessType, setBusinessType] = useState('service');
+    // Persisted (previously reset to 'service' on every reload, silently losing "Restaurant
+    // mode" — the one real toggle a business could set). Defaults from the onboarding category
+    // via the capability system rather than always starting at 'service', so a business that
+    // onboarded as "Restaurant" (or any category the capability system maps to 'restaurant')
+    // opens in the right mode the very first time, with no manual toggle needed.
+    const [businessType, setBusinessType] = useState(() => loadLS('avio_business_type', null) || (getBusinessTypeId(bizOnboarding.category) === 'restaurant' ? 'restaurant' : 'service'));
+    useEffect(() => { saveLS('avio_business_type', businessType); }, [businessType]);
     const [restaurantDashboardOpen, setRestaurantDashboardOpen] = useState(false);
     const [restaurantDashTab, setRestaurantDashTab] = useState('overview');
     const [restaurantReservations, setRestaurantReservations] = useState(() => loadLS('avio_restaurant_reservations', []));
@@ -5380,7 +5452,10 @@ function App() {
     const [editBusinessProfileOpen, setEditBusinessProfileOpen] = useState(false);
     const [editProfileDraft, setEditProfileDraft] = useState(null);
     const [editProfileDiscardConfirm, setEditProfileDiscardConfirm] = useState(false);
+    const [editProfileCategoryPickerOpen, setEditProfileCategoryPickerOpen] = useState(false);
     const editProfilePhotoInputRef = useRef(null);
+    const editProfileCoverInputRef = useRef(null);
+    const editProfileGalleryInputRef = useRef(null);
     const [bizDraftsOpen, setBizDraftsOpen] = useState(false);
     const [bizProfileTab, setBizProfileTab] = useState('videos');
     const [postViewer, setPostViewer] = useState(null);
@@ -5629,9 +5704,25 @@ function App() {
     const [providerServices, setProviderServices] = useState(() => loadLS('avio_provider_services', DEFAULT_MY_SERVICES));
     const [providerWeeklyHours, setProviderWeeklyHours] = useState(() => loadLS('avio_provider_weekly_hours', DEFAULT_WEEKLY_HOURS));
     const [providerDateOverrides, setProviderDateOverrides] = useState(() => loadLS('avio_provider_date_overrides', {}));
-    const [providerBreaks, setProviderBreaks] = useState(() => loadLS('avio_provider_breaks', []));
+    const [providerBreaks, setProviderBreaks] = useState(() => loadLS('avio_provider_breaks', [
+        { id: 'break-lunch-default', name: 'Lunch Break', start: '12:00', end: '13:00', days: [1, 2, 3, 4, 5] },
+    ]));
     const [providerUnavailable, setProviderUnavailable] = useState(() => loadLS('avio_provider_unavailable', []));
     const [providerTimeOff, setProviderTimeOff] = useState(() => loadLS('avio_provider_time_off', []));
+    // Booking policy rules — separate from Hours & Availability (which controls WHEN the
+    // business is open) and from the live schedule/calendar (which controls WHAT's already on
+    // it). This is the "how far ahead / how last-minute" policy layer.
+    const [providerBookingRules, setProviderBookingRules] = useState(() => loadLS('avio_provider_booking_rules', {
+        minNoticeHours: 2, maxAdvanceDays: 60, sameDayAllowed: true, bufferMinutes: 0, cancellationCutoffHours: 24,
+    }));
+    useEffect(() => { saveLS('avio_provider_booking_rules', providerBookingRules); }, [providerBookingRules]);
+    const [bookingSettingsOpen, setBookingSettingsOpen] = useState(false);
+    const [payoutSettingsOpen, setPayoutSettingsOpen] = useState(false);
+    // Decoupled from `bizVerify.payoutMethod` (which is onboarding-flow-only state that was
+    // never persisted) so post-onboarding payout changes made from Manage Business actually
+    // survive a reload.
+    const [providerPayoutMethod, setProviderPayoutMethod] = useState(() => loadLS('avio_provider_payout_method', 'Bank Account'));
+    useEffect(() => { saveLS('avio_provider_payout_method', providerPayoutMethod); }, [providerPayoutMethod]);
     useEffect(() => { saveLS('avio_provider_breaks', providerBreaks); }, [providerBreaks]);
     useEffect(() => { saveLS('avio_provider_unavailable', providerUnavailable); }, [providerUnavailable]);
     useEffect(() => { saveLS('avio_provider_time_off', providerTimeOff); }, [providerTimeOff]);
@@ -5657,6 +5748,13 @@ function App() {
     useEffect(() => { saveLS('avio_provider_staff', providerStaff); }, [providerStaff]);
     const [businessBookings, setBusinessBookings] = useState(BUSINESS_INCOMING_BOOKINGS);
     const [businessBookingDetail, setBusinessBookingDetail] = useState(null);
+    // The Today's Schedule hero card's "OPEN TIME" tap target — { startMin, endMin } for
+    // whichever gap was tapped, or null when the sheet is closed. Feeds both the quick actions
+    // sheet (Add Booking / Block Time / Change Availability) and the manual Add Booking form's
+    // default time.
+    const [openSlotSheet, setOpenSlotSheet] = useState(null);
+    const [addBookingDraft, setAddBookingDraft] = useState(null); // { customerName, phone, serviceId, timeMinutes }
+    const [businessTypePromptDismissed, setBusinessTypePromptDismissed] = useState(() => loadLS('avio_business_type_prompt_dismissed', false));
     // Reconciles booking/reservation status against the shared lifecycle engine and PERSISTS
     // the result into state — not just a display-time trick. Only ever writes a status the
     // engine itself would derive, so running this repeatedly is a no-op once everything is
@@ -5735,6 +5833,12 @@ function App() {
             setBusinessBookingDetail(fresh);
     }, [businessBookings, businessBookingDetail]);
     const [businessCalendarDay, setBusinessCalendarDay] = useState(() => new Date().getDate());
+    // Full Calendar screen state — a real Day/Week/Month view over the business's own schedule
+    // (hours, breaks, blocked time, businessBookings), replacing the old always-on-this-month,
+    // taps-only-work-on-today's-date-number calendar.
+    const [providerCalendarMode, setProviderCalendarMode] = useState('month'); // 'day' | 'week' | 'month'
+    const [providerCalendarAnchorDate, setProviderCalendarAnchorDate] = useState(() => new Date());
+    const [providerCalendarStaffFilter, setProviderCalendarStaffFilter] = useState(null); // staff id, or null = all staff
     const [earningsInsightsOpen, setEarningsInsightsOpen] = useState(false);
     const [earningsPeriod, setEarningsPeriod] = useState('7D');
     const [earningsTab, setEarningsTab] = useState('overview');
@@ -6006,7 +6110,32 @@ function App() {
     function updateBusinessBookingStatus(id, status) {
         setBusinessBookings((prev) => prev.map((b) => b.id === id ? { ...b, status } : b));
         setBusinessBookingDetail((prev) => prev && prev.id === id ? { ...prev, status } : prev);
-        flashToast(status === 'completed' ? 'Marked as completed' : 'Booking cancelled');
+        const toastByStatus = { completed: 'Marked as completed', cancelled: 'Booking cancelled', no_show: 'Marked as no-show' };
+        flashToast(toastByStatus[status] || 'Booking updated');
+    }
+    // Opens the manual Add Booking form pre-filled to the tapped-open slot's start time — the
+    // one write path a business owner has for putting a walk-in/phone booking directly onto
+    // their own schedule, writing straight into `businessBookings` (the same pool the whole
+    // dashboard already reads for "today's" appointments).
+    function openAddBookingFromSlot(startMin) {
+        const firstService = providerServices[0];
+        setAddBookingDraft({ customerName: '', phone: '', serviceId: firstService ? firstService.id : null, timeMinutes: startMin });
+        setOpenSlotSheet(null);
+    }
+    function saveAddBookingDraft() {
+        const d = addBookingDraft;
+        if (!d || !d.customerName.trim())
+            return;
+        const svc = providerServices.find((s) => s.id === d.serviceId);
+        const initials = d.customerName.trim().split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
+        const newBooking = {
+            id: 'manual-' + bvNonce(), customerName: d.customerName.trim(), initials, phone: d.phone.trim(),
+            service: svc ? svc.name : 'Appointment', price: svc ? (svc.price || 0) : 0, durationMinutes: svc ? (svc.durationMinutes || 45) : 45,
+            time: minutesToTimeLabel(d.timeMinutes), status: 'confirmed', avatarColor: THEME.violet, dateGroup: 'today',
+        };
+        setBusinessBookings((prev) => [...prev, newBooking]);
+        setAddBookingDraft(null);
+        flashToast('Booking added');
     }
     const CANCEL_FLOW_STEPS = ['select', 'confirm', 'reason', 'review', 'success'];
     const [cancelFlowOpen, setCancelFlowOpen] = useState(false);
@@ -8071,8 +8200,8 @@ function App() {
     function addOrUpdateStaff(draft) {
         setProviderStaff((prev) => {
             if (draft.id)
-                return prev.map((s) => s.id === draft.id ? { ...s, name: draft.name, customHours: draft.customHours } : s);
-            return [...prev, { id: 'staff' + Date.now(), name: draft.name, customHours: draft.customHours }];
+                return prev.map((s) => s.id === draft.id ? { ...s, name: draft.name, role: draft.role, serviceIds: draft.serviceIds, customHours: draft.customHours } : s);
+            return [...prev, { id: 'staff' + Date.now(), name: draft.name, role: draft.role, serviceIds: draft.serviceIds, customHours: draft.customHours }];
         });
         setStaffFormDraft(null);
     }
@@ -8827,6 +8956,96 @@ function App() {
     function getMyRestaurant() {
         return feed.find((f) => f.id === RESTAURANT_ID);
     }
+    // The dashboard's own effective type: the legacy `businessType` manual toggle ('restaurant')
+    // wins when set (it's how a business flips into Restaurant mode today), otherwise it falls
+    // through to whatever the onboarding category maps to — so a healthcare/venue/etc. business
+    // gets its correct dashboard shape with no manual step at all.
+    function getMyBusinessTypeId() {
+        return businessType === 'restaurant' ? 'restaurant' : getBusinessTypeId(bizOnboarding.category);
+    }
+    function getMyBusinessCapabilities() {
+        return BUSINESS_TYPE_DEFS[getMyBusinessTypeId()].capabilities;
+    }
+    function getMyBusinessTerminology() {
+        const base = BUSINESS_TYPE_DEFS[getMyBusinessTypeId()].terminology;
+        const override = businessType !== 'restaurant' ? (BUSINESS_CATEGORY_OVERRIDES[bizOnboarding.category] || {}).terminology : null;
+        return override ? { ...base, ...override } : base;
+    }
+    // Builds one day's real schedule as an ordered timeline of bookings, breaks, blocked time,
+    // and the open gaps between them — the data behind both the dashboard's "Today's Schedule"
+    // hero card and the Full Calendar's day view, so the two are never two different sources of
+    // truth for the same day. Reuses the same hours/breaks/blocked-time state the Hours &
+    // Availability screen edits (getProviderHoursForDate, providerBreaks, providerUnavailable);
+    // reads bookings from `businessBookings` (the owner-side incoming-bookings pool this
+    // dashboard already shows everywhere else) via the shared getBookingDate() so "today" /
+    // "tomorrow" / dated-past entries all place correctly, not the customer-side `bookings`
+    // state. `staffId` optionally narrows to one staff member's own schedule.
+    function computeScheduleTimelineForDate(dateObj, staffId) {
+        const rawHours = getProviderHoursForDate(MY_PROVIDER_ID, dateObj);
+        if (!rawHours || !rawHours.length)
+            return { closed: true, segments: [] };
+        const dow = dateObj.getDay();
+        const dayKey = dateKey(dateObj);
+        const busy = [];
+        providerBreaks.forEach((br) => {
+            if (br.days.includes(dow))
+                busy.push({ type: 'break', label: br.name || 'Break', startMin: timeStrToMinutes(br.start), endMin: timeStrToMinutes(br.end) });
+        });
+        providerUnavailable.forEach((u) => {
+            const matches = u.repeat === 'daily' ? dayKey >= u.date
+                : u.repeat === 'weekly' ? (dayKey >= u.date && dow === new Date(u.date + 'T00:00:00').getDay())
+                    : dayKey === u.date;
+            if (matches)
+                busy.push({ type: 'blocked', label: u.reason || 'Blocked', startMin: timeStrToMinutes(u.start), endMin: timeStrToMinutes(u.end) });
+        });
+        businessBookings.filter((b) => (b.status === 'confirmed' || b.status === 'pending') && dateKey(getBookingDate(b)) === dayKey && (!staffId || b.staffId === staffId)).forEach((b) => {
+            const svc = providerServices.find((s) => s.name === b.service);
+            const durationMinutes = b.durationMinutes || (svc && svc.durationMinutes) || 45;
+            const startMin = timeLabelToMinutes(b.time);
+            busy.push({ type: 'booking', booking: b, label: b.service, durationMinutes, startMin, endMin: startMin + durationMinutes });
+        });
+        busy.sort((a, b) => a.startMin - b.startMin);
+        const timeline = [];
+        rawHours.forEach((range) => {
+            let cursor = timeStrToMinutes(range.start);
+            const rangeEnd = timeStrToMinutes(range.end);
+            busy.filter((s) => s.startMin < rangeEnd && s.endMin > cursor).forEach((s) => {
+                if (s.startMin > cursor)
+                    timeline.push({ type: 'open', startMin: cursor, endMin: s.startMin });
+                timeline.push(s);
+                cursor = Math.max(cursor, s.endMin);
+            });
+            if (cursor < rangeEnd)
+                timeline.push({ type: 'open', startMin: cursor, endMin: rangeEnd });
+        });
+        return { closed: false, segments: timeline };
+    }
+    function computeTodaysScheduleTimeline() {
+        return computeScheduleTimelineForDate(new Date());
+    }
+    // Generalizes the restaurant dashboard's setup checklist to any business type — driven by
+    // the same capability flags everything else on the dashboard uses, so a nail salon is never
+    // asked to set up a menu and a restaurant is never asked to add services.
+    function computeBusinessSetupProgress() {
+        const caps = getMyBusinessCapabilities();
+        const items = [
+            { label: 'Business name', done: !!bizOnboarding.businessName.trim() },
+            { label: 'Business category', done: !!bizOnboarding.category },
+            { label: 'Address', done: !!bizOnboarding.address.trim() },
+            { label: 'Hours', done: Object.values(providerWeeklyHours || {}).some((h) => h) },
+        ];
+        if (caps.services)
+            items.push({ label: 'Services', done: providerServices.length > 0 });
+        if (caps.menu) {
+            const r = getMyRestaurant();
+            items.push({ label: 'Menu', done: !!(r && r.menu && r.menu.categories && r.menu.categories.some((c) => (c.items || []).length > 0)) });
+        }
+        if (caps.staff)
+            items.push({ label: getMyBusinessTerminology().staff, done: providerStaff.length > 0 });
+        items.push({ label: 'Business photo', done: !!bizOnboarding.photo });
+        items.push({ label: 'Payouts connected', done: bizOnboarding.paymentAcceptance !== '' && bizOnboarding.paymentAcceptance != null });
+        return items;
+    }
     function updateMyRestaurant(patch) {
         setFeed((prev) => prev.map((f) => f.id === RESTAURANT_ID ? { ...f, ...(typeof patch === 'function' ? patch(f) : patch) } : f));
     }
@@ -9377,6 +9596,10 @@ function App() {
             phone: bizOnboarding.phone || '',
             email: bizOnboarding.email || '',
             photo: bizOnboarding.photo || null,
+            coverPhoto: bizOnboarding.coverPhoto || null,
+            gallery: bizOnboarding.gallery || [],
+            website: bizOnboarding.website || '',
+            social: { instagram: '', tiktok: '', ...(bizOnboarding.social || {}) },
         });
         setEditProfileDiscardConfirm(false);
         setEditBusinessProfileOpen(true);
@@ -9390,7 +9613,11 @@ function App() {
             || editProfileDraft.description !== (bizOnboarding.description || '')
             || editProfileDraft.phone !== (bizOnboarding.phone || '')
             || editProfileDraft.email !== (bizOnboarding.email || '')
-            || editProfileDraft.photo !== (bizOnboarding.photo || null);
+            || editProfileDraft.photo !== (bizOnboarding.photo || null)
+            || editProfileDraft.coverPhoto !== (bizOnboarding.coverPhoto || null)
+            || JSON.stringify(editProfileDraft.gallery) !== JSON.stringify(bizOnboarding.gallery || [])
+            || editProfileDraft.website !== (bizOnboarding.website || '')
+            || JSON.stringify(editProfileDraft.social) !== JSON.stringify({ instagram: '', tiktok: '', ...(bizOnboarding.social || {}) });
     }
     function closeEditBusinessProfile(force) {
         if (!force && isEditProfileDirty()) {
@@ -9412,6 +9639,10 @@ function App() {
             phone: editProfileDraft.phone.trim(),
             email: editProfileDraft.email.trim(),
             photo: editProfileDraft.photo,
+            coverPhoto: editProfileDraft.coverPhoto,
+            gallery: editProfileDraft.gallery,
+            website: editProfileDraft.website.trim(),
+            social: editProfileDraft.social,
         };
         setBizOnboarding((prev) => ({ ...prev, ...updated }));
         // businessProfileTarget is a point-in-time snapshot captured when the profile was
@@ -9433,6 +9664,27 @@ function App() {
         reader.onload = () => setEditProfileDraft((d) => ({ ...d, photo: reader.result }));
         reader.readAsDataURL(file);
         e.target.value = '';
+    }
+    function handleEditProfileCoverFile(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file)
+            return;
+        const reader = new FileReader();
+        reader.onload = () => setEditProfileDraft((d) => ({ ...d, coverPhoto: reader.result }));
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    }
+    function handleEditProfileGalleryFile(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file)
+            return;
+        const reader = new FileReader();
+        reader.onload = () => setEditProfileDraft((d) => ({ ...d, gallery: [...d.gallery, reader.result] }));
+        reader.readAsDataURL(file);
+        e.target.value = '';
+    }
+    function removeEditProfileGalleryPhoto(index) {
+        setEditProfileDraft((d) => ({ ...d, gallery: d.gallery.filter((_, i) => i !== index) }));
     }
     function openCustomerProfile() {
         setProviderDashboardOpen(false);
@@ -12230,8 +12482,14 @@ function App() {
                 React.createElement("button", { onClick: () => closeEditBusinessProfile(false) }, React.createElement(Icon, { name: "arrowleft", size: 18, color: EP.text })),
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15.5, color: EP.text, margin: 0 } }, "Edit Profile"),
                 React.createElement("button", { disabled: !d.businessName.trim(), onClick: saveBusinessProfile, style: { fontSize: 14, fontWeight: 700, color: d.businessName.trim() ? THEME.coral : '#C7C7CC' } }, "Save"));
+            const coverSection = React.createElement("div", { style: { padding: '0' } },
+                React.createElement("button", { onClick: () => editProfileCoverInputRef.current && editProfileCoverInputRef.current.click(), style: { width: '100%', height: 110, position: 'relative', background: d.coverPhoto ? undefined : '#F0F0F2', backgroundImage: d.coverPhoto ? `url(${d.coverPhoto})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center' } },
+                    React.createElement("div", { style: { position: 'absolute', right: 12, bottom: 12, display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 14, background: 'rgba(0,0,0,0.55)' } },
+                        React.createElement(Icon, { name: "camera", size: 13, color: "#fff" }),
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: '#fff' } }, "Cover Photo"))),
+                React.createElement("input", { ref: editProfileCoverInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleEditProfileCoverFile }));
             const photoSection = React.createElement("div", { style: { padding: '20px 18px 0' } },
-                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: EP.text, margin: '0 0 14px' } }, "Profile Photo"),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: EP.text, margin: '0 0 14px' } }, "Logo"),
                 React.createElement("button", { onClick: () => editProfilePhotoInputRef.current && editProfilePhotoInputRef.current.click(), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '4px 0 20px', borderBottom: `1px solid ${EP.border}` } },
                     d.photo
                         ? React.createElement("div", { style: { width: 56, height: 56, borderRadius: '50%', backgroundImage: `url(${d.photo})`, backgroundSize: 'cover', backgroundPosition: 'center', flexShrink: 0 } })
@@ -12239,12 +12497,21 @@ function App() {
                     React.createElement("span", { style: { flex: 1, textAlign: 'left', fontSize: 13.5, fontWeight: 600, color: THEME.coral } }, "Tap to change photo"),
                     React.createElement(Icon, { name: "chevronright", size: 15, color: '#C7C7CC' })),
                 React.createElement("input", { ref: editProfilePhotoInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleEditProfilePhotoFile }));
+            const gallerySection = React.createElement("div", { style: { padding: '20px 18px 0' } },
+                sectionTitle("Photo Gallery"),
+                React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 10, overflowX: 'auto' } },
+                    d.gallery.map((src, i) => React.createElement("div", { key: i, style: { position: 'relative', width: 76, height: 76, borderRadius: 14, flexShrink: 0, backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center' } },
+                        React.createElement("button", { onClick: () => removeEditProfileGalleryPhoto(i), style: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, background: '#161616', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' } }, React.createElement(Icon, { name: "x", size: 11, color: "#fff" })))),
+                    React.createElement("button", { onClick: () => editProfileGalleryInputRef.current && editProfileGalleryInputRef.current.click(), style: { width: 76, height: 76, borderRadius: 14, flexShrink: 0, border: `1.5px dashed ${THEME.coral}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "plus", size: 20, color: THEME.coral }))),
+                React.createElement("input", { ref: editProfileGalleryInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleEditProfileGalleryFile }));
             const businessInfoSection = React.createElement("div", { style: { padding: '0 18px' } },
                 sectionTitle("Business Information"),
                 React.createElement("div", { style: { marginBottom: 16 } }, fieldLabel("Business Name"),
                     React.createElement("input", { value: d.businessName, onChange: (e) => setEditProfileDraft({ ...d, businessName: e.target.value }), placeholder: "My Business", style: inputStyleEP })),
-                React.createElement("div", { style: { marginBottom: 16 } }, fieldLabel("Category"),
-                    React.createElement("input", { value: d.category, onChange: (e) => setEditProfileDraft({ ...d, category: e.target.value }), placeholder: "e.g. Barber Shop", style: inputStyleEP })),
+                React.createElement("div", { style: { marginBottom: 16 } }, fieldLabel("Business Type"),
+                    React.createElement("button", { onClick: () => setEditProfileCategoryPickerOpen(true), style: { ...inputStyleEP, display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' } },
+                        React.createElement("span", { style: { color: d.category ? EP.text : '#B5B5B8' } }, d.category || 'Choose a business type'),
+                        React.createElement(Icon, { name: "chevronright", size: 14, color: '#C7C7CC' }))),
                 React.createElement("div", { style: { marginBottom: 16 } }, fieldLabel("Subcategory"),
                     React.createElement("input", { value: d.subcategory, onChange: (e) => setEditProfileDraft({ ...d, subcategory: e.target.value }), placeholder: "e.g. Men's Haircuts", style: inputStyleEP })),
                 React.createElement("div", { style: { marginBottom: 4 } }, fieldLabel("Description"),
@@ -12254,8 +12521,16 @@ function App() {
                 sectionTitle("Contact Information"),
                 React.createElement("div", { style: { marginBottom: 16 } }, fieldLabel("Phone Number"),
                     React.createElement("input", { type: "tel", value: d.phone, onChange: (e) => setEditProfileDraft({ ...d, phone: e.target.value }), placeholder: "(555) 123-4567", style: inputStyleEP })),
-                React.createElement("div", { style: { marginBottom: 4 } }, fieldLabel("Email"),
-                    React.createElement("input", { type: "email", value: d.email, onChange: (e) => setEditProfileDraft({ ...d, email: e.target.value }), placeholder: "mybusiness@email.com", style: inputStyleEP })));
+                React.createElement("div", { style: { marginBottom: 16 } }, fieldLabel("Email"),
+                    React.createElement("input", { type: "email", value: d.email, onChange: (e) => setEditProfileDraft({ ...d, email: e.target.value }), placeholder: "mybusiness@email.com", style: inputStyleEP })),
+                React.createElement("div", { style: { marginBottom: 4 } }, fieldLabel("Website"),
+                    React.createElement("input", { value: d.website, onChange: (e) => setEditProfileDraft({ ...d, website: e.target.value }), placeholder: "www.mybusiness.com", style: inputStyleEP })));
+            const socialSection = React.createElement("div", { style: { padding: '0 18px' } },
+                sectionTitle("Social Links"),
+                React.createElement("div", { style: { marginBottom: 16 } }, fieldLabel("Instagram"),
+                    React.createElement("input", { value: d.social.instagram, onChange: (e) => setEditProfileDraft({ ...d, social: { ...d.social, instagram: e.target.value } }), placeholder: "@mybusiness", style: inputStyleEP })),
+                React.createElement("div", { style: { marginBottom: 4 } }, fieldLabel("TikTok"),
+                    React.createElement("input", { value: d.social.tiktok, onChange: (e) => setEditProfileDraft({ ...d, social: { ...d.social, tiktok: e.target.value } }), placeholder: "@mybusiness", style: inputStyleEP })));
             const locationSection = React.createElement("div", { style: { padding: '0 18px 28px' } },
                 sectionTitle("Location & Service Area"),
                 chevronRow("Business Address", bizOnboarding.address.trim() || 'Add your business address', () => setLocationDetailsOpen(true)),
@@ -12267,10 +12542,16 @@ function App() {
                     React.createElement("p", { style: { fontSize: 12.5, color: EP.sub, marginTop: 8, lineHeight: 1.45 } }, "Your profile changes haven't been saved."),
                     React.createElement("button", { onClick: () => setEditProfileDiscardConfirm(false), style: { width: '100%', marginTop: 18, padding: '13px 0', borderRadius: 24, background: EP.text, color: '#fff', fontWeight: 700, fontSize: 14 } }, "Keep Editing"),
                     React.createElement("button", { onClick: () => closeEditBusinessProfile(true), style: { width: '100%', marginTop: 10, padding: '13px 0', borderRadius: 24, background: '#F5F5F5', color: '#D0304A', fontWeight: 700, fontSize: 14 } }, "Discard")));
+            const categoryPickerModal = editProfileCategoryPickerOpen && React.createElement("div", { onClick: () => setEditProfileCategoryPickerOpen(false), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 4 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxHeight: '75%', overflowY: 'auto', background: '#fff', borderRadius: '20px 20px 0 0', padding: '18px 18px calc(env(safe-area-inset-bottom) + 18px)' } },
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: EP.text, marginBottom: 14 } }, "Business Type"),
+                    BIZ_CATEGORIES.map((c) => React.createElement("button", { key: c, onClick: () => { setEditProfileDraft({ ...d, category: c }); setEditProfileCategoryPickerOpen(false); }, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 4px', borderBottom: `1px solid ${EP.border}`, textAlign: 'left' } },
+                        React.createElement("span", { style: { fontSize: 14, color: EP.text, fontWeight: d.category === c ? 700 : 400 } }, c),
+                        d.category === c && React.createElement(Icon, { name: "check", size: 15, color: THEME.coral })))));
             return React.createElement("div", { key: "editbizprofile", style: { position: 'absolute', inset: 0, zIndex: 3, background: '#fff', display: 'flex', flexDirection: 'column' } },
                 header,
-                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', paddingBottom: 30 } }, photoSection, businessInfoSection, contactSection, locationSection),
-                discardModal);
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', paddingBottom: 30 } }, coverSection, photoSection, gallerySection, businessInfoSection, contactSection, socialSection, locationSection),
+                discardModal, categoryPickerModal);
         })(),
         rsvFlow && (() => {
             const f = rsvFlow;
@@ -13760,15 +14041,35 @@ function App() {
                 else
                     setScheduleView('menu');
             };
+            const myCaps = getMyBusinessCapabilities();
+            const myTerms = getMyBusinessTerminology();
             const header = providerDashboardTab === 'overview'
-                ? React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px` } },
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
-                        React.createElement("span", { style: { fontSize: 14, color: PD.sub } }, "Good morning,"),
-                        React.createElement("span", { style: { fontSize: 14, fontWeight: 700, color: PD.text } }, bizOnboarding.businessName.trim() || 'My Business'),
-                        businessVerified && React.createElement("div", { style: { width: 14, height: 14, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" }))))
+                ? React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px` } },
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 } },
+                            React.createElement("button", { onClick: openEditBusinessProfile, style: { flexShrink: 0 } },
+                                bizOnboarding.photo
+                                    ? React.createElement("div", { style: { width: 50, height: 50, borderRadius: '50%', backgroundImage: `url(${bizOnboarding.photo})`, backgroundSize: 'cover', backgroundPosition: 'center', border: `2px solid ${THEME.coral}` } })
+                                    : React.createElement("div", { style: { width: 50, height: 50, borderRadius: '50%', background: THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${THEME.coral}` } },
+                                        React.createElement("span", { style: { color: '#fff', fontWeight: 700, fontSize: 17, fontFamily: 'Space Grotesk, sans-serif' } }, (bizOnboarding.businessName.trim() || 'M').charAt(0)))),
+                            React.createElement("div", { style: { minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 13, color: PD.sub, margin: 0 } }, "Good morning,"),
+                                React.createElement("button", { onClick: openEditBusinessProfile, style: { display: 'flex', alignItems: 'center', gap: 6, textAlign: 'left' } },
+                                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: PD.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 180 } }, bizOnboarding.businessName.trim() || 'My Business'),
+                                    businessVerified && React.createElement("div", { style: { width: 15, height: 15, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" }))),
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 } },
+                                    React.createElement(Icon, { name: "mappin", size: 11, color: PD.sub }),
+                                    React.createElement("span", { style: { fontSize: 11.5, color: PD.sub, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 150 } }, bizOnboarding.address.trim() || 'Add your business address'),
+                                    React.createElement("button", { onClick: () => setLocationDetailsOpen(true) }, React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral } }, "Edit"))))),
+                        React.createElement("div", { style: { display: 'flex', gap: 8, flexShrink: 0 } },
+                            React.createElement("button", { onClick: () => flashToast('No new notifications'), style: { width: 34, height: 34, borderRadius: 17, border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "bell", size: 15, color: PD.text })),
+                            React.createElement("button", { onClick: () => openSettings(), style: { width: 34, height: 34, borderRadius: 17, border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "sliders", size: 15, color: PD.text })))),
+                    React.createElement("button", { onClick: openMyBusinessProfile, style: { marginTop: 14, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '11px 0', borderRadius: 16, border: `1px solid ${PD.border}` } },
+                        React.createElement(Icon, { name: "eye", size: 14, color: PD.text }),
+                        React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: PD.text } }, "Preview Business Page")))
                 : React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 14px`, borderBottom: `1px solid ${PD.border}` } },
                     React.createElement("button", { onClick: providerDashboardTab === 'hours' ? scheduleBack : () => setProviderDashboardTab('overview') }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, providerDashboardTab === 'hours' ? (scheduleView === 'calendar' && scheduleCalDay != null ? new Date(scheduleCalMonth.getFullYear(), scheduleCalMonth.getMonth(), scheduleCalDay).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : SCHEDULE_TITLES[scheduleView]) : ({ bookings: 'Bookings', services: 'Services', team: 'Team', calendar: 'Calendar', customerPosts: 'Customer Posts' }[providerDashboardTab] || bizOnboarding.businessName.trim() || 'My Business')),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, providerDashboardTab === 'hours' ? (scheduleView === 'calendar' && scheduleCalDay != null ? new Date(scheduleCalMonth.getFullYear(), scheduleCalMonth.getMonth(), scheduleCalDay).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : SCHEDULE_TITLES[scheduleView]) : ({ bookings: myTerms.appointments, services: myTerms.services, team: myTerms.staff, calendar: myTerms.calendar, customerPosts: 'Customer Posts' }[providerDashboardTab] || bizOnboarding.businessName.trim() || 'My Business')),
                     providerDashboardTab === 'hours'
                         ? (scheduleView === 'breaks' ? React.createElement("button", { onClick: () => { setBreakDraft({ id: null, name: '', start: '12:00', end: '13:00', days: [1, 2, 3, 4, 5] }); setScheduleView('addBreak'); }, style: { fontSize: 13.5, fontWeight: 700, color: THEME.coral } }, "Add")
                             : scheduleView === 'unavailable' ? React.createElement("button", { onClick: () => { setUnavailableDraft({ id: null, date: dateKey(new Date()), start: '09:00', end: '10:00', repeat: 'none', reason: '' }); setScheduleView('addUnavailable'); }, style: { fontSize: 13.5, fontWeight: 700, color: THEME.coral } }, "Add")
@@ -13780,165 +14081,215 @@ function App() {
                             : React.createElement("button", { onClick: () => openSettings() }, React.createElement(Icon, { name: "sliders", size: 17, color: PD.text })));
             let body;
             if (providerDashboardTab === 'overview') {
-                const totalBookings = businessBookings.length;
+                const isHealthcareBiz = bizOnboarding.category === HEALTHCARE_CATEGORY;
                 const stats = computeEarningsStats(businessBookings);
                 const myTips = tips.filter((t) => t.businessId === 'me-business');
                 const tipsEarnedTotal = myTips.reduce((sum, t) => sum + t.tipAmount, 0);
-                const serviceRevenue = stats.totalEarnings;
-                const totalRevenue = serviceRevenue + tipsEarnedTotal;
-                const profileViews = 0;
-                const dayEarnings = stats.byDayOfWeek.map((d) => d.earnings);
-                const maxDayEarning = Math.max(...dayEarnings, 0);
-                const chartVals = dayEarnings.map((e) => maxDayEarning > 0 ? Math.max(0.1, e / maxDayEarning) : 0.1);
-                const chartW = 280, chartH = 64;
-                const chartPts = chartVals.map((v, i) => [Math.round(i * (chartW / (chartVals.length - 1))), Math.round(chartH - v * (chartH - 6) - 3)]);
-                const linePath = 'M' + chartPts.map((p) => p.join(',')).join(' L');
-                const areaPath = linePath + ` L${chartW},${chartH} L0,${chartH} Z`;
-                const selectedDashDay = dashboardChartSelectedDay != null ? stats.byDayOfWeek[dashboardChartSelectedDay] : null;
-                const earningsCard = React.createElement("button", { onClick: () => { setDashboardChartSelectedDay(null); setEarningsInsightsOpen(true); }, style: { display: 'block', width: '100%', textAlign: 'left', border: `1px solid ${PD.border}`, borderRadius: 18, padding: 16 } },
+                // Reads/writes the SAME `bookings` state the customer's Check on Cancellations
+                // screen does — there's one cancellation request record per booking, not a
+                // separate copy per side.
+                const pendingCancellations = bookings.filter((b) => b.cancellationRequest && b.cancellationRequest.status === 'under_review');
+                const insuranceTotalPlans = businessInsuranceSettings.acceptedCarrierIds.length + businessInsuranceSettings.acceptedGovProgramIds.length + Object.values(businessInsuranceSettings.medicaidByState).reduce((sum, plans) => sum + plans.length, 0);
+                const insuranceSummary = !businessInsuranceSettings.setupComplete
+                    ? 'Set up insurance & billing'
+                    : businessInsuranceSettings.paymentAcceptance === 'selfpay_only'
+                        ? 'Self Pay Only'
+                        : `${insuranceTotalPlans} plan${insuranceTotalPlans === 1 ? '' : 's'} accepted`;
+
+                // ---- Setup progress (dynamic per capability, hidden once complete) ----
+                const setupItems = computeBusinessSetupProgress();
+                const setupDoneCount = setupItems.filter((i) => i.done).length;
+                const setupPct = Math.round((setupDoneCount / setupItems.length) * 100);
+                const setupCard = setupDoneCount < setupItems.length && React.createElement("div", { style: { border: `1.5px solid ${THEME.coral}`, borderRadius: 18, padding: 16, marginTop: 4 } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                        React.createElement("p", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Total Earnings"),
-                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 3 } },
-                            React.createElement("span", { style: { fontSize: 11, fontWeight: 600, color: THEME.coral } }, "View insights"),
-                            React.createElement(Icon, { name: "chevronright", size: 12, color: THEME.coral }))),
-                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 30, color: PD.text, margin: '6px 0 0' } }, money(totalRevenue)),
-                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, `Service ${money(serviceRevenue)} · Tips ${money(tipsEarnedTotal)}`),
-                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, minHeight: 16 } },
-                        selectedDashDay
-                            ? React.createElement("span", { style: { fontSize: 12, color: PD.text } }, `${selectedDashDay.label}: `, React.createElement("strong", null, money(selectedDashDay.earnings)), ` · ${selectedDashDay.count} booking${selectedDashDay.count === 1 ? '' : 's'}`)
-                            : [React.createElement("span", { key: "b", style: { fontSize: 12, fontWeight: 700, color: THEME.coral } }, "▲ 18%"),
-                                React.createElement("span", { key: "s", style: { fontSize: 12, color: PD.sub } }, "vs. previous 7 days")]),
-                    React.createElement("svg", { width: "100%", height: chartH, viewBox: `0 0 ${chartW} ${chartH}`, style: { marginTop: 14, display: 'block' } },
-                        React.createElement("defs", null,
-                            React.createElement("linearGradient", { id: "bizEarningsFade", x1: "0", y1: "0", x2: "0", y2: "1" },
-                                React.createElement("stop", { offset: "0%", stopColor: THEME.coral, stopOpacity: 0.22 }),
-                                React.createElement("stop", { offset: "100%", stopColor: THEME.coral, stopOpacity: 0 }))),
-                        React.createElement("path", { d: areaPath, fill: "url(#bizEarningsFade)" }),
-                        React.createElement("path", { d: linePath, fill: "none", stroke: THEME.coral, strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }),
-                        chartPts.map((p, i) => React.createElement("circle", {
-                            key: i, cx: p[0], cy: p[1], r: dashboardChartSelectedDay === i ? 5 : 8,
-                            fill: dashboardChartSelectedDay === i ? THEME.coral : 'transparent', stroke: 'none',
-                            onClick: (e) => { e.stopPropagation(); setDashboardChartSelectedDay((prev) => prev === i ? null : i); },
-                        }))),
-                    React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', marginTop: 6 } },
-                        EARNINGS_WEEKDAYS.map((d, i) => React.createElement("span", { key: d, style: { fontSize: 10, fontWeight: dashboardChartSelectedDay === i ? 700 : 400, color: dashboardChartSelectedDay === i ? THEME.coral : PD.sub } }, d))));
-                const statsRow = React.createElement("div", { style: { display: 'flex', gap: 10, marginTop: 14 } },
-                    [{ value: totalBookings, label: 'New Bookings' }, { value: money(totalRevenue), label: 'Earnings' }, { value: profileViews, label: 'Profile Views' }].map((s) => React.createElement("div", { key: s.label, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '14px 10px', textAlign: 'center' } },
-                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: PD.text, margin: 0 } }, s.value),
-                        React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: '3px 0 0' } }, s.label))));
-                const locationServiceAreaRow = React.createElement("div", { style: { marginTop: 14, border: `1.5px solid ${THEME.coral}`, borderRadius: 18, overflow: 'hidden' } },
-                    React.createElement("button", { onClick: () => setLocationDetailsOpen(true), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
-                        React.createElement(Icon, { name: "mappin", size: 17, color: THEME.coral }),
-                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                            React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Location"),
-                            React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, bizOnboarding.address.trim() || 'Add your business address')),
-                        React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub })),
-                    React.createElement("div", { style: { height: 1, background: PD.border, marginLeft: 43 } }),
-                    React.createElement("button", { onClick: openServiceAreaSettings, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
-                        React.createElement(Icon, { name: "compass", size: 17, color: THEME.coral }),
-                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                            React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Service Area"),
-                            React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, formatServiceAreaSummary(businessTravel))),
-                        React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub })));
-                const QUICK_ACTIONS = [
-                    { id: 'schedule', label: 'Schedule', onClick: () => { setProviderDashboardTab('hours'); setScheduleView('menu'); } },
-                    { id: 'addService', label: 'Add Service', onClick: () => { setProviderDashboardTab('services'); setServiceFormDraft({ id: null, name: '', bookingType: 'APPOINTMENT', durationMinutes: '', price: '', dailyRate: '', hourlyRate: '', basePrice: '' }); } },
-                    { id: 'promote', label: 'Promote', onClick: () => setPromoDraftOpen(true) },
-                    { id: 'restaurant', label: businessType === 'restaurant' ? 'Restaurant' : 'Set Up Restaurant', onClick: openRestaurantDashboard },
-                    { id: 'cancelBookings', label: 'Cancel Bookings', onClick: openCancelFlow },
-                ];
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: PD.text, margin: 0 } }, `Finish setting up ${bizOnboarding.businessName.trim() || 'your business'}`),
+                        React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: THEME.coral } }, `${setupPct}%`)),
+                    React.createElement("div", { style: { height: 6, borderRadius: 3, background: T.surfaceSecondary, marginTop: 10, overflow: 'hidden' } },
+                        React.createElement("div", { style: { height: '100%', width: `${setupPct}%`, background: THEME.coral, borderRadius: 3 } })),
+                    React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 } },
+                        setupItems.map((it) => React.createElement("div", { key: it.label, style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                            React.createElement("div", { style: { width: 16, height: 16, borderRadius: '50%', flexShrink: 0, background: it.done ? THEME.coral : 'transparent', border: it.done ? 'none' : `1.5px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                                it.done && React.createElement(Icon, { name: "check", size: 9, color: "#fff" })),
+                            React.createElement("span", { style: { fontSize: 12.5, color: it.done ? PD.text : PD.sub, textDecoration: it.done ? 'line-through' : 'none' } }, it.label)))),
+                    React.createElement("button", { onClick: openEditBusinessProfile, style: { width: '100%', marginTop: 14, padding: '11px 0', borderRadius: 14, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 13 } }, "Continue Setup"));
+
+                // ---- Today's Schedule hero card (appointment/doctor businesses only —
+                // restaurant/venue point at their own real tools instead, see below) ----
+                let scheduleCard = null;
+                if (myCaps.appointments) {
+                    const today = new Date();
+                    const timeline = computeTodaysScheduleTimeline();
+                    const SEG_STYLE = {
+                        booking: { border: `1px solid ${PD.border}` },
+                        open: { border: `1.5px dashed ${THEME.coral}`, background: 'rgba(151,196,0,0.06)' },
+                        break: { border: `1px solid ${PD.border}`, background: T.surfaceSecondary },
+                        blocked: { border: `1px solid ${PD.border}`, background: T.surfaceSecondary },
+                    };
+                    const segRow = (seg, i) => {
+                        if (seg.type === 'booking') {
+                            const b = seg.booking;
+                            const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
+                            return React.createElement("button", { key: 'seg' + i, onClick: () => setBusinessBookingDetail(b), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, textAlign: 'left', marginBottom: 8, ...SEG_STYLE.booking } },
+                                React.createElement("p", { style: { fontSize: 11.5, fontWeight: 700, color: PD.sub, width: 60, flexShrink: 0, margin: 0 } }, minutesToTimeLabel(seg.startMin)),
+                                React.createElement("div", { style: { width: 36, height: 36, borderRadius: '50%', flexShrink: 0, background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: avatarFg(b.avatarColor), fontFamily: 'Space Grotesk, sans-serif' } }, b.initials),
+                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                    React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, b.customerName),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, `${b.service} · ${seg.durationMinutes} min`)),
+                                React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
+                                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, money(b.price)),
+                                    b.status !== 'confirmed' && React.createElement("span", { style: { fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 8, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize', display: 'inline-block', marginTop: 3 } }, BOOKING_STATUS_LABEL[b.status] || b.status)),
+                                React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }));
+                        }
+                        if (seg.type === 'open') {
+                            return React.createElement("button", { key: 'seg' + i, onClick: () => setOpenSlotSheet({ startMin: seg.startMin, endMin: seg.endMin }), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, textAlign: 'left', marginBottom: 8, ...SEG_STYLE.open } },
+                                React.createElement("p", { style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral, width: 60, flexShrink: 0, margin: 0 } }, minutesToTimeLabel(seg.startMin)),
+                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                    React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: THEME.coral, margin: 0, letterSpacing: 0.3 } }, "OPEN TIME"),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, "Available")),
+                                React.createElement("div", { style: { width: 26, height: 26, borderRadius: '50%', border: `1.5px solid ${THEME.coral}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "plus", size: 13, color: THEME.coral })));
+                        }
+                        return React.createElement("div", { key: 'seg' + i, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, marginBottom: 8, ...SEG_STYLE[seg.type] } },
+                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 700, color: PD.sub, width: 60, flexShrink: 0, margin: 0 } }, minutesToTimeLabel(seg.startMin)),
+                            React.createElement(Icon, { name: seg.type === 'break' ? 'clock' : 'lock', size: 15, color: PD.sub }),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: PD.sub, margin: 0, letterSpacing: 0.3, textTransform: 'uppercase' } }, seg.type === 'break' ? seg.label : 'Blocked'),
+                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, `${minutesToTimeLabel(seg.startMin)} – ${minutesToTimeLabel(seg.endMin)}`)));
+                    };
+                    scheduleCard = React.createElement("div", { style: { marginTop: 16, border: `1px solid ${PD.border}`, borderRadius: 20, padding: 16 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                            React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Today's Schedule"),
+                            React.createElement("div", { style: { display: 'flex', gap: 6 } },
+                                [['day', 'Today'], ['3day', '3 Day'], ['week', 'Week'], ['month', 'Month']].map(([id, label]) => React.createElement("button", {
+                                    key: id,
+                                    onClick: () => { if (id !== 'day') { setProviderCalendarMode(id === '3day' ? 'week' : id); setProviderCalendarAnchorDate(new Date()); setProviderDashboardTab('calendar'); } },
+                                    style: { padding: '4px 9px', borderRadius: 10, fontSize: 11, fontWeight: 700, background: id === 'day' ? THEME.coral : 'transparent', color: id === 'day' ? '#fff' : PD.sub },
+                                }, label)))),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: '10px 0 14px' } }, today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })),
+                        timeline.closed
+                            ? React.createElement("p", { style: { fontSize: 13, color: PD.sub, textAlign: 'center', padding: '18px 0' } }, "Closed today.")
+                            : timeline.segments.length === 0
+                                ? React.createElement("p", { style: { fontSize: 13, color: PD.sub, textAlign: 'center', padding: '18px 0' } }, "Nothing scheduled.")
+                                : React.createElement("div", null, timeline.segments.map(segRow)),
+                        React.createElement("button", { onClick: () => { setProviderCalendarMode('month'); setProviderCalendarAnchorDate(new Date()); setProviderDashboardTab('calendar'); }, style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4, padding: '11px 0', borderRadius: 14, border: `1px solid ${PD.border}` } },
+                            React.createElement(Icon, { name: "calendar", size: 14, color: PD.text }),
+                            React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: PD.text } }, "View Full Calendar")));
+                }
+                // Restaurant/venue businesses already have their own full-featured dashboards
+                // (tables/menu/reservations; ticketing/scanner) — point at those directly rather
+                // than faking an appointment-shaped schedule they don't have.
+                else if (businessType === 'restaurant') {
+                    const restaurant = getMyRestaurant();
+                    const todaysCovers = restaurant ? (restaurant.tables || []).length : 0;
+                    scheduleCard = React.createElement("button", { onClick: openRestaurantDashboard, style: { display: 'block', width: '100%', textAlign: 'left', marginTop: 16, border: `1px solid ${PD.border}`, borderRadius: 20, padding: 16 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                            React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Restaurant Dashboard"),
+                            React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub })),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, margin: '8px 0 2px' } }, "Manage today's reservations"),
+                        React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, margin: 0 } }, todaysCovers > 0 ? `${todaysCovers} tables set up` : "Set up your tables, menu and hours"));
+                }
+                else if (myCaps.tickets) {
+                    scheduleCard = React.createElement("div", { style: { marginTop: 16, border: `1px solid ${PD.border}`, borderRadius: 20, padding: 16 } },
+                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Events & Tickets"),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, margin: '8px 0 12px' } }, "Manage your events and validate tickets at the door"),
+                        React.createElement("div", { style: { display: 'flex', gap: 10 } },
+                            React.createElement("button", { onClick: () => setTicketingSetupOpen(true), style: { flex: 1, padding: '11px 0', borderRadius: 14, border: `1px solid ${PD.border}`, fontSize: 12.5, fontWeight: 700, color: PD.text } }, "Manage Tickets"),
+                            React.createElement("button", { onClick: () => setTicketScannerOpen(true), style: { flex: 1, padding: '11px 0', borderRadius: 14, background: THEME.coral, fontSize: 12.5, fontWeight: 700, color: '#fff' } }, "Scan Tickets")));
+                }
+
+                // ---- Compact tappable stats (today's real numbers, not lifetime totals) ----
+                const todaysBookingsList = businessBookings.filter((b) => dateKey(getBookingDate(b)) === dateKey(new Date()) && b.status !== 'cancelled');
+                const todaysEarnings = todaysBookingsList.reduce((sum, b) => sum + (b.price || 0), 0) + tipsEarnedTotal;
+                const todaysTimelineForStats = myCaps.appointments ? computeTodaysScheduleTimeline() : { segments: [] };
+                const openSlotsToday = todaysTimelineForStats.segments.filter((s) => s.type === 'open').length;
+                const allCustomerNames = Array.from(new Set(businessBookings.filter((b) => b.status !== 'cancelled').map((b) => b.customerName)));
+                const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+                const newCustomersThisWeek = allCustomerNames.filter((name) => { const since = customerSince(businessBookings, name); return since && since.getTime() >= weekAgo; }).length;
+                const statsRow = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 16 } },
+                    [
+                        { value: todaysBookingsList.length, label: myCaps.appointments ? 'Bookings Today' : 'Activity Today', onClick: () => setProviderDashboardTab('bookings') },
+                        { value: money(todaysEarnings), label: 'Earnings Today', onClick: () => { setDashboardChartSelectedDay(null); setEarningsInsightsOpen(true); } },
+                        { value: openSlotsToday, label: 'Open Slots Today', onClick: () => { setProviderCalendarMode('day'); setProviderCalendarAnchorDate(new Date()); setProviderDashboardTab('calendar'); }, hidden: !myCaps.appointments },
+                        { value: newCustomersThisWeek, label: 'New Customers', onClick: () => { setDashboardChartSelectedDay(null); setEarningsInsightsOpen(true); } },
+                    ].filter((s) => !s.hidden).map((s) => React.createElement("button", { key: s.label, onClick: s.onClick, style: { flex: 1, border: `1px solid ${PD.border}`, borderRadius: 16, padding: '13px 6px', textAlign: 'center' } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: PD.text, margin: 0 } }, s.value),
+                        React.createElement("p", { style: { fontSize: 10, color: PD.sub, margin: '3px 0 0' } }, s.label))));
+
+                // ---- Quick Actions: entirely driven by business type, never one-size-fits-all ----
+                let QUICK_ACTIONS;
+                if (businessType === 'restaurant') {
+                    QUICK_ACTIONS = [
+                        { id: 'newReservation', label: 'New Reservation', onClick: () => { openRestaurantDashboard(); setRestaurantDashTab('reservations'); } },
+                        { id: 'manageTables', label: 'Manage Tables', onClick: () => { openRestaurantDashboard(); setRestaurantDashTab('tables'); } },
+                        { id: 'editMenu', label: 'Edit Menu', onClick: () => { openRestaurantDashboard(); setRestaurantDashTab('menu'); } },
+                        { id: 'blockReservations', label: 'Block Reservations', onClick: () => { openRestaurantDashboard(); setRestaurantDashTab('hours'); } },
+                        { id: 'calendar', label: 'Calendar', onClick: () => { openRestaurantDashboard(); setRestaurantDashTab('reservations'); } },
+                    ];
+                }
+                else if (myCaps.tickets) {
+                    QUICK_ACTIONS = [
+                        { id: 'addEvent', label: 'Add Event', onClick: () => setTicketingSetupOpen(true) },
+                        { id: 'manageTickets', label: 'Manage Tickets', onClick: () => setTicketingSetupOpen(true) },
+                        { id: 'ticketScanner', label: 'Ticket Scanner', onClick: () => setTicketScannerOpen(true) },
+                        { id: 'venue', label: 'Venue', onClick: openEditBusinessProfile },
+                        { id: 'eventsCalendar', label: 'Events Calendar', onClick: () => setProviderDashboardTab('calendar') },
+                    ];
+                }
+                else {
+                    const addBookingAction = () => { const n = new Date(); openAddBookingFromSlot(Math.ceil((n.getHours() * 60 + n.getMinutes()) / 30) * 30); };
+                    QUICK_ACTIONS = [
+                        { id: 'addBooking', label: myCaps.appointments ? `Add ${myTerms.appointment}` : 'Add Booking', onClick: addBookingAction },
+                        { id: 'blockTime', label: 'Block Time', onClick: () => { setUnavailableDraft({ id: null, date: dateKey(new Date()), start: '09:00', end: '10:00', repeat: 'none', reason: '' }); setProviderDashboardTab('hours'); setScheduleView('addUnavailable'); } },
+                        isHealthcareBiz
+                            ? { id: 'providers', label: myTerms.staff, onClick: () => setProviderDashboardTab('team') }
+                            : { id: 'addService', label: `Add ${myTerms.service}`, onClick: () => { setProviderDashboardTab('services'); setServiceFormDraft({ id: null, name: '', bookingType: 'APPOINTMENT', durationMinutes: '', price: '', dailyRate: '', hourlyRate: '', basePrice: '' }); } },
+                        isHealthcareBiz
+                            ? { id: 'insurance', label: 'Insurance', onClick: openInsuranceSetup }
+                            : { id: 'promote', label: 'Add Promotion', onClick: () => setPromoDraftOpen(true) },
+                        { id: 'calendar', label: 'Calendar', onClick: () => { setProviderCalendarMode('month'); setProviderCalendarAnchorDate(new Date()); setProviderDashboardTab('calendar'); } },
+                    ];
+                }
                 const quickActionsBar = React.createElement("div", { style: { marginTop: 26 } },
                     React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: '0 0 10px', textTransform: 'uppercase' } }, "Quick Actions"),
                     React.createElement("div", { style: { display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', background: T.surface, border: `1px solid ${PD.border}`, borderRadius: 18, padding: '4px 0' } },
                         QUICK_ACTIONS.map((a, i) => React.createElement(React.Fragment, { key: a.id },
                             i > 0 && React.createElement("div", { style: { width: 1, background: PD.border, margin: '10px 0' } }),
                             React.createElement("button", { onClick: a.onClick, style: { flex: 1, padding: '12px 4px', textAlign: 'center' } },
-                                React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: PD.text } }, a.label))))));
-                const ticketingSection = React.createElement("div", { style: { marginTop: 26 } },
-                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: '0 0 10px', textTransform: 'uppercase' } }, "Ticketing"),
-                    React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 18, overflow: 'hidden' } },
-                        React.createElement("button", { onClick: () => setTicketingSetupOpen(true), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
-                            React.createElement(Icon, { name: "wallet", size: 17, color: THEME.coral }),
-                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Ticketing Setup"),
-                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, businessTicketingMode === 'partner' ? 'Connect Existing Ticket System' : 'Using Bookvado Tickets')),
-                            React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub })),
-                        React.createElement("div", { style: { height: 1, background: PD.border, marginLeft: 43 } }),
-                        React.createElement("button", { onClick: () => setTicketScannerOpen(true), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
-                            React.createElement(Icon, { name: "camera", size: 17, color: THEME.coral }),
-                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Ticket Scanner"),
-                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, "Scan and validate Bookvado tickets")),
-                            React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }))));
-                const tipsSection = React.createElement("div", { style: { marginTop: 26 } },
-                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: '0 0 10px', textTransform: 'uppercase' } }, "Tips"),
-                    React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 18, overflow: 'hidden' } },
-                        React.createElement("button", { onClick: () => setTipsSettingsOpen(true), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
-                            React.createElement(Icon, { name: "heart", size: 17, color: THEME.coral }),
-                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Accept After-Service Tips"),
-                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, businessTipsSettings.enabled ? `On · ${money(tipsEarnedTotal)} earned` : 'Off')),
-                            React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }))));
-                const insuranceTotalPlans =businessInsuranceSettings.acceptedCarrierIds.length + businessInsuranceSettings.acceptedGovProgramIds.length + Object.values(businessInsuranceSettings.medicaidByState).reduce((sum, plans) => sum + plans.length, 0);
-                const insuranceSummary = !businessInsuranceSettings.setupComplete
-                    ? 'Set up insurance & billing'
-                    : businessInsuranceSettings.paymentAcceptance === 'selfpay_only'
-                        ? 'Self Pay Only'
-                        : `${insuranceTotalPlans} plan${insuranceTotalPlans === 1 ? '' : 's'} accepted`;
-                const insuranceSection = bizOnboarding.category === HEALTHCARE_CATEGORY && React.createElement("div", { style: { marginTop: 26 } },
-                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: '0 0 10px', textTransform: 'uppercase' } }, "Insurance & Coverage"),
-                    React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 18, overflow: 'hidden' } },
-                        React.createElement("button", { onClick: openInsuranceSetup, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
-                            React.createElement(Icon, { name: "shield", size: 17, color: THEME.coral }),
-                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Insurance & Billing Setup"),
-                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, insuranceSummary)),
-                            React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }))));
-                // Reads/writes the SAME `bookings` state the customer's Check on
-                // Cancellations screen does — there's one cancellation request
-                // record per booking, not a separate copy per side.
-                const pendingCancellations = bookings.filter((b) => b.cancellationRequest && b.cancellationRequest.status === 'under_review');
-                const cancellationRequestsSection = React.createElement("div", { style: { marginTop: 26 } },
-                    React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: '0 0 10px', textTransform: 'uppercase' } }, "Cancellation Requests"),
-                    React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 18, overflow: 'hidden' } },
-                        React.createElement("button", { onClick: () => setBusinessCancellationRequestsOpen(true), style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left' } },
-                            React.createElement(Icon, { name: "warningtriangle", size: 17, color: THEME.coral }),
-                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, "Review Cancellation Requests"),
-                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, pendingCancellations.length === 0 ? 'Nothing pending right now' : `${pendingCancellations.length} awaiting your review`)),
-                            pendingCancellations.length > 0 && React.createElement("span", { style: { minWidth: 20, height: 20, borderRadius: 10, background: THEME.gold, color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' } }, pendingCancellations.length),
-                            React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }))));
-                const upcomingPreview = businessBookings.filter((b) => b.status === 'confirmed' || b.status === 'pending').slice(0, 3);
-                const isHealthcareBiz = bizOnboarding.category === HEALTHCARE_CATEGORY;
-                const upcomingBookingsSection = React.createElement("div", { style: { marginTop: 26 } },
+                                React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: PD.text } }, a.label))))));
+
+                // ---- Manage Business: one clean, capability-gated list instead of a stack of
+                // unrelated always-on sections ----
+                const manageRow = (icon, title, subtitle, onClick, badge) => React.createElement("button", { key: title, onClick, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 14px', textAlign: 'left', borderBottom: `1px solid ${PD.border}` } },
+                    React.createElement("div", { style: { width: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: icon, size: 17, color: PD.text })),
+                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, title),
+                        subtitle && React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, subtitle)),
+                    badge && React.createElement("span", { style: { minWidth: 20, height: 20, borderRadius: 10, background: THEME.gold, color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' } }, badge),
+                    React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }));
+                const manageRows = [
+                    manageRow('user', 'Business Profile', 'Name, photos, description', openEditBusinessProfile),
+                    manageRow('mappin', 'Location', bizOnboarding.address.trim() || 'Address, map, service area', () => setLocationDetailsOpen(true)),
+                    myCaps.services && manageRow('grid', myTerms.services, `Manage your ${myTerms.services.toLowerCase()} & prices`, () => setProviderDashboardTab('services')),
+                    myCaps.menu && manageRow('grid', 'Menu', 'Categories, items & prices', () => { openRestaurantDashboard(); setRestaurantDashTab('menu'); }),
+                    myCaps.tables && manageRow('grid', 'Tables', 'Seating & capacity', () => { openRestaurantDashboard(); setRestaurantDashTab('tables'); }),
+                    myCaps.staff && manageRow('users', myTerms.staff, `Manage your team`, () => setProviderDashboardTab('team')),
+                    manageRow('clock', 'Hours & Availability', 'Business hours, breaks, holidays', () => { setProviderDashboardTab('hours'); setScheduleView('menu'); }),
+                    manageRow('wallet', 'Payments & Payouts', 'Payout methods, settings', () => setPayoutSettingsOpen(true)),
+                    (myCaps.appointments || businessType === 'restaurant') && manageRow('clipboard', 'Booking Settings', 'Policies, deposits, limits', businessType === 'restaurant' ? () => { openRestaurantDashboard(); setRestaurantDashTab('settings'); } : () => setBookingSettingsOpen(true)),
+                    manageRow('tag', 'Promotions', 'Deals, discounts, offers', () => setPromoDraftOpen(true)),
+                    myCaps.tickets && manageRow('wallet', 'Ticketing Setup', businessTicketingMode === 'partner' ? 'Connect Existing Ticket System' : 'Using Bookvado Tickets', () => setTicketingSetupOpen(true)),
+                    myCaps.ticketScanner && manageRow('camera', 'Ticket Scanner', 'Scan and validate Bookvado tickets', () => setTicketScannerOpen(true)),
+                    myCaps.tips && manageRow('heart', 'Accept After-Service Tips', businessTipsSettings.enabled ? `On · ${money(tipsEarnedTotal)} earned` : 'Off', () => setTipsSettingsOpen(true)),
+                    myCaps.insurance && manageRow('shield', 'Insurance & Billing', insuranceSummary, openInsuranceSetup),
+                    (myCaps.appointments || myCaps.reservations) && manageRow('warningtriangle', 'Cancellation Requests', pendingCancellations.length === 0 ? 'Nothing pending right now' : `${pendingCancellations.length} awaiting your review`, () => setBusinessCancellationRequestsOpen(true), pendingCancellations.length > 0 ? pendingCancellations.length : null),
+                ].filter(Boolean);
+                const manageBusinessSection = React.createElement("div", { style: { marginTop: 26 } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
-                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Upcoming Bookings"),
-                        React.createElement("button", { onClick: () => setProviderDashboardTab('bookings'), style: { fontSize: 12, fontWeight: 600, color: THEME.coral } }, "View all")),
-                    upcomingPreview.length === 0
-                        ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub } }, "No upcoming bookings yet.")
-                        : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, upcomingPreview.map((b) => {
-                            const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
-                            const ins = isHealthcareBiz ? b.insurance : null;
-                            const vs = ins && INSURANCE_VERIFICATION_STATUSES[ins.verificationStatus];
-                            return React.createElement("div", { key: b.id, style: { borderRadius: 16, border: `1px solid ${PD.border}` } },
-                                React.createElement("button", { onClick: () => setBusinessBookingDetail(b), style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, textAlign: 'left', width: '100%' } },
-                                    React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(b.avatarColor), fontSize: 12, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, b.initials),
-                                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, b.customerName),
-                                        React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, `${b.dateGroup === 'tomorrow' ? 'Tomorrow' : 'Today'}, ${b.time} · ${b.service}`),
-                                        ins && React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, ins.carrierName)),
-                                    React.createElement("div", { style: { textAlign: 'right', flexShrink: 0 } },
-                                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, money(b.price)),
-                                        React.createElement("span", { style: { fontSize: 9.5, fontWeight: 700, padding: '3px 8px', borderRadius: 9, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize', display: 'inline-block', marginTop: 3 } }, b.status))),
-                                ins && React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px 12px', marginLeft: 52 } },
-                                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
-                                        React.createElement(Icon, { name: vs.icon, size: 12, color: vs.color }),
-                                        React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: vs.color } }, ins.verificationStatus === 'verified' ? 'Eligibility Verified' : vs.label),
-                                        ins.verificationStatus === 'verified' && ins.copay != null && React.createElement("span", { style: { fontSize: 11.5, color: PD.sub } }, `· Est. Copay $${ins.copay}`)),
-                                    ins.verificationStatus !== 'verified' && React.createElement("button", { onClick: (e) => { e.stopPropagation(); verifyBusinessBookingInsurance(b.id); }, style: { fontSize: 11.5, fontWeight: 700, color: THEME.coral } }, "Verify")));
-                        })));
+                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.4, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Manage Business"),
+                        React.createElement("button", { onClick: openSettings, style: { fontSize: 12, fontWeight: 600, color: THEME.coral } }, "Edit")),
+                    React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 18, overflow: 'hidden' } }, manageRows));
+
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `0 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    earningsCard, statsRow, locationServiceAreaRow, quickActionsBar, tipsSection, insuranceSection, ticketingSection, cancellationRequestsSection, upcomingBookingsSection);
+                    setupCard, scheduleCard, statsRow, quickActionsBar, manageBusinessSection);
             }
             else if (providerDashboardTab === 'bookings') {
                 const BIZ_BOOKING_TABS = [{ id: 'upcoming', label: 'Upcoming' }, { id: 'pending', label: 'Pending' }, { id: 'past', label: 'Past' }, { id: 'cancelled', label: 'Canceled' }];
@@ -14012,9 +14363,9 @@ function App() {
                     return `${s.durationMinutes} min · ${money(s.price)}`;
                 };
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `16px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    React.createElement("button", { onClick: () => setServiceFormDraft({ id: null, name: '', bookingType: 'APPOINTMENT', durationMinutes: '', price: '', dailyRate: '', hourlyRate: '', basePrice: '' }), style: { width: '100%', padding: '12px 0', borderRadius: 14, border: `1.5px dashed ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5, marginBottom: 16 } }, "+ Add Service"),
+                    React.createElement("button", { onClick: () => setServiceFormDraft({ id: null, name: '', bookingType: 'APPOINTMENT', durationMinutes: '', price: '', dailyRate: '', hourlyRate: '', basePrice: '' }), style: { width: '100%', padding: '12px 0', borderRadius: 14, border: `1.5px dashed ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5, marginBottom: 16 } }, `+ Add ${myTerms.service}`),
                     providerServices.length === 0
-                        ? React.createElement("p", { style: { fontSize: 13, color: PD.sub, textAlign: 'center', marginTop: 24 } }, "No services yet — add your first one above.")
+                        ? React.createElement("p", { style: { fontSize: 13, color: PD.sub, textAlign: 'center', marginTop: 24 } }, `No ${myTerms.services.toLowerCase()} yet — add your first one above.`)
                         : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, providerServices.map((s) => React.createElement("div", { key: s.id, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 16, border: `1px solid ${PD.border}` } },
                             React.createElement("div", null,
                                 React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, s.name),
@@ -14025,8 +14376,8 @@ function App() {
             }
             else if (providerDashboardTab === 'team') {
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `16px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    React.createElement("p", { style: { fontSize: 12, color: PD.sub, lineHeight: 1.5, marginBottom: 16 } }, "Add the barbers or staff on your team so customers can pick who they want to book with. Each person can keep your shop's hours or set their own. If your team is empty, customers just book with your business directly."),
-                    React.createElement("button", { onClick: () => setStaffFormDraft({ id: null, name: '', customHours: null }), style: { width: '100%', padding: '12px 0', borderRadius: 14, border: `1.5px dashed ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5, marginBottom: 16 } }, "+ Add Staff"),
+                    React.createElement("p", { style: { fontSize: 12, color: PD.sub, lineHeight: 1.5, marginBottom: 16 } }, `Add the ${myTerms.staff.toLowerCase()} on your team so customers can pick who they want to book with. Each person can keep your shop's hours or set their own. If your team is empty, customers just book with your business directly.`),
+                    React.createElement("button", { onClick: () => setStaffFormDraft({ id: null, name: '', role: '', serviceIds: [], customHours: null }), style: { width: '100%', padding: '12px 0', borderRadius: 14, border: `1.5px dashed ${THEME.coral}`, color: THEME.coral, fontWeight: 700, fontSize: 13.5, marginBottom: 16 } }, `+ Add ${myTerms.staffSingular}`),
                     providerStaff.length === 0
                         ? React.createElement("p", { style: { fontSize: 13, color: PD.sub, textAlign: 'center', marginTop: 24 } }, "No staff yet — customers will just book with your business directly.")
                         : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, providerStaff.map((s) => {
@@ -14035,9 +14386,9 @@ function App() {
                                 React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', fontSize: 13, flexShrink: 0 } }, staffInitials),
                                 React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                                     React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, s.name),
-                                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 3 } }, s.customHours ? 'Custom hours' : "Uses shop's hours")),
+                                    React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 3 } }, [s.role, s.customHours ? 'Custom hours' : "Uses shop's hours"].filter(Boolean).join(' · '))),
                                 React.createElement("div", { style: { display: 'flex', gap: 8 } },
-                                    React.createElement("button", { onClick: () => setStaffFormDraft({ id: s.id, name: s.name, customHours: s.customHours }), style: { width: 32, height: 32, borderRadius: 16, border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "clipboard", size: 14, color: PD.text })),
+                                    React.createElement("button", { onClick: () => setStaffFormDraft({ id: s.id, name: s.name, role: s.role || '', serviceIds: s.serviceIds || [], customHours: s.customHours }), style: { width: 32, height: 32, borderRadius: 16, border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "clipboard", size: 14, color: PD.text })),
                                     React.createElement("button", { onClick: () => deleteStaff(s.id), style: { width: 32, height: 32, borderRadius: 16, border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 14, color: '#D0304A' }))));
                         })));
             }
@@ -14065,42 +14416,103 @@ function App() {
                         })));
             }
             else if (providerDashboardTab === 'calendar') {
-                const today = new Date();
-                const y = today.getFullYear(), m = today.getMonth();
-                const firstWeekday = new Date(y, m, 1).getDay();
-                const daysInMonth = new Date(y, m + 1, 0).getDate();
-                const monthLabel = today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                const cells = [...Array(firstWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
-                const dayBookings = businessCalendarDay === today.getDate() ? businessBookings.filter((b) => b.status !== 'cancelled') : [];
+                const anchor = providerCalendarAnchorDate;
+                const mode = providerCalendarMode;
+                const staffFilter = providerCalendarStaffFilter;
+                const isSameDay = (a, b) => dateKey(a) === dateKey(b);
+                const dayBookingsFor = (dateObj) => businessBookings.filter((b) => b.status !== 'cancelled' && isSameDay(getBookingDate(b), dateObj) && (!staffFilter || b.staffId === staffFilter));
+                const modeSwitcher = React.createElement("div", { style: { display: 'flex', gap: 6, marginBottom: 14 } },
+                    [['day', 'Day'], ['week', 'Week'], ['month', 'Month']].map(([id, label]) => React.createElement("button", { key: id, onClick: () => setProviderCalendarMode(id), style: { flex: 1, padding: '9px 0', borderRadius: 12, textAlign: 'center', fontSize: 12.5, fontWeight: 700, background: mode === id ? THEME.coral : T.surfaceSecondary, color: mode === id ? '#fff' : PD.sub } }, label)));
+                const staffFilterRow = myCaps.staff && providerStaff.length > 0 && React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 16 } },
+                    [{ id: null, name: 'All ' + myTerms.staff }, ...providerStaff].map((s) => React.createElement("button", { key: s.id || 'all', onClick: () => setProviderCalendarStaffFilter(s.id), style: { flexShrink: 0, padding: '7px 13px', borderRadius: 14, border: `1px solid ${staffFilter === s.id ? THEME.coral : PD.border}`, background: staffFilter === s.id ? 'rgba(151,196,0,0.1)' : 'transparent' } },
+                        React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: staffFilter === s.id ? THEME.coral : PD.text } }, s.name))));
+                const navRow = (label, onPrev, onNext) => React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 } },
+                    React.createElement("button", { onClick: onPrev, style: { width: 30, height: 30, borderRadius: '50%', border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 13, color: PD.text })),
+                    React.createElement("button", { onClick: () => setProviderCalendarAnchorDate(new Date()), style: { display: 'flex', flexDirection: 'column', alignItems: 'center' } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14.5, color: PD.text, margin: 0 } }, label),
+                        React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: THEME.coral } }, "Today")),
+                    React.createElement("button", { onClick: onNext, style: { width: 30, height: 30, borderRadius: '50%', border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement("span", { style: { display: 'flex', transform: 'rotate(180deg)' } }, React.createElement(Icon, { name: "arrowleft", size: 13, color: PD.text }))));
+                const bookingRow = (b) => {
+                    const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
+                    return React.createElement("button", { key: b.id, onClick: () => setBusinessBookingDetail(b), style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, border: `1px solid ${PD.border}`, textAlign: 'left', width: '100%', marginBottom: 10 } },
+                        React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: PD.text, width: 58, flexShrink: 0, margin: 0 } }, b.time),
+                        React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: avatarFg(b.avatarColor), flexShrink: 0 } }, b.initials),
+                        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                            React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, b.customerName),
+                            React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, b.service, " · ", money(b.price))),
+                        React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize', flexShrink: 0 } }, BOOKING_STATUS_LABEL[b.status] || b.status));
+                };
+                let content;
+                if (mode === 'day') {
+                    const timeline = computeScheduleTimelineForDate(anchor, staffFilter);
+                    content = React.createElement(React.Fragment, null,
+                        navRow(anchor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }), () => setProviderCalendarAnchorDate(new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - 1)), () => setProviderCalendarAnchorDate(new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + 1))),
+                        timeline.closed
+                            ? React.createElement("p", { style: { fontSize: 13, color: PD.sub, textAlign: 'center', padding: '30px 0' } }, "Closed this day.")
+                            : timeline.segments.length === 0
+                                ? React.createElement("p", { style: { fontSize: 13, color: PD.sub, textAlign: 'center', padding: '30px 0' } }, "Nothing scheduled.")
+                                : timeline.segments.map((seg, i) => seg.type === 'booking'
+                                    ? bookingRow(seg.booking)
+                                    : React.createElement("div", { key: 'seg' + i, onClick: seg.type === 'open' ? () => setOpenSlotSheet({ startMin: seg.startMin, endMin: seg.endMin }) : undefined, style: { display: 'flex', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, marginBottom: 8, cursor: seg.type === 'open' ? 'pointer' : 'default', border: seg.type === 'open' ? `1.5px dashed ${THEME.coral}` : `1px solid ${PD.border}`, background: seg.type === 'open' ? 'rgba(151,196,0,0.06)' : T.surfaceSecondary } },
+                                        React.createElement("span", { style: { fontSize: 11.5, fontWeight: 700, color: seg.type === 'open' ? THEME.coral : PD.sub, width: 58, flexShrink: 0 } }, minutesToTimeLabel(seg.startMin)),
+                                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: seg.type === 'open' ? THEME.coral : PD.sub } }, seg.type === 'open' ? 'Open' : (seg.type === 'break' ? seg.label : 'Blocked')))));
+                }
+                else if (mode === 'week') {
+                    const startOfWeek = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - anchor.getDay());
+                    const weekDays = Array.from({ length: 7 }, (_, i) => new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate() + i));
+                    const todayD = new Date();
+                    content = React.createElement(React.Fragment, null,
+                        navRow(`${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDays[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`, () => setProviderCalendarAnchorDate(new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - 7)), () => setProviderCalendarAnchorDate(new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + 7))),
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, weekDays.map((d) => {
+                            const bks = dayBookingsFor(d);
+                            const isToday = isSameDay(d, todayD);
+                            const hours = getProviderHoursForDate(MY_PROVIDER_ID, d);
+                            return React.createElement("button", { key: dateKey(d), onClick: () => { setProviderCalendarAnchorDate(d); setProviderCalendarMode('day'); }, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, border: isToday ? `1.5px solid ${THEME.coral}` : `1px solid ${PD.border}`, textAlign: 'left' } },
+                                React.createElement("div", { style: { width: 40, flexShrink: 0, textAlign: 'center' } },
+                                    React.createElement("p", { style: { fontSize: 10, fontWeight: 700, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, d.toLocaleDateString('en-US', { weekday: 'short' })),
+                                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontSize: 15, fontWeight: 700, color: isToday ? THEME.coral : PD.text, margin: 0 } }, d.getDate())),
+                                React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                    !hours || !hours.length
+                                        ? React.createElement("span", { style: { fontSize: 12, color: PD.sub } }, "Closed")
+                                        : React.createElement("span", { style: { fontSize: 12, color: PD.sub } }, bks.length === 0 ? 'No bookings' : `${bks.length} booking${bks.length === 1 ? '' : 's'}`)),
+                                React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub }));
+                        })));
+                }
+                else {
+                    const y = anchor.getFullYear(), m = anchor.getMonth();
+                    const firstWeekday = new Date(y, m, 1).getDay();
+                    const daysInMonth = new Date(y, m + 1, 0).getDate();
+                    const monthLabel = anchor.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                    const cells = [...Array(firstWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+                    const todayD = new Date();
+                    const selectedDate = new Date(y, m, businessCalendarDay || todayD.getDate());
+                    const dayBookings = dayBookingsFor(selectedDate);
+                    content = React.createElement(React.Fragment, null,
+                        navRow(monthLabel, () => setProviderCalendarAnchorDate(new Date(y, m - 1, 1)), () => setProviderCalendarAnchorDate(new Date(y, m + 1, 1))),
+                        React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 8 } },
+                            ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => React.createElement("p", { key: i, style: { fontSize: 10.5, fontWeight: 700, color: PD.sub, textAlign: 'center', margin: 0 } }, d))),
+                        React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 } },
+                            cells.map((day, i) => {
+                                if (!day)
+                                    return React.createElement("div", { key: i });
+                                const cellDate = new Date(y, m, day);
+                                const isToday = isSameDay(cellDate, todayD);
+                                const isSelected = day === businessCalendarDay;
+                                const hasBookings = dayBookingsFor(cellDate).length > 0;
+                                return React.createElement("button", { key: i, onClick: () => setBusinessCalendarDay(day), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '6px 0' } },
+                                    React.createElement("span", { style: { width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, fontWeight: isSelected ? 700 : 500, background: isSelected ? THEME.coral : 'transparent', color: isSelected ? '#fff' : (isToday ? THEME.coral : PD.text) } }, day),
+                                    React.createElement("span", { style: { width: 4, height: 4, borderRadius: 2, background: hasBookings ? THEME.coral : 'transparent' } }));
+                            })),
+                        React.createElement("div", { style: { marginTop: 22 } },
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 } },
+                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, isSameDay(selectedDate, todayD) ? "Today's Bookings" : "Bookings"),
+                                React.createElement("button", { onClick: () => { setProviderCalendarAnchorDate(selectedDate); setProviderCalendarMode('day'); }, style: { fontSize: 12, fontWeight: 600, color: THEME.coral } }, "Day view")),
+                            dayBookings.length === 0
+                                ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub } }, "No bookings on this day.")
+                                : React.createElement("div", null, dayBookings.map(bookingRow))));
+                }
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `16px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
-                    React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, marginBottom: 12 } }, monthLabel),
-                    React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 8 } },
-                        ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => React.createElement("p", { key: i, style: { fontSize: 10.5, fontWeight: 700, color: PD.sub, textAlign: 'center', margin: 0 } }, d))),
-                    React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 } },
-                        cells.map((day, i) => {
-                            if (!day)
-                                return React.createElement("div", { key: i });
-                            const isToday = day === today.getDate();
-                            const isSelected = day === businessCalendarDay;
-                            const hasBookings = day === today.getDate() && businessBookings.some((b) => b.status !== 'cancelled');
-                            return React.createElement("button", { key: i, onClick: () => setBusinessCalendarDay(day), style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '6px 0' } },
-                                React.createElement("span", { style: { width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, fontWeight: isSelected ? 700 : 500, background: isSelected ? THEME.coral : 'transparent', color: isSelected ? '#fff' : (isToday ? THEME.coral : PD.text) } }, day),
-                                React.createElement("span", { style: { width: 4, height: 4, borderRadius: 2, background: hasBookings ? THEME.coral : 'transparent' } }));
-                        })),
-                    React.createElement("div", { style: { marginTop: 22 } },
-                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, marginBottom: 10 } }, businessCalendarDay === today.getDate() ? "Today's Bookings" : "Bookings"),
-                        dayBookings.length === 0
-                            ? React.createElement("p", { style: { fontSize: 12.5, color: PD.sub } }, "No bookings on this day.")
-                            : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, dayBookings.map((b) => {
-                                const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
-                                return React.createElement("button", { key: b.id, onClick: () => setBusinessBookingDetail(b), style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, border: `1px solid ${PD.border}`, textAlign: 'left', width: '100%' } },
-                                    React.createElement("p", { style: { fontSize: 12, fontWeight: 700, color: PD.text, width: 58, flexShrink: 0, margin: 0 } }, b.time),
-                                    React.createElement("div", { style: { width: 34, height: 34, borderRadius: '50%', background: b.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: avatarFg(b.avatarColor), flexShrink: 0 } }, b.initials),
-                                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-                                        React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: PD.text, margin: 0 } }, b.customerName),
-                                        React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 0' } }, b.service, " · ", money(b.price))),
-                                    React.createElement("span", { style: { fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 10, background: st.bg, color: st.color, border: st.border, textTransform: 'capitalize', flexShrink: 0 } }, b.status));
-                            }))));
+                    modeSwitcher, staffFilterRow, content);
             }
             else if (scheduleView === 'weekly') {
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `12px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
@@ -14509,6 +14921,83 @@ function App() {
                         React.createElement("span", { style: { fontSize: 13.5, color: PD.text, fontWeight: businessTipsSettings.recipient === o.id ? 700 : 400 } }, o.label),
                         businessTipsSettings.recipient === o.id && React.createElement(Icon, { name: "check", size: 15, color: THEME.coral })))));
             return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 6, background: T.background, display: 'flex', flexDirection: 'column' } }, header, body);
+        })(),
+        providerDashboardOpen && bookingSettingsOpen && (() => {
+            const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const r = providerBookingRules;
+            const set = (patch) => setProviderBookingRules((prev) => ({ ...prev, ...patch }));
+            const numberRow = (label, sub, value, onChange, suffix) => React.createElement("div", { style: { padding: '13px 0', borderBottom: `1px solid ${PD.border}` } },
+                React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: PD.text, margin: 0 } }, label),
+                sub && React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, margin: '2px 0 8px' } }, sub),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: sub ? 0 : 8 } },
+                    React.createElement("input", { type: "number", min: "0", inputMode: "numeric", value: value, onChange: (e) => onChange(Math.max(0, Number(e.target.value) || 0)), style: { width: 90, border: `1px solid ${PD.border}`, borderRadius: 12, padding: '9px 10px', fontSize: 13.5, color: PD.text, outline: 'none', background: T.inputBackground } }),
+                    React.createElement("span", { style: { fontSize: 12.5, color: PD.sub } }, suffix)));
+            const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: `calc(env(safe-area-inset-top) + 8px) 18px 8px`, borderBottom: `1px solid ${PD.border}` } },
+                React.createElement("button", { onClick: () => setBookingSettingsOpen(false) }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "Booking Settings"));
+            const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px calc(env(safe-area-inset-bottom) + 20px)' } },
+                numberRow("Minimum Notice", "How far ahead a customer must book.", r.minNoticeHours, (v) => set({ minNoticeHours: v }), "hours"),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 0', borderBottom: `1px solid ${PD.border}` } },
+                    React.createElement("div", { style: { flex: 1, paddingRight: 12 } },
+                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 600, color: PD.text, margin: 0 } }, "Allow Same-Day Booking"),
+                        React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 2 } }, "Let customers book for today.")),
+                    React.createElement(ToggleSwitch, { on: r.sameDayAllowed, onChange: () => set({ sameDayAllowed: !r.sameDayAllowed }) })),
+                numberRow("Maximum Advance Booking", "How far into the future customers can book.", r.maxAdvanceDays, (v) => set({ maxAdvanceDays: v }), "days"),
+                numberRow("Buffer Between Appointments", "Gap automatically left after each booking.", r.bufferMinutes, (v) => set({ bufferMinutes: v }), "minutes"),
+                numberRow("Cancellation Cutoff", "How close to the appointment a customer can still cancel free of charge.", r.cancellationCutoffHours, (v) => set({ cancellationCutoffHours: v }), "hours"));
+            return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 6, background: T.background, display: 'flex', flexDirection: 'column' } }, header, body);
+        })(),
+        providerDashboardOpen && payoutSettingsOpen && (() => {
+            const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const header = React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: `calc(env(safe-area-inset-top) + 8px) 18px 8px`, borderBottom: `1px solid ${PD.border}` } },
+                React.createElement("button", { onClick: () => setPayoutSettingsOpen(false) }, React.createElement(Icon, { name: "arrowleft", size: 17, color: PD.text })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: PD.text, margin: 0 } }, "Payments & Payouts"));
+            const body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px calc(env(safe-area-inset-bottom) + 20px)' } },
+                React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: PD.sub, textTransform: 'uppercase', letterSpacing: 0.4, margin: '0 0 10px' } }, "Payout Method"),
+                React.createElement("div", { style: { border: `1px solid ${PD.border}`, borderRadius: 16, overflow: 'hidden' } },
+                    BIZ_PAYOUT_METHODS.map((m, i) => React.createElement("button", { key: m, onClick: () => setProviderPayoutMethod(m), style: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', textAlign: 'left', borderBottom: i < BIZ_PAYOUT_METHODS.length - 1 ? `1px solid ${PD.border}` : 'none' } },
+                        React.createElement("span", { style: { fontSize: 13.5, color: PD.text, fontWeight: providerPayoutMethod === m ? 700 : 400 } }, m),
+                        providerPayoutMethod === m && React.createElement(Icon, { name: "check", size: 15, color: THEME.coral })))),
+                React.createElement("p", { style: { fontSize: 11, color: PD.sub, margin: '10px 2px 0', lineHeight: 1.45 } }, "Earnings from completed bookings are sent to this payout method on your regular payout schedule."));
+            return React.createElement("div", { style: { position: 'absolute', inset: 0, zIndex: 6, background: T.background, display: 'flex', flexDirection: 'column' } }, header, body);
+        })(),
+        providerDashboardOpen && openSlotSheet && (() => {
+            const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const toHHMM = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+            const actions = [
+                { icon: 'plus', label: `Add ${getMyBusinessTerminology().appointment}`, onClick: () => openAddBookingFromSlot(openSlotSheet.startMin) },
+                { icon: 'lock', label: 'Block Time', onClick: () => { setUnavailableDraft({ id: null, date: dateKey(new Date()), start: toHHMM(openSlotSheet.startMin), end: toHHMM(Math.min(openSlotSheet.endMin, openSlotSheet.startMin + 60)), repeat: 'none', reason: '' }); setOpenSlotSheet(null); setProviderDashboardTab('hours'); setScheduleView('addUnavailable'); } },
+                { icon: 'clock', label: 'Change Availability', onClick: () => { setOpenSlotSheet(null); setProviderDashboardTab('hours'); setScheduleView('weekly'); } },
+            ];
+            return React.createElement("div", { onClick: () => setOpenSlotSheet(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '24px 24px 0 0', padding: `14px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                    React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: PD.border, margin: '0 auto 14px' } }),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15.5, color: PD.text, margin: '0 0 4px' } }, minutesToTimeLabel(openSlotSheet.startMin)),
+                    React.createElement("p", { style: { fontSize: 12, color: PD.sub, margin: '0 0 12px' } }, "This time is open."),
+                    actions.map((a, i) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '13px 4px', borderBottom: i < actions.length - 1 ? `1px solid ${PD.border}` : 'none' } },
+                        React.createElement(Icon, { name: a.icon, size: 16, color: PD.text }),
+                        React.createElement("span", { style: { fontSize: 13.5, fontWeight: 500, color: PD.text } }, a.label)))));
+        })(),
+        providerDashboardOpen && addBookingDraft && (() => {
+            const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const d = addBookingDraft;
+            const inputStyleAB = { width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '11px 12px', fontSize: 13.5, color: PD.text, outline: 'none', background: T.inputBackground, fontFamily: 'inherit' };
+            return React.createElement("div", { onClick: () => setAddBookingDraft(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '24px 24px 0 0', padding: `14px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '85%', overflowY: 'auto' } },
+                    React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: PD.border, margin: '0 auto 14px' } }),
+                    React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, margin: '0 0 14px' } }, `Add ${getMyBusinessTerminology().appointment} · ${minutesToTimeLabel(d.timeMinutes)}`),
+                    React.createElement("div", { style: { marginBottom: 12 } },
+                        React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Customer Name"),
+                        React.createElement("input", { value: d.customerName, onChange: (e) => setAddBookingDraft({ ...d, customerName: e.target.value }), placeholder: "Full name", style: inputStyleAB })),
+                    React.createElement("div", { style: { marginBottom: 12 } },
+                        React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Phone (optional)"),
+                        React.createElement("input", { type: "tel", value: d.phone, onChange: (e) => setAddBookingDraft({ ...d, phone: e.target.value }), placeholder: "(555) 123-4567", style: inputStyleAB })),
+                    providerServices.length > 0 && React.createElement("div", { style: { marginBottom: 16 } },
+                        React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, getMyBusinessTerminology().service),
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 8 } }, providerServices.map((s) => React.createElement("button", { key: s.id, onClick: () => setAddBookingDraft({ ...d, serviceId: s.id }), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: 12, border: `1.5px solid ${d.serviceId === s.id ? THEME.coral : PD.border}`, background: d.serviceId === s.id ? 'rgba(151,196,0,0.08)' : 'transparent' } },
+                            React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: PD.text } }, s.name),
+                            React.createElement("span", { style: { fontSize: 12, color: PD.sub } }, money(s.price || 0)))))),
+                    React.createElement("button", { disabled: !d.customerName.trim(), onClick: saveAddBookingDraft, style: { width: '100%', padding: '14px 0', borderRadius: 24, background: d.customerName.trim() ? THEME.coral : '#EDEDED', color: d.customerName.trim() ? '#fff' : '#B5B5B8', fontWeight: 700, fontSize: 14 } }, `Add ${getMyBusinessTerminology().appointment}`)));
         })(),
         (providerDashboardOpen || editBusinessProfileOpen) && serviceAreaSettingsOpen && serviceAreaDraft && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
@@ -15487,10 +15976,20 @@ function App() {
             }
             return React.createElement("div", { onClick: () => setStaffFormDraft(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 11 } },
                     React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxHeight: '85%', overflowY: 'auto', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
-                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, staffFormDraft.id ? 'Edit Staff' : 'Add Staff'),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, staffFormDraft.id ? `Edit ${getMyBusinessTerminology().staffSingular}` : `Add ${getMyBusinessTerminology().staffSingular}`),
                         React.createElement("div", { style: { marginBottom: 14 } },
                             React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Name"),
                             React.createElement("input", { value: staffFormDraft.name, onChange: (e) => setStaffFormDraft({ ...staffFormDraft, name: e.target.value }), placeholder: "e.g. Jamie Rivera", style: inputStyle3 })),
+                        React.createElement("div", { style: { marginBottom: 14 } },
+                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Role (optional)"),
+                            React.createElement("input", { value: staffFormDraft.role || '', onChange: (e) => setStaffFormDraft({ ...staffFormDraft, role: e.target.value }), placeholder: "e.g. Senior " + getMyBusinessTerminology().staffSingular, style: inputStyle3 })),
+                        providerServices.length > 0 && React.createElement("div", { style: { marginBottom: 14 } },
+                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, `${getMyBusinessTerminology().services} performed`),
+                            React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } }, providerServices.map((sv) => {
+                                const active = (staffFormDraft.serviceIds || []).includes(sv.id);
+                                return React.createElement("button", { key: sv.id, onClick: () => setStaffFormDraft((prev) => { const cur = prev.serviceIds || []; return { ...prev, serviceIds: cur.includes(sv.id) ? cur.filter((x) => x !== sv.id) : [...cur, sv.id] }; }), style: { padding: '7px 12px', borderRadius: 12, border: `1.5px solid ${active ? THEME.coral : PD.border}`, background: active ? 'rgba(151,196,0,0.1)' : 'transparent' } },
+                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: active ? THEME.coral : PD.text } }, sv.name));
+                            }))),
                         React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 } },
                             React.createElement("div", null,
                                 React.createElement("p", { style: { fontSize: 13, fontWeight: 600, color: PD.text, margin: 0 } }, "Custom hours"),
@@ -15507,7 +16006,7 @@ function App() {
                                     React.createElement("input", { type: "time", value: hours.start, onChange: (e) => setStaffDay(dayIdx, { ...hours, start: e.target.value }), style: { ...inputStyle3, flex: 1 } }),
                                     React.createElement("input", { type: "time", value: hours.end, onChange: (e) => setStaffDay(dayIdx, { ...hours, end: e.target.value }), style: { ...inputStyle3, flex: 1 } })));
                         })),
-                        React.createElement("button", { disabled: !staffFormDraft.name.trim(), onClick: () => addOrUpdateStaff({ id: staffFormDraft.id, name: staffFormDraft.name.trim(), customHours: staffFormDraft.customHours }), style: { width: '100%', height: 50, borderRadius: 25, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5 } }, "Save Staff")));
+                        React.createElement("button", { disabled: !staffFormDraft.name.trim(), onClick: () => addOrUpdateStaff({ id: staffFormDraft.id, name: staffFormDraft.name.trim(), role: (staffFormDraft.role || '').trim(), serviceIds: staffFormDraft.serviceIds || [], customHours: staffFormDraft.customHours }), style: { width: '100%', height: 50, borderRadius: 25, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5 } }, `Save ${getMyBusinessTerminology().staffSingular}`)));
         })(),
         providerDashboardOpen && promoDraftOpen && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
@@ -16052,7 +16551,10 @@ function App() {
         businessBookingDetail && (React.createElement("div", { onClick: () => setBusinessBookingDetail(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } }, (() => {
             const b = businessBookingDetail;
             const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
-            const actions = [{ icon: 'message', label: 'Message Customer', onClick: () => flashToast('Messaging ' + b.customerName) }];
+            const actions = [
+                { icon: 'message', label: 'Message Customer', onClick: () => flashToast('Messaging ' + b.customerName) },
+                { icon: 'user', label: 'View Customer', onClick: () => { setBusinessBookingDetail(null); setSelectedCustomerDetail(b.customerName); setEarningsInsightsOpen(true); } },
+            ];
             // Directions always go to wherever the service actually happens — the customer's own
             // service address for a mobile booking, never the business's own location.
             if (b.serviceAddress)
@@ -16060,6 +16562,8 @@ function App() {
             if (b.status === 'confirmed' || b.status === 'pending') {
                 actions.push({ icon: 'clock', label: 'Reschedule', onClick: () => flashToast('Reschedule — coming soon') });
                 actions.push({ icon: 'check', label: 'Mark Complete', onClick: () => updateBusinessBookingStatus(b.id, 'completed') });
+                actions.push({ icon: 'x', label: 'No Show', onClick: () => updateBusinessBookingStatus(b.id, 'no_show') });
+                actions.push({ icon: 'trash', label: 'Cancel Booking', danger: true, onClick: () => updateBusinessBookingStatus(b.id, 'cancelled') });
             }
             return React.createElement("div", { onClick: (e) => e.stopPropagation(), className: "avio-filter-sheet", style: { width: '100%', background: T.modalBackground, borderRadius: '24px 24px 0 0', padding: `14px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '85%', overflowY: 'auto' } },
                 React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: T.border, margin: '0 auto 14px' } }),
