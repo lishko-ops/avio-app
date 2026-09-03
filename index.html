@@ -3045,10 +3045,18 @@ function customerSince(allBookings, customerName) {
     const dates = allBookings.filter((b) => b.customerName === customerName && b.status !== 'cancelled').map((b) => getBookingDate(b));
     return dates.length ? new Date(Math.min(...dates.map((d) => d.getTime()))) : null;
 }
+// The single safe-numeric-coercion rule used everywhere an engagement count (or any other
+// number that might be missing/undefined/NaN on an older or partially-built post) gets read —
+// never trust the raw stored value, always fall back to 0 rather than let a NaN/undefined reach
+// a render.
+function safeNum(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+}
 function parseCount(v) {
     if (typeof v === 'number')
-        return v;
-    const m = /^([\d.]+)([KM]?)$/.exec(String(v).trim());
+        return safeNum(v);
+    const m = /^([\d.]+)([KM]?)$/.exec(String(v == null ? '' : v).trim());
     if (!m)
         return 0;
     const n = parseFloat(m[1]);
@@ -3059,11 +3067,34 @@ function parseCount(v) {
     return Math.round(n);
 }
 function formatCount(n) {
+    n = safeNum(n);
     if (n >= 1000000)
         return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
     if (n >= 1000)
         return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
     return String(n);
+}
+// Every post — whatever shape it arrived in (a seeded business/creator post, a freshly
+// published upload, a post reconstructed from a stub in the post-viewer, a reposted draft, an
+// older post from before a field existed) — is routed through this before it's read or
+// rendered. It never migrates/mutates stored data; it just guarantees the read side always
+// sees safe values, so no UI ever has to special-case "what if this field is missing."
+function normalizePost(item) {
+    if (!item)
+        return item;
+    return {
+        ...item,
+        name: item.name || (item.isCustomerPost ? 'Bookvado User' : 'Business'),
+        location: item.location || '',
+        blurb: typeof item.blurb === 'string' ? item.blurb : '',
+        likes: item.likes != null ? item.likes : 0,
+        comments: safeNum(item.comments),
+        saves: item.saves != null ? item.saves : 0,
+        shares: item.shares != null ? item.shares : 0,
+        taggedBusinessIds: Array.isArray(item.taggedBusinessIds) ? item.taggedBusinessIds : [],
+        verifiedTags: Array.isArray(item.verifiedTags) ? item.verifiedTags : [],
+        avatarColor: item.avatarColor || '#000',
+    };
 }
 const FILTER_MASTER_CATEGORIES = [
     { id: 'beauty', label: 'Beauty & Grooming', subs: ['Barbers', 'Hair', 'Nails', 'Makeup', 'Spa'] },
@@ -3397,15 +3428,9 @@ function getCategoryDiscovery(category) { return CATEGORY_DISCOVERY[category] ||
 // fields the real booking flow already branches on (startBookingFor), not a parallel
 // guess, so the label never lies about what tapping it will actually open.
 function getBookingCtaLabel(business) {
-    if (!business)
-        return 'Book Now';
-    if (business.businessType === 'restaurant')
-        return 'Reserve Table';
-    if (business.businessType === 'activities')
-        return 'Book Activity';
-    if (business.category === 'Movies' || business.category === 'Events')
+    if (business && !business.businessType && (business.category === 'Movies' || business.category === 'Events'))
         return 'Get Tickets';
-    return 'Book Appointment';
+    return getBookingCta(business).label;
 }
 function parseCompactNumber(v) {
     if (typeof v === 'number')
@@ -3611,11 +3636,19 @@ function App() {
         if (r && r.menu)
             saveLS('avio_restaurant_menu_' + RESTAURANT_ID, r.menu);
     }, [feed]);
+    // A real, user-published post (from finalizePostThrillz or repostDraft) is always
+    // `mine: true` with a `customVideoUrl` pointing at a blob the app itself created — that
+    // combination, not any id prefix, is what marks a post as "needs its own persistence,"
+    // since a blob: URL dies on every reload and nothing else in `feed` (seeded posts) ever
+    // has one. Metadata (everything except the doomed blob URL) goes to localStorage; the
+    // actual video bytes already live in IndexedDB (saved at publish time) and get restored
+    // into a fresh object URL below.
+    const isUserUploadedPost = (item) => !!(item.mine && item.customVideoUrl);
     const shortsHydratedRef = useRef(false);
     useEffect(() => {
         if (!shortsHydratedRef.current)
             return;
-        const userShorts = feed.filter((item) => item.id.startsWith('short-')).map(({ customVideoUrl, ...meta }) => meta);
+        const userShorts = feed.filter(isUserUploadedPost).map(({ customVideoUrl, ...meta }) => meta);
         saveLS('avio_user_shorts_meta', userShorts);
     }, [feed]);
     useEffect(() => {
@@ -3627,13 +3660,13 @@ function App() {
                 try {
                     const blob = await idbGetBlob(meta.id);
                     if (blob)
-                        restored.push({ ...meta, customVideoUrl: URL.createObjectURL(blob) });
+                        restored.push(normalizePost({ ...meta, customVideoUrl: URL.createObjectURL(blob) }));
                 }
                 catch (e) { }
             }
             if (!cancelled) {
                 if (restored.length)
-                    setFeed((prev) => [...restored, ...prev.filter((item) => !item.id.startsWith('short-'))]);
+                    setFeed((prev) => [...restored, ...prev.filter((item) => !isUserUploadedPost(item))]);
                 shortsHydratedRef.current = true;
             }
         })();
@@ -5024,12 +5057,75 @@ function App() {
         if (!uploadCoverImage)
             captureCoverFromVideoEl(v, Math.min(0.15, (v.duration || 1) * 0.1));
     }
-    function getUploadTagBusiness() {
-        if (!uploadTagBusinessId)
+    // Resolves any stored/selected business id (from the live upload form, a saved draft, or a
+    // draft being reposted) to the real business record — the single place that knows "my own
+    // business" is a synthetic id backed by onboarding state rather than a `feed` entry. Never
+    // invents a business for an id it can't find, so callers correctly treat that as "no tag."
+    function resolveTaggedBusiness(businessId) {
+        if (!businessId)
             return null;
-        if (uploadTagBusinessId === MY_PROVIDER_ID)
+        if (businessId === MY_PROVIDER_ID)
             return { id: MY_PROVIDER_ID, name: bizOnboarding.businessName.trim() || 'My Business', category: bizOnboarding.category || 'Business', location: bizOnboarding.address || 'Your area', avatarColor: THEME.coral, verified: businessVerified };
-        return feed.find((f) => f.id === uploadTagBusinessId) || null;
+        return feed.find((f) => f.id === businessId) || null;
+    }
+    function getUploadTagBusiness() {
+        return resolveTaggedBusiness(uploadTagBusinessId);
+    }
+    // Validates the business/service tag before a post is allowed to publish (section 11 of the
+    // blogger-post spec): a post can go out with no tag at all, but a post that carries a tag
+    // must carry a REAL one — a business id that still resolves, and, if a service was also
+    // selected, a service that genuinely belongs to that business. Also blocks the fully-empty
+    // "just a video, no caption, no tag" post the spec explicitly calls out.
+    function validateThrillzPost() {
+        if (!uploadCaption.trim() && !uploadTagBusinessId)
+            return 'Add a caption or tag a business before posting.';
+        if (uploadTagBusinessId) {
+            const taggedBusiness = getUploadTagBusiness();
+            if (!taggedBusiness)
+                return "That tagged business couldn't be found. Please choose it again.";
+            if (uploadTagServiceId) {
+                const services = getBusinessServicesForTag(taggedBusiness);
+                if (!services.some((s) => s.id === uploadTagServiceId))
+                    return "That tagged service doesn't belong to this business anymore. Please choose it again.";
+            }
+        }
+        return null;
+    }
+    // Shared by finalizePostThrillz (the live upload flow) and repostDraft (reposting a saved
+    // draft) — the one place a full, correctly-shaped Thrillz post object gets built, so a
+    // reposted draft never again reaches the feed missing half its fields (the exact bug that
+    // used to produce NaN comment counts and vanished creator/tag info on reposts).
+    function buildThrillzPost({ blurb, location, topics, taggedBusinessId, taggedServiceId, image, customVideoUrl, sound, commentsOn, eligibleVisit }) {
+        const isCustomerPost = accountType !== 'business';
+        const taggedBusiness = resolveTaggedBusiness(taggedBusinessId);
+        const taggedServices = taggedBusiness ? getBusinessServicesForTag(taggedBusiness) : [];
+        const taggedService = taggedServices.find((s) => s.id === taggedServiceId) || null;
+        return {
+            id: 'thrillz-' + Date.now(),
+            category: taggedBusiness ? taggedBusiness.category : (isCustomerPost ? 'Beauty' : (bizOnboarding.category || 'Beauty')),
+            name: isCustomerPost ? (customerProfile.fullName.trim() || 'You') : (bizOnboarding.businessName.trim() || 'My Business'),
+            location: (location || '').trim() || (taggedBusiness ? taggedBusiness.location : 'Your city'),
+            rating: 5.0,
+            price: taggedService ? taggedService.price : (taggedBusiness ? (taggedBusiness.price || 50) : 50),
+            likes: '0', comments: 0, saves: '0',
+            blurb: (blurb || '').trim(),
+            verified: false, distance: '0 mi',
+            openStatus: 'Available Today',
+            hashtags: (topics || []).map((t) => '#' + t.replace(/\s+/g, '').toLowerCase()),
+            topics: topics || [],
+            friendsBooked: 0,
+            avatarColor: isCustomerPost ? THEME.violet : THEME.coral,
+            image: image || null,
+            video: null,
+            customVideoUrl: customVideoUrl || null,
+            mine: true,
+            isCustomerPost,
+            creatorId: isCustomerPost ? MY_USER_ID : null,
+            commentsOn: commentsOn !== false,
+            sound: sound || null,
+            taggedBusinessIds: taggedBusiness ? [taggedBusiness.id] : [],
+            verifiedTags: taggedBusiness ? [{ businessId: taggedBusiness.id, businessName: taggedBusiness.name, service: taggedService ? taggedService.name : '', verified: !!eligibleVisit || !isCustomerPost }] : [],
+        };
     }
     function getBusinessServicesForTag(business) {
         if (!business)
@@ -5047,6 +5143,11 @@ function App() {
     function startPostThrillz() {
         if (uploadStep === 'posting')
             return;
+        const validationError = validateThrillzPost();
+        if (validationError) {
+            setUploadPostError(validationError);
+            return;
+        }
         setUploadPostError(null);
         setUploadStep('posting');
         setUploadPostProgress(0);
@@ -5068,37 +5169,13 @@ function App() {
     function finalizePostThrillz() {
         try {
             const isCustomerPost = accountType !== 'business';
-            const taggedBusiness = getUploadTagBusiness();
-            const taggedServices = taggedBusiness ? getBusinessServicesForTag(taggedBusiness) : [];
-            const taggedService = taggedServices.find((s) => s.id === uploadTagServiceId) || null;
             const eligibleVisit = isCustomerPost ? getTaggableBusinesses().find((v) => v.providerId === uploadTagBusinessId) : null;
-            const newItem = {
-                id: 'thrillz-' + Date.now(),
-                category: taggedBusiness ? taggedBusiness.category : (isCustomerPost ? 'Beauty' : (bizOnboarding.category || 'Beauty')),
-                name: isCustomerPost ? (customerProfile.fullName.trim() || 'You') : (bizOnboarding.businessName.trim() || 'My Business'),
-                location: uploadLocationText.trim() || (taggedBusiness ? taggedBusiness.location : 'Your city'),
-                rating: 5.0,
-                price: taggedService ? taggedService.price : (taggedBusiness ? (taggedBusiness.price || 50) : 50),
-                likes: '0', comments: 0, saves: '0',
-                blurb: uploadCaption.trim(),
-                verified: false, distance: '0 mi',
-                openStatus: 'Available Today',
-                hashtags: uploadTopics.map((t) => '#' + t.replace(/\s+/g, '').toLowerCase()),
-                topics: uploadTopics,
-                friendsBooked: 0,
-                avatarColor: isCustomerPost ? THEME.violet : THEME.coral,
-                image: uploadCoverImage,
-                video: null,
-                customVideoUrl: uploadVideoUrl,
-                mine: true,
-                isCustomerPost,
-                creatorId: isCustomerPost ? MY_USER_ID : null,
-                commentsOn: uploadCommentsOn,
-                sound: uploadSound,
-                playbackRate: uploadPlaybackRate,
-                taggedBusinessIds: taggedBusiness ? [taggedBusiness.id] : [],
-                verifiedTags: taggedBusiness ? [{ businessId: taggedBusiness.id, businessName: taggedBusiness.name, service: taggedService ? taggedService.name : '', verified: !!eligibleVisit || !isCustomerPost }] : [],
-            };
+            const newItem = buildThrillzPost({
+                blurb: uploadCaption, location: uploadLocationText, topics: uploadTopics,
+                taggedBusinessId: uploadTagBusinessId, taggedServiceId: uploadTagServiceId,
+                image: uploadCoverImage, customVideoUrl: uploadVideoUrl, sound: uploadSound,
+                commentsOn: uploadCommentsOn, eligibleVisit,
+            });
             if (uploadFileRef.current)
                 idbSaveBlob(newItem.id, uploadFileRef.current).catch(() => { });
             setFeed((prev) => [newItem, ...prev]);
@@ -5387,6 +5464,20 @@ function App() {
     // gesture system on the card already owns) so the same code path covers iOS Safari/PWA,
     // Android, and desktop mouse.
     const [shortsSpeed, setShortsSpeed] = useState(null); // { itemId, rate: 1.5 | 2 } | null
+    // Which uploaded-video shorts (keyed by item id) are currently showing a "couldn't play,
+    // tap to retry" state after a genuine media error — never for a normal buffering pause,
+    // which the poster-swap onPlaying/onWaiting handlers already cover.
+    const [shortVideoErrorIds, setShortVideoErrorIds] = useState(() => new Set());
+    function retryShortVideo(itemId) {
+        setShortVideoErrorIds((prev) => { const next = new Set(prev); next.delete(itemId); return next; });
+        const vid = shortVideoRefs.current[itemId];
+        if (vid) {
+            vid.load();
+            const p = vid.play();
+            if (p && p.catch)
+                p.catch(() => { });
+        }
+    }
     const shortsHoldTimerRef = useRef(null);
     const shortsHoldStartRef = useRef(null); // { x, y, itemId } while a press is pending/active
     const shortsSuppressClickRef = useRef(false);
@@ -6994,7 +7085,7 @@ function App() {
             body = posts.length === 0
                 ? React.createElement("p", { style: { fontSize: 13, color: T.textSecondary, textAlign: 'center', padding: '40px 0' } }, "No posts yet")
                 : React.createElement("div", { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginTop: 3 } },
-                    posts.map((p) => React.createElement("button", { key: p.id, onClick: () => { closeCreatorProfile(); openPostViewer({ id: info.id, name: info.displayName, avatarColor: info.avatarColor, mine: info.isMe }, posts.map((v) => ({ id: v.id, image: v.image, video: v.video, videoUrl: v.customVideoUrl || null, likes: v.likes })), posts.indexOf(p)); }, style: { position: 'relative', aspectRatio: '1 / 1', backgroundImage: p.image ? `url(${p.image})` : 'none', backgroundColor: p.image ? undefined : info.avatarColor, backgroundSize: 'cover', backgroundPosition: 'center' } },
+                    posts.map((p) => React.createElement("button", { key: p.id, onClick: () => { closeCreatorProfile(); openPostViewer({ id: info.id, name: info.displayName, avatarColor: info.avatarColor, mine: info.isMe }, posts, posts.indexOf(p)); }, style: { position: 'relative', aspectRatio: '1 / 1', backgroundImage: p.image ? `url(${p.image})` : 'none', backgroundColor: p.image ? undefined : info.avatarColor, backgroundSize: 'cover', backgroundPosition: 'center' } },
                         (p.verifiedTags || []).some((t) => t.verified) && React.createElement("div", { style: { position: 'absolute', top: 6, left: 6, width: 16, height: 16, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "check", size: 9, color: "#fff" })),
                         React.createElement("div", { style: { position: 'absolute', left: 6, bottom: 6, display: 'flex', alignItems: 'center', gap: 3 } },
                             React.createElement("span", { style: { fontSize: 9, color: '#fff' } }, "▶"),
@@ -7677,6 +7768,7 @@ function App() {
     function deleteThrillz(post) {
         setFeed((prev) => prev.filter((f) => f.id !== post.id));
         setDrafts((prev) => prev.filter((f) => f.id !== post.id));
+        idbDeleteBlob(post.id).catch(() => { });
         setDeleteThrillzConfirmOpen(false);
         closePostViewer();
         flashToast('Thrillz deleted');
@@ -7685,7 +7777,19 @@ function App() {
         const full = drafts.find((f) => f.id === id);
         if (!full)
             return;
-        setFeed((prev) => [full, ...prev]);
+        // Drafts are saved with their own reduced shape (see saveUploadAsDraft) — never pushed
+        // into `feed` as-is, or the post that comes out the other end is missing everything
+        // renderShortCard needs (comments, isCustomerPost, creatorId, taggedBusinessIds/
+        // verifiedTags, ...), which used to be a second source of the NaN/"looks broken" bugs.
+        const newItem = buildThrillzPost({
+            blurb: full.blurb, location: full.location, topics: full.topics,
+            taggedBusinessId: full.taggedBusinessId, taggedServiceId: full.taggedServiceId,
+            image: full.image, customVideoUrl: full.customVideoUrl, sound: full.sound,
+            commentsOn: full.commentsOn,
+        });
+        if (full.id)
+            idbGetBlob(full.id).then((blob) => { if (blob) idbSaveBlob(newItem.id, blob).catch(() => { }); }).catch(() => { });
+        setFeed((prev) => [newItem, ...prev]);
         setDrafts((prev) => prev.filter((f) => f.id !== id));
         flashToast('Reposted to Thrillz');
     }
@@ -8647,10 +8751,14 @@ function App() {
     // Trip-style features already hook, never inferred later from matching user/business/date.
     function startBookingFromPost(post, business) {
         if (post && post.isCustomerPost) {
-            setPendingPostAttribution({ creatorId: post.creatorId, postId: post.id, businessId: business.id });
+            setPendingPostAttribution({ source: 'people_post', creatorId: post.creatorId, sourceCreatorId: post.creatorId, postId: post.id, sourcePostId: post.id, businessId: business.id, taggedBusinessId: business.id });
         }
         startBookingFor(business);
     }
+    // Only ever fires for a booking that ACTUALLY finalized (every consumePostAttribution call
+    // site sits right after the booking/reservation is created, never at the moment its CTA is
+    // merely opened) — and only once per booking, even if the same finalize function somehow
+    // runs twice for the same confirmation, since a booking id already recorded here is skipped.
     function consumePostAttribution(booking) {
         if (!pendingPostAttribution)
             return;
@@ -8658,7 +8766,9 @@ function App() {
         setPendingPostAttribution(null);
         if (attr.businessId !== booking.providerId && attr.businessId !== (booking.restaurantId || booking.providerId))
             return;
-        setPostAttributions((prev) => [{ id: 'attr-' + bvNonce(), creatorId: attr.creatorId, postId: attr.postId, businessId: attr.businessId, bookingId: booking.id, createdAt: Date.now() }, ...prev]);
+        setPostAttributions((prev) => prev.some((a) => a.bookingId === booking.id)
+            ? prev
+            : [{ id: 'attr-' + bvNonce(), source: attr.source || 'people_post', creatorId: attr.creatorId, postId: attr.postId, businessId: attr.businessId, bookingId: booking.id, createdAt: Date.now() }, ...prev]);
     }
     function restartShort(item) {
         const el = shortVideoRefs.current[item.id];
@@ -8979,6 +9089,7 @@ function App() {
             status: 'upcoming', confirmationCode: 'BV' + Math.random().toString(36).slice(2, 7).toUpperCase(), createdAt: Date.now(),
         };
         saveRestaurantReservations([...restaurantReservations, reservation]);
+        consumePostAttribution(reservation);
         setRsvFlow((prev) => ({ ...prev, stage: 'confirmed', confirmed: reservation }));
         flashToast('Reservation confirmed');
     }
@@ -10558,7 +10669,12 @@ function App() {
                 React.createElement("input", { ref: settingsAttachInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleSettingsAttachFile }),
                 photoSheet));
     }
-    function renderShortCard(item, itemIdx, activeShortIdx, showFeedHeader) {
+    function renderShortCard(rawItem, itemIdx, activeShortIdx, showFeedHeader) {
+            // Every post reaching this render — a seeded business/creator post, a freshly
+            // published upload, or a post rebuilt from a stub elsewhere in the app — is
+            // normalized here so the rest of this function never has to guard against a
+            // missing/NaN count or a malformed tag array itself.
+            const item = normalizePost(rawItem);
             const isNearActive = Math.abs(itemIdx - activeShortIdx) <= 1;
             // Only the active card plus its immediate neighbors ever get a real <video>
             // element — with 65+ shorts in the feed, mounting every one of them at once
@@ -10573,15 +10689,22 @@ function App() {
             const followed = followedIds.has(item.id);
             const saved = savedShorts.has(item.id);
             const likeCount = formatCount(parseCount(item.likes) + (liked ? 1 : 0));
-            const commentCount = item.comments + ((commentsByItem[item.id] || []).length);
+            const commentCount = formatCount(safeNum(item.comments) + ((commentsByItem[item.id] || []).length));
             const shareCount = formatCount(Math.round(parseCount(item.likes) * 0.4));
             const saveCount = formatCount(parseCount(item.saves) + (saved ? 1 : 0));
             const posterOnly = item.image
                 ? React.createElement("img", { key: item.id + '-poster-only', src: item.image, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } })
                 : React.createElement("div", { style: { position: 'absolute', inset: 0, background: item.avatarColor || '#000' } });
+            const hasVideoError = shortVideoErrorIds.has(item.id);
+            const videoRetryOverlay = hasVideoError && React.createElement("button", { key: item.id + '-retry', onClick: (e) => { e.stopPropagation(); retryShortVideo(item.id); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'rgba(0,0,0,0.45)', zIndex: 1 } },
+                React.createElement(Icon, { name: "refresh", size: 26, color: "#fff" }),
+                React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: '#fff' } }, "Couldn't play — tap to retry"));
             const backdrop = item.customVideoUrl
                 ? (inMountWindow
-                    ? React.createElement("video", { key: item.id + '-video', ref: getShortVideoRefCallback(item.id), src: item.customVideoUrl, muted: false, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onClick: handleShortVideoClick, onPointerDown: (e) => handleShortHoldStart(e, item.id), onPointerMove: (e) => handleShortHoldMove(e, item.id), onPointerUp: () => endShortsHoldSpeed(item.id), onPointerCancel: () => endShortsHoldSpeed(item.id), onPointerLeave: () => endShortsHoldSpeed(item.id), style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000', cursor: 'pointer' } })
+                    ? React.createElement(React.Fragment, { key: item.id + '-videowrap' },
+                        React.createElement("video", { key: item.id + '-video', ref: getShortVideoRefCallback(item.id), src: item.customVideoUrl, muted: false, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onPlaying: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = 'none'; setShortVideoErrorIds((prev) => prev.has(item.id) ? (() => { const n = new Set(prev); n.delete(item.id); return n; })() : prev); }, onWaiting: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = ''; }, onError: () => { setShortVideoErrorIds((prev) => new Set(prev).add(item.id)); }, onClick: handleShortVideoClick, onPointerDown: (e) => handleShortHoldStart(e, item.id), onPointerMove: (e) => handleShortHoldMove(e, item.id), onPointerUp: () => endShortsHoldSpeed(item.id), onPointerCancel: () => endShortsHoldSpeed(item.id), onPointerLeave: () => endShortsHoldSpeed(item.id), style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000', cursor: 'pointer' } }),
+                        item.image && React.createElement("img", { key: item.id + '-poster', ref: getShortPosterRefCallback(item.id), src: item.image, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }),
+                        videoRetryOverlay)
                     : posterOnly)
                 : item.video
                     ? (inMountWindow
@@ -10647,12 +10770,22 @@ function App() {
             // A creator's post is identified by WHO posted it, never confused with the business
             // they're reviewing — tapping the name here opens their creator profile, not the
             // business's (that's what the tagged-business pill / booking CTA below are for).
+            // Blogger/People posts additionally get a small avatar + display name above their
+            // @username, so a post never reads as if the tagged business itself posted it.
+            const creatorAvatar = postCreator && (postCreator.avatarPhoto
+                ? React.createElement("img", { src: postCreator.avatarPhoto, style: { width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 } })
+                : React.createElement("div", { style: { width: 30, height: 30, borderRadius: '50%', background: postCreator.avatarColor || THEME.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: '#fff' } }, (postCreator.displayName || '?').trim().charAt(0).toUpperCase())));
             const nameRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
                 postCreator
-                    ? React.createElement("button", { onClick: () => openCreatorProfile(postCreator.id), style: { display: 'flex', alignItems: 'center', gap: 6 } },
-                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: '#fff', margin: 0 } }, '@' + postCreator.username),
-                        postCreator.verified && React.createElement("div", { style: { width: 15, height: 15, borderRadius: '50%', background: T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                            React.createElement(Icon, { name: "check", size: 8, color: THEME.ink })))
+                    ? React.createElement("button", { onClick: () => openCreatorProfile(postCreator.id), style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                        creatorAvatar,
+                        React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start' } },
+                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14.5, color: '#fff', margin: 0, lineHeight: 1.25 } }, postCreator.displayName),
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4 } },
+                                React.createElement("p", { style: { fontSize: 12, color: 'rgba(255,255,255,0.75)', margin: 0 } }, '@' + postCreator.username),
+                                postCreator.verified && React.createElement("div", { style: { width: 13, height: 13, borderRadius: '50%', background: T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                                    React.createElement(Icon, { name: "check", size: 7, color: THEME.ink })))))
                     : React.createElement("button", { onClick: () => openBusinessProfile(item), style: { display: 'flex', alignItems: 'center', gap: 6 } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 17, color: '#fff', margin: 0 } }, item.name),
                         item.verified && React.createElement("div", { style: { width: 15, height: 15, borderRadius: '50%', background: T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
@@ -10671,15 +10804,23 @@ function App() {
                     React.createElement("span", { style: { fontSize: 12, color: 'rgba(255,255,255,0.6)' } }, "with"),
                     taggedBusinesses.map((b) => React.createElement("button", { key: b.id, onClick: () => openBusinessProfile(b), style: { fontSize: 12, fontWeight: 600, color: THEME.coral, background: 'rgba(151,196,0,0.15)', borderRadius: 12, padding: '3px 10px' } }, b.name))));
             const primaryTagTarget = taggedBusinesses[0] || item;
-            const bookedCount = parseCount(item.likes).toLocaleString();
-            const bookedBadge = React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.14)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', borderRadius: 9, padding: '4px 8px', marginBottom: 5 } },
+            // Real attribution, not a stand-in derived from likes: every confirmed booking that
+            // was actually opened from THIS post (see startBookingFromPost/consumePostAttribution)
+            // recorded itself into postAttributions at the moment it finalized, so this count is
+            // exactly how many bookings this post has driven — nothing inferred, nothing faked.
+            const bookedCount = postAttributions.filter((a) => a.postId === item.id).length;
+            const bookedBadge = React.createElement("div", { style: { display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.14)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', borderRadius: 9, padding: '4px 8px', marginTop: 8 } },
                 React.createElement(Icon, { name: "users", size: 9.5, color: THEME.coral }),
-                React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: "#fff" } }, bookedCount),
+                React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: "#fff" } }, bookedCount.toLocaleString()),
                 React.createElement("span", { style: { fontSize: 9.5, fontWeight: 500, color: 'rgba(255,255,255,0.75)' } }, "Booked"));
             const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 'calc(env(safe-area-inset-bottom) + 110px)', padding: '0 18px', zIndex: 2 } },
-                bookedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, taggedRow);
+                React.createElement("div", null, nameRow), categoryRow2, captionP, taggedRow, bookedBadge);
             const thrillCta = getBookingCta(primaryTagTarget);
-            const bookCta = !item.mine && React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(max(0px, env(safe-area-inset-bottom) - 37px) + 72px)', zIndex: 2, borderRadius: 18, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
+            // Every post shows the real booking CTA now — including your own — so a blogger
+            // (or business) can always see and use the exact same booking flow their viewers
+            // would (section 5/10 of the blogger-post spec): no more special-cased hiding for
+            // `item.mine`.
+            const bookCta = React.createElement("div", { style: { position: 'absolute', left: 18, bottom: 'calc(max(0px, env(safe-area-inset-bottom) - 37px) + 72px)', zIndex: 2, borderRadius: 18, background: 'rgba(0,0,0,0.4)', border: `1.3px solid ${THEME.coral}` } },
                 React.createElement("button", { onClick: () => startBookingFromPost(item, primaryTagTarget), style: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '12px 19.5px' } },
                     React.createElement(Icon, { name: "calendar", size: 14, color: "#fff" }),
                     React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 12, color: "#fff" } }, thrillCta.label),
@@ -11709,7 +11850,7 @@ function App() {
                         React.createElement("div", { style: { position: 'absolute', left: 6, bottom: 6, display: 'flex', alignItems: 'center', gap: 3 } },
                             React.createElement("span", { style: { fontSize: 9, color: '#fff' } }, "▶"),
                             React.createElement("span", { style: { fontSize: 10, color: '#fff', fontWeight: 600 } }, f.likes)))));
-            const openThrill = (list) => (f, i) => openPostViewer({ id: 'me-customer', name: displayName, avatarColor: THEME.violet, mine: true }, list.map((v) => ({ id: v.id, image: v.image, video: v.video, videoUrl: v.customVideoUrl || null, likes: v.likes })), i);
+            const openThrill = (list) => (f, i) => openPostViewer({ id: 'me-customer', name: displayName, avatarColor: THEME.violet, mine: true }, list, i);
 
             let body;
             if (customerProfileView === 'followers') {
@@ -13859,7 +14000,10 @@ function App() {
                         ? React.createElement("p", { style: { fontSize: 13, color: PD.sub, textAlign: 'center', marginTop: 24 } }, "No customer posts yet.")
                         : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, customerPosts.map((p) => {
                             const views = formatCount(parseCount(p.likes));
-                            const bookingsGenerated = Math.max(1, Math.round(parseCount(p.likes) * 0.02));
+                            // Real bookings this post actually drove, not an estimate off its
+                            // like count — same postAttributions record the post's own "N Booked"
+                            // badge in the feed reads from.
+                            const bookingsGenerated = postAttributions.filter((a) => a.postId === p.id).length;
                             return React.createElement("div", { key: p.id, style: { display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16, border: `1px solid ${PD.border}` } },
                                 React.createElement("div", { style: { position: 'relative', width: 48, height: 48, borderRadius: 10, flexShrink: 0, backgroundImage: p.image ? `url(${p.image})` : 'none', backgroundColor: p.image ? undefined : (p.avatarColor || THEME.violet), backgroundSize: 'cover', backgroundPosition: 'center' } }),
                                 React.createElement("div", { style: { flex: 1, minWidth: 0 } },
@@ -16213,6 +16357,7 @@ function App() {
                             React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: UP.text } }, "Allow Comments"),
                             React.createElement(ToggleSwitch, { on: uploadCommentsOn, onChange: () => setUploadCommentsOn((v) => !v) })))),
                 React.createElement("div", { style: { flexShrink: 0, padding: '12px 20px calc(env(safe-area-inset-bottom) + 16px)', borderTop: `1px solid ${UP.border}` } },
+                    uploadPostError && React.createElement("p", { style: { fontSize: 12.5, fontWeight: 600, color: '#D0304A', textAlign: 'center', margin: '0 0 10px' } }, uploadPostError),
                     React.createElement("button", { onClick: startPostThrillz, style: { width: '100%', height: 54, borderRadius: 27, background: green, color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' } }, "Post Thrillz")));
 
             // ---------- STEP 5 — Posting ----------
