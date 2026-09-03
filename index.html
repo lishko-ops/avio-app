@@ -5478,6 +5478,41 @@ function App() {
                 p.catch(() => { });
         }
     }
+    // Which shorts are sitting on their poster/first-frame because BOTH the unmuted and the
+    // muted autoplay attempt (see the IntersectionObserver below) were rejected by the
+    // browser — this is the one case the poster-hide-on-`playing` pattern can never resolve
+    // by itself, since no further event ever fires to hide it. Without an explicit "tap to
+    // play" affordance here, that video is visually indistinguishable from a static image —
+    // exactly the bug this tracks. A video that plays normally never enters this set; one
+    // that's merely buffering isn't in it either (that's onWaiting, a transient state, not
+    // a blocked one).
+    const [shortsAutoplayBlockedIds, setShortsAutoplayBlockedIds] = useState(() => new Set());
+    function markShortAutoplayBlocked(itemId, blocked) {
+        setShortsAutoplayBlockedIds((prev) => {
+            const has = prev.has(itemId);
+            if (blocked === has)
+                return prev;
+            const next = new Set(prev);
+            if (blocked) next.add(itemId); else next.delete(itemId);
+            return next;
+        });
+    }
+    function tapToPlayShort(itemId) {
+        markShortAutoplayBlocked(itemId, false);
+        const vid = shortVideoRefs.current[itemId];
+        if (!vid)
+            return;
+        vid.muted = false;
+        const p = vid.play();
+        if (p && p.catch) {
+            p.catch(() => {
+                vid.muted = true;
+                const p2 = vid.play();
+                if (p2 && p2.catch)
+                    p2.catch(() => { markShortAutoplayBlocked(itemId, true); });
+            });
+        }
+    }
     const shortsHoldTimerRef = useRef(null);
     const shortsHoldStartRef = useRef(null); // { x, y, itemId } while a press is pending/active
     const shortsSuppressClickRef = useRef(false);
@@ -7315,7 +7350,12 @@ function App() {
                     // Try unmuted first — sound should always be on by default. Some
                     // mobile browsers still block unmuted autoplay without a fresh user
                     // gesture; if that happens, fall back to a muted play so the video
-                    // at least keeps moving instead of freezing on the poster.
+                    // at least keeps moving instead of freezing on the poster. If even
+                    // THAT is rejected, the browser is refusing autoplay outright — mark
+                    // it so the render shows an explicit tap-to-play control instead of
+                    // silently leaving the poster up forever with no way to tell it's a
+                    // video at all.
+                    markShortAutoplayBlocked(id, false);
                     vid.muted = false;
                     const p = vid.play();
                     if (p && p.catch) {
@@ -7323,7 +7363,7 @@ function App() {
                             vid.muted = true;
                             const p2 = vid.play();
                             if (p2 && p2.catch)
-                                p2.catch(() => { });
+                                p2.catch(() => { markShortAutoplayBlocked(id, true); });
                         });
                     }
                     setActiveShortId(id);
@@ -10699,20 +10739,29 @@ function App() {
             const videoRetryOverlay = hasVideoError && React.createElement("button", { key: item.id + '-retry', onClick: (e) => { e.stopPropagation(); retryShortVideo(item.id); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'rgba(0,0,0,0.45)', zIndex: 1 } },
                 React.createElement(Icon, { name: "refresh", size: 26, color: "#fff" }),
                 React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: '#fff' } }, "Couldn't play — tap to retry"));
+            // The browser refused BOTH the unmuted and the muted autoplay attempt — nothing else
+            // will ever hide the poster on its own, so without this the post would sit there
+            // looking exactly like a static photo forever. Same visual language as the retry
+            // overlay above, distinct wording, and never shown at the same time as a real error.
+            const needsPlayTap = !hasVideoError && shortsAutoplayBlockedIds.has(item.id);
+            const playTapOverlay = needsPlayTap && React.createElement("button", { key: item.id + '-playtap', onClick: (e) => { e.stopPropagation(); tapToPlayShort(item.id); }, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.15)', zIndex: 1 } },
+                React.createElement("div", { style: { width: 62, height: 62, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "playcircle", size: 30, color: "#fff" })));
             const backdrop = item.customVideoUrl
                 ? (inMountWindow
                     ? React.createElement(React.Fragment, { key: item.id + '-videowrap' },
-                        React.createElement("video", { key: item.id + '-video', ref: getShortVideoRefCallback(item.id), src: item.customVideoUrl, muted: false, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onPlaying: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = 'none'; setShortVideoErrorIds((prev) => prev.has(item.id) ? (() => { const n = new Set(prev); n.delete(item.id); return n; })() : prev); }, onWaiting: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = ''; }, onError: () => { setShortVideoErrorIds((prev) => new Set(prev).add(item.id)); }, onClick: handleShortVideoClick, onPointerDown: (e) => handleShortHoldStart(e, item.id), onPointerMove: (e) => handleShortHoldMove(e, item.id), onPointerUp: () => endShortsHoldSpeed(item.id), onPointerCancel: () => endShortsHoldSpeed(item.id), onPointerLeave: () => endShortsHoldSpeed(item.id), style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000', cursor: 'pointer' } }),
+                        React.createElement("video", { key: item.id + '-video', ref: getShortVideoRefCallback(item.id), src: item.customVideoUrl, muted: false, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onPlaying: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = 'none'; setShortVideoErrorIds((prev) => prev.has(item.id) ? (() => { const n = new Set(prev); n.delete(item.id); return n; })() : prev); markShortAutoplayBlocked(item.id, false); }, onWaiting: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = ''; }, onError: () => { setShortVideoErrorIds((prev) => new Set(prev).add(item.id)); }, onClick: handleShortVideoClick, onPointerDown: (e) => handleShortHoldStart(e, item.id), onPointerMove: (e) => handleShortHoldMove(e, item.id), onPointerUp: () => endShortsHoldSpeed(item.id), onPointerCancel: () => endShortsHoldSpeed(item.id), onPointerLeave: () => endShortsHoldSpeed(item.id), style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', background: '#000', cursor: 'pointer' } }),
                         item.image && React.createElement("img", { key: item.id + '-poster', ref: getShortPosterRefCallback(item.id), src: item.image, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }),
-                        videoRetryOverlay)
+                        playTapOverlay, videoRetryOverlay)
                     : posterOnly)
                 : item.video
                     ? (inMountWindow
                         ? React.createElement(React.Fragment, { key: item.id + '-videowrap' },
-                            React.createElement("video", { key: item.id + '-video', ref: getShortVideoRefCallback(item.id), muted: false, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onPlaying: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = 'none'; }, onWaiting: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = ''; }, onClick: handleShortVideoClick, onPointerDown: (e) => handleShortHoldStart(e, item.id), onPointerMove: (e) => handleShortHoldMove(e, item.id), onPointerUp: () => endShortsHoldSpeed(item.id), onPointerCancel: () => endShortsHoldSpeed(item.id), onPointerLeave: () => endShortsHoldSpeed(item.id), style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
+                            React.createElement("video", { key: item.id + '-video', ref: getShortVideoRefCallback(item.id), muted: false, loop: true, playsInline: true, preload: isNearActive ? "auto" : "metadata", onPlaying: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = 'none'; markShortAutoplayBlocked(item.id, false); }, onWaiting: (e) => { const p = shortPosterRefs.current[item.id]; if (p) p.style.display = ''; }, onClick: handleShortVideoClick, onPointerDown: (e) => handleShortHoldStart(e, item.id), onPointerMove: (e) => handleShortHoldMove(e, item.id), onPointerUp: () => endShortsHoldSpeed(item.id), onPointerCancel: () => endShortsHoldSpeed(item.id), onPointerLeave: () => endShortsHoldSpeed(item.id), style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' } },
                                 React.createElement("source", { src: item.video + '.webm', type: "video/webm" }),
                                 React.createElement("source", { src: item.video + '.mp4', type: "video/mp4" })),
-                            item.image && React.createElement("img", { key: item.id + '-poster', ref: getShortPosterRefCallback(item.id), src: item.image, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }))
+                            item.image && React.createElement("img", { key: item.id + '-poster', ref: getShortPosterRefCallback(item.id), src: item.image, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }),
+                            playTapOverlay)
                         : posterOnly)
                     : item.image
                     ? React.createElement("div", { style: { position: 'absolute', inset: 0, backgroundImage: `url(${item.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } })
