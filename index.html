@@ -5380,28 +5380,42 @@ function App() {
     // instant playback, instead of every one of the 65 shorts fighting for
     // bandwidth at once.
     const [activeShortId, setActiveShortId] = useState(null);
-    // WhatsApp-style press-and-hold speed control for Thrillz videos. Pointer Events (not raw
-    // touch events, which the existing swipe/double-tap-like/scrub gesture system on the card
-    // already owns) so the same code path covers iOS Safari/PWA, Android, and desktop mouse —
-    // and since it only ever reads position and sets playbackRate, it can never interfere with
-    // (or be blamed for triggering) the like/swipe/booking gestures living alongside it.
-    const [shortsSpeedItemId, setShortsSpeedItemId] = useState(null);
+    // WhatsApp-style press-and-hold speed control for Thrillz videos: hold = 1.5x, hold + slide
+    // right = 2x, slide back left = 1.5x, release = instantly back to 1x. No permanent speed
+    // button — this is transient UI state only, never persisted, and every video always starts
+    // at 1x. Pointer Events (not raw touch events, which the existing swipe/double-tap-like/scrub
+    // gesture system on the card already owns) so the same code path covers iOS Safari/PWA,
+    // Android, and desktop mouse.
+    const [shortsSpeed, setShortsSpeed] = useState(null); // { itemId, rate: 1.5 | 2 } | null
     const shortsHoldTimerRef = useRef(null);
-    const shortsHoldStartRef = useRef(null); // { x, y, itemId } while a press is pending, else null
+    const shortsHoldStartRef = useRef(null); // { x, y, itemId } while a press is pending/active
     const shortsSuppressClickRef = useRef(false);
+    // Set the instant the hold threshold fires, cleared the instant the hold ends. Read
+    // SYNCHRONOUSLY (a ref, not the shortsSpeed state, which a same-tick touch event could still
+    // see as stale) by the legacy touch-gesture handlers just below — once a hold has claimed a
+    // touch, double-tap-to-like, the edge-swipe restart, and the profile-reveal drag must all
+    // stay out of it entirely, or sliding right to reach 2x would also restart the video (it's
+    // the same rightward gesture the edge-swipe uses) and a stationary hold-then-release would
+    // read as a like-triggering "tap."
+    const shortsHoldEngagedItemIdRef = useRef(null);
     function clearShortsHoldTimer() {
         if (shortsHoldTimerRef.current) { clearTimeout(shortsHoldTimerRef.current); shortsHoldTimerRef.current = null; }
+    }
+    function applyShortsPlaybackRate(itemId, rate) {
+        const vid = shortVideoRefs.current[itemId];
+        if (vid) vid.playbackRate = rate;
     }
     function endShortsHoldSpeed(itemId) {
         clearShortsHoldTimer();
         shortsHoldStartRef.current = null;
-        const vid = shortVideoRefs.current[itemId];
-        if (vid) vid.playbackRate = 1.0;
-        setShortsSpeedItemId((cur) => cur === itemId ? null : cur);
+        if (shortsHoldEngagedItemIdRef.current === itemId)
+            shortsHoldEngagedItemIdRef.current = null;
+        applyShortsPlaybackRate(itemId, 1.0);
+        setShortsSpeed((cur) => (cur && cur.itemId === itemId) ? null : cur);
     }
-    // The hold threshold is what keeps an ordinary tap from ever visibly flashing into 2x — 2x
-    // only engages once the timer actually fires, and release-before-then (a normal tap) clears
-    // it first via clearShortsHoldTimer() in the pointerup/pointercancel handlers below.
+    // The hold threshold is what keeps an ordinary tap from ever visibly flashing into 1.5x —
+    // speed only engages once the timer actually fires, and release-before-then (a normal tap)
+    // clears it first via clearShortsHoldTimer() in the pointerup/pointercancel handlers below.
     function handleShortHoldStart(e, itemId) {
         clearShortsHoldTimer();
         shortsSuppressClickRef.current = false;
@@ -5409,20 +5423,41 @@ function App() {
         shortsHoldTimerRef.current = setTimeout(() => {
             shortsHoldTimerRef.current = null;
             shortsSuppressClickRef.current = true;
-            const vid = shortVideoRefs.current[itemId];
-            if (vid) vid.playbackRate = 2.0;
+            shortsHoldEngagedItemIdRef.current = itemId;
+            applyShortsPlaybackRate(itemId, 1.5);
             if (navigator.vibrate) navigator.vibrate(10);
-            setShortsSpeedItemId(itemId);
+            setShortsSpeed({ itemId, rate: 1.5 });
         }, 180);
     }
     function handleShortHoldMove(e, itemId) {
         const start = shortsHoldStartRef.current;
         if (!start || start.itemId !== itemId) return;
-        // Movement past a small threshold means this touch is turning into a swipe (changing
-        // videos, restarting, revealing a profile) rather than a hold — bail out completely and
-        // let that gesture proceed untouched instead of fighting it.
-        if (Math.abs(e.clientX - start.x) > 10 || Math.abs(e.clientY - start.y) > 10)
+        const dx = e.clientX - start.x;
+        const dy = e.clientY - start.y;
+        // Movement that's mostly VERTICAL means this touch is turning into a real swipe (changing
+        // videos) rather than a speed slide — bail out of speed mode completely and let that
+        // gesture proceed untouched instead of fighting it. Horizontal movement is never treated
+        // as a bail-out here — it's the slide-right-for-2x gesture itself.
+        if (Math.abs(dy) > 24 && Math.abs(dy) > Math.abs(dx)) {
             endShortsHoldSpeed(itemId);
+            return;
+        }
+        // Before the hold has actually engaged (still inside the tap threshold), any real
+        // movement — including horizontal — just means this was always a swipe, not a hold.
+        if (shortsHoldEngagedItemIdRef.current !== itemId) {
+            if (Math.abs(dx) > 10 || Math.abs(dy) > 10)
+                endShortsHoldSpeed(itemId);
+            return;
+        }
+        const SLIDE_TO_2X_PX = 40;
+        const nextRate = dx > SLIDE_TO_2X_PX ? 2.0 : 1.5;
+        setShortsSpeed((cur) => {
+            if (!cur || cur.itemId !== itemId || cur.rate === nextRate)
+                return cur;
+            applyShortsPlaybackRate(itemId, nextRate);
+            if (navigator.vibrate) navigator.vibrate(8);
+            return { itemId, rate: nextRate };
+        });
     }
     function handleShortVideoClick(e) {
         if (shortsSuppressClickRef.current) { shortsSuppressClickRef.current = false; return; }
@@ -5432,14 +5467,14 @@ function App() {
     useEffect(() => {
         if (tab !== 'discover') {
             Object.values(shortVideoRefs.current).forEach((v) => { if (v) { v.pause(); v.playbackRate = 1.0; } });
-            if (shortsSpeedItemId) endShortsHoldSpeed(shortsSpeedItemId);
+            if (shortsSpeed) endShortsHoldSpeed(shortsSpeed.itemId);
         }
     }, [tab]);
     useEffect(() => {
         const pauseAll = () => {
             if (document.hidden) {
                 Object.values(shortVideoRefs.current).forEach((v) => { if (v) { v.pause(); v.playbackRate = 1.0; } });
-                if (shortsSpeedItemId) endShortsHoldSpeed(shortsSpeedItemId);
+                if (shortsSpeed) endShortsHoldSpeed(shortsSpeed.itemId);
             }
         };
         document.addEventListener('visibilitychange', pauseAll);
@@ -5448,12 +5483,12 @@ function App() {
             document.removeEventListener('visibilitychange', pauseAll);
             window.removeEventListener('pagehide', pauseAll);
         };
-    }, [shortsSpeedItemId]);
+    }, [shortsSpeed]);
     // The active short changing means whatever was mid-hold just scrolled away — never leave a
-    // stale 2x badge (or an off-screen video quietly stuck at 2x) behind.
+    // stale speed badge (or an off-screen video quietly stuck above 1x) behind.
     useEffect(() => {
-        if (shortsSpeedItemId && shortsSpeedItemId !== activeShortId)
-            endShortsHoldSpeed(shortsSpeedItemId);
+        if (shortsSpeed && shortsSpeed.itemId !== activeShortId)
+            endShortsHoldSpeed(shortsSpeed.itemId);
     }, [activeShortId]);
     const bizPanelTouchRef = useRef(null);
     const lastTapRef = useRef({ time: 0, id: null });
@@ -9322,6 +9357,10 @@ function App() {
         shortTouchRef.current = { itemId: item.id, startX: x, startY: y, edge, axis: null, triggered: false, inScrubZone, scrubbing: false };
     }
     function handleShortTouchMove(e, item) {
+        // A press-and-hold speed gesture has already claimed this touch — never also restart the
+        // video or drag the profile reveal for the very same rightward/leftward slide.
+        if (shortsHoldEngagedItemIdRef.current === item.id)
+            return;
         const t = shortTouchRef.current;
         if (!t || t.itemId !== item.id)
             return;
@@ -9386,6 +9425,10 @@ function App() {
     function handleShortTouchEnd(e, item) {
         const t = shortTouchRef.current;
         shortTouchRef.current = null;
+        // Same claim as above — a hold that engaged and was released with little/no movement
+        // must never read as the tap half of a double-tap-to-like.
+        if (shortsHoldEngagedItemIdRef.current === item.id)
+            return;
         if (!t || t.itemId !== item.id)
             return;
         if (t.scrubbing) {
@@ -10684,8 +10727,10 @@ function App() {
             // Positioned low enough to clear the dismissible "leave a review/tip" banner (a
             // separate top-level overlay at a much higher z-index that would otherwise sit right
             // on top of a badge placed any closer to the search/filter row above it).
-            const speedBadge = shortsSpeedItemId === item.id && React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 190px)', right: 16, zIndex: 2, pointerEvents: 'none', padding: '5px 12px', borderRadius: 14, background: 'rgba(0,0,0,0.55)', border: `1px solid ${THEME.coral}` } },
-                React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontSize: 12, fontWeight: 700, color: THEME.coral } }, "2×"));
+            const speedBadge = shortsSpeed && shortsSpeed.itemId === item.id && React.createElement("div", { style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 190px)', right: 16, zIndex: 2, pointerEvents: 'none', display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 14, background: 'rgba(0,0,0,0.55)', border: `1px solid ${THEME.coral}` } },
+                [1.5, 2].map((r, i) => React.createElement(React.Fragment, { key: r },
+                    i > 0 && React.createElement("span", { style: { fontSize: 11, color: 'rgba(255,255,255,0.4)' } }, "›"),
+                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontSize: 12, fontWeight: shortsSpeed.rate === r ? 700 : 500, color: shortsSpeed.rate === r ? THEME.coral : 'rgba(255,255,255,0.45)' } }, `${r}×`))));
             // `contain` lets the browser skip layout/paint work for the ~60 other cards
             // sitting off-screen in this scroll-snap list instead of tracking them as if
             // they might affect the page outside their own box — a big part of what made
