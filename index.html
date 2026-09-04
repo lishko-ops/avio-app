@@ -99,8 +99,8 @@
   .avio-upload-sheet { animation: avioUploadSheetUp 0.25s cubic-bezier(0.32, 0.72, 0, 1); }
   @keyframes avioUploadPageIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   .avio-upload-page { animation: avioUploadPageIn 0.22s ease; }
-  .avio-rail-circle { width: 50px; height: 50px; border-radius: 50%; background: transparent; border: none; display: flex; align-items: center; justify-content: center; transition: transform 0.2s ease, background 0.2s ease; }
-  .avio-rail-btn:active .avio-rail-circle { transform: scale(0.94); background: rgba(255,255,255,0.12); }
+  .avio-rail-circle { width: 46px; height: 46px; border-radius: 50%; background: rgba(20,20,20,0.4); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); border: none; display: flex; align-items: center; justify-content: center; transition: transform 0.2s ease, background 0.2s ease; }
+  .avio-rail-btn:active .avio-rail-circle { transform: scale(0.94); background: rgba(20,20,20,0.55); }
   .avio-rail-btn.share:active .avio-rail-circle { transform: scale(0.94) rotate(8deg); }
   @keyframes avioRailBounce { 0%, 100% { transform: scale(0.94); } 50% { transform: scale(1.05); } }
   .avio-rail-btn.comment:active .avio-rail-circle { animation: avioRailBounce 0.2s ease; }
