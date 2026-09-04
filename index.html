@@ -1386,17 +1386,66 @@ const PROFILE_REVIEWS = [
 function loadLS(key, fallback) {
     try {
         const raw = localStorage.getItem(key);
-        if (raw)
-            return JSON.parse(raw);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            // A stored literal `null`/`undefined` (e.g. from a past bug that cleared a key by
+            // saving null instead of removing it) must fall through to `fallback` just like a
+            // missing key would — every caller's fallback is a real, correctly-shaped default
+            // (an array, an object with all its fields), and handing back a bare `null` instead
+            // is exactly the kind of "undefined business object" that crashes an unguarded
+            // `.length`/`.trim()`/`.filter()` read deep in a render function.
+            if (parsed !== null && parsed !== undefined)
+                return parsed;
+        }
     }
     catch (e) { }
     return fallback;
+}
+// For state that must always be an array (providerServices, providerStaff, ...): a wrong-typed
+// persisted value (an object, a string, anything non-array) would otherwise reach `.map`/
+// `.filter`/`.length` call sites deep in render with no guard, throwing uncaught. Coercing the
+// type at load time — the same one-place fix as sanitizeBizOnboarding — makes that whole class of
+// crash impossible instead of merely retriable.
+function loadLSArray(key, fallback) {
+    const v = loadLS(key, fallback);
+    return Array.isArray(v) ? v : fallback;
 }
 function saveLS(key, value) {
     try {
         localStorage.setItem(key, JSON.stringify(value));
     }
     catch (e) { }
+}
+const DEFAULT_BIZ_ONBOARDING = { businessName: '', category: '', subcategory: '', services: [], locationMode: '', address: '', serviceArea: '', description: '', phone: '', email: '', photo: null, coverPhoto: null, gallery: [], website: '', social: { instagram: '', tiktok: '' }, paymentAcceptance: '' };
+// `loadLS` returns whatever JSON.parse hands back with NO merge against the default shape — a
+// business account whose `avio_biz_onboarding` blob predates a field this app later added (or is
+// otherwise partial/malformed) loads with that field `undefined`. Dozens of render call sites do
+// `bizOnboarding.businessName.trim()` / `.services.filter(...)` etc with no null-guard, so an
+// `undefined` field there throws INSIDE React's render pass — uncaught, that unmounts the whole
+// tree and trips the app-wide AppErrorBoundary, which is exactly the "Business tab sometimes
+// shows the global crash screen" bug. Coercing every field to the right type at the one load site
+// (rather than guarding every read site) makes that class of crash structurally impossible.
+function sanitizeBizOnboarding(raw) {
+    const r = (raw && typeof raw === 'object') ? raw : {};
+    const str = (v) => typeof v === 'string' ? v : '';
+    return {
+        businessName: str(r.businessName),
+        category: str(r.category),
+        subcategory: str(r.subcategory),
+        services: Array.isArray(r.services) ? r.services : [],
+        locationMode: str(r.locationMode),
+        address: str(r.address),
+        serviceArea: str(r.serviceArea),
+        description: str(r.description),
+        phone: str(r.phone),
+        email: str(r.email),
+        photo: typeof r.photo === 'string' ? r.photo : null,
+        coverPhoto: typeof r.coverPhoto === 'string' ? r.coverPhoto : null,
+        gallery: Array.isArray(r.gallery) ? r.gallery : [],
+        website: str(r.website),
+        social: { instagram: str(r.social && r.social.instagram), tiktok: str(r.social && r.social.tiktok) },
+        paymentAcceptance: str(r.paymentAcceptance),
+    };
 }
 // Shared by the chat Photos picker (and reusable anywhere else a picked image needs to become a
 // storable data URL): downscales to a sane max dimension and re-encodes as JPEG so a full-
@@ -3617,7 +3666,7 @@ function App() {
     const [showSplash, setShowSplash] = useState(true);
     const [authView, setAuthView] = useState('welcome');
     const [authDraft, setAuthDraft] = useState({ firstName: '', lastName: '', identifier: '', password: '', otp: ['', '', '', '', '', ''] });
-    const [bizOnboarding, setBizOnboarding] = useState(() => loadLS('avio_biz_onboarding', { businessName: '', category: '', subcategory: '', services: [], locationMode: '', address: '', serviceArea: '', description: '', phone: '', email: '', photo: null, coverPhoto: null, gallery: [], website: '', social: { instagram: '', tiktok: '' }, paymentAcceptance: '' }));
+    const [bizOnboarding, setBizOnboarding] = useState(() => sanitizeBizOnboarding(loadLS('avio_biz_onboarding', DEFAULT_BIZ_ONBOARDING)));
     useEffect(() => { saveLS('avio_biz_onboarding', bizOnboarding); }, [bizOnboarding]);
     const [bizCategoryPickerOpen, setBizCategoryPickerOpen] = useState(false);
     const [bizCategorySearch, setBizCategorySearch] = useState('');
@@ -5713,14 +5762,14 @@ function App() {
     const [hasBusinessProfile, setHasBusinessProfile] = useState(() => loadLS('avio_has_business_profile', false) || loadLS('avio_account_type_v2', null) === 'business');
     useEffect(() => { saveLS('avio_has_business_profile', hasBusinessProfile); }, [hasBusinessProfile]);
     const [modeSwitcherOpen, setModeSwitcherOpen] = useState(false);
-    const [providerServices, setProviderServices] = useState(() => loadLS('avio_provider_services', DEFAULT_MY_SERVICES));
+    const [providerServices, setProviderServices] = useState(() => loadLSArray('avio_provider_services', DEFAULT_MY_SERVICES));
     const [providerWeeklyHours, setProviderWeeklyHours] = useState(() => loadLS('avio_provider_weekly_hours', DEFAULT_WEEKLY_HOURS));
     const [providerDateOverrides, setProviderDateOverrides] = useState(() => loadLS('avio_provider_date_overrides', {}));
-    const [providerBreaks, setProviderBreaks] = useState(() => loadLS('avio_provider_breaks', [
+    const [providerBreaks, setProviderBreaks] = useState(() => loadLSArray('avio_provider_breaks', [
         { id: 'break-lunch-default', name: 'Lunch Break', start: '12:00', end: '13:00', days: [1, 2, 3, 4, 5] },
     ]));
-    const [providerUnavailable, setProviderUnavailable] = useState(() => loadLS('avio_provider_unavailable', []));
-    const [providerTimeOff, setProviderTimeOff] = useState(() => loadLS('avio_provider_time_off', []));
+    const [providerUnavailable, setProviderUnavailable] = useState(() => loadLSArray('avio_provider_unavailable', []));
+    const [providerTimeOff, setProviderTimeOff] = useState(() => loadLSArray('avio_provider_time_off', []));
     // Booking policy rules — separate from Hours & Availability (which controls WHEN the
     // business is open) and from the live schedule/calendar (which controls WHAT's already on
     // it). This is the "how far ahead / how last-minute" policy layer.
@@ -5751,11 +5800,16 @@ function App() {
     const [scheduleConflictPrompt, setScheduleConflictPrompt] = useState(null);
     const [providerDashboardOpen, setProviderDashboardOpen] = useState(false);
     const [providerDashboardTab, setProviderDashboardTab] = useState('overview');
+    // Set (with logging) by the try/catch around the Business dashboard's render below when it
+    // throws, instead of letting the error escape and unmount the whole app under AppErrorBoundary.
+    // Cleared on every fresh open of the tab so a stale crash flag never blocks a legitimate retry.
+    const [businessDashboardCrashed, setBusinessDashboardCrashed] = useState(false);
     useEffect(() => { if (providerDashboardTab !== 'hours') { setScheduleView('menu'); setCopyHoursOpen(false); setCopyHoursTargetDays([]); setScheduleCalDay(null); setScheduleDeleteConfirm(null); setScheduleConflictPrompt(null); } }, [providerDashboardTab]);
     useEffect(() => { if (!providerDashboardOpen) { setEarningsInsightsOpen(false); setEarningsTab('overview'); setEarningsChartSelectedIdx(null); setEarningsSelectedDay(null); setSelectedServiceDetail(null); setSelectedCustomerDetail(null); setEarningsSelectedTime(null); setAllServicesOpen(false); setAllCustomersOpen(false); setPromotionDrillDownOpen(false); setRetentionListOpen(false); setInsightsMoreOpen(false); } }, [providerDashboardOpen]);
+    useEffect(() => { if (providerDashboardOpen) setBusinessDashboardCrashed(false); }, [providerDashboardOpen]);
     const [serviceFormDraft, setServiceFormDraft] = useState(null);
     const [hoursOverrideDraft, setHoursOverrideDraft] = useState(null);
-    const [providerStaff, setProviderStaff] = useState(() => loadLS('avio_provider_staff', DEFAULT_STAFF));
+    const [providerStaff, setProviderStaff] = useState(() => loadLSArray('avio_provider_staff', DEFAULT_STAFF));
     const [staffFormDraft, setStaffFormDraft] = useState(null);
     useEffect(() => { saveLS('avio_provider_staff', providerStaff); }, [providerStaff]);
     const [businessBookings, setBusinessBookings] = useState(BUSINESS_INCOMING_BOOKINGS);
@@ -14038,6 +14092,18 @@ function App() {
             return React.createElement("div", { className: "avio-upload-page", style: { position: 'absolute', inset: 0, background: T.background, zIndex: 10, display: 'flex', flexDirection: 'column' } }, header, body, footer);
         })(),
         providerDashboardOpen && (() => {
+            // Local recovery UI for this screen only — never the app-wide AppErrorBoundary, so a
+            // bad business record can't blank the whole app just because the user tapped Business.
+            const renderBizDashboardCrash = () => React.createElement("div", { key: "biz-dash-crashed", style: { position: 'absolute', inset: 0, zIndex: 2, background: T.background, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', textAlign: 'center' } },
+                React.createElement("div", { style: { width: 56, height: 56, borderRadius: '50%', background: 'rgba(208,48,74,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+                    React.createElement(Icon, { name: "warningtriangle", size: 24, color: "#D0304A" })),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, marginTop: 18 } }, "Your business dashboard hit a snag"),
+                React.createElement("p", { style: { fontSize: 13, color: T.textSecondary, marginTop: 8, lineHeight: 1.45 } }, "Your bookings, profile and account data are safe — this screen just couldn't load. Try again."),
+                React.createElement("button", { className: "avio-press", onClick: () => setBusinessDashboardCrashed(false), style: { width: '100%', maxWidth: 280, marginTop: 24, padding: '14px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Try Again"),
+                React.createElement("button", { className: "avio-press", onClick: () => { setBusinessDashboardCrashed(false); setProviderDashboardOpen(false); setTab('discover'); }, style: { width: '100%', maxWidth: 280, marginTop: 10, padding: '14px 0', borderRadius: 24, background: T.surfaceSecondary, color: T.textPrimary, fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, "Go to Home"));
+            if (businessDashboardCrashed)
+                return renderBizDashboardCrash();
+          try {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
             const inputStyle3 = { width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none', background: T.inputBackground, fontFamily: 'inherit' };
             const SCHEDULE_TITLES = { menu: 'Schedule', weekly: 'Weekly Hours', editDay: editDayIdx != null ? WEEKDAY_LABELS[editDayIdx] : 'Edit Day', breaks: 'Breaks', addBreak: breakDraft && breakDraft.id ? 'Edit Break' : 'Add Break', unavailable: 'Block Time', addUnavailable: unavailableDraft && unavailableDraft.id ? 'Edit Block Time' : 'Add Block Time', timeOff: 'Time Off', addTimeOff: timeOffDraft && timeOffDraft.id ? 'Edit Time Off' : 'Add Time Off', specialHours: 'Special Hours', calendar: 'Calendar View' };
@@ -14842,6 +14908,11 @@ function App() {
                     React.createElement("button", { onClick: () => { setBusinessBookingDetail(scheduleConflictPrompt.sample); setScheduleConflictPrompt(null); }, style: { width: '100%', marginTop: 18, padding: '13px 0', borderRadius: 24, background: THEME.coral, color: '#fff', fontWeight: 700, fontSize: 14 } }, "Review Booking"),
                     React.createElement("button", { onClick: () => setScheduleConflictPrompt(null), style: { width: '100%', marginTop: 10, padding: '13px 0', borderRadius: 24, background: T.surfaceSecondary, color: T.textPrimary, fontWeight: 700, fontSize: 14 } }, "OK")));
             return React.createElement("div", { key: providerDashboardTab === 'hours' ? 'schedule-' + scheduleView : undefined, className: providerDashboardTab === 'hours' ? 'avio-settings-fwd' : undefined, style: { position: 'absolute', inset: 0, zIndex: 2, background: T.background, display: 'flex', flexDirection: 'column' } }, header, body, scheduleDeleteConfirmModal, scheduleConflictModal);
+          } catch (err) {
+            console.error('[Bookvado] Business dashboard failed to render — showing local recovery UI instead of crashing the app.', { businessId: MY_PROVIDER_ID, accountType, providerDashboardTab, scheduleView, error: err && err.message, stack: err && err.stack });
+            setBusinessDashboardCrashed(true);
+            return renderBizDashboardCrash();
+          }
         })(),
         (providerDashboardOpen || editBusinessProfileOpen) && locationDetailsOpen && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
