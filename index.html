@@ -4692,6 +4692,37 @@ function App() {
     const [connectDraft, setConnectDraft] = useState('');
     const [pinnedIds, setPinnedIds] = useState(() => new Set());
     const [swipedRowId, setSwipedRowId] = useState(null);
+    // Messages navigation: which tab to return to when the user backs out of Connect entirely —
+    // captured the moment `tab` actually transitions TO 'connect' from something else, so the
+    // back arrow always lands on the exact screen they came from, never a hardcoded default.
+    // Real back-button/swipe-back support for the two Messages levels (list, then a single open
+    // chat) piggybacks on the same transition: one history entry gets pushed on each forward step
+    // in, and BOTH the in-app back arrows and a genuine hardware/gesture back converge on the same
+    // history.back() call, so the pushed-entry count and the app's own nesting depth can never
+    // drift out of sync with each other.
+    const [connectEntryTab, setConnectEntryTab] = useState('discover');
+    const prevTabRef = useRef(tab);
+    useEffect(() => {
+        if (tab === 'connect' && prevTabRef.current !== 'connect') {
+            setConnectEntryTab(prevTabRef.current);
+            window.history.pushState({ avioConnect: true }, '');
+        }
+        prevTabRef.current = tab;
+    }, [tab]);
+    const prevActiveConversationRef = useRef(null);
+    useEffect(() => {
+        if (activeConversationId && !prevActiveConversationRef.current)
+            window.history.pushState({ avioChat: true }, '');
+        prevActiveConversationRef.current = activeConversationId;
+    }, [activeConversationId]);
+    useEffect(() => {
+        function onPopState() {
+            if (activeConversationId) { setActiveConversationId(null); return; }
+            if (tab === 'connect') setTab(connectEntryTab || 'discover');
+        }
+        window.addEventListener('popstate', onPopState);
+        return () => window.removeEventListener('popstate', onPopState);
+    }, [activeConversationId, tab, connectEntryTab]);
     const connectTouchRef = useRef(null);
     // Shared debounce guard for one-tap native/external actions (directions, call, calendar,
     // message) — a fast double-tap on a real device should never fire the handler twice.
@@ -5025,6 +5056,74 @@ function App() {
             togglePin(id);
         else
             setSwipedRowId((prev) => prev === id ? null : prev);
+    }
+    // One bubble renderer shared by both the business and customer chat screens — 'availability'
+    // (real, tappable, live-checked times a business sent) and 'booking' (a static summary card)
+    // used to only be handled on the customer side, so a business's OWN copy of a message it just
+    // sent via either quick action rendered as a blank bubble. Centralizing this means both sides
+    // always agree on how every message type looks, and a new type only ever needs to be taught here.
+    function renderChatBubble(m, CN) {
+        const mine = m.from === 'me';
+        if (m.type === 'availability') {
+            const msgDate = new Date(m.dateISO);
+            const dayLabel = dateKey(msgDate) === dateKey(new Date()) ? 'Today' : msgDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            const isReschedule = !!m.bookingId;
+            return React.createElement("div", { key: m.id, style: { alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '82%', background: T.surfaceSecondary, border: `1px solid ${CN.border}`, borderRadius: 16, padding: 12 } },
+                React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: CN.text, margin: 0 } }, `Available times from ${m.businessName}`),
+                React.createElement("p", { style: { fontSize: 11, color: CN.sub, marginTop: 2 } }, `${dayLabel} · ${m.serviceName}`),
+                React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 } },
+                    m.times.map((t) => React.createElement("button", { key: t, onClick: () => tapAvailabilityTime(m, t), style: { padding: '8px 14px', borderRadius: 14, border: `1px solid ${T.textPrimary}`, background: 'rgba(128,128,128,0.1)' } },
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: T.textPrimary } }, minutesToTimeLabel(t))))),
+                React.createElement("p", { style: { fontSize: 10.5, color: CN.sub, marginTop: 8 } }, isReschedule ? 'Tap a time to reschedule' : 'Tap a time to book'));
+        }
+        if (m.type === 'booking') {
+            return React.createElement("div", { key: m.id, style: { alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '78%', background: T.surfaceSecondary, border: `1px solid ${CN.border}`, borderRadius: 16, padding: 12 } },
+                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: CN.text, margin: 0 } }, m.service),
+                React.createElement("p", { style: { fontSize: 11.5, color: CN.sub, marginTop: 2 } }, `${m.date} · ${m.duration}`),
+                React.createElement("p", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 15, fontWeight: 700, color: CN.text, marginTop: 6 } }, money(m.price)),
+                React.createElement("button", { onClick: () => flashToast('Booking confirmed'), style: { width: '100%', marginTop: 8, padding: '9px 0', borderRadius: 14, background: T.primaryButton, color: T.primaryButtonText, fontSize: 12.5, fontWeight: 700 } }, "Book Now"));
+        }
+        if (m.type === 'image') {
+            return React.createElement("div", { key: m.id, style: { alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '62%' } },
+                React.createElement("button", { onClick: () => setChatImageViewer(m.imageUrl), style: { display: 'block', borderRadius: 16, overflow: 'hidden', border: `1px solid ${CN.border}`, lineHeight: 0 } },
+                    React.createElement("img", { src: m.imageUrl, style: { width: '100%', maxHeight: 260, objectFit: 'cover', display: 'block' } })),
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, justifyContent: mine ? 'flex-end' : 'flex-start' } },
+                    React.createElement("span", { style: { fontSize: 10, color: CN.sub } }, m.time),
+                    mine && React.createElement(Icon, { name: "check", size: 10, color: CN.sub })));
+        }
+        return React.createElement("div", { key: m.id, style: { alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '78%' } },
+            React.createElement("div", { style: { background: mine ? T.textPrimary : T.surfaceSecondary, color: mine ? T.background : CN.text, borderRadius: 18, padding: '10px 14px', fontSize: 13.5, lineHeight: 1.35 } }, m.text),
+            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, justifyContent: mine ? 'flex-end' : 'flex-start' } },
+                React.createElement("span", { style: { fontSize: 10, color: CN.sub } }, m.time),
+                mine && React.createElement(Icon, { name: "check", size: 10, color: CN.sub })));
+    }
+    // The confirm sheet for a tapped availability time — shared by both chat screens for the same
+    // reason as renderChatBubble above: whichever side (business or customer) tapped a time needs
+    // the exact same review-and-confirm step, backed by the one real chatBookingSheet/
+    // confirmChatBooking pair, never a second parallel implementation.
+    function renderChatBookingSheetOverlay(CN) {
+        if (!chatBookingSheet)
+            return null;
+        const { message, minutes, dateObj } = chatBookingSheet;
+        const isReschedule = !!message.bookingId;
+        const existingBooking = isReschedule ? bookings.find((b) => b.id === message.bookingId) : null;
+        const dateLabel = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+        const row = (label, value) => React.createElement("div", { key: label, style: { display: 'flex', justifyContent: 'space-between', gap: 10, padding: '9px 0', borderBottom: `1px solid ${CN.border}` } },
+            React.createElement("span", { style: { fontSize: 12, color: CN.sub } }, label),
+            React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: CN.text, textAlign: 'right' } }, value));
+        return React.createElement("div", { onClick: () => setChatBookingSheet(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-end', zIndex: 20 } },
+            React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `16px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: CN.border, margin: '0 auto 14px' } }),
+                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: CN.text, margin: 0 } }, isReschedule ? 'Confirm Reschedule' : 'Confirm Booking'),
+                React.createElement("div", { style: { marginTop: 12, borderRadius: 16, border: `1px solid ${CN.border}`, padding: '2px 14px' } },
+                    row('Service', message.serviceName),
+                    row('Provider', message.businessName),
+                    row('Date & Time', `${dateLabel} · ${minutesToTimeLabel(minutes)}`),
+                    row('Location', message.location || 'Address shared after booking'),
+                    isReschedule && existingBooking && row('Previous Time', existingBooking.time),
+                    row(isReschedule ? 'Price Change' : 'Total', isReschedule ? 'No change' : money(message.price))),
+                React.createElement("button", { onClick: confirmChatBooking, style: { width: '100%', marginTop: 16, padding: '14px 0', borderRadius: 24, background: T.primaryButton, color: T.primaryButtonText, fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, isReschedule ? 'Confirm Reschedule' : 'Confirm'),
+                React.createElement("button", { onClick: () => setChatBookingSheet(null), style: { width: '100%', marginTop: 6, padding: '10px 0', textAlign: 'center', fontSize: 13, fontWeight: 600, color: CN.sub } }, "Cancel")));
     }
     const fileInputRef = useRef(null);
     const uploadFileRef = useRef(null);
@@ -12302,7 +12401,7 @@ function App() {
                 if (bizActiveConversation) {
                     const c = bizActiveConversation;
                     const chatHeader = React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 12px) 18px 14px`, borderBottom: `1px solid ${CN.border}`, display: 'flex', alignItems: 'center', gap: 12 } },
-                        React.createElement("button", { onClick: () => setActiveConversationId(null), style: { flexShrink: 0 } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: CN.text })),
+                        React.createElement("button", { onClick: () => window.history.back(), style: { flexShrink: 0 } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: CN.text })),
                         React.createElement("div", { style: { width: 44, height: 44, borderRadius: '50%', background: c.avatarColor || '#161616', border: avatarBorder(c.avatarColor), display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(c.avatarColor), fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, c.initials),
                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                             React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: CN.text, margin: 0 } }, c.name),
@@ -12321,31 +12420,13 @@ function App() {
                             React.createElement("button", { onClick: () => flashToast('Booking confirmed'), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px 0', borderRadius: 14, background: T.textPrimary, color: T.background, fontSize: 12.5, fontWeight: 700 } }, React.createElement(Icon, { name: "check", size: 12, color: T.background }), "Confirm")));
                     const bubbles = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 } },
                         React.createElement("p", { style: { textAlign: 'center', fontSize: 11, color: CN.sub, margin: '0 0 4px' } }, "Today"),
-                        c.messages.map((m) => {
-                            const mine = m.from === 'me';
-                            if (m.type === 'image') {
-                                return React.createElement("div", { key: m.id, style: { display: 'flex', alignItems: 'flex-end', gap: 8, justifyContent: mine ? 'flex-end' : 'flex-start' } },
-                                    !mine && React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', background: c.avatarColor || '#161616', border: avatarBorder(c.avatarColor), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(c.avatarColor), fontSize: 8.5, fontWeight: 700 } }, c.initials),
-                                    React.createElement("div", { style: { maxWidth: '62%' } },
-                                        React.createElement("button", { onClick: () => setChatImageViewer(m.imageUrl), style: { display: 'block', borderRadius: 16, overflow: 'hidden', border: `1px solid ${CN.border}`, lineHeight: 0 } },
-                                            React.createElement("img", { src: m.imageUrl, style: { width: '100%', maxHeight: 260, objectFit: 'cover', display: 'block' } })),
-                                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, justifyContent: mine ? 'flex-end' : 'flex-start' } },
-                                            React.createElement("span", { style: { fontSize: 10, color: CN.sub } }, m.time),
-                                            mine && React.createElement("span", { style: { fontSize: 10.5, color: T.textPrimary, fontWeight: 700 } }, "✓✓"))));
-                            }
-                            return React.createElement("div", { key: m.id, style: { display: 'flex', alignItems: 'flex-end', gap: 8, justifyContent: mine ? 'flex-end' : 'flex-start' } },
-                                !mine && React.createElement("div", { style: { width: 24, height: 24, borderRadius: '50%', background: c.avatarColor || '#161616', border: avatarBorder(c.avatarColor), flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(c.avatarColor), fontSize: 8.5, fontWeight: 700 } }, c.initials),
-                                React.createElement("div", { style: { maxWidth: '74%' } },
-                                    React.createElement("div", { style: { background: mine ? T.textPrimary : T.border, color: mine ? T.background : CN.text, borderRadius: 18, padding: '10px 14px', fontSize: 13.5, lineHeight: 1.35 } }, m.text),
-                                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, justifyContent: mine ? 'flex-end' : 'flex-start' } },
-                                        React.createElement("span", { style: { fontSize: 10, color: CN.sub } }, m.time),
-                                        mine && React.createElement("span", { style: { fontSize: 10.5, color: T.textPrimary, fontWeight: 700 } }, "✓✓"))));
-                        }));
+                        c.messages.map((m) => renderChatBubble(m, CN)));
                     const quickActions = [
                         { icon: 'camera', label: 'Camera', onClick: openChatCamera },
                         { icon: 'image', label: 'Photos', onClick: () => chatPhotoLibraryInputRef.current && chatPhotoLibraryInputRef.current.click() },
                         { icon: 'mappin', label: 'Location', onClick: () => flashToast('Location shared') },
                         { icon: 'calendar', label: 'Booking', onClick: insertBookingCard },
+                        { icon: 'clock', label: 'Times', onClick: insertAvailabilityCard },
                         { icon: 'wallet', label: 'Payment', onClick: () => flashToast('Payment — coming soon') },
                     ];
                     const inputArea = React.createElement("div", { style: { flexShrink: 0, borderTop: `1px solid ${CN.border}`, padding: `10px 18px calc(env(safe-area-inset-bottom) + 10px)` } },
@@ -12359,7 +12440,7 @@ function App() {
                         React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 20, overflowX: 'auto', marginTop: 12 } }, quickActions.map((a) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
                             React.createElement(Icon, { name: a.icon, size: 18, color: CN.sub }),
                             React.createElement("span", { style: { fontSize: 9, color: CN.sub } }, a.label)))));
-                    return React.createElement("div", { style: { height: '100%', display: 'flex', flexDirection: 'column' } }, chatHeader, bookingCard, bubbles, inputArea);
+                    return React.createElement("div", { style: { height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' } }, chatHeader, bookingCard, bubbles, inputArea, renderChatBookingSheetOverlay(CN));
                 }
                 const BIZ_FILTERS = [{ id: 'all', label: 'All' }, { id: 'unread', label: 'Unread' }];
                 const unreadCount = businessConversations.filter((c) => c.unread > 0).length;
@@ -12369,11 +12450,12 @@ function App() {
                     if (connectFilter === 'bookings' && !c.booking)
                         return false;
                     const q = connectSearch.trim().toLowerCase();
-                    if (q && !c.name.toLowerCase().includes(q))
+                    if (q && !(c.name.toLowerCase().includes(q) || c.messages.some((m) => m.text && m.text.toLowerCase().includes(q))))
                         return false;
                     return true;
                 });
-                const header = React.createElement("div", { style: { padding: '0 18px' } },
+                const header = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, padding: '0 18px' } },
+                    React.createElement("button", { onClick: () => window.history.back(), "aria-label": "Back", style: { flexShrink: 0, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -6 } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: CN.text })),
                     React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 28, color: CN.text, margin: 0 } }, "Messages"));
                 const searchRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, padding: '0 18px', marginTop: 14 } },
                     React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: T.surfaceSecondary, borderRadius: 16, height: 40, padding: '0 12px' } },
@@ -12386,8 +12468,9 @@ function App() {
                         f.label,
                         count > 0 && React.createElement("span", { style: { minWidth: 18, height: 18, borderRadius: 9, background: '#3FBF6A', color: '#fff', fontSize: 10.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' } }, count));
                 }));
+                const bizEmptyText = connectFilter === 'unread' && !connectSearch.trim() ? "You're all caught up." : connectSearch.trim() ? "No conversations match your search." : "No conversations here.";
                 const list = React.createElement("div", { style: { marginTop: 10 } }, bizFiltered.length === 0
-                    ? React.createElement("p", { style: { textAlign: 'center', fontSize: 12.5, color: CN.sub, padding: '40px 18px' } }, "No conversations here.")
+                    ? React.createElement("p", { style: { textAlign: 'center', fontSize: 12.5, color: CN.sub, padding: '40px 18px' } }, bizEmptyText)
                     : bizFiltered.map((c) => {
                         const lastMsg = c.messages[c.messages.length - 1];
                         const preview = lastMsg ? (lastMsg.type === 'booking' ? 'Sent a booking card' : `${lastMsg.from === 'me' ? 'You: ' : ''}${lastMsg.text}`) : '';
@@ -12410,7 +12493,7 @@ function App() {
                 const c = activeConversation;
                 const chatHeader = React.createElement("div", { style: { flexShrink: 0, padding: `calc(env(safe-area-inset-top) + 12px) 18px 12px`, borderBottom: `1px solid ${CN.border}` } },
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
-                        React.createElement("button", { onClick: () => setActiveConversationId(null), style: { flexShrink: 0 } }, React.createElement(Icon, { name: "arrowleft", size: 18, color: CN.text })),
+                        React.createElement("button", { onClick: () => window.history.back(), style: { flexShrink: 0 } }, React.createElement(Icon, { name: "arrowleft", size: 18, color: CN.text })),
                         React.createElement("div", { style: { width: 40, height: 40, borderRadius: '50%', background: T.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.background, fontSize: 13, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, c.initials),
                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                             React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 5 } },
@@ -12421,44 +12504,9 @@ function App() {
                         React.createElement("button", { onClick: () => flashToast('More options — coming soon'), style: { fontSize: 18, color: CN.text, letterSpacing: 1, flexShrink: 0 } }, "•••")),
                     React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 12 } },
                         React.createElement("button", { onClick: () => flashToast(`Viewing ${c.name}'s profile`), style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', borderRadius: 18, border: `1px solid ${CN.border}` } }, React.createElement(Icon, { name: "user", size: 13, color: CN.text }), React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: CN.text } }, "View profile")),
-                        React.createElement("button", { onClick: () => { setTab('bookings'); }, style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', borderRadius: 18, border: `1px solid ${CN.border}` } }, React.createElement(Icon, { name: "calendar", size: 13, color: CN.text }), React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: CN.text } }, "View booking"))));
+                        React.createElement("button", { onClick: () => { setActiveConversationId(null); setTab('bookings'); }, style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 0', borderRadius: 18, border: `1px solid ${CN.border}` } }, React.createElement(Icon, { name: "calendar", size: 13, color: CN.text }), React.createElement("span", { style: { fontSize: 12, fontWeight: 600, color: CN.text } }, "View booking"))));
                 const bubbles = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 } },
-                    c.messages.map((m) => {
-                        if (m.type === 'availability') {
-                            const msgDate = new Date(m.dateISO);
-                            const dayLabel = dateKey(msgDate) === dateKey(new Date()) ? 'Today' : msgDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-                            const isReschedule = !!m.bookingId;
-                            return React.createElement("div", { key: m.id, style: { alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start', maxWidth: '82%', background: T.surfaceSecondary, border: `1px solid ${CN.border}`, borderRadius: 16, padding: 12 } },
-                                React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: CN.text, margin: 0 } }, `Available times from ${m.businessName}`),
-                                React.createElement("p", { style: { fontSize: 11, color: CN.sub, marginTop: 2 } }, `${dayLabel} · ${m.serviceName}`),
-                                React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 } },
-                                    m.times.map((t) => React.createElement("button", { key: t, onClick: () => tapAvailabilityTime(m, t), style: { padding: '8px 14px', borderRadius: 14, border: `1px solid ${T.textPrimary}`, background: 'rgba(128,128,128,0.1)' } },
-                                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: T.textPrimary } }, minutesToTimeLabel(t))))),
-                                React.createElement("p", { style: { fontSize: 10.5, color: CN.sub, marginTop: 8 } }, isReschedule ? 'Tap a time to reschedule' : 'Tap a time to book'));
-                        }
-                        if (m.type === 'booking') {
-                            return React.createElement("div", { key: m.id, style: { alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start', maxWidth: '78%', background: T.surfaceSecondary, border: `1px solid ${CN.border}`, borderRadius: 16, padding: 12 } },
-                                React.createElement("p", { style: { fontSize: 13, fontWeight: 700, color: CN.text, margin: 0 } }, m.service),
-                                React.createElement("p", { style: { fontSize: 11.5, color: CN.sub, marginTop: 2 } }, `${m.date} · ${m.duration}`),
-                                React.createElement("p", { style: { fontFamily: 'JetBrains Mono, monospace', fontSize: 15, fontWeight: 700, color: CN.text, marginTop: 6 } }, money(m.price)),
-                                React.createElement("button", { onClick: () => flashToast('Booking confirmed'), style: { width: '100%', marginTop: 8, padding: '9px 0', borderRadius: 14, background: T.primaryButton, color: T.primaryButtonText, fontSize: 12.5, fontWeight: 700 } }, "Book Now"));
-                        }
-                        if (m.type === 'image') {
-                            const mineImg = m.from === 'me';
-                            return React.createElement("div", { key: m.id, style: { alignSelf: mineImg ? 'flex-end' : 'flex-start', maxWidth: '62%' } },
-                                React.createElement("button", { onClick: () => setChatImageViewer(m.imageUrl), style: { display: 'block', borderRadius: 16, overflow: 'hidden', border: `1px solid ${CN.border}`, lineHeight: 0 } },
-                                    React.createElement("img", { src: m.imageUrl, style: { width: '100%', maxHeight: 260, objectFit: 'cover', display: 'block' } })),
-                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, justifyContent: mineImg ? 'flex-end' : 'flex-start' } },
-                                    React.createElement("span", { style: { fontSize: 10, color: CN.sub } }, m.time),
-                                    mineImg && React.createElement(Icon, { name: "check", size: 10, color: CN.sub })));
-                        }
-                        const mine = m.from === 'me';
-                        return React.createElement("div", { key: m.id, style: { alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '78%' } },
-                            React.createElement("div", { style: { background: mine ? T.textPrimary : T.surfaceSecondary, color: mine ? T.background : CN.text, borderRadius: 18, padding: '10px 14px', fontSize: 13.5, lineHeight: 1.35 } }, m.text),
-                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3, justifyContent: mine ? 'flex-end' : 'flex-start' } },
-                                React.createElement("span", { style: { fontSize: 10, color: CN.sub } }, m.time),
-                                mine && React.createElement(Icon, { name: "check", size: 10, color: CN.sub })));
-                    }));
+                    c.messages.map((m) => renderChatBubble(m, CN)));
                 const quickActions = [
                     { icon: 'camera', label: 'Camera', onClick: openChatCamera },
                     { icon: 'image', label: 'Photos', onClick: () => chatPhotoLibraryInputRef.current && chatPhotoLibraryInputRef.current.click() },
@@ -12467,33 +12515,6 @@ function App() {
                     { icon: 'clock', label: 'Times', onClick: insertAvailabilityCard },
                     { icon: 'wallet', label: 'Payment', onClick: () => flashToast('Payment — coming soon') },
                 ];
-                // Bottom sheet for the tapped availability time — service/provider/date-time/
-                // location/price (or "no change" for a reschedule, matching commitReschedule
-                // being price-neutral by design), then one Confirm that actually creates or
-                // moves the booking. This never leaves the conversation: no re-navigating to
-                // the business, no re-entering the date/time by hand.
-                const chatBookingSheetOverlay = chatBookingSheet && (() => {
-                    const { message, minutes, dateObj } = chatBookingSheet;
-                    const isReschedule = !!message.bookingId;
-                    const existingBooking = isReschedule ? bookings.find((b) => b.id === message.bookingId) : null;
-                    const dateLabel = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-                    const row = (label, value) => React.createElement("div", { key: label, style: { display: 'flex', justifyContent: 'space-between', gap: 10, padding: '9px 0', borderBottom: `1px solid ${CN.border}` } },
-                        React.createElement("span", { style: { fontSize: 12, color: CN.sub } }, label),
-                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: CN.text, textAlign: 'right' } }, value));
-                    return React.createElement("div", { onClick: () => setChatBookingSheet(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-end', zIndex: 20 } },
-                        React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `16px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
-                            React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: CN.border, margin: '0 auto 14px' } }),
-                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: CN.text, margin: 0 } }, isReschedule ? 'Confirm Reschedule' : 'Confirm Booking'),
-                            React.createElement("div", { style: { marginTop: 12, borderRadius: 16, border: `1px solid ${CN.border}`, padding: '2px 14px' } },
-                                row('Service', message.serviceName),
-                                row('Provider', message.businessName),
-                                row('Date & Time', `${dateLabel} · ${minutesToTimeLabel(minutes)}`),
-                                row('Location', message.location || 'Address shared after booking'),
-                                isReschedule && existingBooking && row('Previous Time', existingBooking.time),
-                                row(isReschedule ? 'Price Change' : 'Total', isReschedule ? 'No change' : money(message.price))),
-                            React.createElement("button", { onClick: confirmChatBooking, style: { width: '100%', marginTop: 16, padding: '14px 0', borderRadius: 24, background: T.primaryButton, color: T.primaryButtonText, fontWeight: 700, fontSize: 14.5, fontFamily: 'Space Grotesk, sans-serif' } }, isReschedule ? 'Confirm Reschedule' : 'Confirm'),
-                            React.createElement("button", { onClick: () => setChatBookingSheet(null), style: { width: '100%', marginTop: 6, padding: '10px 0', textAlign: 'center', fontSize: 13, fontWeight: 600, color: CN.sub } }, "Cancel")));
-                })();
                 const inputArea = React.createElement("div", { style: { flexShrink: 0, borderTop: `1px solid ${CN.border}`, padding: `10px 18px calc(env(safe-area-inset-bottom) + 10px)` } },
                     React.createElement("input", { ref: chatPhotoLibraryInputRef, type: "file", accept: "image/*", style: { display: 'none' }, onChange: handleChatPhotoLibraryFile }),
                     React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8 } },
@@ -12505,7 +12526,7 @@ function App() {
                     React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 20, overflowX: 'auto', marginTop: 12 } }, quickActions.map((a) => React.createElement("button", { key: a.label, onClick: a.onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 } },
                         React.createElement(Icon, { name: a.icon, size: 18, color: CN.sub }),
                         React.createElement("span", { style: { fontSize: 9, color: CN.sub } }, a.label)))));
-                return React.createElement("div", { style: { height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' } }, chatHeader, bubbles, inputArea, chatBookingSheetOverlay);
+                return React.createElement("div", { style: { height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' } }, chatHeader, bubbles, inputArea, renderChatBookingSheetOverlay(CN));
             }
             const q = connectSearch.trim().toLowerCase();
             const filteredConversations = conversations.filter((c) => {
@@ -12517,23 +12538,29 @@ function App() {
                     return false;
                 if (connectFilter === 'requests' && !c.messages.some((m) => m.isRequest))
                     return false;
-                if (q && !(c.name.toLowerCase().includes(q) || c.category.toLowerCase().includes(q)))
+                if (q && !(c.name.toLowerCase().includes(q) || c.category.toLowerCase().includes(q) || c.messages.some((m) => m.text && m.text.toLowerCase().includes(q))))
                     return false;
                 return true;
             }).sort((a, b) => (pinnedIds.has(b.id) ? 1 : 0) - (pinnedIds.has(a.id) ? 1 : 0));
-            const header = React.createElement("div", { style: { padding: '0 18px' } },
+            const header = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10, padding: '0 18px' } },
+                React.createElement("button", { onClick: () => window.history.back(), "aria-label": "Back", style: { flexShrink: 0, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -6 } }, React.createElement(Icon, { name: "arrowleft", size: 20, color: CN.text })),
                 React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 26, color: CN.text, margin: 0 } }, "Connect"));
             const searchRow = React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 8, padding: '0 18px', marginTop: 14 } },
                 React.createElement("div", { style: { flex: 1, display: 'flex', alignItems: 'center', gap: 8, background: T.surfaceSecondary, borderRadius: 16, height: 40, padding: '0 12px' } },
                     React.createElement(Icon, { name: "search", size: 15, color: CN.sub }),
                     React.createElement("input", { value: connectSearch, onChange: (e) => setConnectSearch(e.target.value), placeholder: "Search conversations", style: { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: CN.text } })));
+            const custUnreadCount = conversations.filter((c) => c.unread > 0).length;
             const filters = [{ id: 'all', label: 'All' }, { id: 'unread', label: 'Unread' }];
             const filterRow = React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 18px 0' } }, filters.map((f) => {
                 const active = connectFilter === f.id;
-                return React.createElement("button", { key: f.id, onClick: () => setConnectFilter(f.id), style: { flexShrink: 0, fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 16, background: active ? T.textPrimary : T.surfaceSecondary, color: active ? T.background : CN.text } }, f.label);
+                const count = f.id === 'unread' ? custUnreadCount : 0;
+                return React.createElement("button", { key: f.id, onClick: () => setConnectFilter(f.id), style: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 16, background: active ? T.textPrimary : T.surfaceSecondary, color: active ? T.background : CN.text } },
+                    f.label,
+                    count > 0 && React.createElement("span", { style: { minWidth: 18, height: 18, borderRadius: 9, background: '#3FBF6A', color: '#fff', fontSize: 10.5, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' } }, count));
             }));
+            const custEmptyText = connectFilter === 'unread' && !connectSearch.trim() ? "You're all caught up." : connectSearch.trim() ? "No conversations match your search." : "No conversations here.";
             const list = React.createElement("div", { style: { marginTop: 14 } }, filteredConversations.length === 0
-                ? React.createElement("p", { style: { textAlign: 'center', fontSize: 12.5, color: CN.sub, padding: '40px 18px' } }, "No conversations here.")
+                ? React.createElement("p", { style: { textAlign: 'center', fontSize: 12.5, color: CN.sub, padding: '40px 18px' } }, custEmptyText)
                 : filteredConversations.map((c) => {
                     const swiped = swipedRowId === c.id;
                     const lastMsg = c.messages[c.messages.length - 1];
@@ -12556,7 +12583,7 @@ function App() {
                                 React.createElement("p", { style: { fontSize: 12, color: c.unread > 0 ? CN.text : CN.sub, fontWeight: c.unread > 0 ? 600 : 400, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, preview)),
                             React.createElement("div", { style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 } },
                                 React.createElement("span", { style: { fontSize: 10.5, color: CN.sub } }, lastMsg ? lastMsg.time : ''),
-                                c.unread > 0 && React.createElement("span", { style: { minWidth: 18, height: 18, borderRadius: 9, background: T.textPrimary, color: T.background, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' } }, c.unread))));
+                                c.unread > 0 && React.createElement("span", { style: { minWidth: 18, height: 18, borderRadius: 9, background: '#3FBF6A', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' } }, c.unread))));
                 }));
             return React.createElement("div", { className: "avio-scroll", style: { height: '100%', overflowY: 'auto', padding: `calc(env(safe-area-inset-top) + 18px) 0 calc(env(safe-area-inset-bottom) + 90px)` } },
                 header, searchRow, filterRow, list);
