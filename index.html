@@ -311,6 +311,9 @@ function Icon({ name, size = 20, color = 'currentColor', fill = 'none' }) {
         umbrella: React.createElement(React.Fragment, null,
             React.createElement("path", { d: "M3 11C3 6 7 3 12 3s9 3 9 8H3z", ...solid }),
             React.createElement("path", { d: "M12 11v8a2.2 2.2 0 0 1-2.2 2.2M12 3v1" })),
+        snowflake: React.createElement(React.Fragment, null,
+            React.createElement("path", { d: "M12 2v20M4 7l16 10M20 7L4 17" }),
+            React.createElement("path", { d: "M12 2l-2.2 2.2M12 2l2.2 2.2M12 22l-2.2-2.2M12 22l2.2-2.2M4 7l3 .3M4 7l1-2.8M20 7l-3 .3M20 7l-1-2.8M4 17l3-.3M4 17l1 2.8M20 17l-3-.3M20 17l-1 2.8" })),
         user: React.createElement(React.Fragment, null,
             React.createElement("circle", { cx: "12", cy: "7.6", r: "3.8", ...solid }),
             React.createElement("path", { d: "M4.6 20.2c.4-4.1 3.6-6.9 7.4-6.9s7 2.8 7.4 6.9c.1.7-.5 1.3-1.2 1.3H5.8c-.7 0-1.3-.6-1.2-1.3z", ...solid })),
@@ -566,18 +569,33 @@ function stayGroupForPropertyType(pt) {
     return 'homes';
 }
 const STAY_SEARCH_TABS = [{ id: 'hotels', label: 'Hotels' }, { id: 'homes', label: 'Vacation Homes' }, { id: 'unique', label: 'Unique Stays' }];
+// Every amenity carries a `category` (used to group the full "See all amenities" sheet) and
+// AMENITY_PRIORITY below decides which ~6 surface directly on the Stay page — most-important
+// first, never a fixed/arbitrary subset — before the rest fold behind that sheet.
 const AMENITY_META = {
-    pool: { icon: 'waves', label: 'Pool' },
-    gym: { icon: 'dumbbell', label: 'Gym' },
-    spa: { icon: 'sparkles', label: 'Spa' },
-    wifi: { icon: 'wifi', label: 'Wi-Fi' },
-    parking: { icon: 'car', label: 'Parking' },
-    beachAccess: { icon: 'umbrella', label: 'Beach Access' },
-    petFriendly: { icon: 'heart', label: 'Pet Friendly' },
-    breakfast: { icon: 'coffee', label: 'Breakfast' },
-    kitchen: { icon: 'utensils', label: 'Kitchen' },
-    workspace: { icon: 'briefcase', label: 'Workspace' },
+    pool: { icon: 'waves', label: 'Pool', category: 'Outdoors & Recreation' },
+    beachAccess: { icon: 'umbrella', label: 'Beach Access', category: 'Outdoors & Recreation' },
+    gym: { icon: 'dumbbell', label: 'Gym', category: 'Outdoors & Recreation' },
+    spa: { icon: 'sparkles', label: 'Spa', category: 'Outdoors & Recreation' },
+    restaurant: { icon: 'utensils', label: 'Restaurant', category: 'Food & Drink' },
+    bar: { icon: 'bottle', label: 'Bar', category: 'Food & Drink' },
+    roomService: { icon: 'bell', label: 'Room Service', category: 'Food & Drink' },
+    breakfast: { icon: 'coffee', label: 'Breakfast', category: 'Food & Drink' },
+    parking: { icon: 'car', label: 'Parking', category: 'Parking & Transport' },
+    valetParking: { icon: 'car', label: 'Valet Parking', category: 'Parking & Transport' },
+    evCharging: { icon: 'bolt', label: 'EV Charging', category: 'Parking & Transport' },
+    wifi: { icon: 'wifi', label: 'Free Wi-Fi', category: 'Comfort' },
+    airConditioning: { icon: 'snowflake', label: 'Air Conditioning', category: 'Comfort' },
+    petFriendly: { icon: 'heart', label: 'Pet Friendly', category: 'Comfort' },
+    kitchen: { icon: 'utensils', label: 'Kitchen', category: 'Comfort' },
+    workspace: { icon: 'briefcase', label: 'Workspace', category: 'Comfort' },
 };
+const AMENITY_PRIORITY = ['pool', 'beachAccess', 'wifi', 'gym', 'spa', 'restaurant', 'bar', 'roomService', 'parking', 'valetParking', 'petFriendly', 'breakfast', 'airConditioning', 'evCharging', 'kitchen', 'workspace'];
+function sortedStayAmenities(list) {
+    return [...(list || [])].sort((a, b) => AMENITY_PRIORITY.indexOf(a) - AMENITY_PRIORITY.indexOf(b));
+}
+// Categories a Stay's photo gallery can be organized into when a photo names one.
+const STAY_GALLERY_CATEGORIES = ['Rooms', 'Pool', 'Beach', 'Lobby', 'Restaurants', 'Gym', 'Spa', 'Views', 'Exterior'];
 const BOOKING_SERVICE_TEMPLATES = {
     'Beauty': [{ name: 'Signature Style', durationMin: 45 }, { name: 'Express Service', durationMin: 20 }, { name: 'Style + Treatment', durationMin: 60 }, { name: 'Color Correction', durationMin: 90 }],
     'Home Services': [{ name: 'Standard Clean', durationMin: 90 }, { name: 'Deep Clean', durationMin: 150 }, { name: 'Move-In / Move-Out', durationMin: 180 }],
@@ -2301,81 +2319,103 @@ const FEED = [
     { id: 'stay-southbeach-resort', category: 'Stays', name: '1 Hotel South Beach', location: 'Miami Beach, FL', rating: 4.9, price: 420, likes: '3.4K', comments: 92, saves: '2.9K', blurb: 'Unreal sunset from the rooftop pool 😍', verified: true, distance: '2.1 mi', openStatus: 'Check-in 3:00 PM', hashtags: ['#miami', '#resort', '#getaway'], friendsBooked: 21, avatarColor: '#2E9BFF', locationMode: 'At my business location', image: 'assets/shorts/thumbs/waterpark-1.jpg', video: 'assets/shorts/biz/waterpark-1',
         businessType: 'stay', propertyType: 'resort', address: '2341 Collins Ave, Miami Beach, FL 33139', phone: '(305) 555-0110',
         description: 'A beachfront resort built around three pools, a private stretch of sand, and rooms that open straight onto the ocean air. Come for a weekend, stay for the sunsets.',
-        gallery: ['assets/shorts/thumbs/waterpark-1.jpg', 'assets/shorts/thumbs/waterpark-2.jpg', 'assets/shorts/thumbs/waterpark-3.jpg', 'assets/shorts/thumbs/lounge-1.jpg'],
-        amenities: ['pool', 'beachAccess', 'spa', 'gym', 'wifi', 'parking', 'breakfast'],
-        badges: ['Popular'],
+        gallery: [
+            { src: 'assets/shorts/thumbs/waterpark-1.jpg', category: 'Exterior' }, { src: 'assets/shorts/thumbs/waterpark-2.jpg', category: 'Pool' },
+            { src: 'assets/shorts/thumbs/waterpark-3.jpg', category: 'Beach' }, { src: 'assets/shorts/thumbs/lounge-1.jpg', category: 'Lobby' },
+            { src: 'assets/shorts/thumbs/lounge-2.jpg', category: 'Restaurants' },
+        ],
+        amenities: ['pool', 'beachAccess', 'spa', 'gym', 'wifi', 'restaurant', 'roomService', 'parking', 'valetParking', 'breakfast', 'airConditioning'],
+        badges: ['Popular'], resortFeePerNight: 35,
         policies: { checkIn: '3:00 PM', checkOut: '11:00 AM', cancellation: 'Free cancellation up to 5 days before check-in.' },
         roomTypes: [
-            { id: 'stay-southbeach-resort-rm0', name: 'Ocean View King', bedType: '1 King Bed', sqft: 380, maxGuests: 2, price: 420 },
-            { id: 'stay-southbeach-resort-rm1', name: 'Beachfront Suite', bedType: '1 King Bed + Sofa', sqft: 620, maxGuests: 4, price: 690, popular: true },
+            { id: 'stay-southbeach-resort-rm0', name: 'Ocean View King', bedType: '1 King Bed', sqft: 380, maxGuests: 2, price: 420, view: 'Ocean View', refundable: true, image: 'assets/shorts/thumbs/waterpark-2.jpg', amenities: ['wifi', 'airConditioning'], taxesNote: 'Includes $35/night resort fee' },
+            { id: 'stay-southbeach-resort-rm1', name: 'Beachfront Suite', bedType: '1 King Bed + Sofa', sqft: 620, maxGuests: 4, price: 690, popular: true, view: 'Beachfront', refundable: true, image: 'assets/shorts/thumbs/waterpark-3.jpg', amenities: ['wifi', 'airConditioning', 'breakfast'], taxesNote: 'Includes $35/night resort fee' },
         ],
     },
     { id: 'stay-ivyoak-boutique', category: 'Stays', name: 'Ivy & Oak Boutique Hotel', location: 'Brooklyn, NY', rating: 4.8, price: 295, likes: '1.9K', comments: 44, saves: '1.5K', blurb: 'Every room has its own reading nook.', verified: true, distance: '1.1 mi', openStatus: 'Check-in 4:00 PM', hashtags: ['#brooklyn', '#boutiquehotel', '#weekendaway'], friendsBooked: 12, avatarColor: '#6B4A1E', locationMode: 'At my business location', image: 'assets/shorts/thumbs/lounge-1.jpg', video: 'assets/shorts/biz/lounge-1',
         businessType: 'stay', propertyType: 'boutique_hotel', address: '148 Bedford Ave, Brooklyn, NY 11249', phone: '(718) 555-0161',
         description: 'A twelve-room hotel in a converted 1920s warehouse, ten minutes from the water. Exposed brick, a slow-mornings breakfast room, and a rooftop that catches the skyline just right.',
-        gallery: ['assets/shorts/thumbs/lounge-1.jpg', 'assets/shorts/thumbs/lounge-2.jpg', 'assets/shorts/thumbs/bistro-1.jpg'],
+        gallery: [
+            { src: 'assets/shorts/thumbs/lounge-1.jpg', category: 'Exterior' }, { src: 'assets/shorts/thumbs/lounge-2.jpg', category: 'Lobby' },
+            { src: 'assets/shorts/thumbs/bistro-1.jpg', category: 'Restaurants' }, { src: 'assets/shorts/thumbs/bistro-2.jpg', category: 'Rooms' },
+        ],
         amenities: ['wifi', 'breakfast', 'gym', 'workspace'],
         badges: ['Trending'],
         policies: { checkIn: '4:00 PM', checkOut: '11:00 AM', cancellation: 'Free cancellation up to 48 hours before check-in.' },
         roomTypes: [
-            { id: 'stay-ivyoak-boutique-rm0', name: 'Classic Queen', bedType: '1 Queen Bed', sqft: 220, maxGuests: 2, price: 295, popular: true },
-            { id: 'stay-ivyoak-boutique-rm1', name: 'Loft King', bedType: '1 King Bed', sqft: 310, maxGuests: 2, price: 365 },
+            { id: 'stay-ivyoak-boutique-rm0', name: 'Classic Queen', bedType: '1 Queen Bed', sqft: 220, maxGuests: 2, price: 295, popular: true, view: 'City View', refundable: false, image: 'assets/shorts/thumbs/lounge-1.jpg', amenities: ['wifi'], taxesNote: 'Taxes and fees included' },
+            { id: 'stay-ivyoak-boutique-rm1', name: 'Loft King', bedType: '1 King Bed', sqft: 310, maxGuests: 2, price: 365, view: 'Skyline View', refundable: true, image: 'assets/shorts/thumbs/lounge-2.jpg', amenities: ['wifi', 'workspace'], taxesNote: 'Taxes and fees included' },
         ],
     },
     { id: 'stay-hudson-grand', category: 'Stays', name: 'The Hudson Grand Hotel', location: 'Chicago, IL', rating: 4.6, price: 210, likes: '1.2K', comments: 27, saves: '860', blurb: 'Lobby bar makes the best espresso martini in the loop.', verified: true, distance: '0.9 mi', openStatus: 'Check-in 3:00 PM', hashtags: ['#chicago', '#hotel', '#downtown'], friendsBooked: 9, avatarColor: '#3F3F5C', locationMode: 'At my business location', image: 'assets/shorts/thumbs/lounge-2.jpg', video: 'assets/shorts/biz/lounge-2',
         businessType: 'stay', propertyType: 'hotel', address: '520 N Michigan Ave, Chicago, IL 60611', phone: '(312) 555-0184',
         description: 'A classic downtown hotel two blocks from the river, built for business trips that still want a proper gym and a lobby bar worth lingering in.',
-        gallery: ['assets/shorts/thumbs/lounge-2.jpg', 'assets/shorts/thumbs/lounge-1.jpg', 'assets/shorts/thumbs/bistro-2.jpg'],
-        amenities: ['wifi', 'gym', 'parking', 'workspace'],
+        gallery: [
+            { src: 'assets/shorts/thumbs/lounge-2.jpg', category: 'Exterior' }, { src: 'assets/shorts/thumbs/lounge-1.jpg', category: 'Lobby' },
+            { src: 'assets/shorts/thumbs/bistro-2.jpg', category: 'Restaurants' },
+        ],
+        amenities: ['wifi', 'gym', 'bar', 'restaurant', 'parking', 'valetParking', 'workspace', 'evCharging'],
         policies: { checkIn: '3:00 PM', checkOut: '12:00 PM', cancellation: 'Free cancellation up to 24 hours before check-in.' },
         roomTypes: [
-            { id: 'stay-hudson-grand-rm0', name: 'Standard King', bedType: '1 King Bed', sqft: 260, maxGuests: 2, price: 210, popular: true },
-            { id: 'stay-hudson-grand-rm1', name: 'Executive Suite', bedType: '1 King Bed + Sofa', sqft: 450, maxGuests: 3, price: 340 },
+            { id: 'stay-hudson-grand-rm0', name: 'Standard King', bedType: '1 King Bed', sqft: 260, maxGuests: 2, price: 210, popular: true, view: 'City View', refundable: true, image: 'assets/shorts/thumbs/lounge-2.jpg', amenities: ['wifi'], taxesNote: 'Plus 14% occupancy tax' },
+            { id: 'stay-hudson-grand-rm1', name: 'Executive Suite', bedType: '1 King Bed + Sofa', sqft: 450, maxGuests: 3, price: 340, view: 'River View', refundable: true, image: 'assets/shorts/thumbs/lounge-1.jpg', amenities: ['wifi', 'workspace'], taxesNote: 'Plus 14% occupancy tax' },
         ],
     },
     { id: 'stay-gracebay-resort', category: 'Stays', name: 'Grace Bay Grand Resort', location: 'Turks & Caicos', rating: 4.9, price: 650, likes: '4.1K', comments: 133, saves: '3.6K', blurb: 'This water does not look real in person either.', verified: true, distance: '—', openStatus: 'Check-in 4:00 PM', hashtags: ['#turksandcaicos', '#resort', '#bucketlist'], friendsBooked: 6, avatarColor: '#2FD9C4', locationMode: 'At my business location', image: 'assets/shorts/thumbs/waterpark-3.jpg', video: 'assets/shorts/biz/waterpark-3',
         businessType: 'stay', propertyType: 'resort', address: 'Grace Bay Rd, Providenciales TKCA 1ZZ', phone: '+1 (649) 555-0121',
         description: 'A quiet stretch of Grace Bay with an infinity pool that lines up with the horizon, a full-service spa, and beach butlers who remember how you take your coffee.',
-        gallery: ['assets/shorts/thumbs/waterpark-3.jpg', 'assets/shorts/thumbs/waterpark-2.jpg', 'assets/shorts/thumbs/waterpark-1.jpg'],
-        amenities: ['pool', 'beachAccess', 'spa', 'gym', 'wifi', 'breakfast'],
-        badges: ['Trending'],
+        gallery: [
+            { src: 'assets/shorts/thumbs/waterpark-3.jpg', category: 'Exterior' }, { src: 'assets/shorts/thumbs/waterpark-2.jpg', category: 'Pool' },
+            { src: 'assets/shorts/thumbs/waterpark-1.jpg', category: 'Beach' }, { src: 'assets/shorts/thumbs/lounge-1.jpg', category: 'Spa' },
+        ],
+        amenities: ['pool', 'beachAccess', 'spa', 'gym', 'wifi', 'restaurant', 'bar', 'roomService', 'breakfast', 'airConditioning'],
+        badges: ['Trending'], resortFeePerNight: 55,
         policies: { checkIn: '4:00 PM', checkOut: '11:00 AM', cancellation: 'Free cancellation up to 7 days before check-in.' },
         roomTypes: [
-            { id: 'stay-gracebay-resort-rm0', name: 'Garden View Room', bedType: '2 Queen Beds', sqft: 400, maxGuests: 4, price: 650, popular: true },
-            { id: 'stay-gracebay-resort-rm1', name: 'Oceanfront Villa Suite', bedType: '1 King Bed', sqft: 900, maxGuests: 4, price: 1150 },
+            { id: 'stay-gracebay-resort-rm0', name: 'Garden View Room', bedType: '2 Queen Beds', sqft: 400, maxGuests: 4, price: 650, popular: true, view: 'Garden View', refundable: true, image: 'assets/shorts/thumbs/waterpark-2.jpg', amenities: ['wifi', 'breakfast'], taxesNote: 'Includes $55/night resort fee' },
+            { id: 'stay-gracebay-resort-rm1', name: 'Oceanfront Villa Suite', bedType: '1 King Bed', sqft: 900, maxGuests: 4, price: 1150, view: 'Oceanfront', refundable: false, image: 'assets/shorts/thumbs/waterpark-1.jpg', amenities: ['wifi', 'breakfast', 'spa'], taxesNote: 'Includes $55/night resort fee' },
         ],
     },
     { id: 'stay-canalstreet-loft', category: 'Stays', name: 'Canal Street Loft', location: 'New York, NY', rating: 4.7, price: 245, likes: '1.4K', comments: 31, saves: '1.0K', blurb: 'Floor-to-ceiling windows and a skyline that never gets old.', verified: true, distance: '0.6 mi', openStatus: 'Self check-in', hashtags: ['#nyc', '#loft', '#entireplace'], friendsBooked: 10, avatarColor: '#8FBF3F', locationMode: 'At my business location', image: 'assets/shorts/thumbs/bistro-1.jpg', video: 'assets/shorts/biz/bistro-1',
         businessType: 'stay', propertyType: 'apartment', address: '212 Canal St, New York, NY 10013', phone: null,
         description: 'A one-bedroom loft above Canal Street with a real kitchen, a proper desk, and enough natural light that you won\'t reach for the lamps until sundown.',
-        gallery: ['assets/shorts/thumbs/bistro-1.jpg', 'assets/shorts/thumbs/bistro-2.jpg', 'assets/shorts/thumbs/bistro-3.jpg'],
-        amenities: ['wifi', 'kitchen', 'workspace'],
+        gallery: [
+            { src: 'assets/shorts/thumbs/bistro-1.jpg', category: 'Rooms' }, { src: 'assets/shorts/thumbs/bistro-2.jpg', category: 'Rooms' },
+            { src: 'assets/shorts/thumbs/bistro-3.jpg', category: 'Views' },
+        ],
+        amenities: ['wifi', 'kitchen', 'workspace', 'airConditioning'], cleaningFee: 85,
         policies: { checkIn: 'Self check-in after 4:00 PM', checkOut: '11:00 AM', cancellation: 'Free cancellation up to 5 days before check-in.' },
         bedrooms: 1, beds: 1, bathrooms: 1, entirePlace: true,
     },
     { id: 'stay-cliffside-villa', category: 'Stays', name: 'Cliffside Ocean Villa', location: 'Malibu, CA', rating: 4.9, price: 890, likes: '2.6K', comments: 71, saves: '2.1K', blurb: 'Whale watching from the infinity edge, no boat required.', verified: true, distance: '3.4 mi', openStatus: 'Self check-in', hashtags: ['#malibu', '#villa', '#oceanview'], friendsBooked: 8, avatarColor: '#2E9BFF', locationMode: 'At my business location', image: 'assets/shorts/thumbs/boat-1.jpg', video: 'assets/shorts/biz/boat-1',
         businessType: 'stay', propertyType: 'villa', address: 'Pacific Coast Hwy, Malibu, CA 90265', phone: null,
         description: 'A four-bedroom clifftop villa with its own infinity pool, private beach path, and a chef\'s kitchen built for hosting the whole group.',
-        gallery: ['assets/shorts/thumbs/boat-1.jpg', 'assets/shorts/thumbs/boat-2.jpg', 'assets/shorts/thumbs/waterpark-2.jpg'],
-        amenities: ['pool', 'beachAccess', 'wifi', 'parking', 'kitchen'],
-        badges: ['Popular'],
+        gallery: [
+            { src: 'assets/shorts/thumbs/boat-1.jpg', category: 'Exterior' }, { src: 'assets/shorts/thumbs/boat-2.jpg', category: 'Pool' },
+            { src: 'assets/shorts/thumbs/waterpark-2.jpg', category: 'Views' },
+        ],
+        amenities: ['pool', 'beachAccess', 'wifi', 'parking', 'evCharging', 'kitchen', 'airConditioning'],
+        badges: ['Popular'], cleaningFee: 250,
         policies: { checkIn: 'Self check-in after 4:00 PM', checkOut: '11:00 AM', cancellation: 'Free cancellation up to 14 days before check-in.' },
         bedrooms: 4, beds: 5, bathrooms: 3.5, entirePlace: true,
     },
     { id: 'stay-pinecrest-cabin', category: 'Stays', name: 'Pinecrest Mountain Cabin', location: 'Aspen, CO', rating: 4.8, price: 310, likes: '1.1K', comments: 26, saves: '940', blurb: 'Snow on the deck, fire going, dog approved.', verified: true, distance: '4.8 mi', openStatus: 'Self check-in', hashtags: ['#aspen', '#cabin', '#mountains'], friendsBooked: 7, avatarColor: '#3F6FBF', locationMode: 'At my business location', image: 'assets/shorts/thumbs/icerink-1.jpg', video: 'assets/shorts/biz/icerink-1',
         businessType: 'stay', propertyType: 'cabin', address: 'Pinecrest Rd, Aspen, CO 81611', phone: null,
         description: 'A two-bedroom log cabin fifteen minutes from the lifts, with a wood-burning fireplace, a full kitchen, and a deck built for watching the snow come down.',
-        gallery: ['assets/shorts/thumbs/icerink-1.jpg', 'assets/shorts/thumbs/icerink-2.jpg'],
-        amenities: ['wifi', 'kitchen', 'petFriendly', 'parking'],
+        gallery: [{ src: 'assets/shorts/thumbs/icerink-1.jpg', category: 'Exterior' }, { src: 'assets/shorts/thumbs/icerink-2.jpg', category: 'Views' }],
+        amenities: ['wifi', 'kitchen', 'petFriendly', 'parking'], cleaningFee: 120,
         policies: { checkIn: 'Self check-in after 4:00 PM', checkOut: '10:00 AM', cancellation: 'Free cancellation up to 7 days before check-in.' },
         bedrooms: 2, beds: 3, bathrooms: 2, entirePlace: true,
     },
     { id: 'stay-skyline-treehouse', category: 'Stays', name: 'Skyline Treehouse Retreat', location: 'Sedona, AZ', rating: 4.9, price: 375, likes: '2.2K', comments: 58, saves: '1.9K', blurb: 'Woke up level with the red rocks. Unreal.', verified: true, distance: '5.2 mi', openStatus: 'Self check-in', hashtags: ['#sedona', '#uniquestay', '#treehouse'], friendsBooked: 14, avatarColor: '#E7C77A', locationMode: 'At my business location', image: 'assets/shorts/thumbs/photo-4.jpg', video: 'assets/shorts/biz/photo-4',
         businessType: 'stay', propertyType: 'unique_stay', address: 'Red Rock Loop Rd, Sedona, AZ 86336', phone: null,
         description: 'A one-of-one treehouse built into the canyon wall, wired for comfort but designed to keep you outside — a wraparound deck, an outdoor soaking tub, and red-rock views from bed.',
-        gallery: ['assets/shorts/thumbs/photo-4.jpg', 'assets/shorts/thumbs/photo-5.jpg', 'assets/shorts/thumbs/photo-3.jpg'],
+        gallery: [
+            { src: 'assets/shorts/thumbs/photo-4.jpg', category: 'Exterior' }, { src: 'assets/shorts/thumbs/photo-5.jpg', category: 'Views' },
+            { src: 'assets/shorts/thumbs/photo-3.jpg', category: 'Rooms' },
+        ],
         amenities: ['wifi', 'kitchen', 'petFriendly'],
-        badges: ['Great Deal'],
+        badges: ['Great Deal'], cleaningFee: 90,
         policies: { checkIn: 'Self check-in after 3:00 PM', checkOut: '10:00 AM', cancellation: 'Free cancellation up to 5 days before check-in.' },
         bedrooms: 1, beds: 1, bathrooms: 1, entirePlace: true,
     },
@@ -8045,6 +8085,30 @@ function App() {
     const [confirmedStayBooking, setConfirmedStayBooking] = useState(null);
     const [myTrip, setMyTrip] = useState(() => loadLS('avio_my_trip', null));
     useEffect(() => { saveLS('avio_my_trip', myTrip); }, [myTrip]);
+    // Stay Detail page interactions: which hero photo is showing, the full-screen gallery viewer,
+    // the "See all amenities" sheet, a room's detail sheet, and the price-breakdown reveal.
+    const [stayHeroIndex, setStayHeroIndex] = useState(0);
+    useEffect(() => { setStayHeroIndex(0); }, [businessProfileTarget && businessProfileTarget.id]);
+    const [stayGalleryOpen, setStayGalleryOpen] = useState(false);
+    const [stayGalleryIndex, setStayGalleryIndex] = useState(0);
+    const [stayGalleryCategory, setStayGalleryCategory] = useState('All');
+    function openStayGallery(index) { setStayGalleryIndex(index || 0); setStayGalleryCategory('All'); setStayGalleryOpen(true); }
+    function closeStayGallery() { setStayGalleryOpen(false); }
+    const [stayAmenitiesSheetOpen, setStayAmenitiesSheetOpen] = useState(false);
+    const [stayRoomDetail, setStayRoomDetail] = useState(null);
+    const [stayPriceBreakdownOpen, setStayPriceBreakdownOpen] = useState(false);
+    // Single source of truth for a stay's nightly math — the booking flow's summary, its
+    // tappable breakdown, and the final booking record all read from this so they can never
+    // drift out of sync with each other.
+    function computeStayPriceBreakdown(business, room, nights) {
+        const nightlyRate = room ? room.price : business.price;
+        const subtotal = nightlyRate * nights;
+        const resortFeeTotal = Math.round((business.resortFeePerNight || 0) * nights * 100) / 100;
+        const cleaningFee = business.cleaningFee || 0;
+        const taxes = Math.round(subtotal * 0.12 * 100) / 100;
+        const total = Math.round((subtotal + taxes + resortFeeTotal + cleaningFee) * 100) / 100;
+        return { nightlyRate, nights, subtotal, taxes, resortFeeTotal, cleaningFee, total };
+    }
     function openStaysSearch() { setStaysScreen('search'); }
     function closeStaysSearch() { setStaysScreen(null); }
     function runStaysSearch() { setStaysScreen('results'); }
@@ -8081,6 +8145,7 @@ function App() {
         setStayBookingDraft({ checkIn: staysSearchDraft.checkIn || todayIso(), checkOut: staysSearchDraft.checkOut || addDaysIso(todayIso(), 3), adults: staysSearchDraft.adults || 2, children: staysSearchDraft.children || 0, roomId: preselectedRoomId || defaultRoomId });
         setStayBookingStep('dates');
         setConfirmedStayBooking(null);
+        setStayPriceBreakdownOpen(false);
     }
     function closeStayBookingFlow() { setStayBookingTarget(null); }
     function stayNightsForDraft(d) {
@@ -8094,10 +8159,9 @@ function App() {
         const d = stayBookingDraft;
         const nights = stayNightsForDraft(d);
         const room = (business.roomTypes || []).find((r) => r.id === d.roomId);
-        const nightlyRate = room ? room.price : business.price;
-        const subtotal = nightlyRate * nights;
-        const tax = Math.round(subtotal * 0.12 * 100) / 100;
-        const total = Math.round((subtotal + tax) * 100) / 100;
+        const price = computeStayPriceBreakdown(business, room, nights);
+        const subtotal = price.subtotal;
+        const total = price.total;
         const checkInDate = new Date(d.checkIn + 'T00:00:00');
         const checkInLabel = checkInDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const checkOutLabel = new Date(d.checkOut + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -8112,6 +8176,7 @@ function App() {
             time: null, timeRange: `${checkInLabel} – ${checkOutLabel}`, total, status: 'confirmed',
             address: business.address || business.location, logoText: initials,
             confirmationNumber, paymentMethod, originalPrice: subtotal, finalPrice: subtotal,
+            taxes: price.taxes, resortFeeTotal: price.resortFeeTotal, cleaningFee: price.cleaningFee,
         };
         setBookings((prev) => [booking, ...prev]);
         consumePostAttribution(booking);
@@ -9437,6 +9502,9 @@ function App() {
         setBusinessProfileTarget(item);
         setBizProfileTab('videos');
         setProfileDrag({ itemId: item.id, progress: 1, dragging: false });
+        setStayGalleryOpen(false);
+        setStayAmenitiesSheetOpen(false);
+        setStayRoomDetail(null);
     }
     function getMyRestaurant() {
         return feed.find((f) => f.id === RESTAURANT_ID);
@@ -12995,36 +13063,60 @@ function App() {
                     "View all thrillz", React.createElement(Icon, { name: "chevronright", size: 14, color: T.textPrimary })));
             const servicesSection = item.businessType === 'stay'
                 ? (() => {
-                    const gallery = (item.gallery && item.gallery.length ? item.gallery : [item.image]).filter(Boolean);
-                    const gallerySection = gallery.length > 0 && React.createElement("div", { style: { padding: '18px 18px 0' } },
-                        React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto' } },
-                            gallery.map((src, i) => React.createElement("div", { key: i, style: { flexShrink: 0, width: i === 0 ? 260 : 160, height: 180, borderRadius: 16, backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center' } }))));
+                    // Photos are the lead of the Stay page, not an afterthought — a large swipeable
+                    // hero (native scroll-snap, so no gesture library needed) with a "1 / N" counter,
+                    // tapping any frame opens the full-screen, category-filterable gallery.
+                    const gallery = (item.gallery && item.gallery.length ? item.gallery : (item.image ? [{ src: item.image, category: 'Exterior' }] : []))
+                        .map((g) => (typeof g === 'string' ? { src: g, category: 'Photos' } : g)).filter((g) => g && g.src);
+                    const gallerySection = gallery.length > 0 && React.createElement("div", { style: { marginTop: 4 } },
+                        React.createElement("div", {
+                            className: "avio-scroll", style: { display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory' },
+                            onScroll: (e) => { const i = Math.round(e.target.scrollLeft / e.target.clientWidth); if (i !== stayHeroIndex) setStayHeroIndex(i); },
+                        }, gallery.map((g, i) => React.createElement("button", { key: i, onClick: () => openStayGallery(i), style: { flex: '0 0 100%', scrollSnapAlign: 'start', height: 260, backgroundImage: `url(${g.src})`, backgroundSize: 'cover', backgroundPosition: 'center' } }))),
+                        gallery.length > 1 && React.createElement("div", { style: { position: 'relative' } },
+                            React.createElement("span", { style: { position: 'absolute', right: 14, bottom: 12, fontSize: 11.5, fontWeight: 700, color: '#fff', background: 'rgba(0,0,0,0.55)', borderRadius: 10, padding: '4px 10px' } }, `${stayHeroIndex + 1} / ${gallery.length}`)));
                     const aboutSection = item.description && React.createElement("div", { style: { padding: '20px 18px 0' } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, margin: '0 0 8px' } }, "About This Stay"),
                         React.createElement("p", { style: { fontSize: 12.5, color: '#484848', lineHeight: 1.55 } }, item.description));
                     const isHotelLike = !!item.roomTypes;
+                    const roomCard = (r) => React.createElement("div", { key: r.id, style: { border: `1px solid ${T.border}`, borderRadius: 16, overflow: 'hidden' } },
+                        r.image && React.createElement("div", { style: { height: 130, backgroundImage: `url(${r.image})`, backgroundSize: 'cover', backgroundPosition: 'center' } }),
+                        React.createElement("div", { style: { padding: 14 } },
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 } },
+                                React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: T.textPrimary, margin: 0 } }, r.name),
+                                r.popular && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: T.textPrimary, background: 'rgba(128,128,128,0.14)', borderRadius: 8, padding: '3px 8px', flexShrink: 0 } }, "Popular")),
+                            React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, marginTop: 4 } }, [r.bedType, r.sqft && `${r.sqft} sq ft`, r.view, `Sleeps ${r.maxGuests}`].filter(Boolean).join(' · ')),
+                            (r.amenities || []).length > 0 && React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 } },
+                                r.amenities.slice(0, 4).map((a) => AMENITY_META[a] && React.createElement("span", { key: a, style: { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, color: T.textSecondary, background: T.surfaceSecondary, borderRadius: 8, padding: '3px 7px' } }, React.createElement(Icon, { name: AMENITY_META[a].icon, size: 10, color: T.textSecondary }), AMENITY_META[a].label))),
+                            React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 } },
+                                React.createElement("button", { onClick: () => setStayRoomDetail(r), style: { fontSize: 11.5, fontWeight: 700, color: T.textSecondary, textDecoration: 'underline' } }, "View room"),
+                                React.createElement("span", { style: { fontSize: 10.5, fontWeight: 600, color: r.refundable === false ? '#D0304A' : '#1E8E5A' } }, r.refundable === false ? 'Non-refundable' : 'Free cancellation')),
+                            React.createElement("button", { onClick: () => openStayBooking(item, r.id), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginTop: 10, padding: '11px 0', borderTop: `1px solid ${T.border}` } },
+                                React.createElement("div", null,
+                                    React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: T.textPrimary } }, `${money(r.price)} / night`),
+                                    r.taxesNote && React.createElement("span", { style: { display: 'block', fontSize: 10, color: T.textSecondary, marginTop: 1 } }, r.taxesNote)),
+                                React.createElement(Icon, { name: "chevronright", size: 15, color: '#B5B5B8' }))));
                     const roomsSection = React.createElement("div", { style: { padding: '20px 18px 0' } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, margin: '0 0 10px' } }, isHotelLike ? "Rooms / Stay Options" : "Stay Details"),
                         isHotelLike
-                            ? React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, item.roomTypes.map((r) => React.createElement("div", { key: r.id, style: { border: `1px solid ${T.border}`, borderRadius: 16, padding: 14 } },
-                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
-                                    React.createElement("p", { style: { fontSize: 14, fontWeight: 700, color: T.textPrimary, margin: 0 } }, r.name),
-                                    r.popular && React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: T.textPrimary, background: 'rgba(128,128,128,0.14)', borderRadius: 8, padding: '3px 8px' } }, "Popular")),
-                                React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, marginTop: 4 } }, `${r.bedType} · ${r.sqft} sq ft · Sleeps ${r.maxGuests}`),
-                                React.createElement("button", { onClick: () => openStayBooking(item, r.id), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginTop: 10, padding: '11px 0' } },
-                                    React.createElement("span", { style: { fontSize: 13, fontWeight: 700, color: T.textPrimary } }, `${money(r.price)} / night`),
-                                    React.createElement(Icon, { name: "chevronright", size: 15, color: '#B5B5B8' })))))
+                            ? React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, item.roomTypes.map(roomCard))
                             : React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 8 } },
                                 [item.entirePlace ? 'Entire place' : 'Private room', `${item.bedrooms} Bedroom${item.bedrooms === 1 ? '' : 's'}`, `${item.beds} Bed${item.beds === 1 ? '' : 's'}`, `${item.bathrooms} Bath${item.bathrooms === 1 ? '' : 's'}`].map((label) => React.createElement("span", { key: label, style: { fontSize: 12, fontWeight: 600, color: T.textPrimary, background: 'rgba(128,128,128,0.12)', borderRadius: 12, padding: '7px 12px' } }, label))));
-                    const amenitiesSection = (item.amenities || []).length > 0 && React.createElement("div", { style: { padding: '20px 18px 0' } },
+                    // Only the property's OWN amenities ever render — never a fake/placeholder list —
+                    // most-important-first (AMENITY_PRIORITY), ~6 up front so the page stays clean,
+                    // the rest one tap away behind "See all amenities" (grouped by category there).
+                    const stayAmenityKeys = sortedStayAmenities(item.amenities);
+                    const amenityChip = (a) => {
+                        const meta = AMENITY_META[a];
+                        if (!meta) return null;
+                        return React.createElement("div", { key: a, style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                            React.createElement(Icon, { name: meta.icon, size: 16, color: T.textPrimary }),
+                            React.createElement("span", { style: { fontSize: 12.5, color: T.textPrimary } }, meta.label));
+                    };
+                    const amenitiesSection = stayAmenityKeys.length > 0 && React.createElement("div", { style: { padding: '20px 18px 0' } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, margin: '0 0 10px' } }, "Amenities"),
-                        React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } }, item.amenities.map((a) => {
-                            const meta = AMENITY_META[a];
-                            if (!meta) return null;
-                            return React.createElement("div", { key: a, style: { display: 'flex', alignItems: 'center', gap: 8 } },
-                                React.createElement(Icon, { name: meta.icon, size: 16, color: T.textPrimary }),
-                                React.createElement("span", { style: { fontSize: 12.5, color: T.textPrimary } }, meta.label));
-                        })));
+                        React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } }, stayAmenityKeys.slice(0, 6).map(amenityChip)),
+                        stayAmenityKeys.length > 6 && React.createElement("button", { onClick: () => setStayAmenitiesSheetOpen(true), style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 12, fontSize: 12.5, fontWeight: 700, color: T.textPrimary } }, `See all ${stayAmenityKeys.length} amenities`, React.createElement(Icon, { name: "chevronright", size: 13, color: T.textPrimary })));
                     const locationSection = item.address && React.createElement("div", { style: { padding: '20px 18px 0' } },
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, margin: '0 0 8px' } }, "Location"),
                         React.createElement("div", { style: { display: 'flex', alignItems: 'flex-start', gap: 6 } },
@@ -13105,6 +13197,71 @@ function App() {
                     header, avatarRow, statsRow, bioRow, actionRow, profileDealBadge, tabsRow, activeSection,
                     bizProfileTab === 'services' && renderCommunityVideos(item)),
                 stayCheckAvailabilityFooter);
+        })(),
+        stayGalleryOpen && businessProfileTarget && businessProfileTarget.businessType === 'stay' && (() => {
+            const item = businessProfileTarget;
+            const gallery = (item.gallery && item.gallery.length ? item.gallery : (item.image ? [{ src: item.image, category: 'Exterior' }] : []))
+                .map((g) => (typeof g === 'string' ? { src: g, category: 'Photos' } : g)).filter((g) => g && g.src);
+            const categoriesPresent = ['All', ...STAY_GALLERY_CATEGORIES.filter((c) => gallery.some((g) => g.category === c))];
+            const shown = stayGalleryCategory === 'All' ? gallery : gallery.filter((g) => g.category === stayGalleryCategory);
+            const clampedIndex = Math.min(stayGalleryIndex, Math.max(0, shown.length - 1));
+            return React.createElement("div", { key: "staygallery", style: { position: 'absolute', inset: 0, zIndex: 13, background: '#000', display: 'flex', flexDirection: 'column' } },
+                React.createElement("div", { style: { flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `calc(env(safe-area-inset-top) + 14px) 18px 10px` } },
+                    React.createElement("button", { onClick: closeStayGallery }, React.createElement(Icon, { name: "x", size: 20, color: "#fff" })),
+                    shown.length > 0 && React.createElement("span", { style: { fontSize: 12.5, fontWeight: 700, color: '#fff' } }, `${clampedIndex + 1} / ${shown.length}`),
+                    React.createElement("span", { style: { width: 20 } })),
+                categoriesPresent.length > 2 && React.createElement("div", { className: "avio-scroll", style: { flexShrink: 0, display: 'flex', gap: 8, overflowX: 'auto', padding: '0 18px 12px' } },
+                    categoriesPresent.map((c) => {
+                        const active = stayGalleryCategory === c;
+                        return React.createElement("button", { key: c, onClick: () => { setStayGalleryCategory(c); setStayGalleryIndex(0); }, style: { flexShrink: 0, padding: '6px 13px', borderRadius: 14, fontSize: 12, fontWeight: 600, background: active ? '#fff' : 'rgba(255,255,255,0.14)', color: active ? '#0A0A0A' : '#fff' } }, c);
+                    })),
+                React.createElement("div", {
+                    key: stayGalleryCategory, className: "avio-scroll", style: { flex: 1, display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory' },
+                    onScroll: (e) => { const i = Math.round(e.target.scrollLeft / e.target.clientWidth); if (i !== stayGalleryIndex) setStayGalleryIndex(i); },
+                }, shown.map((g, i) => React.createElement("div", { key: i, style: { flex: '0 0 100%', scrollSnapAlign: 'start', backgroundImage: `url(${g.src})`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' } }))));
+        })(),
+        stayAmenitiesSheetOpen && businessProfileTarget && businessProfileTarget.businessType === 'stay' && (() => {
+            const item = businessProfileTarget;
+            const keys = sortedStayAmenities(item.amenities);
+            const byCategory = {};
+            keys.forEach((a) => { const meta = AMENITY_META[a]; if (!meta) return; (byCategory[meta.category] = byCategory[meta.category] || []).push(a); });
+            return React.createElement("div", { key: "stayamenities", onClick: () => setStayAmenitiesSheetOpen(false), style: { position: 'absolute', inset: 0, zIndex: 13, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end' } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), className: "avio-filter-sheet", style: { width: '100%', background: T.modalBackground, borderRadius: '24px 24px 0 0', padding: `14px 18px calc(env(safe-area-inset-bottom) + 18px)`, maxHeight: '80%', overflowY: 'auto' } },
+                    React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: T.border, margin: '0 auto 14px' } }),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: T.textPrimary, margin: 0 } }, "All Amenities"),
+                        React.createElement("button", { onClick: () => setStayAmenitiesSheetOpen(false) }, React.createElement(Icon, { name: "x", size: 18, color: T.textSecondary }))),
+                    Object.keys(byCategory).map((cat) => React.createElement("div", { key: cat, style: { marginBottom: 18 } },
+                        React.createElement("p", { style: { fontSize: 11, fontWeight: 700, color: T.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 } }, cat),
+                        React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 } }, byCategory[cat].map((a) => React.createElement("div", { key: a, style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                            React.createElement(Icon, { name: AMENITY_META[a].icon, size: 16, color: T.textPrimary }),
+                            React.createElement("span", { style: { fontSize: 12.5, color: T.textPrimary } }, AMENITY_META[a].label))))))));
+        })(),
+        stayRoomDetail && businessProfileTarget && businessProfileTarget.businessType === 'stay' && (() => {
+            const item = businessProfileTarget;
+            const r = stayRoomDetail;
+            const rawGallery = (item.gallery && item.gallery.length ? item.gallery : []).map((g) => (typeof g === 'string' ? { src: g, category: 'Photos' } : g));
+            const roomPhotos = [r.image, ...rawGallery.filter((g) => g && g.category === 'Rooms').map((g) => g.src)].filter(Boolean);
+            return React.createElement("div", { key: "roomdetail", style: { position: 'absolute', inset: 0, zIndex: 12, background: T.background, display: 'flex', flexDirection: 'column' } },
+                React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto' } },
+                    React.createElement("div", { style: { position: 'relative' } },
+                        roomPhotos.length > 0
+                            ? React.createElement("div", { className: "avio-scroll", style: { display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory' } },
+                                roomPhotos.map((src, i) => React.createElement("div", { key: i, style: { flex: '0 0 100%', scrollSnapAlign: 'start', height: 240, backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center' } })))
+                            : React.createElement("div", { style: { height: 240, background: T.surfaceSecondary } }),
+                        React.createElement("button", { onClick: () => setStayRoomDetail(null), style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', left: 14, width: 34, height: 34, borderRadius: 17, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "arrowleft", size: 17, color: "#fff" }))),
+                    React.createElement("div", { style: { padding: '18px 18px 24px' } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 19, color: T.textPrimary, margin: 0 } }, r.name),
+                        React.createElement("p", { style: { fontSize: 12.5, color: T.textSecondary, marginTop: 4 } }, [r.bedType, r.sqft && `${r.sqft} sq ft`, r.view, `Sleeps ${r.maxGuests}`].filter(Boolean).join(' · ')),
+                        React.createElement("p", { style: { fontSize: 12, fontWeight: 600, color: r.refundable === false ? '#D0304A' : '#1E8E5A', marginTop: 8 } }, r.refundable === false ? 'Non-refundable' : 'Free cancellation'),
+                        (r.amenities || []).length > 0 && React.createElement(React.Fragment, null,
+                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, color: T.textPrimary, margin: '20px 0 10px' } }, "Room Amenities"),
+                            React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } }, r.amenities.map((a) => AMENITY_META[a] && React.createElement("div", { key: a, style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                                React.createElement(Icon, { name: AMENITY_META[a].icon, size: 16, color: T.textPrimary }),
+                                React.createElement("span", { style: { fontSize: 12.5, color: T.textPrimary } }, AMENITY_META[a].label))))),
+                        r.taxesNote && React.createElement("p", { style: { fontSize: 11.5, color: T.textSecondary, marginTop: 16 } }, r.taxesNote))),
+                React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${T.border}` } },
+                    React.createElement("button", { onClick: () => { setStayRoomDetail(null); openStayBooking(item, r.id); }, style: { width: '100%', height: 52, borderRadius: 26, background: T.textPrimary, color: T.background, fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } }, `${money(r.price)} / night`, React.createElement("span", { style: { opacity: 0.6 } }, "·"), "Continue")));
         })(),
         editBusinessProfileOpen && editProfileDraft && (() => {
             const d = editProfileDraft;
@@ -14671,11 +14828,8 @@ function App() {
             const d = stayBookingDraft;
             const rooms = business.roomTypes || null;
             const room = rooms ? (rooms.find((r) => r.id === d.roomId) || rooms[0]) : null;
-            const nightlyRate = room ? room.price : business.price;
             const nights = stayNightsForDraft(d);
-            const subtotal = nightlyRate * nights;
-            const tax = Math.round(subtotal * 0.12 * 100) / 100;
-            const total = Math.round((subtotal + tax) * 100) / 100;
+            const { nightlyRate, subtotal, taxes: tax, resortFeeTotal, cleaningFee, total } = computeStayPriceBreakdown(business, room, nights);
             const bizInitials = business.name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
             const STEP_TITLES = { dates: 'Select Dates', guests: "Who's Coming", review: 'Review Your Stay', success: '' };
             const STEP_ORDER = ['dates', 'guests', 'review'];
@@ -14747,8 +14901,10 @@ function App() {
                                 React.createElement("span", { style: { fontSize: 12.5, color: SF.sub } }, k),
                                 React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: SF.text } }, v)))),
                     React.createElement("div", { style: { marginTop: 18 } },
-                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0' } }, React.createElement("span", { style: { fontSize: 12.5, color: SF.sub } }, `${money(nightlyRate)} × ${nights} night${nights === 1 ? '' : 's'}`), React.createElement("span", { style: { fontSize: 12.5, color: SF.text } }, money(subtotal))),
-                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0' } }, React.createElement("span", { style: { fontSize: 12.5, color: SF.sub } }, "Taxes & fees"), React.createElement("span", { style: { fontSize: 12.5, color: SF.text } }, money(tax)))),
+                        [[`${money(nightlyRate)} × ${nights} night${nights === 1 ? '' : 's'}`, subtotal],
+                            resortFeeTotal > 0 && ['Resort fee', resortFeeTotal],
+                            cleaningFee > 0 && ['Cleaning fee', cleaningFee],
+                            ['Taxes & fees', tax]].filter(Boolean).map(([label, amt]) => React.createElement("div", { key: label, style: { display: 'flex', justifyContent: 'space-between', padding: '4px 0' } }, React.createElement("span", { style: { fontSize: 12.5, color: SF.sub } }, label), React.createElement("span", { style: { fontSize: 12.5, color: SF.text } }, money(amt))))),
                     React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 14, borderTop: `1px solid ${SF.border}` } },
                         React.createElement("span", { style: { fontSize: 12.5, color: SF.sub } }, "Total"),
                         React.createElement("span", { style: { fontSize: 20, fontWeight: 700, color: T.textPrimary, fontFamily: 'Space Grotesk, sans-serif' } }, money(total))));
@@ -14775,7 +14931,21 @@ function App() {
             }
             let footer = null;
             const ctaStyle = (ready) => ({ width: '100%', height: 52, borderRadius: 26, background: ready ? T.textPrimary : '#EDEDED', color: ready ? T.background : '#B5B5B8', fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif' });
-            const footerWrap = (node) => React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${SF.border}` } }, node);
+            // The clear "N nights · $X/night — $Y total" bar the price-summary upgrade asked for —
+            // shown above the CTA from the moment dates are picked, tapping it reveals the same
+            // room/taxes/fees breakdown the review step shows inline, without leaving this screen.
+            const priceBar = datesValid && stayBookingStep !== 'review' && React.createElement("button", { onClick: () => setStayPriceBreakdownOpen((v) => !v), style: { display: 'flex', flexDirection: 'column', width: '100%', textAlign: 'left', marginBottom: 10 } },
+                React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                    React.createElement("span", { style: { fontSize: 12, color: SF.sub } }, `${nights} night${nights === 1 ? '' : 's'} · ${money(nightlyRate)}/night`),
+                    React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4 } },
+                        React.createElement("span", { style: { fontSize: 15, fontWeight: 700, color: SF.text, fontFamily: 'Space Grotesk, sans-serif' } }, `${money(total)} total`),
+                        React.createElement(Icon, { name: stayPriceBreakdownOpen ? "chevrondown" : "chevronright", size: 12, color: SF.sub }))),
+                stayPriceBreakdownOpen && React.createElement("div", { style: { marginTop: 10, paddingTop: 10, borderTop: `1px solid ${SF.border}`, display: 'flex', flexDirection: 'column', gap: 5 } },
+                    [[`${money(nightlyRate)} × ${nights} night${nights === 1 ? '' : 's'}`, subtotal],
+                        resortFeeTotal > 0 && ['Resort fee', resortFeeTotal],
+                        cleaningFee > 0 && ['Cleaning fee', cleaningFee],
+                        ['Taxes & fees', tax]].filter(Boolean).map(([label, amt]) => React.createElement("div", { key: label, style: { display: 'flex', justifyContent: 'space-between' } }, React.createElement("span", { style: { fontSize: 11.5, color: SF.sub } }, label), React.createElement("span", { style: { fontSize: 11.5, color: SF.text } }, money(amt))))));
+            const footerWrap = (node) => React.createElement("div", { style: { flexShrink: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${SF.border}` } }, priceBar, node);
             if (stayBookingStep === 'dates')
                 footer = footerWrap(React.createElement("button", { disabled: !datesValid, onClick: () => setStayBookingStep('guests'), style: ctaStyle(datesValid) }, "Continue"));
             else if (stayBookingStep === 'guests')
