@@ -596,6 +596,17 @@ function sortedStayAmenities(list) {
 }
 // Categories a Stay's photo gallery can be organized into when a photo names one.
 const STAY_GALLERY_CATEGORIES = ['Rooms', 'Pool', 'Beach', 'Lobby', 'Restaurants', 'Gym', 'Spa', 'Views', 'Exterior'];
+// The one place a stay's average rating and review count are computed — straight from its own
+// star tally, never a hardcoded or borrowed number, so the Ratings & Reviews sheet, the feed
+// chip, and the results-grid card can never disagree with each other about the same property.
+function stayRatingStats(item) {
+    const tally = item.ratingTally || { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    const total = [5, 4, 3, 2, 1].reduce((sum, star) => sum + (tally[star] || 0), 0);
+    const avg = total > 0 ? [5, 4, 3, 2, 1].reduce((sum, star) => sum + star * (tally[star] || 0), 0) / total : (item.rating || 0);
+    const percentages = {};
+    [5, 4, 3, 2, 1].forEach((star) => { percentages[star] = total > 0 ? Math.round(((tally[star] || 0) / total) * 100) : 0; });
+    return { total, avg, tally, percentages };
+}
 const BOOKING_SERVICE_TEMPLATES = {
     'Beauty': [{ name: 'Signature Style', durationMin: 45 }, { name: 'Express Service', durationMin: 20 }, { name: 'Style + Treatment', durationMin: 60 }, { name: 'Color Correction', durationMin: 90 }],
     'Home Services': [{ name: 'Standard Clean', durationMin: 90 }, { name: 'Deep Clean', durationMin: 150 }, { name: 'Move-In / Move-Out', durationMin: 180 }],
@@ -2324,8 +2335,16 @@ const FEED = [
             { src: 'assets/shorts/thumbs/waterpark-3.jpg', category: 'Beach' }, { src: 'assets/shorts/thumbs/lounge-1.jpg', category: 'Lobby' },
             { src: 'assets/shorts/thumbs/lounge-2.jpg', category: 'Restaurants' },
         ],
-        amenities: ['pool', 'beachAccess', 'spa', 'gym', 'wifi', 'restaurant', 'roomService', 'parking', 'valetParking', 'breakfast', 'airConditioning'],
-        badges: ['Popular'], resortFeePerNight: 35,
+        amenities: ['pool', 'beachAccess', 'spa', 'gym', 'wifi', 'restaurant', 'roomService', 'parking', 'valetParking', 'breakfast', 'airConditioning', 'petFriendly'],
+        badges: ['Popular'], resortFeePerNight: 35, ecoFriendly: true,
+        ratingTally: { 5: 348, 4: 23, 3: 4, 2: 3, 1: 0 },
+        reviews: [
+            { id: 'rv-sb-1', name: 'Emily R.', avatarColor: '#D4536B', rating: 5, date: 'Aug 28, 2026', text: 'Incredible hotel! The rooftop pool is unreal and the service was amazing. Highly recommend!', photos: ['assets/shorts/thumbs/waterpark-1.jpg', 'assets/shorts/thumbs/waterpark-2.jpg', 'assets/shorts/thumbs/lounge-1.jpg'] },
+            { id: 'rv-sb-2', name: 'Jason M.', avatarColor: '#3F6FBF', rating: 5, date: 'Aug 24, 2026', text: 'Beautiful property, great location, and top notch staff. Will be back!', photos: ['assets/shorts/thumbs/waterpark-3.jpg', 'assets/shorts/thumbs/lounge-2.jpg'] },
+            { id: 'rv-sb-3', name: 'Sarah L.', avatarColor: '#E7C77A', rating: 5, date: 'Aug 19, 2026', text: 'The views, the rooms, the vibe — everything was perfect. A true Miami experience!', photos: [] },
+            { id: 'rv-sb-4', name: 'Marcus T.', avatarColor: '#6C4CFC', rating: 4, date: 'Aug 12, 2026', text: 'Gorgeous resort and the eco-conscious design is a nice touch. Only ding is the valet line got long on Saturday night.', photos: [] },
+            { id: 'rv-sb-5', name: 'Priya N.', avatarColor: '#3FBF8A', rating: 5, date: 'Aug 3, 2026', text: 'Booked the beachfront suite for our anniversary — worth every penny. Breakfast spread was fantastic too.', photos: ['assets/shorts/thumbs/waterpark-2.jpg'] },
+        ],
         policies: { checkIn: '3:00 PM', checkOut: '11:00 AM', cancellation: 'Free cancellation up to 5 days before check-in.' },
         roomTypes: [
             { id: 'stay-southbeach-resort-rm0', name: 'Ocean View King', bedType: '1 King Bed', sqft: 380, maxGuests: 2, price: 420, view: 'Ocean View', refundable: true, image: 'assets/shorts/thumbs/waterpark-2.jpg', amenities: ['wifi', 'airConditioning'], taxesNote: 'Includes $35/night resort fee' },
@@ -2341,6 +2360,13 @@ const FEED = [
         ],
         amenities: ['wifi', 'breakfast', 'gym', 'workspace'],
         badges: ['Trending'],
+        ratingTally: { 5: 130, 4: 20, 3: 4, 2: 1, 1: 1 },
+        reviews: [
+            { id: 'rv-io-1', name: 'Dana K.', avatarColor: '#3F6FBF', rating: 5, date: 'Aug 30, 2026', text: 'Exposed brick, great coffee downstairs, and a rooftop view that made the whole trip. Loved it.', photos: ['assets/shorts/thumbs/lounge-1.jpg'] },
+            { id: 'rv-io-2', name: 'Wes P.', avatarColor: '#E7C77A', rating: 5, date: 'Aug 22, 2026', text: 'Small hotel but every detail was thought through. The reading nook in our room was a nice surprise.', photos: [] },
+            { id: 'rv-io-3', name: 'Alina F.', avatarColor: '#D4536B', rating: 4, date: 'Aug 15, 2026', text: 'Charming spot in Williamsburg. Walls are a little thin but the staff more than made up for it.', photos: ['assets/shorts/thumbs/bistro-1.jpg'] },
+            { id: 'rv-io-4', name: 'Chris O.', avatarColor: '#3FBF8A', rating: 5, date: 'Aug 6, 2026', text: 'Breakfast room in the morning light is worth the stay alone. Booking again next time we\'re in Brooklyn.', photos: [] },
+        ],
         policies: { checkIn: '4:00 PM', checkOut: '11:00 AM', cancellation: 'Free cancellation up to 48 hours before check-in.' },
         roomTypes: [
             { id: 'stay-ivyoak-boutique-rm0', name: 'Classic Queen', bedType: '1 Queen Bed', sqft: 220, maxGuests: 2, price: 295, popular: true, view: 'City View', refundable: false, image: 'assets/shorts/thumbs/lounge-1.jpg', amenities: ['wifi'], taxesNote: 'Taxes and fees included' },
@@ -2355,6 +2381,13 @@ const FEED = [
             { src: 'assets/shorts/thumbs/bistro-2.jpg', category: 'Restaurants' },
         ],
         amenities: ['wifi', 'gym', 'bar', 'restaurant', 'parking', 'valetParking', 'workspace', 'evCharging'],
+        ratingTally: { 5: 150, 4: 45, 3: 10, 2: 3, 1: 2 },
+        reviews: [
+            { id: 'rv-hg-1', name: 'Ben C.', avatarColor: '#3F3F5C', rating: 5, date: 'Aug 27, 2026', text: 'The lobby bar lives up to the hype — best espresso martini I\'ve had downtown. Rooms are solid too.', photos: ['assets/shorts/thumbs/lounge-2.jpg'] },
+            { id: 'rv-hg-2', name: 'Natalie H.', avatarColor: '#E7C77A', rating: 4, date: 'Aug 20, 2026', text: 'Reliable business hotel, good gym, easy walk to the river. Nothing flashy but does the job well.', photos: [] },
+            { id: 'rv-hg-3', name: 'Marcus D.', avatarColor: '#3FBF8A', rating: 5, date: 'Aug 9, 2026', text: 'Upgraded to the Executive Suite and the river view was worth it. Valet was fast even at rush hour.', photos: [] },
+            { id: 'rv-hg-4', name: 'Ola A.', avatarColor: '#D4536B', rating: 4, date: 'Jul 30, 2026', text: 'Good stay overall. EV charging in the garage was a nice surprise for a downtown hotel.', photos: ['assets/shorts/thumbs/bistro-2.jpg'] },
+        ],
         policies: { checkIn: '3:00 PM', checkOut: '12:00 PM', cancellation: 'Free cancellation up to 24 hours before check-in.' },
         roomTypes: [
             { id: 'stay-hudson-grand-rm0', name: 'Standard King', bedType: '1 King Bed', sqft: 260, maxGuests: 2, price: 210, popular: true, view: 'City View', refundable: true, image: 'assets/shorts/thumbs/lounge-2.jpg', amenities: ['wifi'], taxesNote: 'Plus 14% occupancy tax' },
@@ -2369,7 +2402,14 @@ const FEED = [
             { src: 'assets/shorts/thumbs/waterpark-1.jpg', category: 'Beach' }, { src: 'assets/shorts/thumbs/lounge-1.jpg', category: 'Spa' },
         ],
         amenities: ['pool', 'beachAccess', 'spa', 'gym', 'wifi', 'restaurant', 'bar', 'roomService', 'breakfast', 'airConditioning'],
-        badges: ['Trending'], resortFeePerNight: 55,
+        badges: ['Trending'], resortFeePerNight: 55, ecoFriendly: true,
+        ratingTally: { 5: 225, 4: 15, 3: 3, 2: 1, 1: 1 },
+        reviews: [
+            { id: 'rv-gb-1', name: 'Tori S.', avatarColor: '#2FD9C4', rating: 5, date: 'Aug 31, 2026', text: 'The water genuinely does not look real. Beach butlers remembered our order by day two — five stars easily.', photos: ['assets/shorts/thumbs/waterpark-3.jpg', 'assets/shorts/thumbs/waterpark-1.jpg'] },
+            { id: 'rv-gb-2', name: 'Ravi K.', avatarColor: '#3F6FBF', rating: 5, date: 'Aug 21, 2026', text: 'Splurged on the oceanfront villa suite for our honeymoon and it delivered on every level.', photos: [] },
+            { id: 'rv-gb-3', name: 'Camille D.', avatarColor: '#D4536B', rating: 4, date: 'Aug 5, 2026', text: 'Stunning property. Spa was booked solid most of the week so plan ahead if that matters to you.', photos: ['assets/shorts/thumbs/lounge-1.jpg'] },
+            { id: 'rv-gb-4', name: 'Owen B.', avatarColor: '#3FBF8A', rating: 5, date: 'Jul 28, 2026', text: 'Infinity pool that lines up with the horizon is not an exaggeration — go see it for yourself.', photos: [] },
+        ],
         policies: { checkIn: '4:00 PM', checkOut: '11:00 AM', cancellation: 'Free cancellation up to 7 days before check-in.' },
         roomTypes: [
             { id: 'stay-gracebay-resort-rm0', name: 'Garden View Room', bedType: '2 Queen Beds', sqft: 400, maxGuests: 4, price: 650, popular: true, view: 'Garden View', refundable: true, image: 'assets/shorts/thumbs/waterpark-2.jpg', amenities: ['wifi', 'breakfast'], taxesNote: 'Includes $55/night resort fee' },
@@ -2384,6 +2424,12 @@ const FEED = [
             { src: 'assets/shorts/thumbs/bistro-3.jpg', category: 'Views' },
         ],
         amenities: ['wifi', 'kitchen', 'workspace', 'airConditioning'], cleaningFee: 85,
+        ratingTally: { 5: 75, 4: 16, 3: 5, 2: 1, 1: 1 },
+        reviews: [
+            { id: 'rv-cs-1', name: 'Grace L.', avatarColor: '#8FBF3F', rating: 5, date: 'Aug 29, 2026', text: 'Woke up to floor-to-ceiling skyline views every morning. The kitchen made it easy to just stay in some nights.', photos: ['assets/shorts/thumbs/bistro-3.jpg'] },
+            { id: 'rv-cs-2', name: 'Theo M.', avatarColor: '#3F6FBF', rating: 4, date: 'Aug 17, 2026', text: 'Great location right off Canal St. Self check-in was smooth, just wish there was more counter space.', photos: [] },
+            { id: 'rv-cs-3', name: 'Hana Y.', avatarColor: '#D4536B', rating: 5, date: 'Aug 2, 2026', text: 'Real desk, real light, real kitchen — exactly what we needed for a working week in the city.', photos: [] },
+        ],
         policies: { checkIn: 'Self check-in after 4:00 PM', checkOut: '11:00 AM', cancellation: 'Free cancellation up to 5 days before check-in.' },
         bedrooms: 1, beds: 1, bathrooms: 1, entirePlace: true,
     },
@@ -2395,7 +2441,13 @@ const FEED = [
             { src: 'assets/shorts/thumbs/waterpark-2.jpg', category: 'Views' },
         ],
         amenities: ['pool', 'beachAccess', 'wifi', 'parking', 'evCharging', 'kitchen', 'airConditioning'],
-        badges: ['Popular'], cleaningFee: 250,
+        badges: ['Popular'], cleaningFee: 250, ecoFriendly: true,
+        ratingTally: { 5: 80, 4: 5, 3: 1, 2: 1, 1: 0 },
+        reviews: [
+            { id: 'rv-cv-1', name: 'Isla P.', avatarColor: '#2E9BFF', rating: 5, date: 'Sep 1, 2026', text: 'Watched whales from the infinity pool with coffee in hand. This place is worth every bit of the splurge.', photos: ['assets/shorts/thumbs/boat-1.jpg', 'assets/shorts/thumbs/boat-2.jpg'] },
+            { id: 'rv-cv-2', name: 'Devon R.', avatarColor: '#3FBF8A', rating: 5, date: 'Aug 18, 2026', text: 'Hosted our whole family here — the chef\'s kitchen and the private beach path made it effortless.', photos: [] },
+            { id: 'rv-cv-3', name: 'Mara S.', avatarColor: '#D4536B', rating: 4, date: 'Aug 4, 2026', text: 'Stunning clifftop setting. PCH traffic getting in/out on weekends is the only real downside.', photos: [] },
+        ],
         policies: { checkIn: 'Self check-in after 4:00 PM', checkOut: '11:00 AM', cancellation: 'Free cancellation up to 14 days before check-in.' },
         bedrooms: 4, beds: 5, bathrooms: 3.5, entirePlace: true,
     },
@@ -2404,6 +2456,12 @@ const FEED = [
         description: 'A two-bedroom log cabin fifteen minutes from the lifts, with a wood-burning fireplace, a full kitchen, and a deck built for watching the snow come down.',
         gallery: [{ src: 'assets/shorts/thumbs/icerink-1.jpg', category: 'Exterior' }, { src: 'assets/shorts/thumbs/icerink-2.jpg', category: 'Views' }],
         amenities: ['wifi', 'kitchen', 'petFriendly', 'parking'], cleaningFee: 120,
+        ratingTally: { 5: 53, 4: 8, 3: 2, 2: 1, 1: 0 },
+        reviews: [
+            { id: 'rv-pc-1', name: 'Kellan W.', avatarColor: '#3F6FBF', rating: 5, date: 'Aug 26, 2026', text: 'Fireplace going, snow outside, and our dog was welcomed like family. Exactly the mountain trip we wanted.', photos: ['assets/shorts/thumbs/icerink-1.jpg'] },
+            { id: 'rv-pc-2', name: 'Renee J.', avatarColor: '#E7C77A', rating: 5, date: 'Aug 11, 2026', text: 'Fifteen minutes from the lifts and the kitchen was fully stocked with everything we needed.', photos: [] },
+            { id: 'rv-pc-3', name: 'Simon T.', avatarColor: '#8FBF3F', rating: 4, date: 'Jul 27, 2026', text: 'Cozy cabin, great deck for watching the snow. Wifi dropped once during a storm but came back fast.', photos: [] },
+        ],
         policies: { checkIn: 'Self check-in after 4:00 PM', checkOut: '10:00 AM', cancellation: 'Free cancellation up to 7 days before check-in.' },
         bedrooms: 2, beds: 3, bathrooms: 2, entirePlace: true,
     },
@@ -2415,7 +2473,13 @@ const FEED = [
             { src: 'assets/shorts/thumbs/photo-3.jpg', category: 'Rooms' },
         ],
         amenities: ['wifi', 'kitchen', 'petFriendly'],
-        badges: ['Great Deal'], cleaningFee: 90,
+        badges: ['Great Deal'], cleaningFee: 90, ecoFriendly: true,
+        ratingTally: { 5: 103, 4: 7, 3: 1, 2: 1, 1: 0 },
+        reviews: [
+            { id: 'rv-st-1', name: 'Willow K.', avatarColor: '#E7C77A', rating: 5, date: 'Aug 30, 2026', text: 'Woke up level with the red rocks and it genuinely didn\'t feel real. Outdoor soaking tub at sunset is a must.', photos: ['assets/shorts/thumbs/photo-4.jpg', 'assets/shorts/thumbs/photo-5.jpg'] },
+            { id: 'rv-st-2', name: 'Andres V.', avatarColor: '#6C4CFC', rating: 5, date: 'Aug 14, 2026', text: 'One of one is right — nothing else like it in Sedona. Wraparound deck sold us before we even checked in.', photos: [] },
+            { id: 'rv-st-3', name: 'Faith N.', avatarColor: '#3FBF8A', rating: 4, date: 'Jul 31, 2026', text: 'Beautiful and peaceful, just know the road up gets a bit rough for a low car.', photos: ['assets/shorts/thumbs/photo-3.jpg'] },
+        ],
         policies: { checkIn: 'Self check-in after 3:00 PM', checkOut: '10:00 AM', cancellation: 'Free cancellation up to 5 days before check-in.' },
         bedrooms: 1, beds: 1, bathrooms: 1, entirePlace: true,
     },
@@ -8196,6 +8260,53 @@ function App() {
     const [stayAmenitiesSheetOpen, setStayAmenitiesSheetOpen] = useState(false);
     const [stayRoomDetail, setStayRoomDetail] = useState(null);
     const [stayPriceBreakdownOpen, setStayPriceBreakdownOpen] = useState(false);
+    // The two feed-chip sheets (Ratings & Reviews, About This <Type>) — tappable straight from a
+    // Thrillz video's info chips, so they hold the target business directly rather than an id,
+    // since the tapped chip already has the exact object in hand.
+    const [stayRatingsSheetTarget, setStayRatingsSheetTarget] = useState(null);
+    const [stayAboutSheetTarget, setStayAboutSheetTarget] = useState(null);
+    const [stayRatingsFilter, setStayRatingsFilter] = useState('all'); // all | photos | latest
+    const [stayAboutTab, setStayAboutTab] = useState('overview');
+    useEffect(() => { if (stayRatingsSheetTarget) setStayRatingsFilter('all'); }, [stayRatingsSheetTarget]);
+    useEffect(() => { if (stayAboutSheetTarget) setStayAboutTab('overview'); }, [stayAboutSheetTarget]);
+    // Same real-history back-gesture pattern as Messages (see prevActiveConversationRef above):
+    // one pushState per sheet opening, popped by either its own close button or a genuine
+    // hardware/gesture back, so back never has to fall all the way out to leaving the feed.
+    const prevStayRatingsSheetRef = useRef(null);
+    useEffect(() => {
+        if (stayRatingsSheetTarget && !prevStayRatingsSheetRef.current)
+            window.history.pushState({ avioStayRatings: true }, '');
+        prevStayRatingsSheetRef.current = stayRatingsSheetTarget;
+    }, [stayRatingsSheetTarget]);
+    const prevStayAboutSheetRef = useRef(null);
+    useEffect(() => {
+        if (stayAboutSheetTarget && !prevStayAboutSheetRef.current)
+            window.history.pushState({ avioStayAbout: true }, '');
+        prevStayAboutSheetRef.current = stayAboutSheetTarget;
+    }, [stayAboutSheetTarget]);
+    useEffect(() => {
+        function onPopState() {
+            if (stayRatingsSheetTarget) { setStayRatingsSheetTarget(null); return; }
+            if (stayAboutSheetTarget) { setStayAboutSheetTarget(null); return; }
+        }
+        window.addEventListener('popstate', onPopState);
+        return () => window.removeEventListener('popstate', onPopState);
+    }, [stayRatingsSheetTarget, stayAboutSheetTarget]);
+    // Minimal real swipe-down-to-dismiss for a bottom sheet — pure DOM transform during the drag
+    // (no re-render needed to track it), calling the sheet's own close handler past the threshold.
+    // Shared by both new sheets since only one is ever open at a time.
+    const sheetDragStartYRef = useRef(0);
+    const sheetNodeRef = useRef(null);
+    function handleSheetTouchStart(e) { sheetDragStartYRef.current = e.touches[0].clientY; }
+    function handleSheetTouchMove(e) {
+        const dy = e.touches[0].clientY - sheetDragStartYRef.current;
+        if (dy > 0 && sheetNodeRef.current) sheetNodeRef.current.style.transform = `translateY(${dy}px)`;
+    }
+    function handleSheetTouchEnd(e, onDismiss) {
+        const dy = e.changedTouches[0].clientY - sheetDragStartYRef.current;
+        if (sheetNodeRef.current) sheetNodeRef.current.style.transform = '';
+        if (dy > 90) onDismiss();
+    }
     // Single source of truth for a stay's nightly math — the booking flow's summary, its
     // tappable breakdown, and the final booking record all read from this so they can never
     // drift out of sync with each other.
@@ -11788,14 +11899,24 @@ function App() {
             const bookedToday = postAttributions.filter((a) => a.postId === item.id && dateKey(new Date(a.createdAt)) === dateKey(new Date())).length;
             const reviewCountLabel = formatCount(Math.max(12, Math.round(parseCount(item.likes) / 9)));
             const typeChip = feedCategoryChipInfo(primaryTagTarget);
-            const chipPill = (key, iconName, label) => React.createElement("div", { key, style: { display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.14)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', borderRadius: 9, padding: '4px 8px' } },
+            // Tappable chips (rating, property type) get real button semantics, a bigger hit area
+            // than their visible padding suggests, and the shared avio-pill pressed-state — a
+            // non-interactive chip (like "Booked Today") stays a plain div, unchanged.
+            const chipPill = (key, iconName, label, onClick) => React.createElement(onClick ? "button" : "div", {
+                key, className: onClick ? "avio-pill" : undefined, onClick,
+                style: { display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.14)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', borderRadius: 9, padding: onClick ? '7px 9px' : '4px 8px', minHeight: onClick ? 30 : undefined },
+            },
                 iconName === 'star'
                     ? React.createElement(Icon, { name: "star", size: 10, color: THEME.gold, fill: THEME.gold })
                     : React.createElement(Icon, { name: iconName, size: 10, color: '#fff' }),
                 React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, color: "#fff" } }, label));
+            const stayReviewStats = primaryTagTarget.businessType === 'stay' ? stayRatingStats(primaryTagTarget) : null;
+            const chipRatingLabel = stayReviewStats
+                ? `${stayReviewStats.avg.toFixed(1)} (${formatCount(stayReviewStats.total)})`
+                : primaryTagTarget.rating ? `${primaryTagTarget.rating.toFixed(1)} (${reviewCountLabel})` : null;
             const chipsRow = React.createElement("div", { style: { display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 } },
-                primaryTagTarget.rating && chipPill('rating', 'star', `${primaryTagTarget.rating.toFixed(1)} (${reviewCountLabel})`),
-                typeChip && chipPill('type', typeChip.icon, typeChip.label),
+                chipRatingLabel && chipPill('rating', 'star', chipRatingLabel, primaryTagTarget.businessType === 'stay' ? () => setStayRatingsSheetTarget(primaryTagTarget) : undefined),
+                typeChip && chipPill('type', typeChip.icon, typeChip.label, primaryTagTarget.businessType === 'stay' ? () => setStayAboutSheetTarget(primaryTagTarget) : undefined),
                 chipPill('booked', 'users', `${bookedToday.toLocaleString()} Booked Today`));
             const infoBlock = React.createElement("div", { style: { position: 'absolute', left: 0, right: 66, bottom: 'calc(env(safe-area-inset-bottom) + 110px)', padding: '0 18px', zIndex: 2 } },
                 topRatedBadge, React.createElement("div", null, nameRow), categoryRow2, captionP, stayTagCard || taggedRow, chipsRow);
@@ -17605,6 +17726,138 @@ function App() {
             React.createElement("button", { onClick: () => setChatImageViewer(null), style: { position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', right: 14, width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' } },
                 React.createElement(Icon, { name: "x", size: 18, color: "#fff" })),
             React.createElement("img", { src: chatImageViewer, style: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' } })),
+        // Tapped straight from a Thrillz video's "⭐ 4.9 (378)" chip — every number here comes
+        // from that exact property's own ratingTally/reviews (stayRatingStats), never a shared
+        // constant, so two different stays never accidentally show the same "4.9 (378)".
+        stayRatingsSheetTarget && (() => {
+            const item = stayRatingsSheetTarget;
+            const stats = stayRatingStats(item);
+            const allReviews = item.reviews || [];
+            const photoReviews = allReviews.filter((r) => r.photos && r.photos.length > 0);
+            const shown = [...(stayRatingsFilter === 'photos' ? photoReviews : allReviews)].sort((a, b) => new Date(b.date) - new Date(a.date));
+            const RS = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const closeRatingsSheet = () => window.history.back();
+            const filters = [{ id: 'all', label: `All (${formatCount(stats.total)})` }, { id: 'photos', label: `Photos (${photoReviews.length})` }, { id: 'latest', label: 'Latest' }];
+            const starRow = (size, filled) => React.createElement("div", { style: { display: 'flex', gap: 2 } }, Array.from({ length: 5 }).map((_, i) => React.createElement(Icon, { key: i, name: "star", size, color: THEME.gold, fill: i < filled ? THEME.gold : 'none' })));
+            return React.createElement("div", { onClick: closeRatingsSheet, style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 30, display: 'flex', alignItems: 'flex-end' } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), ref: sheetNodeRef, className: "avio-filter-sheet", style: { width: '100%', height: '82%', background: T.modalBackground, borderRadius: '24px 24px 0 0', display: 'flex', flexDirection: 'column' } },
+                    React.createElement("div", { onTouchStart: handleSheetTouchStart, onTouchMove: handleSheetTouchMove, onTouchEnd: (e) => handleSheetTouchEnd(e, closeRatingsSheet), style: { flexShrink: 0, padding: '10px 18px 14px' } },
+                        React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: RS.border, margin: '0 auto 14px' } }),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 18, color: RS.text, margin: 0 } }, "Ratings & Reviews"),
+                            React.createElement("button", { onClick: closeRatingsSheet, "aria-label": "Close" }, React.createElement(Icon, { name: "x", size: 18, color: RS.sub })))),
+                    React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px calc(env(safe-area-inset-bottom) + 18px)' } },
+                        React.createElement("div", { style: { display: 'flex', gap: 20, alignItems: 'center', paddingBottom: 16, borderBottom: `1px solid ${RS.border}` } },
+                            React.createElement("div", { style: { flexShrink: 0 } },
+                                React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 40, color: RS.text, margin: 0, lineHeight: 1 } }, stats.avg.toFixed(1)),
+                                React.createElement("div", { style: { marginTop: 6 } }, starRow(14, Math.round(stats.avg))),
+                                React.createElement("p", { style: { fontSize: 12, color: RS.sub, marginTop: 6, whiteSpace: 'nowrap' } }, `${stats.total.toLocaleString()} reviews`)),
+                            React.createElement("div", { style: { flex: 1, display: 'flex', flexDirection: 'column', gap: 5 } }, [5, 4, 3, 2, 1].map((star) => React.createElement("div", { key: star, style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                                React.createElement("span", { style: { fontSize: 11, color: RS.sub, width: 8 } }, star),
+                                React.createElement("div", { style: { flex: 1, height: 6, borderRadius: 3, background: T.surfaceSecondary, overflow: 'hidden' } }, React.createElement("div", { style: { width: `${stats.percentages[star]}%`, height: '100%', background: THEME.gold } })),
+                                React.createElement("span", { style: { fontSize: 10.5, color: RS.sub, width: 30, textAlign: 'right' } }, `${stats.percentages[star]}%`))))),
+                        React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 0' } }, filters.map((f) => {
+                            const active = stayRatingsFilter === f.id;
+                            return React.createElement("button", { key: f.id, onClick: () => setStayRatingsFilter(f.id), style: { flexShrink: 0, padding: '8px 14px', borderRadius: 16, fontSize: 12, fontWeight: 600, background: active ? T.textPrimary : T.surfaceSecondary, color: active ? T.background : RS.text } }, f.label);
+                        })),
+                        shown.length === 0
+                            ? React.createElement("p", { style: { textAlign: 'center', fontSize: 12.5, color: RS.sub, padding: '30px 0' } }, "No reviews match this filter yet.")
+                            : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 20, paddingBottom: 10 } }, shown.map((r) => React.createElement("div", { key: r.id },
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+                                    React.createElement("div", { style: { width: 38, height: 38, borderRadius: '50%', background: r.avatarColor || THEME.violet, border: avatarBorder(r.avatarColor), display: 'flex', alignItems: 'center', justifyContent: 'center', color: avatarFg(r.avatarColor), fontSize: 14, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0 } }, r.name.charAt(0)),
+                                    React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                        React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: RS.text, margin: 0 } }, r.name),
+                                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 } }, starRow(10, r.rating), React.createElement("span", { style: { fontSize: 11, color: RS.sub } }, r.date)))),
+                                React.createElement("p", { style: { fontSize: 12.5, color: RS.text, lineHeight: 1.5, marginTop: 8 } }, r.text),
+                                r.photos && r.photos.length > 0 && React.createElement("div", { className: "avio-scroll", style: { display: 'flex', gap: 8, overflowX: 'auto', marginTop: 10 } }, r.photos.map((src, i) => React.createElement("div", { key: i, style: { flexShrink: 0, width: 88, height: 88, borderRadius: 12, backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center' } })))))),
+                        React.createElement("button", { onClick: () => flashToast('Write a review — coming soon'), style: { width: '100%', margin: '20px 0', padding: '14px 0', borderRadius: 24, background: T.primaryButton, color: T.primaryButtonText, fontWeight: 700, fontSize: 14, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } }, React.createElement(Icon, { name: "pencil", size: 14, color: T.primaryButtonText }), "Write a Review"))));
+        })(),
+        // Tapped from the property-type chip (Resort/Hotel/Villa/...) — the label itself already
+        // comes from PROPERTY_TYPE_LABEL[item.propertyType] via feedCategoryChipInfo, so a villa's
+        // chip opens "About This Villa" and a hotel's opens "About This Hotel" with no special-casing.
+        stayAboutSheetTarget && (() => {
+            const item = stayAboutSheetTarget;
+            const stats = stayRatingStats(item);
+            const propertyTypeLabel = PROPERTY_TYPE_LABEL[item.propertyType] || 'Stay';
+            const AB = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const closeAboutSheet = () => window.history.back();
+            const goBookFromAbout = () => { setStayAboutSheetTarget(null); window.history.back(); openStayBooking(item); };
+            const bookedTodayForStay = bookings.filter((b) => b.providerId === item.id && b.day != null && dateKey(new Date(b.year, b.month, b.day)) === dateKey(new Date())).length;
+            const saved = savedShorts.has(item.id);
+            const iconAction = (key, iconName, label, onClick, filled) => React.createElement("button", { key, onClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 } },
+                React.createElement("div", { style: { width: 42, height: 42, borderRadius: '50%', border: `1px solid ${AB.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: iconName, size: 17, color: AB.text, fill: filled ? AB.text : 'none' })),
+                React.createElement("span", { style: { fontSize: 10.5, color: AB.sub } }, label));
+            const AB_TABS = [{ id: 'overview', label: 'Overview' }, { id: 'amenities', label: 'Amenities' }, { id: 'policies', label: 'Policies' }, { id: 'location', label: 'Location' }];
+            const infoRow = (iconName, label) => label && React.createElement("div", { key: label, style: { display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0' } },
+                React.createElement(Icon, { name: iconName, size: 15, color: AB.sub }),
+                React.createElement("span", { style: { fontSize: 12.5, color: AB.text } }, label));
+            let tabBody;
+            if (stayAboutTab === 'overview') {
+                tabBody = React.createElement(React.Fragment, null,
+                    item.description && React.createElement("p", { style: { fontSize: 12.5, color: AB.text, lineHeight: 1.55, margin: '4px 0 14px' } }, item.description),
+                    React.createElement("div", { style: { borderTop: `1px solid ${AB.border}` } },
+                        infoRow('mappin', item.address),
+                        infoRow('bed', propertyTypeLabel + (item.roomTypes ? ' · Hotel' : '')),
+                        infoRow('users', `${bookedTodayForStay.toLocaleString()} Booked Today`),
+                        item.ecoFriendly && infoRow('sparkles', 'Eco-Friendly'),
+                        (item.amenities || []).includes('petFriendly') && infoRow('heart', 'Pet Friendly')),
+                    React.createElement("button", { onClick: () => setStayAboutTab('policies'), style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '12px 0', borderTop: `1px solid ${AB.border}`, marginTop: 4 } },
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: AB.text } }, "More Details"),
+                        React.createElement(Icon, { name: "chevronright", size: 14, color: AB.sub })));
+            } else if (stayAboutTab === 'amenities') {
+                const keys = sortedStayAmenities(item.amenities);
+                tabBody = keys.length === 0
+                    ? React.createElement("p", { style: { fontSize: 12.5, color: AB.sub, padding: '20px 0', textAlign: 'center' } }, "No amenities listed yet.")
+                    : React.createElement("div", { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, paddingTop: 6 } }, keys.map((a) => AMENITY_META[a] && React.createElement("div", { key: a, style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                        React.createElement(Icon, { name: AMENITY_META[a].icon, size: 16, color: AB.text }),
+                        React.createElement("span", { style: { fontSize: 12.5, color: AB.text } }, AMENITY_META[a].label))));
+            } else if (stayAboutTab === 'policies') {
+                const rows = [['Check-in', item.policies && item.policies.checkIn], ['Check-out', item.policies && item.policies.checkOut], ['Cancellation', item.policies && item.policies.cancellation]].filter(([, v]) => v);
+                tabBody = rows.length === 0
+                    ? React.createElement("p", { style: { fontSize: 12.5, color: AB.sub, padding: '20px 0', textAlign: 'center' } }, "No policy details yet.")
+                    : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 6 } }, rows.map(([k, v]) => React.createElement("div", { key: k, style: { display: 'flex', justifyContent: 'space-between', gap: 12, paddingBottom: 10, borderBottom: `1px solid ${AB.border}` } },
+                        React.createElement("span", { style: { fontSize: 12.5, color: AB.sub, flexShrink: 0 } }, k),
+                        React.createElement("span", { style: { fontSize: 12.5, fontWeight: 600, color: AB.text, textAlign: 'right' } }, v))));
+            } else {
+                tabBody = React.createElement("div", { style: { paddingTop: 6 } },
+                    infoRow('mappin', item.address),
+                    item.distance && infoRow('send', `${item.distance} away`));
+            }
+            return React.createElement("div", { onClick: closeAboutSheet, style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 30, display: 'flex', alignItems: 'flex-end' } },
+                React.createElement("div", { onClick: (e) => e.stopPropagation(), ref: sheetNodeRef, className: "avio-filter-sheet", style: { position: 'relative', width: '100%', height: '85%', background: T.modalBackground, borderRadius: '24px 24px 0 0', display: 'flex', flexDirection: 'column' } },
+                    React.createElement("div", { onTouchStart: handleSheetTouchStart, onTouchMove: handleSheetTouchMove, onTouchEnd: (e) => handleSheetTouchEnd(e, closeAboutSheet), style: { flexShrink: 0, padding: '10px 18px 0' } },
+                        React.createElement("div", { style: { width: 36, height: 4, borderRadius: 2, background: AB.border, margin: '0 auto 14px' } }),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                            React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: AB.text, margin: 0 } }, `About This ${propertyTypeLabel}`),
+                            React.createElement("button", { onClick: closeAboutSheet, "aria-label": "Close" }, React.createElement(Icon, { name: "x", size: 18, color: AB.sub })))),
+                    React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: '0 18px calc(env(safe-area-inset-bottom) + 90px)' } },
+                        React.createElement("div", { style: { position: 'relative', margin: '10px 0 0', borderRadius: 16, overflow: 'hidden', aspectRatio: '16 / 9', backgroundImage: item.image ? `url(${item.image})` : 'none', backgroundColor: item.image ? undefined : T.textPrimary, backgroundSize: 'cover', backgroundPosition: 'center' } },
+                            React.createElement("span", { style: { position: 'absolute', top: 10, left: 10, fontSize: 10.5, fontWeight: 700, color: '#fff', background: 'rgba(0,0,0,0.55)', borderRadius: 8, padding: '4px 9px' } }, propertyTypeLabel)),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 } },
+                            React.createElement("div", { style: { width: 44, height: 44, borderRadius: 12, flexShrink: 0, backgroundImage: item.image ? `url(${item.image})` : 'none', backgroundColor: item.image ? undefined : T.textPrimary, backgroundSize: 'cover', backgroundPosition: 'center' } }),
+                            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+                                    React.createElement("span", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 15, color: AB.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, item.name),
+                                    item.verified && React.createElement("div", { style: { width: 14, height: 14, borderRadius: '50%', background: THEME.coral, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } }, React.createElement(Icon, { name: "check", size: 8, color: "#fff" }))),
+                                React.createElement("p", { style: { fontSize: 11.5, color: AB.sub, marginTop: 2 } }, item.location),
+                                React.createElement("div", { style: { display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 } },
+                                    React.createElement(Icon, { name: "star", size: 11, color: THEME.gold, fill: THEME.gold }),
+                                    React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: AB.text } }, stats.avg.toFixed(1)),
+                                    React.createElement("span", { style: { fontSize: 11.5, color: AB.sub } }, `(${formatCount(stats.total)})`))),
+                            React.createElement("button", { onClick: () => { setStayAboutSheetTarget(null); window.history.back(); openBusinessProfile(item); }, style: { flexShrink: 0, padding: '10px 16px', borderRadius: 18, background: T.primaryButton, color: T.primaryButtonText, fontSize: 12.5, fontWeight: 700 } }, "View Stay")),
+                        React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', marginTop: 18 } },
+                            iconAction('call', 'phone', 'Call', () => callBusiness(item)),
+                            iconAction('directions', 'send', 'Directions', () => openBusinessDirections(item)),
+                            iconAction('share', 'upload', 'Share', () => shareItem(item)),
+                            iconAction('save', 'heart', 'Save', () => toggleSaveShort(item.id), saved)),
+                        React.createElement("div", { style: { display: 'flex', gap: 22, marginTop: 20, borderBottom: `1px solid ${AB.border}` } }, AB_TABS.map((t) => {
+                            const active = stayAboutTab === t.id;
+                            return React.createElement("button", { key: t.id, onClick: () => setStayAboutTab(t.id), style: { paddingBottom: 10, fontSize: 12.5, fontWeight: active ? 700 : 500, color: active ? AB.text : AB.sub, borderBottom: active ? `2px solid ${AB.text}` : '2px solid transparent' } }, t.label);
+                        })),
+                        tabBody),
+                    React.createElement("div", { style: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: '12px 18px calc(env(safe-area-inset-bottom) + 14px)', background: T.modalBackground, borderTop: `1px solid ${AB.border}` } },
+                        React.createElement("button", { onClick: goBookFromAbout, style: { width: '100%', height: 52, borderRadius: 26, background: T.textPrimary, color: T.background, fontSize: 14.5, fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 } }, "Check Availability", React.createElement("span", { style: { opacity: 0.6 } }, "|"), `${money(item.price)} / night`))));
+        })(),
         businessBookingDetail && (React.createElement("div", { onClick: () => setBusinessBookingDetail(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-end', zIndex: 13 } }, (() => {
             const b = businessBookingDetail;
             const st = BOOKING_STATUS_STYLE[b.status] || BOOKING_STATUS_STYLE.confirmed;
