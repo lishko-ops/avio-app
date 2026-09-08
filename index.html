@@ -3537,7 +3537,7 @@ const ACCOUNT_TYPE_CARDS = [
     { id: 'personal', title: "I'm a Customer", subtitle: 'Discover & book', desc: 'Scroll services, discover businesses and book what you love.', words: ['WATCH', 'BOOK', 'SHARE'], icon: 'user' },
     { id: 'business', title: "I'm a Business", subtitle: 'Showcase & grow', desc: 'Show your work and turn views into bookings.', words: ['POST', 'BOOK', 'GROW'], icon: 'grid' },
 ];
-const BIZ_CATEGORIES = ['Barber', 'Hair Salon / Hairstylist', 'Nails', 'Lashes', 'Makeup', 'Beauty', 'Tattoo / Piercing', 'Fitness / Personal Training', 'Healthcare / Medical', 'Photography / Videography', 'DJ / Events', 'Restaurant', 'Sports Team / Venue', 'Auto Services', 'Cleaning', 'Home Services', 'Real Estate', 'Rentals', 'Other'];
+const BIZ_CATEGORIES = ['Barber', 'Hair Salon / Hairstylist', 'Nails', 'Lashes', 'Makeup', 'Beauty', 'Tattoo / Piercing', 'Fitness / Personal Training', 'Healthcare / Medical', 'Photography / Videography', 'DJ / Events', 'Restaurant', 'Hotel / Stay / Resort', 'Tours & Activities', 'Sports Team / Venue', 'Ticket Seller / Events', 'Auto Services', 'Cleaning', 'Home Services', 'Real Estate', 'Rentals', 'Other'];
 const HEALTHCARE_CATEGORY = 'Healthcare / Medical';
 const BIZ_SERVICES_BY_CATEGORY = {
     'Barber': ['Haircut', 'Skin Fade', 'Beard Trim', 'Lineup', 'Kids Cut', 'Haircut + Beard', 'Other'],
@@ -3576,12 +3576,12 @@ const BIZ_SERVICES_BY_CATEGORY = {
 const BUSINESS_TYPE_DEFS = {
     appointment: {
         id: 'appointment', label: 'Service Business',
-        capabilities: { appointments: true, services: true, staff: true, tips: true, menu: false, tables: false, reservations: false, tickets: false, events: false, ticketScanner: false, insurance: false, providers: false },
+        capabilities: { appointments: true, services: true, staff: true, tips: true, menu: false, tables: false, reservations: false, tickets: false, events: false, ticketScanner: false, insurance: false, providers: false, stays: false },
         terminology: { services: 'Services', service: 'Service', staff: 'Staff', staffSingular: 'Staff Member', appointments: 'Appointments', appointment: 'Appointment', calendar: 'Calendar' },
     },
     restaurant: {
         id: 'restaurant', label: 'Restaurant',
-        capabilities: { appointments: false, services: false, staff: true, tips: true, menu: true, tables: true, reservations: true, tickets: false, events: false, ticketScanner: false, insurance: false, providers: false },
+        capabilities: { appointments: false, services: false, staff: true, tips: true, menu: true, tables: true, reservations: true, tickets: false, events: false, ticketScanner: false, insurance: false, providers: false, stays: false },
         terminology: { services: 'Menu', service: 'Menu Item', staff: 'Staff', staffSingular: 'Staff Member', appointments: 'Reservations', appointment: 'Reservation', calendar: 'Reservations Calendar' },
     },
     doctor: {
@@ -3591,8 +3591,17 @@ const BUSINESS_TYPE_DEFS = {
     },
     venue: {
         id: 'venue', label: 'Venue / Sports Team',
-        capabilities: { appointments: false, services: false, staff: false, tips: false, menu: false, tables: false, reservations: false, tickets: true, events: true, ticketScanner: true, insurance: false, providers: false },
+        capabilities: { appointments: false, services: false, staff: false, tips: false, menu: false, tables: false, reservations: false, tickets: true, events: true, ticketScanner: true, insurance: false, providers: false, stays: false },
         terminology: { services: 'Events', service: 'Event', staff: 'Staff', staffSingular: 'Staff Member', appointments: 'Events', appointment: 'Event', calendar: 'Events Calendar' },
+    },
+    stay: {
+        id: 'stay', label: 'Hotel / Stay',
+        // Date-range reservations, not time-slot appointments — `stays: true` gates the
+        // dashboard's Reservations hero card / quick actions instead of the appointment
+        // timeline. `services: true` reuses the existing Services & Pricing CRUD editor,
+        // relabeled via terminology below, as the property's Rooms & Rates catalog.
+        capabilities: { appointments: false, services: true, staff: false, tips: false, menu: false, tables: false, reservations: true, tickets: false, events: false, ticketScanner: false, insurance: false, providers: false, stays: true },
+        terminology: { services: 'Rooms & Rates', service: 'Room Type', staff: 'Staff', staffSingular: 'Staff Member', appointments: 'Reservations', appointment: 'Reservation', calendar: 'Reservations Calendar' },
     },
 };
 // Keyed by the exact BIZ_CATEGORIES string. `typeId` picks the underlying shape (defaults to
@@ -3609,7 +3618,10 @@ const BUSINESS_CATEGORY_OVERRIDES = {
     'DJ / Events': { terminology: { staff: 'Talent', staffSingular: 'Performer' } },
     'Healthcare / Medical': { typeId: 'doctor' },
     'Restaurant': { typeId: 'restaurant' },
+    'Hotel / Stay / Resort': { typeId: 'stay' },
+    'Tours & Activities': { terminology: { services: 'Experiences', service: 'Experience', staff: 'Guides', staffSingular: 'Guide' } },
     'Sports Team / Venue': { typeId: 'venue' },
+    'Ticket Seller / Events': { typeId: 'venue' },
 };
 function getBusinessTypeId(category) {
     const o = BUSINESS_CATEGORY_OVERRIDES[category];
@@ -9798,7 +9810,7 @@ function App() {
             { label: 'Hours', done: Object.values(providerWeeklyHours || {}).some((h) => h) },
         ];
         if (caps.services)
-            items.push({ label: 'Services', done: providerServices.length > 0 });
+            items.push({ label: getMyBusinessTerminology().services, done: providerServices.length > 0 });
         if (caps.menu) {
             const r = getMyRestaurant();
             items.push({ label: 'Menu', done: !!(r && r.menu && r.menu.categories && r.menu.categories.some((c) => (c.items || []).length > 0)) });
@@ -12920,7 +12932,11 @@ function App() {
                             React.createElement("span", { style: { fontSize: 12, color: T.navigationActive, fontWeight: 600, whiteSpace: 'nowrap' } }, "Create"));
                     }
                     const active = activeSection === t.id;
-                    const onNavClick = t.id === 'business' ? () => { setCustomerProfileOpen(false); setBusinessProfileTarget(null); setProviderDashboardOpen(true); } : t.id === 'profile' ? () => { setCustomerProfileOpen(false); openMyBusinessProfile(); } : t.id === 'budget' ? openCustomerProfile : () => { setCustomerProfileOpen(false); setProviderDashboardOpen(false); setBusinessProfileTarget(null); setEditBusinessProfileOpen(false); setEditProfileDraft(null); setEditProfileDiscardConfirm(false); setTab(t.id); setActiveCat(null); };
+                    // Business and Profile both land inside the ONE business control center rather
+                    // than Profile being a disconnected public-preview screen — Business opens it
+                    // on the dashboard overview, Profile opens it straight into editing your info.
+                    // Closing the editor reveals the same dashboard underneath either way.
+                    const onNavClick = t.id === 'business' ? () => { setCustomerProfileOpen(false); setBusinessProfileTarget(null); setProviderDashboardOpen(true); } : t.id === 'profile' ? () => { setCustomerProfileOpen(false); setBusinessProfileTarget(null); setProviderDashboardOpen(true); setProviderDashboardTab('overview'); openEditBusinessProfile(); } : t.id === 'budget' ? openCustomerProfile : () => { setCustomerProfileOpen(false); setProviderDashboardOpen(false); setBusinessProfileTarget(null); setEditBusinessProfileOpen(false); setEditProfileDraft(null); setEditProfileDiscardConfirm(false); setTab(t.id); setActiveCat(null); };
                     return React.createElement("button", { key: t.id, onClick: onNavClick, style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, flexShrink: 0 } },
                         React.createElement(Icon, { name: t.icon, size: 24, color: active ? T.navigationActive : T.navigationInactive, fill: active && (t.icon === 'house' || t.icon === 'message') ? T.navigationActive : 'none' }),
                         React.createElement("span", { style: { fontSize: 12, color: active ? T.navigationActive : T.navigationInactive, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap' } }, t.label));
@@ -15359,6 +15375,17 @@ function App() {
                         React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, margin: '8px 0 2px' } }, "Manage today's reservations"),
                         React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, margin: 0 } }, todaysCovers > 0 ? `${todaysCovers} tables set up` : "Set up your tables, menu and hours"));
                 }
+                // Hotel / stay businesses book by date range, not time slot — point at
+                // Reservations (Bookings tab) instead of faking an hourly timeline.
+                else if (myCaps.stays) {
+                    const todaysStays = businessBookings.filter((b) => b.dateGroup === 'today' && b.status !== 'cancelled').length;
+                    scheduleCard = React.createElement("button", { onClick: () => setProviderDashboardTab('bookings'), style: { display: 'block', width: '100%', textAlign: 'left', marginTop: 16, border: `1px solid ${PD.border}`, borderRadius: 20, padding: 16 } },
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+                            React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Reservations"),
+                            React.createElement(Icon, { name: "chevronright", size: 14, color: PD.sub })),
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, margin: '8px 0 2px' } }, "Manage today's check-ins & check-outs"),
+                        React.createElement("p", { style: { fontSize: 12.5, color: PD.sub, margin: 0 } }, todaysStays > 0 ? `${todaysStays} reservation${todaysStays === 1 ? '' : 's'} today` : "No reservations today"));
+                }
                 else if (myCaps.tickets) {
                     scheduleCard = React.createElement("div", { style: { marginTop: 16, border: `1px solid ${PD.border}`, borderRadius: 20, padding: 16 } },
                         React.createElement("p", { style: { fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: PD.sub, margin: 0, textTransform: 'uppercase' } }, "Events & Tickets"),
@@ -15378,7 +15405,7 @@ function App() {
                 const newCustomersThisWeek = allCustomerNames.filter((name) => { const since = customerSince(businessBookings, name); return since && since.getTime() >= weekAgo; }).length;
                 const statsRow = React.createElement("div", { style: { display: 'flex', gap: 8, marginTop: 16 } },
                     [
-                        { value: todaysBookingsList.length, label: myCaps.appointments ? 'Bookings Today' : 'Activity Today', onClick: () => setProviderDashboardTab('bookings') },
+                        { value: todaysBookingsList.length, label: myCaps.appointments ? 'Bookings Today' : myCaps.stays ? 'Reservations Today' : 'Activity Today', onClick: () => setProviderDashboardTab('bookings') },
                         { value: money(todaysEarnings), label: 'Earnings Today', onClick: () => { setDashboardChartSelectedDay(null); setEarningsInsightsOpen(true); } },
                         { value: openSlotsToday, label: 'Open Slots Today', onClick: () => { setProviderCalendarMode('day'); setProviderCalendarAnchorDate(new Date()); setProviderDashboardTab('calendar'); }, hidden: !myCaps.appointments },
                         { value: newCustomersThisWeek, label: 'New Customers', onClick: () => { setDashboardChartSelectedDay(null); setEarningsInsightsOpen(true); } },
@@ -15409,7 +15436,7 @@ function App() {
                 else {
                     const addBookingAction = () => { const n = new Date(); openAddBookingFromSlot(Math.ceil((n.getHours() * 60 + n.getMinutes()) / 30) * 30); };
                     QUICK_ACTIONS = [
-                        { id: 'addBooking', label: myCaps.appointments ? `Add ${myTerms.appointment}` : 'Add Booking', onClick: addBookingAction },
+                        { id: 'addBooking', label: (myCaps.appointments || myCaps.stays) ? `Add ${myTerms.appointment}` : 'Add Booking', onClick: addBookingAction },
                         { id: 'blockTime', label: 'Block Time', onClick: () => { setUnavailableDraft({ id: null, date: dateKey(new Date()), start: '09:00', end: '10:00', repeat: 'none', reason: '' }); setProviderDashboardTab('hours'); setScheduleView('addUnavailable'); } },
                         isHealthcareBiz
                             ? { id: 'providers', label: myTerms.staff, onClick: () => setProviderDashboardTab('team') }
@@ -15446,7 +15473,7 @@ function App() {
                     myCaps.staff && manageRow('users', myTerms.staff, `Manage your team`, () => setProviderDashboardTab('team')),
                     manageRow('clock', 'Hours & Availability', 'Business hours, breaks, holidays', () => { setProviderDashboardTab('hours'); setScheduleView('menu'); }),
                     manageRow('wallet', 'Payments & Payouts', 'Payout methods, settings', () => setPayoutSettingsOpen(true)),
-                    (myCaps.appointments || businessType === 'restaurant') && manageRow('clipboard', 'Booking Settings', 'Policies, deposits, limits', businessType === 'restaurant' ? () => { openRestaurantDashboard(); setRestaurantDashTab('settings'); } : () => setBookingSettingsOpen(true)),
+                    (myCaps.appointments || myCaps.stays || businessType === 'restaurant') && manageRow('clipboard', 'Booking Settings', 'Policies, deposits, limits', businessType === 'restaurant' ? () => { openRestaurantDashboard(); setRestaurantDashTab('settings'); } : () => setBookingSettingsOpen(true)),
                     manageRow('tag', 'Promotions', 'Deals, discounts, offers', () => setPromoDraftOpen(true)),
                     myCaps.tickets && manageRow('wallet', 'Ticketing Setup', businessTicketingMode === 'partner' ? 'Connect Existing Ticket System' : 'Using Bookvado Tickets', () => setTicketingSetupOpen(true)),
                     myCaps.ticketScanner && manageRow('camera', 'Ticket Scanner', 'Scan and validate Bookvado tickets', () => setTicketScannerOpen(true)),
