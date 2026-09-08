@@ -6235,6 +6235,11 @@ function App() {
     useEffect(() => { saveLS('avio_has_business_profile', hasBusinessProfile); }, [hasBusinessProfile]);
     const [modeSwitcherOpen, setModeSwitcherOpen] = useState(false);
     const [providerServices, setProviderServices] = useState(() => loadLSArray('avio_provider_services', DEFAULT_MY_SERVICES));
+    // Stay businesses manage a Rooms & Rates catalog instead of generic services — a distinct
+    // shape (bed type, sqft, view, refundable, per-night rate) feeding the SAME Stay detail
+    // renderer the 8 seeded demo properties use, so an owner's real rooms show up exactly like
+    // any other stay's roomTypes the moment they preview their own business page.
+    const [providerRooms, setProviderRooms] = useState(() => loadLSArray('avio_provider_rooms', []));
     const [providerWeeklyHours, setProviderWeeklyHours] = useState(() => loadLS('avio_provider_weekly_hours', DEFAULT_WEEKLY_HOURS));
     const [providerDateOverrides, setProviderDateOverrides] = useState(() => loadLS('avio_provider_date_overrides', {}));
     const [providerBreaks, setProviderBreaks] = useState(() => loadLSArray('avio_provider_breaks', [
@@ -6280,6 +6285,7 @@ function App() {
     useEffect(() => { if (!providerDashboardOpen) { setEarningsInsightsOpen(false); setEarningsTab('overview'); setEarningsChartSelectedIdx(null); setEarningsSelectedDay(null); setSelectedServiceDetail(null); setSelectedCustomerDetail(null); setEarningsSelectedTime(null); setAllServicesOpen(false); setAllCustomersOpen(false); setPromotionDrillDownOpen(false); setRetentionListOpen(false); setInsightsMoreOpen(false); } }, [providerDashboardOpen]);
     useEffect(() => { if (providerDashboardOpen) setBusinessDashboardCrashed(false); }, [providerDashboardOpen]);
     const [serviceFormDraft, setServiceFormDraft] = useState(null);
+    const [roomFormDraft, setRoomFormDraft] = useState(null);
     const [hoursOverrideDraft, setHoursOverrideDraft] = useState(null);
     const [providerStaff, setProviderStaff] = useState(() => loadLSArray('avio_provider_staff', DEFAULT_STAFF));
     const [staffFormDraft, setStaffFormDraft] = useState(null);
@@ -6726,6 +6732,7 @@ function App() {
     const [promoDraftOpen, setPromoDraftOpen] = useState(false);
     useEffect(() => { saveLS('avio_provider_deal', providerDeal); }, [providerDeal]);
     useEffect(() => { saveLS('avio_provider_services', providerServices); }, [providerServices]);
+    useEffect(() => { saveLS('avio_provider_rooms', providerRooms); }, [providerRooms]);
     useEffect(() => { saveLS('avio_provider_weekly_hours', providerWeeklyHours); }, [providerWeeklyHours]);
     useEffect(() => { saveLS('avio_provider_date_overrides', providerDateOverrides); }, [providerDateOverrides]);
     const [filterDistance, setFilterDistance] = useState('Any distance');
@@ -8956,6 +8963,22 @@ function App() {
     function deleteService(id) {
         setProviderServices((prev) => prev.filter((s) => s.id !== id));
     }
+    function addOrUpdateRoom(draft) {
+        const fields = {
+            name: draft.name, bedType: draft.bedType, sqft: draft.sqft ? Number(draft.sqft) : undefined,
+            maxGuests: Number(draft.maxGuests), price: Number(draft.price), view: draft.view,
+            refundable: draft.refundable, taxesNote: draft.taxesNote,
+        };
+        setProviderRooms((prev) => {
+            if (draft.id)
+                return prev.map((r) => r.id === draft.id ? { ...r, ...fields } : r);
+            return [...prev, { id: 'room' + Date.now(), amenities: [], ...fields }];
+        });
+        setRoomFormDraft(null);
+    }
+    function deleteRoom(id) {
+        setProviderRooms((prev) => prev.filter((r) => r.id !== id));
+    }
     function setWeeklyDay(dayIdx, hoursOrNull, silent) {
         setProviderWeeklyHours((prev) => ({ ...prev, [dayIdx]: hoursOrNull }));
         if (!silent)
@@ -9810,7 +9833,7 @@ function App() {
             { label: 'Hours', done: Object.values(providerWeeklyHours || {}).some((h) => h) },
         ];
         if (caps.services)
-            items.push({ label: getMyBusinessTerminology().services, done: providerServices.length > 0 });
+            items.push({ label: getMyBusinessTerminology().services, done: caps.stays ? providerRooms.length > 0 : providerServices.length > 0 });
         if (caps.menu) {
             const r = getMyRestaurant();
             items.push({ label: 'Menu', done: !!(r && r.menu && r.menu.categories && r.menu.categories.some((c) => (c.items || []).length > 0)) });
@@ -10348,6 +10371,11 @@ function App() {
     }
     function openMyBusinessProfile() {
         setProviderDashboardOpen(false);
+        // A stay business's own preview renders through the exact same Stay-profile branch
+        // (gallery/rooms/amenities/policies, all keyed off `businessType`/`roomTypes`/etc. on
+        // the item) that every seeded Stays property uses — so it reflects real, owner-edited
+        // rooms the moment they're saved, not a separate mocked-up preview.
+        const isStay = getMyBusinessTypeId() === 'stay';
         openBusinessProfile({
             id: MY_PROVIDER_ID,
             name: bizOnboarding.businessName.trim() || 'My Business',
@@ -10360,6 +10388,7 @@ function App() {
             likes: '850',
             verified: businessVerified,
             mine: true,
+            ...(isStay ? { businessType: 'stay', address: bizOnboarding.address || '', gallery: bizOnboarding.gallery || [], roomTypes: providerRooms } : {}),
         });
     }
     function openEditBusinessProfile() {
@@ -15440,7 +15469,7 @@ function App() {
                         { id: 'blockTime', label: 'Block Time', onClick: () => { setUnavailableDraft({ id: null, date: dateKey(new Date()), start: '09:00', end: '10:00', repeat: 'none', reason: '' }); setProviderDashboardTab('hours'); setScheduleView('addUnavailable'); } },
                         isHealthcareBiz
                             ? { id: 'providers', label: myTerms.staff, onClick: () => setProviderDashboardTab('team') }
-                            : { id: 'addService', label: `Add ${myTerms.service}`, onClick: () => { setProviderDashboardTab('services'); setServiceFormDraft({ id: null, name: '', bookingType: 'APPOINTMENT', durationMinutes: '', price: '', dailyRate: '', hourlyRate: '', basePrice: '' }); } },
+                            : { id: 'addService', label: `Add ${myTerms.service}`, onClick: () => { setProviderDashboardTab('services'); myCaps.stays ? setRoomFormDraft({ id: null, name: '', bedType: '', sqft: '', maxGuests: '2', price: '', view: '', refundable: true, taxesNote: '' }) : setServiceFormDraft({ id: null, name: '', bookingType: 'APPOINTMENT', durationMinutes: '', price: '', dailyRate: '', hourlyRate: '', basePrice: '' }); } },
                         isHealthcareBiz
                             ? { id: 'insurance', label: 'Insurance', onClick: openInsuranceSetup }
                             : { id: 'promote', label: 'Add Promotion', onClick: () => setPromoDraftOpen(true) },
@@ -15551,6 +15580,20 @@ function App() {
                     React.createElement(Icon, { name: "upload", size: 15, color: PD.text }), "Export Past Bookings");
                 body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `16px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
                     subTabsRow, listContent, exportBtn);
+            }
+            else if (providerDashboardTab === 'services' && myCaps.stays) {
+                body = React.createElement("div", { className: "avio-scroll", style: { flex: 1, overflowY: 'auto', padding: `16px 18px calc(env(safe-area-inset-bottom) + 100px)` } },
+                    React.createElement("button", { onClick: () => setRoomFormDraft({ id: null, name: '', bedType: '', sqft: '', maxGuests: '2', price: '', view: '', refundable: true, taxesNote: '' }), style: { width: '100%', padding: '12px 0', borderRadius: 14, border: `1.5px dashed ${T.textPrimary}`, color: T.textPrimary, fontWeight: 700, fontSize: 13.5, marginBottom: 16 } }, `+ Add ${myTerms.service}`),
+                    providerRooms.length === 0
+                        ? React.createElement("p", { style: { fontSize: 13, color: PD.sub, textAlign: 'center', marginTop: 24 } }, `No ${myTerms.services.toLowerCase()} yet — add your first one above. It'll show up on your Stay page instantly.`)
+                        : React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } }, providerRooms.map((r) => React.createElement("div", { key: r.id, style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 16, border: `1px solid ${PD.border}` } },
+                            React.createElement("div", { style: { minWidth: 0 } },
+                                React.createElement("p", { style: { fontSize: 13.5, fontWeight: 700, color: PD.text, margin: 0 } }, r.name),
+                                React.createElement("p", { style: { fontSize: 11.5, color: PD.sub, marginTop: 3 } }, [r.bedType, r.sqft && `${r.sqft} sq ft`, `Sleeps ${r.maxGuests}`].filter(Boolean).join(' · ')),
+                                React.createElement("p", { style: { fontSize: 12.5, fontWeight: 700, color: PD.text, marginTop: 4 } }, `${money(r.price)} / night`)),
+                            React.createElement("div", { style: { display: 'flex', gap: 8, flexShrink: 0 } },
+                                React.createElement("button", { onClick: () => setRoomFormDraft({ id: r.id, name: r.name, bedType: r.bedType || '', sqft: r.sqft || '', maxGuests: String(r.maxGuests), price: r.price, view: r.view || '', refundable: r.refundable !== false, taxesNote: r.taxesNote || '' }), style: { width: 32, height: 32, borderRadius: 16, border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "clipboard", size: 14, color: PD.text })),
+                                React.createElement("button", { onClick: () => deleteRoom(r.id), style: { width: 32, height: 32, borderRadius: 16, border: `1px solid ${PD.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' } }, React.createElement(Icon, { name: "x", size: 14, color: '#D0304A' })))))));
             }
             else if (providerDashboardTab === 'services') {
                 const serviceRowSubtitle = (s) => {
@@ -17137,6 +17180,42 @@ function App() {
                             }),
                             style: { width: '100%', height: 50, borderRadius: 25, background: ready ? T.textPrimary : '#EDEDED', color: ready ? T.background : '#B5B5B8', fontWeight: 700, fontSize: 14.5 },
                         }, "Save Service")));
+        })(),
+        providerDashboardOpen && roomFormDraft && (() => {
+            const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
+            const inputStyle3 = { width: '100%', border: `1px solid ${PD.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 13.5, color: PD.text, outline: 'none', background: T.inputBackground, fontFamily: 'inherit' };
+            const draft = roomFormDraft;
+            const ready = draft.name.trim() && Number(draft.maxGuests) > 0 && Number(draft.price) > 0;
+            return React.createElement("div", { onClick: () => setRoomFormDraft(null), style: { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 11 } },
+                    React.createElement("div", { onClick: (e) => e.stopPropagation(), style: { width: '100%', maxHeight: '85%', overflowY: 'auto', background: T.modalBackground, borderRadius: '20px 20px 0 0', padding: `18px 18px calc(env(safe-area-inset-bottom) + 18px)` } },
+                        React.createElement("p", { style: { fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 16, color: PD.text, marginBottom: 16 } }, draft.id ? 'Edit Room Type' : 'Add Room Type'),
+                        React.createElement("div", { style: { marginBottom: 14 } },
+                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Room Name"),
+                            React.createElement("input", { value: draft.name, onChange: (e) => setRoomFormDraft({ ...draft, name: e.target.value }), placeholder: "e.g. Ocean View King", style: inputStyle3 })),
+                        React.createElement("div", { style: { display: 'flex', gap: 10, marginBottom: 14 } },
+                            React.createElement("div", { style: { flex: 1 } },
+                                React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Bed Type"),
+                                React.createElement("input", { value: draft.bedType, onChange: (e) => setRoomFormDraft({ ...draft, bedType: e.target.value }), placeholder: "e.g. 1 King Bed", style: inputStyle3 })),
+                            React.createElement("div", { style: { flex: 1 } },
+                                React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Sleeps"),
+                                React.createElement("input", { type: "number", inputMode: "numeric", min: "1", value: draft.maxGuests, onChange: (e) => setRoomFormDraft({ ...draft, maxGuests: e.target.value }), placeholder: "e.g. 2", style: inputStyle3 }))),
+                        React.createElement("div", { style: { display: 'flex', gap: 10, marginBottom: 14 } },
+                            React.createElement("div", { style: { flex: 1 } },
+                                React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Rate per Night ($)"),
+                                React.createElement("input", { type: "number", inputMode: "decimal", min: "0", value: draft.price, onChange: (e) => setRoomFormDraft({ ...draft, price: e.target.value }), placeholder: "e.g. 220", style: inputStyle3 })),
+                            React.createElement("div", { style: { flex: 1 } },
+                                React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Size (sq ft)"),
+                                React.createElement("input", { type: "number", inputMode: "numeric", min: "0", value: draft.sqft, onChange: (e) => setRoomFormDraft({ ...draft, sqft: e.target.value }), placeholder: "Optional", style: inputStyle3 }))),
+                        React.createElement("div", { style: { marginBottom: 14 } },
+                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "View"),
+                            React.createElement("input", { value: draft.view, onChange: (e) => setRoomFormDraft({ ...draft, view: e.target.value }), placeholder: "e.g. Ocean View", style: inputStyle3 })),
+                        React.createElement("div", { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 } },
+                            React.createElement("span", { style: { fontSize: 13, fontWeight: 600, color: PD.text } }, "Refundable"),
+                            React.createElement(ToggleSwitch, { on: draft.refundable, onChange: () => setRoomFormDraft({ ...draft, refundable: !draft.refundable }) })),
+                        React.createElement("div", { style: { marginBottom: 20 } },
+                            React.createElement("p", { style: { fontSize: 11.5, fontWeight: 600, color: PD.sub, marginBottom: 6 } }, "Taxes & Fees Note"),
+                            React.createElement("input", { value: draft.taxesNote, onChange: (e) => setRoomFormDraft({ ...draft, taxesNote: e.target.value }), placeholder: "e.g. Taxes and fees included", style: inputStyle3 })),
+                        React.createElement("button", { disabled: !ready, onClick: () => addOrUpdateRoom(draft), style: { width: '100%', height: 50, borderRadius: 25, background: ready ? T.textPrimary : '#EDEDED', color: ready ? T.background : '#B5B5B8', fontWeight: 700, fontSize: 14.5 } }, "Save Room Type")));
         })(),
         providerDashboardOpen && hoursOverrideDraft && (() => {
             const PD = { text: T.textPrimary, sub: T.textSecondary, border: T.border };
