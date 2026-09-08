@@ -13226,15 +13226,22 @@ function App() {
                     ? React.createElement("button", { onClick: openEditBusinessProfile, style: { flex: 1, padding: '13px 0', borderRadius: 24, background: T.textPrimary, border: 'none', color: T.background, fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 } },
                         "Edit", React.createElement(Icon, { name: "pencil", size: 13, color: T.background }))
                     : React.createElement("button", { onClick: () => toggleFollow(item.id), style: { flex: 1, padding: '13px 0', borderRadius: 24, background: followed ? 'transparent' : T.textPrimary, border: followed ? '1px solid #E0E0E0' : 'none', color: followed ? T.textPrimary : T.background, fontWeight: 700, fontSize: 14 } }, followed ? "Following" : "Follow"),
-                !isOwnProfile && React.createElement("button", { onClick: () => openBusinessConversation(item), style: { width: 46, height: 46, borderRadius: 14, border: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
-                    React.createElement(Icon, { name: "messageoutline", size: 18, color: "#161616" })),
-                !isOwnProfile && item.businessType === 'stay' && React.createElement("button", { onClick: () => addStayToTrip(item, null), style: { width: 46, height: 46, borderRadius: 14, border: '1px solid #E0E0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }, "aria-label": "Add to Trip" },
-                    React.createElement(Icon, { name: "compass", size: 18, color: "#161616" })));
+                // Fixed black/white regardless of theme — same as the Follow button's height and
+                // corner radius, but these two never rely on a theme token for contrast, so they
+                // can never wash out to near-invisible against a dark page the way the old
+                // light-gray-border/near-black-icon version did.
+                !isOwnProfile && React.createElement("button", { className: "avio-press", onClick: () => openBusinessConversation(item), "aria-label": "Message", style: { width: 46, height: 46, borderRadius: 14, background: '#000', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement(Icon, { name: "messageoutline", size: 19, color: "#fff" })),
+                !isOwnProfile && React.createElement("button", { className: "avio-press", onClick: () => openBusinessDirections(item), "aria-label": "Directions", style: { width: 46, height: 46, borderRadius: 14, background: '#000', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 } },
+                    React.createElement(Icon, { name: "send", size: 19, color: "#fff" })));
             const activeProfileDealLabel = (item.mine || item.id === MY_PROVIDER_ID) ? (providerDeal.enabled ? providerDeal.label : null) : (item.deal && item.deal.enabled ? item.deal.label : null);
             const profileDealBadge = activeProfileDealLabel && React.createElement("div", { style: { margin: '16px 18px 0', display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(128,128,128,0.12)', borderRadius: 18, padding: '6px 12px' } },
                 React.createElement("span", { style: { fontSize: 13 } }, "🎁"),
                 React.createElement("span", { style: { fontSize: 12, fontWeight: 700, color: T.textPrimary } }, activeProfileDealLabel));
-            const BIZ_TABS = [{ id: 'videos', label: 'Thrillz', icon: 'bolt' }, { id: 'services', label: 'Services', icon: 'wings' }, { id: 'reviews', label: 'All Comments', icon: 'message' }];
+            // Reviews tab uses a star, not a chat bubble — a chat-bubble icon sitting right below
+            // the real Message button read as a second, accidental message action even though it
+            // just switches to the comments tab; the tab itself is unchanged, only its glyph is.
+            const BIZ_TABS = [{ id: 'videos', label: 'Thrillz', icon: 'bolt' }, { id: 'services', label: 'Services', icon: 'wings' }, { id: 'reviews', label: 'All Comments', icon: 'star' }];
             const tabsRow = React.createElement("div", { style: { display: 'flex', justifyContent: 'space-around', marginTop: 22, borderBottom: `1px solid ${T.border}` } },
                 BIZ_TABS.map((t) => {
                     const active = bizProfileTab === t.id;
